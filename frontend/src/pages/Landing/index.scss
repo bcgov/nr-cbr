@@ -1,0 +1,141 @@
+@use '../../styles/variables' as vars;
+@use '@carbon/react/scss/breakpoint' as *;
+@use '@carbon/type';
+
+.logo {
+  margin-top: 1.2rem;
+}
+
+.landing-grid-container {
+  .landing-grid {
+    padding: 0;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    padding-inline: 0;
+
+    .landing-content-col {
+      margin: 0;
+      padding: 2rem;
+
+      @include breakpoint-down(md) {
+        padding: 1rem;
+      }
+
+      .landing-content-wrapper {
+        display: flex;
+        flex-direction: column;
+
+        .landing-title {
+          @include type.type-style('fluid-display-01', true);
+        }
+
+        .landing-subtitle {
+          // Declared before the include: type-style's fluid variant emits nested @media rules, and
+          // a declaration sitting after those is the `mixed-decls` deprecation — Sass currently
+          // hoists it above them but will stop doing so. Neither order changes the result here
+          // (type-style sets no colour), so this just states the intended one.
+          // `text-primary`, not a literal black: it resolves to #161616 on the light theme and to
+          // white under g100, so the line stays legible in both. A hardcoded #000 would be
+          // black-on-black in dark mode. Matches the FSPTS landing subtitle.
+          color: var(--#{vars.$bcgov-prefix}-text-primary);
+          @include type.type-style('fluid-paragraph-01', true);
+        }
+      }
+
+      .buttons-container {
+        display: flex;
+        justify-content: flex-start;
+        width: 100%;
+        margin-top: -2rem;
+
+        .login-btn {
+          width: 20rem;
+          max-width: 100%;
+          justify-content: space-between;
+        }
+      }
+
+      // Login buttons sit side-by-side on desktop and stack (full-width) only on mobile. `flex-wrap`
+      // is a safety net so a too-narrow desktop/tablet row wraps instead of clipping a button.
+      .single-row {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 1rem;
+
+        @include breakpoint-down(md) {
+          flex-direction: column;
+
+          .login-btn {
+            width: 100%;
+          }
+        }
+      }
+    }
+
+    .landing-img-col {
+      padding: 0;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      height: 100vh;
+      max-height: 100vh;
+
+      .landing-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        object-position: center;
+      }
+    }
+  }
+}
+
+/* "Request access" — a link and a one-line caveat under the login buttons, mirroring FSPTS. A button
+   rather than an anchor because it opens the instructions dialog rather than navigating. */
+.landing-request-access {
+  &__link {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--cds-link-primary);
+    cursor: pointer;
+    font: inherit;
+    text-decoration: underline;
+
+    &:hover {
+      color: var(--cds-link-primary-hover);
+    }
+  }
+
+  &__note {
+    margin: 0.5rem 0 0;
+    color: var(--cds-text-primary);
+    font-size: 0.875rem;
+  }
+}
+
+.landing-request-modal {
+  // Matches the dialog heading, which Carbon paints with --cds-text-primary.
+  color: var(--cds-text-primary);
+
+  ul {
+    margin: 0.25rem 0 1rem;
+    padding-inline-start: 1.5rem;
+    // Restore the disc bullets the global list reset strips off.
+    list-style: disc;
+  }
+
+  li {
+    margin-block: 0.25rem;
+  }
+
+  &__group-title {
+    margin-block: 1rem 0;
+    font-weight: 600;
+  }
+}

@@ -54,7 +54,7 @@ public class JwtPrincipalUtil {
    * "custom:idp_name" within the claims. If the provider's name starts with "ca.bc.gov.flnr.fam.",
    * it is replaced with "BCSC". The FAM provider name "BCEIDBUSINESS" is normalized to "BCEID" so
    * the userid prefix matches the legacy WebADE source-directory token ("BCEID\\username") that the
-   * legacy FREP schema (audit columns, evaluator/search display stripping) was built around.
+   * legacy CBR schema (ENTRY_USERID / UPDATE_USERID audit columns) was built around.
    * Otherwise, the provider's name is returned in uppercase. If the provider is not specified, an
    * empty string is returned.
    *

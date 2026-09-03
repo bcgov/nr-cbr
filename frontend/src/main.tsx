@@ -1,26 +1,52 @@
-import '@bcgov/bc-sans/css/BC_Sans.css'
-import { StrictMode } from 'react'
-import * as ReactDOM from 'react-dom/client'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Amplify } from 'aws-amplify';
+import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
+import { CookieStorage } from 'aws-amplify/utils';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 
-// Import bootstrap styles
-import '@/scss/styles.scss'
+import '@/styles/index.scss';
+import App from '@/App.tsx';
+import { AuthProvider } from '@/context/auth/AuthProvider';
+import { ConfirmProvider } from '@/context/confirm/ConfirmProvider';
+import NotificationProvider from '@/context/notification/NotificationProvider';
+import PageTitleProvider from '@/context/pageTitle/PageTitleProvider';
+import { PreferenceProvider } from '@/context/preference/PreferenceProvider.tsx';
+import ThemeProvider from '@/context/theme/ThemeProvider.tsx';
 
-// Import the generated route tree
-import { routeTree } from './routeTree.gen'
+import amplifyconfig from '@/config/fam/config';
+import { queryClientConfig } from '@/config/react-query/config';
+import { env } from '@/env';
 
-// Create a new router instance
-const router = createRouter({ routeTree })
+const queryClient = new QueryClient(queryClientConfig);
 
-// Register the router instance for type safety
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router
-  }
-}
+cognitoUserPoolsTokenProvider.setKeyValueStorage(
+  new CookieStorage({
+    domain: window.location.hostname,
+    path: env.VITE_BASE_PATH || '/',
+    secure: window.location.protocol === 'https:',
+    sameSite: 'strict',
+    expires: undefined,
+  }),
+);
+Amplify.configure(amplifyconfig);
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <PreferenceProvider>
+          <ThemeProvider>
+            <NotificationProvider>
+              <ConfirmProvider>
+                <PageTitleProvider>
+                  <App />
+                </PageTitleProvider>
+              </ConfirmProvider>
+            </NotificationProvider>
+          </ThemeProvider>
+        </PreferenceProvider>
+      </QueryClientProvider>
+    </AuthProvider>
   </StrictMode>,
-)
+);

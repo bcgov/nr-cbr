@@ -1,0 +1,635 @@
+@use "sass:map";
+
+@use "./variables" as variables;
+
+@use "@carbon/react/scss/themes";
+@use "@carbon/react/scss/theme" with (
+  $fallback: themes.$white,
+  $theme: themes.$white
+);
+
+@use "@carbon/react/scss/components/button/tokens" as button-tokens;
+@use "@carbon/react/scss/components/tag/tokens" as tag-tokens;
+@use "@carbon/react/scss/components/notification/tokens" as notification-tokens;
+
+@use "@carbon/react";
+@use "@carbon/styles/scss/grid";
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/breakpoint' as *;
+
+@include grid.flex-grid();
+
+:root[data-carbon-theme='white'] {
+  --cds-grid-gutter: 0;
+  @include theme.add-component-tokens(button-tokens.$button-tokens);
+  @include theme.add-component-tokens(tag-tokens.$tag-tokens);
+  @include theme.add-component-tokens(notification-tokens.$notification-tokens);
+  @include theme.theme(themes.$white);
+
+  /* CBR blue — overrides Carbon's blue family. Declared after theme() so these win. See
+     _variables.scss for the two roles and how the hover/active shades are derived. */
+  --cds-background-brand: #{variables.$cbr-blue-solid};
+  --cds-button-primary: #{variables.$cbr-blue-solid};
+  --cds-button-primary-hover: #{variables.$cbr-blue-solid-hover};
+  --cds-button-primary-active: #{variables.$cbr-blue-solid-active};
+  --cds-interactive: #{variables.$cbr-blue-solid};
+  --cds-border-interactive: #{variables.$cbr-blue-solid};
+  --cds-support-info: #{variables.$cbr-blue-solid};
+  --cds-focus: #{variables.$cbr-blue-solid};
+
+  --cds-link-primary: #{variables.$cbr-blue-text-light};
+  --cds-link-primary-hover: #{variables.$cbr-blue-text-light-hover};
+  --cds-link-secondary: #{variables.$cbr-blue-text-light-hover};
+  --cds-icon-interactive: #{variables.$cbr-blue-text-light};
+  /* A tertiary button is blue text and border until hover, when it fills. */
+  --cds-button-tertiary: #{variables.$cbr-blue-text-light};
+  --cds-button-tertiary-hover: #{variables.$cbr-blue-text-light-hover};
+  --cds-button-tertiary-active: #{variables.$cbr-blue-solid-active};
+}
+
+:root[data-carbon-theme='g100'] {
+  --cds-grid-gutter: 0;
+  @include theme.add-component-tokens(button-tokens.$button-tokens);
+  @include theme.add-component-tokens(tag-tokens.$tag-tokens);
+  @include theme.add-component-tokens(notification-tokens.$notification-tokens);
+  @include theme.theme(themes.$g100);
+
+  /* Solid stays the same blue in both themes; text lightens so it keeps its contrast against
+     #161616. `focus`, `icon-interactive` and `button-tertiary` are deliberately NOT overridden here
+     — Carbon makes them white on dark for contrast, and a blue focus ring on a dark page is the
+     accessibility regression this palette exists to avoid. */
+  --cds-background-brand: #{variables.$cbr-blue-solid};
+  --cds-button-primary: #{variables.$cbr-blue-solid};
+  --cds-button-primary-hover: #{variables.$cbr-blue-solid-hover};
+  --cds-button-primary-active: #{variables.$cbr-blue-solid-active};
+  --cds-interactive: #{variables.$cbr-blue-text-dark};
+  --cds-border-interactive: #{variables.$cbr-blue-text-dark};
+  --cds-support-info: #{variables.$cbr-blue-text-dark};
+
+  --cds-link-primary: #{variables.$cbr-blue-text-dark};
+  --cds-link-primary-hover: #{variables.$cbr-blue-text-dark-hover};
+  --cds-link-secondary: #{variables.$cbr-blue-text-dark-hover};
+}
+
+/* --------------------- Buttons ---------------------
+- Border-radius: 4px all corners
+---------------------------------------------------- */
+.#{variables.$bcgov-prefix}--btn {
+  border-radius: 0.25rem;
+}
+
+/* Carbon's default pins the icon absolutely to the right edge and reserves
+   extra right padding for it, which makes both text-only and text+icon
+   buttons look lopsided. Center the contents, take the icon out of absolute
+   positioning so it flows next to the text, and equalize padding. */
+.#{variables.$bcgov-prefix}--btn:not(.#{variables.$bcgov-prefix}--btn--icon-only) {
+  justify-content: center;
+  gap: 0.5rem;
+  padding-inline-end: 1rem;
+
+  .#{variables.$bcgov-prefix}--btn__icon {
+    position: static;
+    inset-inline-end: auto;
+    /* Icon leads the label, app-wide: Carbon renders it as the button's last child, which puts a
+       "+" after "Add feature" — the opposite of the pattern every other control here follows.
+       `order` rather than DOM changes, so it applies to every Carbon button at once. */
+    order: -1;
+    transform: translateY(1px);
+  }
+}
+
+/* The one icon that belongs after its label: an arrow pointing the way the button takes you reads
+   backwards on the left. Applies to the landing page's "Get started", not to the login buttons
+   beside it — those lead with their icon like everything else. */
+.#{variables.$bcgov-prefix}--btn[data-testid='landing-button__offline']
+  .#{variables.$bcgov-prefix}--btn__icon {
+  order: 0;
+}
+
+/* ------- Text Input / Text Area / Password Input -------
+- Border-radius: 4px top corners
+-------------------------------------------------------- */
+.#{variables.$bcgov-prefix}--text-input,
+.#{variables.$bcgov-prefix}--text-area {
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+
+/* ------------------ Number Input ----------------------
+- Border-radius: 4px top corners
+- Control Button: border-radius 4px all corners (this is mistach with Figma, but is documented)
+------------------------------------------------------- */
+.#{variables.$bcgov-prefix}--number,
+.#{variables.$bcgov-prefix}--number__input-wrapper,
+input[type="number"] {
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+
+.#{variables.$bcgov-prefix}--number__control-btn {
+  border-radius: 0.25rem;
+}
+
+/* ------------------ Select ---------------------------
+- Input field: border-radius 4px top corners
+------------------------------------------------------ */
+.#{variables.$bcgov-prefix}--select-input {
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+
+/* ------------------ Dropdown ---------------------------
+- Input field (list-box): border-radius 4px top corners
+- Dropdown menu: border-radius 4px all corners (this is mistach with Figma, but is documented)
+--------------------------------------------- */
+.#{variables.$bcgov-prefix}--list-box__field,
+.#{variables.$bcgov-prefix}--list-box {
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+.#{variables.$bcgov-prefix}--list-box__menu {
+  border-radius: 0.25rem;
+}
+
+/* ------------------ Date Picker ---------------------------
+- Input field: border-radius 4px top corners
+- Calender picker and control buttons: border-radius 4px all corners
+--------------------------------------------- */
+.#{variables.$bcgov-prefix}--date-picker__input {
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+
+.flatpickr-calendar,
+.flatpickr-prev-month,
+.flatpickr-next-month {
+  border-radius: 0.25rem;
+}
+
+// Single-mode DatePicker fills its container like a text input. Carbon hard-codes the input to a
+// fixed 18rem (`inline-size`), which overflows narrow grid/flex cells; stretch the whole wrapper
+// chain instead. The inner <span> is `display: inline` by default, so it must become a block for
+// the width to take and the calendar icon to stay pinned to the right edge.
+.#{variables.$bcgov-prefix}--date-picker--single,
+.#{variables.$bcgov-prefix}--date-picker--single .#{variables.$bcgov-prefix}--date-picker-container,
+.#{variables.$bcgov-prefix}--date-picker--single .#{variables.$bcgov-prefix}--date-picker-input__wrapper,
+.#{variables.$bcgov-prefix}--date-picker--single .#{variables.$bcgov-prefix}--date-picker__input {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.#{variables.$bcgov-prefix}--date-picker--single .#{variables.$bcgov-prefix}--date-picker-input__wrapper > span {
+  display: block;
+  inline-size: 100%;
+}
+
+// Shared opt-in fix: add `className="cbr-date-picker"` to any single-mode <DatePicker> to make it
+// fill its cell. The className lands on the outer `.cds--form-item`; compounding the two classes
+// gives enough specificity to beat Carbon's hard-coded 18rem input (the bare `.cds--date-picker--single`
+// rule above loses to Carbon on specificity). MasterListAdmin/Reports carry their own page version.
+.cbr-date-picker.#{variables.$bcgov-prefix}--form-item {
+  inline-size: 100%;
+
+  .#{variables.$bcgov-prefix}--date-picker,
+  .#{variables.$bcgov-prefix}--date-picker-container,
+  .#{variables.$bcgov-prefix}--date-picker-input__wrapper,
+  .#{variables.$bcgov-prefix}--date-picker__input {
+    inline-size: 100%;
+  }
+
+  .#{variables.$bcgov-prefix}--date-picker-input__wrapper > span {
+    display: block;
+    inline-size: 100%;
+  }
+}
+
+/* ------------------ Time Picker ---------------------------
+Removed. The three rules here were written as selector lists whose later members began with a bare
+`>` ("> .cds--text-input"), which is invalid CSS at the top level: one invalid member invalidates
+the whole list, so every browser discarded these rules entirely — they never styled anything. One
+of them also carried a bare `:last-child`, which would have applied a border radius to every
+last-child element on the page had the rule ever been valid.
+
+Deleting rather than repairing them because the app renders no TimePicker at all. Sass still
+compiled them with a bogus-combinators deprecation, which becomes a hard error in Dart Sass 2.0.0.
+----------------------------------------------------------------- */
+
+/* --------------- Search ------------------------------
+- Border-radius: 4px top corners
+--------------------------------------------- */
+.#{variables.$bcgov-prefix}--search-input {
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+
+/* --------------- Notification ------------------------------
+- Inline notifications match the "Generate Master List" banner: full-width, SQUARE corners (so the
+  coloured left accent reads as a full-height bar), a light (40%-opacity) border on the other three
+  sides, and the title + subtitle on a single line.
+- Toast notifications keep 4px rounded corners.
+--------------------------------------------- */
+.#{variables.$bcgov-prefix}--toast-notification {
+  border-radius: 0.25rem;
+}
+
+.#{variables.$bcgov-prefix}--inline-notification {
+  max-inline-size: 100%;
+  inline-size: 100%;
+  border-radius: 0;
+}
+
+// Keep the title and subtitle on one line (Carbon defaults the text wrapper to wrap, and a
+// multi-word title can break onto two lines when the subtitle squeezes it).
+.#{variables.$bcgov-prefix}--inline-notification__text-wrapper {
+  flex-wrap: nowrap;
+}
+
+.#{variables.$bcgov-prefix}--inline-notification__title {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+// Three-sided border drawn by the low-contrast pseudo-element: square it and lighten to 40% so it
+// reads like a subtle frame, with the full-height accent supplied by the border-left below.
+div.#{variables.$bcgov-prefix}--inline-notification--low-contrast::before {
+  border-radius: 0;
+  filter: opacity(0.4);
+}
+
+$types: "error", "info", "success", "warning";
+@each $notificationType in $types {
+  div.#{variables.$bcgov-prefix}--inline-notification--#{$notificationType} {
+    border-left: 0.25rem
+      solid
+      var(--#{variables.$bcgov-prefix}-support-#{$notificationType}-inverse);
+  }
+  div.#{variables.$bcgov-prefix}--inline-notification--low-contrast.#{variables.$bcgov-prefix}--inline-notification--#{$notificationType} {
+    border-left: 0.25rem
+      solid
+      var(--#{variables.$bcgov-prefix}-support-#{$notificationType});
+  }
+  div.#{variables.$bcgov-prefix}--inline-notification--low-contrast.#{variables.$bcgov-prefix}--inline-notification--#{$notificationType}::before {
+    border-color: var(--#{variables.$bcgov-prefix}-support-#{$notificationType});
+  }
+}
+
+.#{variables.$bcgov-prefix}--toast-notification--low-contrast {
+  border-width: 0.063rem 0.063rem 0.063rem 0;
+  border-style: solid;
+}
+@each $notificationType in $types {
+  div.#{variables.$bcgov-prefix}--toast-notification--#{$notificationType} {
+    border-left: 0.25rem
+      solid
+      var(--#{variables.$bcgov-prefix}-support-#{$notificationType}-inverse);
+  }
+  div.#{variables.$bcgov-prefix}--toast-notification--low-contrast.#{variables.$bcgov-prefix}--toast-notification--#{$notificationType} {
+    border-left: 0.25rem
+      solid
+      var(--#{variables.$bcgov-prefix}-support-#{$notificationType});
+    border-top-color: var(
+      --#{variables.$bcgov-prefix}-notification-border-#{$notificationType}
+    );
+    border-bottom-color: var(
+      --#{variables.$bcgov-prefix}-notification-border-#{$notificationType}
+    );
+    border-right-color: var(
+      --#{variables.$bcgov-prefix}-notification-border-#{$notificationType}
+    );
+  }
+}
+
+/* ----------------- Tile ----------------------------
+- Border-radius: 4px all corners
+----------------------------------------------------- */
+.#{variables.$bcgov-prefix}--tile {
+  border-radius: 0.25rem;
+}
+
+/* ------------------ Data Table ---------------------------
+- Header: border-radius 4px top corners
+- Table column header: font-weight bold
+- Table row expand button: border-radius 4px all corners
+------------------------------------------------------ */
+.#{variables.$bcgov-prefix}--data-table-header {
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+
+.#{variables.$bcgov-prefix}--table-header-label,
+.#{variables.$bcgov-prefix}--data-table thead th,
+.#{variables.$bcgov-prefix}--data-table thead .#{variables.$bcgov-prefix}--table-header {
+  font-weight: 700;
+}
+
+/* Required-field marker: a red asterisk appended to a label via the shared
+   requiredLabel() helper (src/utils/requiredLabel.tsx). */
+.required-asterisk {
+  color: var(--#{variables.$bcgov-prefix}-text-error);
+  font-size: 1.1rem;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* On a disabled field the marker fades with its label. A read-only checklist renders its inputs
+   disabled, and a full-strength red asterisk against a greyed-out label reads as an unmet
+   requirement on a form that cannot be filled in. */
+.#{variables.$bcgov-prefix}--label--disabled .required-asterisk {
+  color: inherit;
+}
+
+/* Zebra striping for every data table: white rows with a faint grey alternate,
+   matching the standard NRIDS results-table look. Applies to all Carbon
+   DataTables (no `useZebraStyles` prop needed). Carbon's White theme maps
+   `layer-02` to white and `layer-01` to #f4f4f4, so the rows read white +
+   subtle grey. Selected and expandable parent rows keep Carbon's own
+   backgrounds; hover is re-asserted so it still wins over the even-row stripe. */
+.#{variables.$bcgov-prefix}--data-table tbody {
+  background-color: var(--#{variables.$bcgov-prefix}-layer-02);
+}
+
+.#{variables.$bcgov-prefix}--data-table
+  tbody
+  tr:not(.#{variables.$bcgov-prefix}--parent-row):not(.#{variables.$bcgov-prefix}--data-table--selected):nth-child(even) {
+  background-color: var(--#{variables.$bcgov-prefix}-layer-01);
+}
+
+.#{variables.$bcgov-prefix}--data-table
+  tbody
+  tr:not(.#{variables.$bcgov-prefix}--parent-row):not(.#{variables.$bcgov-prefix}--data-table--selected):hover {
+  background-color: var(--#{variables.$bcgov-prefix}-layer-hover);
+}
+
+/* ----------------- Tabs (contained) -------------------
+   The contained tab panel keeps a gray surface (like a table's gray frame) so
+   it reads as one piece with the gray tab bar. Inputs that sit directly on the
+   gray panel bump to white (--cds-field-02) to stand out.
+------------------------------------------------------- */
+.#{variables.$bcgov-prefix}--tab-content {
+  --cds-field: var(--cds-field-02);
+  --cds-field-hover: var(--cds-field-hover-02);
+  --cds-border-subtle: var(--cds-border-subtle-02);
+  --cds-border-subtle-selected: var(--cds-border-subtle-selected-02);
+}
+
+/* ----------------- Content Tiles --------------------
+   Tiles are white "cards" everywhere (no gray boxes) — matching the Site
+   Details look — on edit pages, checklist summaries, and as cards on the gray
+   tab panel. Interactive tiles (dashboard ClickableTile, selectable/expandable)
+   keep their own styling.
+----------------------------------------------------- */
+.#{variables.$bcgov-prefix}--tile:not(.#{variables.$bcgov-prefix}--tile--clickable):not(.#{variables.$bcgov-prefix}--tile--selectable):not(.#{variables.$bcgov-prefix}--tile--expandable) {
+  background: var(--cds-background);
+}
+
+/* A white card sitting on the gray tab panel: its inputs revert to gray
+   (--cds-field-01) so they stand out against the white card surface. */
+.#{variables.$bcgov-prefix}--tab-content .#{variables.$bcgov-prefix}--tile {
+  --cds-field: var(--cds-field-01);
+  --cds-field-hover: var(--cds-field-hover-01);
+  --cds-border-subtle: var(--cds-border-subtle-01);
+  --cds-border-subtle-selected: var(--cds-border-subtle-selected-01);
+}
+
+/* ── Inverted nested tabs (Agreement Workspace) ────────
+   The inner sub-tabs sit on top of a gray panel and we want the inverse
+   contrast: white tab pills + white panel, gray widgets inside.
+------------------------------------------------------- */
+.agreement-workspace-tabs,
+.property-tabs {
+  // White tab pill (selected) + white panel surface
+  --cds-layer: var(--cds-layer-02);
+
+  .#{variables.$bcgov-prefix}--tab-content {
+    // Widgets inside the inner panel revert to layer-01 (gray)
+    --cds-field: var(--cds-field-01);
+    --cds-field-hover: var(--cds-field-hover-01);
+    --cds-border-subtle: var(--cds-border-subtle-01);
+    --cds-border-subtle-selected: var(--cds-border-subtle-selected-01);
+  }
+}
+
+.#{variables.$bcgov-prefix}--table-expand__button {
+  border-radius: 0.25rem;
+}
+
+/* -------------------- Pagination -------------------------
+- Border-radius: 4px bottom corners
+- Set height of small (2.5rem), medium (3rem) and large (3.5rem) size
+- Set border-radius of the previous and next button, item per page and page select to 4px all corners
+--------------------------------------------- */
+.#{variables.$bcgov-prefix}--pagination {
+  border-bottom-left-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
+}
+
+// Pagination size variants. Each rule scopes its inner selectors under the size
+// variant so heights only apply to pagination internals, not every
+// `.cds--popover-container` in the app (which Carbon uses as a tooltip wrapper
+// for icon buttons everywhere).
+.#{variables.$bcgov-prefix}--pagination--sm {
+  .#{variables.$bcgov-prefix}--pagination__control-buttons,
+  .#{variables.$bcgov-prefix}--popover-container {
+    height: 2.5rem;
+  }
+}
+
+.#{variables.$bcgov-prefix}--pagination--md {
+  .#{variables.$bcgov-prefix}--pagination__control-buttons,
+  .#{variables.$bcgov-prefix}--popover-container {
+    height: 3rem;
+  }
+}
+
+.#{variables.$bcgov-prefix}--pagination--lg {
+  .#{variables.$bcgov-prefix}--pagination__control-buttons,
+  .#{variables.$bcgov-prefix}--popover-container {
+    height: 3.5rem;
+  }
+}
+
+// Inline selects inside pagination (items-per-page and page-number) — drop the
+// 1px border and round the corners so they match the rest of the toolbar.
+// Scoped under `.cds--pagination` so we don't strip borders off every other
+// Select in the app.
+.#{variables.$bcgov-prefix}--pagination {
+  .#{variables.$bcgov-prefix}--select__item-count,
+  .#{variables.$bcgov-prefix}--select__page-number,
+  .#{variables.$bcgov-prefix}--select-input__wrapper,
+  select.#{variables.$bcgov-prefix}--select-input {
+    border-radius: 0.25rem;
+    border: 0;
+  }
+
+  .#{variables.$bcgov-prefix}--select__item-count,
+  .#{variables.$bcgov-prefix}--select__page-number,
+  .#{variables.$bcgov-prefix}--select-input__wrapper {
+    margin: 0.25rem;
+  }
+
+  .#{variables.$bcgov-prefix}--pagination__button {
+    margin: 0.25rem;
+    border: 0;
+  }
+}
+
+/* ------------------ Overflow Menu ---------------------------
+- Closed trigger button: border-radius 4px on all corners
+- Opened trigger button: border-radius 4px top corners
+- First menu item: border-radius 4px top corners
+- Last menu item: border-radius 4px bottom corners
+------------------------------------------------------------- */
+.#{variables.$bcgov-prefix}--overflow-menu.bcgov--overflow-menu--open {
+  border-radius: 0.25rem 0.25rem 0 0;
+}
+
+.#{variables.$bcgov-prefix}--overflow-menu-options {
+  border-radius: 0 0.25rem 0.25rem 0.25rem;
+}
+
+li.#{variables.$bcgov-prefix}--overflow-menu-options__option:first-child {
+  border-radius: 0 0.25rem 0 0;
+}
+
+li.#{variables.$bcgov-prefix}--overflow-menu-options__option:last-child {
+  border-radius: 0 0 0.25rem 0.25rem;
+}
+
+/* ------------------  Modal ---------------------------
+- Border-radius: 8px on all corners
+------------------------------------------------------ */
+.#{variables.$bcgov-prefix}--modal-container {
+  border-radius: 0.5rem;
+}
+
+/* ------------ Label ---------------
+- Update text color from text-secondary to text-primary
+This will apply to Checkbox, Data Picker, Dropdown, RadioButton, Select, Slider, Text Input, Password Input, Text Area label
+
+Disabled labels are excluded. `label.cds--label` is specificity (0,1,1), which outranks Carbon's
+`.cds--label--disabled` (0,1,0), so without the guard this rule repainted every disabled label full
+black — a disabled text input kept a black label beside its greyed-out value, while a disabled
+select greyed correctly (Carbon reaches those through a more specific selector). The `:not()` keeps
+this rule ahead of Carbon's base label colour while letting the disabled one through.
+------------------------------- */
+label.#{variables.$bcgov-prefix}--label:not(.#{variables.$bcgov-prefix}--label--disabled),
+legend.#{variables.$bcgov-prefix}--label:not(.#{variables.$bcgov-prefix}--label--disabled) {
+  color: var(--#{variables.$bcgov-prefix}-text-primary);
+}
+
+/* ------------------  Left Panel ---------------------------
+- List item height: 48px
+- Left icons use "link-primary" color
+- Add a right border for the panel
+------------------------------------------------------ */
+.#{variables.$bcgov-prefix}--side-nav__menu,
+  .#{variables.$bcgov-prefix}--side-nav__menu-item,
+  a.#{variables.$bcgov-prefix}--side-nav__link,
+button.#{variables.$bcgov-prefix}--side-nav__submenu,
+.#{variables.$bcgov-prefix}--side-nav__link {
+  height: 3rem;
+}
+
+// Note: this changed to link-primary, previous code is secondary
+.#{variables.$bcgov-prefix}--side-nav__icon {
+  svg {
+    fill: var(--#{variables.$bcgov-prefix}-link-primary) !important;
+  }
+}
+
+nav.#{variables.$bcgov-prefix}--side-nav--expanded {
+    border-right: 0.063rem solid var(--#{variables.$bcgov-prefix}-border-subtle-01);
+}
+
+/* ------------------ Header ---------------------------
+- Update the background color
+- Set the height
+- Adjust the side nav position for the new header height
+------------------------------------------------------ */
+.#{variables.$bcgov-prefix}--header {
+  background-color: var(--#{variables.$bcgov-prefix}-background-brand);
+  //height: 3.5rem; //TODO: height seems kinda arbitrary and doesn't reflect the rest of the menus
+}
+
+// this is new added for the side nav layout
+.#{variables.$bcgov-prefix}--header ~ .#{variables.$bcgov-prefix}--side-nav {
+  inset-block-start: 3.5rem;
+}
+
+a.#{variables.$bcgov-prefix}--header__name {
+  // previously was .#{variables.$bcgov-prefix}--header-site-name
+  font-family: "BCSans", "Noto Sans", Verdana, Arial, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #f3f3f5;
+  padding-left: 2rem;
+}
+
+
+/* ------------------ Other Overrides-------------------
+- Sets the grid gutter
+- Sets the content spacing
+------------------------------------------------------ */
+
+/// Remove overrides once Carbon bugs are fixed upstream.
+/// Need grid option to not add page gutters at large viewports, to also use when nesting grids
+/// @link https://github.com/carbon-design-system/carbon/issues/2792
+@media (min-width: 42rem) {
+  .#{variables.$bcgov-prefix}--grid--no-gutter {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/// Padding was introduced in 10.3.0, needs an option to let grid set the viewport gutter
+/// @link https://github.com/carbon-design-system/carbon/issues/3010
+html,
+body,
+.#{variables.$bcgov-prefix}--content,
+nav.#{variables.$bcgov-prefix}--side-nav,
+.#{variables.$bcgov-prefix}--side-nav__items {
+  background: var(--cds-background);
+}
+
+.#{variables.$bcgov-prefix}--content {
+  padding: 0;
+}
+
+.#{variables.$bcgov-prefix}--header ~ .#{variables.$bcgov-prefix}--content, div:has(.#{variables.$bcgov-prefix}--header) ~ .#{variables.$bcgov-prefix}--content {
+    margin-block-start: $layout-05;
+}
+
+.#{variables.$bcgov-prefix}--content .#{variables.$bcgov-prefix}--css-grid {
+  max-width: 100%;
+  @include breakpoint(md) {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+// Persistent side nav content offset is applied via .layout-content--side-nav-expanded
+// in components/Layout/index.scss.
+
+// If you don't have the Carbon mixin available:
+// Hide the "Close" tooltip label on modal close buttons
+// Hide the "Close" tooltip on modal close buttons
+.cds--modal-close-button .cds--popover {
+  display: none;
+}
+
+// Soften the focus ring on the modal close button
+.cds--modal-close:focus {
+  outline: 2px solid var(--cds-focus, #0f62fe);
+  outline-offset: -2px;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+// Suppress every IconButton's hover tooltip popover. The `label` prop is still
+// passed through (it stays as aria-labelledby content for assistive tech), but
+// the visible bubble is hidden. .cds--icon-tooltip is the wrapper class Carbon
+// applies to the Tooltip rendered around any IconButton; the popover popup
+// underneath it is what we hide.
+.cds--icon-tooltip > .cds--popover {
+  display: none;
+}
