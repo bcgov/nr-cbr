@@ -410,3 +410,13 @@ specs
 # Prisma 7 generated client
 backend/generated/
 .copilot-memory
+
+# Playwright
+/frontend/playwright-report/
+/frontend/test-results/
+/frontend/e2e/.auth/
+
+# Local env files (never commit real Oracle/Cognito/ConsignO credentials)
+.env.local
+backend/.env
+frontend/.env

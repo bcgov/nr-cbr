@@ -1,0 +1,175 @@
+# CBR backend configuration.
+#
+# Derived from nr-frep's application.yml — the load-bearing parts are carried over verbatim
+# (Oracle TCPS datasource, the NLS_NUMERIC_CHARACTERS pin, Cognito resource-server wiring, actuator
+# exposure, CORS). FREP-only blocks (open-maps, ClamAV, the one-time BLOB migration tooling) are not
+# carried; add them when the equivalent CBR features land.
+
+server:
+  servlet:
+    context-path: /
+  error:
+    include-message: always
+  # SERVER_PORT placeholder so application-local.yml and the OpenShift env var can override.
+  port: ${SERVER_PORT:3000}
+  shutdown: graceful
+  max-http-request-header-size: 16KB
+  undertow:
+    # Connector-level request-body backstop, above spring.servlet.multipart.max-request-size so the
+    # multipart layer is normally what rejects an oversized upload with a field-level message.
+    # Sized by heap, not by the connector: attachment bytes are held as a byte[] and the JVM runs
+    # -Xmx400m under -XX:+ExitOnOutOfMemoryError, so an oversized upload kills the pod.
+    max-http-post-size: ${MAX_HTTP_POST_SIZE:52428800}
+  # Honour X-Forwarded-* from the Caddy reverse proxy when reconstructing the request URL. Without
+  # this Spring sees the in-cluster Host and treats the browser Origin as cross-origin.
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: cbr-backend
+  servlet:
+    multipart:
+      # Inspection photos and as-built drawings. file-size-threshold stays at its 0 default so every
+      # part spools to a temp file under java.io.tmpdir rather than buffering in memory — which makes
+      # the /tmp emptyDir mount in openshift.deploy.yml load-bearing under readOnlyRootFilesystem.
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:15MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:17MB}
+  datasource:
+    url: "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=${DATABASE_HOST})(PORT=${DATABASE_PORT:1543}))(CONNECT_DATA=(SERVICE_NAME=${DATABASE_SERVICE_NAME})(SERVER=DEDICATED)))"
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      # Pin the decimal separator for every pooled connection.
+      #
+      # Carried over from nr-frep, where its absence caused ORA-06502 on every decimal value. The
+      # same exposure exists here: the CBR packages take numeric parameters that arrive through
+      # implicit VARCHAR2 -> NUMBER conversion, which runs under the session's
+      # NLS_NUMERIC_CHARACTERS — derived from the JVM default locale unless set. Where the decimal
+      # separator is not ".", whole numbers save and decimals fail. CBR has plenty of decimals
+      # (channel measurements, span lengths, slope, cover depths, lat/long, UTM).
+      #
+      # Value is decimal separator then group separator: "." and "," — the ANSI default.
+      connection-init-sql: "ALTER SESSION SET NLS_NUMERIC_CHARACTERS = '.,'"
+      data-source-properties:
+        javax.net.ssl.trustStoreType: JKS
+        javax.net.ssl.trustStore: ${TRUSTSTORE_PATH:/cert/jssecacerts}
+        javax.net.ssl.trustStorePassword: ${KEYSTORE_SECRET}
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AWS_COGNITO_ISSUER_URI}
+          jwk-set-uri: ${AWS_COGNITO_ISSUER_URI}/.well-known/jwks.json
+  mvc:
+    problemdetails:
+      enabled: true
+  jackson:
+    serialization:
+      FAIL_ON_EMPTY_BEANS: false
+
+management:
+  enable-native-support: true
+  endpoints:
+    web:
+      exposure:
+        # health + prometheus only — the probes and the Prometheus scrape. These two are the
+        # anonymous endpoints named individually in ApiAuthorizationCustomizer; keep the two lists
+        # in step.
+        include: "health,prometheus"
+  endpoint:
+    metrics:
+      enabled: false
+    health:
+      # The probes only check the status code, so component detail was published to no one.
+      show-details: never
+
+# Application metadata. Read through @Value, not the Actuator /info endpoint (not exposed).
+info:
+  app:
+    name: ${spring.application.name}
+    version: ${APP_VERSION:0.0.1-SNAPSHOT}
+    zone: ${APP_ZONE:local}
+
+cbr:
+  # The legacy PL/SQL packages this app calls. Business logic stays in the database — see
+  # docs/legacy-cbr-overview.md §7 and §16. Deployed from bcgov-c/nr-mof-db, not from this repo.
+  package-name: CBR
+  general-package-name: CBR_GENERAL
+  reporting-package-name: CBR_REPORTING
+  admin-package-name: CBR_ADMIN
+  regional-engineer-package-name: CBR_REGIONAL_ENGINEER
+  contract-engineer-package-name: CBR_CONTRACT_REGIONAL_ENGINEER
+  # S3-compatible object storage for inspection attachments. Replaces the CROSSING_STRUCTURE_FILE
+  # BLOBs; the legacy data is a separate migration.
+  object-storage:
+    host: ${OBJECT_STORAGE_HOST:}
+    bucket: ${OBJECT_STORAGE_BUCKET:}
+    access-key: ${OBJECT_STORAGE_ACCESS_KEY:}
+    secret-key: ${OBJECT_STORAGE_SECRET_KEY:}
+  # ConsignO e-signature — P.Eng sealing of reviewed inspection reports. No nr-frep precedent.
+  # Secrets come from the environment; the legacy app committed them to application.properties.
+  # See docs/legacy-cbr-overview.md §14.
+  consigno:
+    enabled: ${CONSIGNO_ENABLED:false}
+    base-url: ${CONSIGNO_BASE_URL:}
+    api-key: ${CONSIGNO_API_KEY:}
+    secret: ${CONSIGNO_SECRET:}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      breaker:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+  retry:
+    instances:
+      apiRetry:
+        max-attempts: 3
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
+
+ca:
+  bc:
+    gov:
+      nrs:
+        self-uri: http://localhost:3000
+        environment: ${APP_ZONE:local}
+        cognito:
+          userinfo-uri: ${COGNITO_USERINFO_URI}
+        frontend:
+          url: ${FRONTEND_URL:http://localhost:3000}
+
+# Logging — Spring Boot default stack (SLF4J + Logback). Per-category levels default to INFO;
+# override at runtime via env vars (relaxed binding maps UPPERCASE_WITH_UNDERSCORES -> dot.case):
+#   APP_LOG_LEVEL          -> ca.bc.gov.nrs.cbr
+#   HIKARI_LOG_LEVEL       -> com.zaxxer.hikari
+#   ORACLE_JDBC_LOG_LEVEL  -> oracle.jdbc
+#   LOGGING_LEVEL_ROOT     -> root logger
+logging:
+  level:
+    ca.bc.gov.nrs.cbr: ${APP_LOG_LEVEL:INFO}
+    com.zaxxer.hikari: ${HIKARI_LOG_LEVEL:INFO}
+    oracle.jdbc: ${ORACLE_JDBC_LOG_LEVEL:INFO}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${spring.application.name}] [%X{X-TRACE-ID:-},${PID:-}] [%t] %logger:%L - %m%n%wEx"
