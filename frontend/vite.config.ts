@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => {
         // Disabled in dev so HMR/dev server is unaffected; active for build/preview.
         devOptions: { enabled: false },
         manifest: {
-          name: 'CBR — Crossings and Bridges Register',
+          name: 'CBR — Corporate Bridge Register',
           short_name: "CBR",
           description: 'Forest and Range Evaluation Program checklists',
           theme_color: '#036',

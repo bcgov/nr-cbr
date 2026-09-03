@@ -1,0 +1,169 @@
+import {
+  AVAILABLE_ROLES,
+  CONTRACT_ENGINEER_PREFIX,
+  REGIONAL_ENGINEER_PREFIX,
+  validIdpProviders,
+  type FamLoginUser,
+  type IdpProviderType,
+  type JWT,
+  type ROLE_TYPE,
+  type USER_PRIVILEGE_TYPE,
+} from './types';
+
+import { env } from '@/env';
+
+// ── Cookie helpers ───────────────────────────────────────────────────
+
+/** Reads a browser cookie value by name. Returns '' if not found. */
+export const getCookie = (name: string): string => {
+  const cookie = document.cookie
+    .split(';')
+    .find((cookieValue) => cookieValue.trim().startsWith(name));
+  return cookie ? (cookie.split('=')[1] ?? '') : '';
+};
+
+/**
+ * Note on token reads: Amplify's {@code configure()} re-seeds the token store to its default
+ * {@code localStorage} (see {@link clearStoredTokens} and main.tsx), so Cognito tokens are NOT
+ * available as DOM-visible cookies. Read them via {@code fetchAuthSession} (storage-agnostic)
+ * instead — see {@code services/http/headers.ts}. The only cookie we read directly is the
+ * backend-set XSRF token, via {@link getCookie} above.
+ */
+
+/**
+ * Removes every Amplify token/session entry for the configured app client. Used by the federated
+ * logout path ({@code buildFederatedLogoutUrl}), which drives the sign-out redirect chain itself
+ * (Siteminder → Keycloak → Cognito → app) instead of Amplify's {@code signOut()}: clearing the local
+ * tokens up front means the browser lands back on the app with no session and renders the logged-out
+ * Landing. The chain's final Cognito /logout hop clears the Cognito session cookie server-side.
+ *
+ * <p>Storage note: despite the {@code CookieStorage} override in main.tsx, Amplify's
+ * {@code Amplify.configure()} re-seeds the token store to its default {@code localStorage} on first
+ * call (aws-amplify initSingleton.mjs, the {@code !Amplify.libraryOptions.Auth} branch), so tokens
+ * actually live in localStorage — reads go through {@code fetchAuthSession}, which is storage-agnostic.
+ * We therefore clear the {@code CognitoIdentityServiceProvider.<clientId>.*} keys from localStorage;
+ * clearing cookies here would be a silent no-op and leave the local session intact after logout.
+ */
+/**
+ * Set when the user signs out while offline, so the landing page can say that the sign-out was
+ * local only. Mirrors {@code SESSION_EXPIRED_FLAG}: sessionStorage, read-and-cleared once.
+ */
+export const OFFLINE_SIGNOUT_FLAG = 'cbr.offlineSignOut';
+
+export const clearStoredTokens = (): void => {
+  const prefix = `CognitoIdentityServiceProvider.${env.VITE_USER_POOLS_WEB_CLIENT_ID}`;
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key?.startsWith(prefix)) keys.push(key);
+    }
+    keys.forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    /* storage disabled / unavailable — nothing to clear */
+  }
+};
+
+/**
+ * Parses a Cognito ID token JWT into the app's FamLoginUser shape.
+ * Extracts display name, IDP provider, Cognito groups → roles.
+ *
+ * NOTE: This must be called with the **ID token**, not the access token,
+ * because only the ID token carries the `custom:idp_*` profile claims.
+ */
+export const parseToken = (idToken: JWT | undefined): FamLoginUser | undefined => {
+  if (!idToken) return undefined;
+  const decodedIdToken = idToken?.payload;
+  const displayName = (decodedIdToken?.['custom:idp_display_name'] as string) || '';
+  const idpProvider = validIdpProviders.includes(
+    (decodedIdToken?.['custom:idp_name'] as string)?.toUpperCase() as IdpProviderType,
+  )
+    ? ((decodedIdToken?.['custom:idp_name'] as string).toUpperCase() as IdpProviderType)
+    : undefined;
+  const hasComma = displayName.includes(',');
+  let [lastName, firstName] = hasComma ? displayName.split(', ') : displayName.split(' ');
+  if (!hasComma) [lastName, firstName] = [firstName, lastName];
+  const sanitizedFirstName = hasComma ? firstName?.split(' ')[0]?.trim() : firstName || '';
+  const userName = (decodedIdToken?.['custom:idp_username'] as string) || '';
+  const email = (decodedIdToken?.['email'] as string) || '';
+  const cognitoGroups = extractGroups(decodedIdToken);
+  const privileges = parsePrivileges(cognitoGroups);
+  const derivedRoles = Object.keys(privileges) as ROLE_TYPE[];
+  // The backend (JwtPrincipalUtil) stores userids with the legacy WebADE source-directory prefix,
+  // normalizing FAM's "BCEIDBUSINESS" to "BCEID". Mirror that here so providerUsername matches the
+  // backend-stored userid (e.g. the assessedBy "Assign it to me" comparison). idpProvider keeps the
+  // accurate FAM provider name for display.
+  const userIdPrefix = idpProvider === 'BCEIDBUSINESS' ? 'BCEID' : idpProvider;
+  return {
+    userName,
+    displayName,
+    email,
+    idpProvider,
+    privileges,
+    roles: derivedRoles,
+    firstName: sanitizedFirstName,
+    lastName,
+    providerUsername: `${userIdPrefix}\\${userName}`,
+  };
+};
+
+/**
+ * Parses Cognito group strings into a user privilege object.
+ *
+ * - Global roles that exactly match {@link AVAILABLE_ROLES} (e.g. "CBR_ADMIN", "CBR_GENERAL") map to
+ *   a `null` value (null = global, non-scoped role).
+ * - Region-scoped groups ({@link REGIONAL_ENGINEER_PREFIX}`<code>`, e.g.
+ *   "CBR_REGIONAL_ENGINEER_DCK") collapse into the synthetic `CBR_REGIONAL_ENGINEER` role whose
+ *   value is the `string[]` of org-unit codes (a scoped role). Contract engineers collapse the same
+ *   way into `CBR_CONTRACT_REGIONAL_ENGINEER`.
+ * - Any other group is ignored.
+ *
+ * Order matters: `CBR_CONTRACT_REGIONAL_ENGINEER_` is tested first because
+ * `CBR_REGIONAL_ENGINEER_` would not match it under `startsWith`, but a future rename could make
+ * the two overlap — testing the more specific prefix first keeps that safe.
+ *
+ * Mirrors the backend `LoggedUserHelper#codesWithPrefix`; keep the two in step.
+ *
+ * @param {string[]} input - Array of group strings from Cognito.
+ * @returns {USER_PRIVILEGE_TYPE} The parsed privilege object.
+ */
+export function parsePrivileges(input: string[]): USER_PRIVILEGE_TYPE {
+  const result: USER_PRIVILEGE_TYPE = {};
+  const regions: string[] = [];
+  const contractRegions: string[] = [];
+  for (const item of input) {
+    if (item.startsWith(CONTRACT_ENGINEER_PREFIX)) {
+      const code = item.slice(CONTRACT_ENGINEER_PREFIX.length).trim().toUpperCase();
+      if (code) contractRegions.push(code);
+    } else if (item.startsWith(REGIONAL_ENGINEER_PREFIX)) {
+      const code = item.slice(REGIONAL_ENGINEER_PREFIX.length).trim().toUpperCase();
+      if (code) regions.push(code);
+    } else if (AVAILABLE_ROLES.includes(item as ROLE_TYPE)) {
+      // Direct match against known global Cognito groups.
+      result[item as ROLE_TYPE] = null; // null = global (non-scoped) role
+    }
+  }
+  if (regions.length > 0) {
+    // Scoped role: the value carries the org-unit codes (sorted, de-duplicated).
+    result.CBR_REGIONAL_ENGINEER = [...new Set(regions)].sort((a, b) => a.localeCompare(b));
+  }
+  if (contractRegions.length > 0) {
+    result.CBR_CONTRACT_REGIONAL_ENGINEER = [...new Set(contractRegions)].sort((a, b) =>
+      a.localeCompare(b),
+    );
+  }
+  return result;
+}
+
+/**
+ * Extracts Cognito groups from a decoded JWT payload.
+ * @param {object | undefined} decodedIdToken - The decoded JWT payload.
+ * @returns {string[]} Array of group strings, or empty array if none found.
+ */
+export function extractGroups(decodedIdToken: object | undefined): string[] {
+  if (!decodedIdToken) return [];
+  if ('cognito:groups' in decodedIdToken) {
+    return decodedIdToken['cognito:groups'] as string[];
+  }
+  return [];
+}

@@ -1,4 +1,4 @@
-# CBR — Crossings and Bridges Register
+# CBR — Corporate Bridge Register
 
 CBR is the BC Government register of bridges and engineered culverts on forest service and tenured
 roads. It covers structure inventory, field inspection, repair and monitor tracking, load-rating

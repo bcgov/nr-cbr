@@ -11,7 +11,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.web.config.EnableSpringDataWebSupport;
 
 /**
- * CBR (Crossings and Bridges Register) API.
+ * CBR (Corporate Bridge Register) API.
  *
  * <p>Structure follows nr-frep: an OAuth 2.0 resource server over FAM/Cognito access tokens, reading
  * and writing the shared Oracle {@code THE} schema through the legacy {@code CBR_*} PL/SQL packages.
