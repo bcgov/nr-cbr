@@ -5,7 +5,8 @@ roads. It covers structure inventory, field inspection, repair and monitor track
 history, and a catalogue of operational reports.
 
 This repository is the modernization of the legacy Java EE application. For what the legacy system
-does and how it is built, see **[docs/legacy-cbr-overview.md](./docs/legacy-cbr-overview.md)**.
+does and how it is built, start at **[cbr-overview.local.md](./cbr-overview.local.md)** — the index
+for a set of local reference docs (data model, workflows, auth, offline client, modernization).
 
 | Component | Technology |
 |-----------|------------|
@@ -85,7 +86,7 @@ Before this can deploy, four things need answering:
 4. The repo secrets the workflows reference (`database_*`, `keystore_secret`, `object_storage_*`,
    `oc_namespace`, `oc_token`).
 
-See [docs/legacy-cbr-overview.md §20](./docs/legacy-cbr-overview.md#20-scaffold-migration--what-changed)
+See [cbr-modernization.local.md](./cbr-modernization.local.md)
 for exactly what the scaffold migration changed and what was deliberately left incomplete.
 
 ## Contributing

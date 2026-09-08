@@ -14,7 +14,7 @@ export type JWT = AmplifyJWT;
  * `string[]` rather than `null`). Same mechanism as nr-frep's per-district CHR roles.
  *
  * ⚠ PROVISIONAL — the FAM role set for CBR has not been agreed. See the backend `RoleConstants`
- * and docs/legacy-cbr-overview.md §9 and §18.
+ * and cbr-auth-and-roles.local.md.
  */
 export const AVAILABLE_ROLES = [
   'CBR_ADMIN',

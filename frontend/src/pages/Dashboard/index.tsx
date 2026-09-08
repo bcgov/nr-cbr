@@ -14,7 +14,7 @@ import { APP_FULL_NAME, APP_NAME } from '@/constants/appName';
  * <p>Ported from nr-frep's Dashboard, which renders a grid of ClickableTiles — one per screen. CBR
  * has no screens yet, so this deliberately shows the shell and says so rather than presenting tiles
  * that navigate nowhere. Restore the tile grid from nr-frep's version as the screens land; the
- * inventory to build against is in docs/legacy-cbr-overview.md §5 (site, structure with 7 tabs,
+ * inventory to build against is in cbr-overview.local.md §5 (site, structure with 7 tabs,
  * inspection, documents, 12 reports, 3 admin screens, search).
  */
 const DashboardPage: FC = () => {
@@ -35,7 +35,7 @@ const DashboardPage: FC = () => {
           title="Application shell"
           subtitle={
             'Authentication and authorization are wired to FAM. The CBR screens have not been ' +
-            'built yet — see docs/legacy-cbr-overview.md for the inventory they will cover.'
+            'built yet — see cbr-overview.local.md for the inventory they will cover.'
           }
         />
       </Column>

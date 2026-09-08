@@ -17,7 +17,7 @@ import type { ROLE_TYPE } from '@/context/auth/types';
  * (unauthenticated), no-role (authenticated but holding no recognised CBR group), and protected.
  *
  * <p>The CBR screens are not built yet — Dashboard is the only protected destination. The inventory
- * this grows into is in docs/legacy-cbr-overview.md §5: site, structure (7 tabs), inspection,
+ * this grows into is in cbr-overview.local.md §5: site, structure (7 tabs), inspection,
  * documents, 12 report criteria pages, 3 admin pages and the search pages.
  *
  * <p>nr-frep also carries an offline route set (getOfflineRoutes / getOfflineMenuEntries) served

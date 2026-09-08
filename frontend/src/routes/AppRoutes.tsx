@@ -16,7 +16,7 @@ import { useAuthorization } from '@/hooks/useAuthorization';
  *
  * <p>nr-frep also serves an offline route set when the browser is offline and the user is not
  * signed in. CBR will need the same once the offline inspection flow lands (see
- * docs/legacy-cbr-overview.md §11 and §16) — it is deliberately not stubbed here, because a route
+ * cbr-offline-client.local.md) — it is deliberately not stubbed here, because a route
  * set with nothing behind it is worse than none.
  */
 const AppRoutes: FC = () => {

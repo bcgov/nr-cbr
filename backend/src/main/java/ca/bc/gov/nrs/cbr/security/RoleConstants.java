@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
  * <h3>⚠ PROVISIONAL — the FAM role set for CBR has not been agreed</h3>
  * The names below are a direct translation of the legacy authorization model and are a starting
  * point for that discussion, not a decision. Confirm against {@code CBR_SecurityMatrix.xls} and the
- * package grants before wiring FAM. See {@code docs/legacy-cbr-overview.md} §9 and §18.
+ * package grants before wiring FAM. See {@code cbr-auth-and-roles.local.md} and
+ * {@code cbr-workflows.local.md} §9 (the role-to-action map).
  *
  * <h3>Legacy model this replaces</h3>
  * Authorization used to be enforced three times over: a WebADE application role declared on the
