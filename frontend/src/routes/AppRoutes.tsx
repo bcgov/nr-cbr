@@ -26,6 +26,9 @@ const AppRoutes: FC = () => {
 
   const displayLoading = () => <Loading data-testid="loading" withOverlay={true} />;
 
+  // Which route set is in play. Also the RouterProvider key — see below.
+  const routeSetId = !isLoggedIn ? 'public' : hasAnyRole ? 'protected' : 'no-role';
+
   const routesToUse = useMemo(() => {
     if (!isLoggedIn) return getPublicRoutes();
     // Region-only users hold no global role; useAuthorization#hasAnyRole accounts for that, which
@@ -56,7 +59,13 @@ const AppRoutes: FC = () => {
     // one would reset on every navigation (the side nav springing back open mid-task).
     <LayoutProvider>
       <Suspense fallback={displayLoading()}>
-        <RouterProvider router={browserRouter} />
+        {/* Keyed so a change of route set remounts the provider. RouterProvider subscribes to the
+            router it is first given and ignores a later one, so swapping the prop alone left the
+            previous set's page on screen. Every other transition between sets happens through a
+            full page load (the OAuth redirect, the end-session redirect), which hides this — until
+            an in-place set swap is needed, as nr-frep found with offline sign-out. Only fires when
+            the set changes, never on navigation. */}
+        <RouterProvider key={routeSetId} router={browserRouter} />
       </Suspense>
     </LayoutProvider>
   );

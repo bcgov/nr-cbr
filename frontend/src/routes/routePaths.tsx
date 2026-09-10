@@ -2,6 +2,7 @@ import { Dashboard as DashboardReference } from '@carbon/icons-react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 
 import Layout from '@/components/Layout';
+import AuthCallbackPage from '@/pages/AuthCallback';
 import DashboardPage from '@/pages/Dashboard';
 import GlobalErrorPage from '@/pages/GlobalError';
 import LandingPage from '@/pages/Landing';
@@ -56,11 +57,15 @@ export const PUBLIC_ROUTES: RouteDescription[] = [
     isSideMenu: false,
   },
   {
-    // OAuth redirect target (redirectSignIn). Amplify completes the code exchange on load; once
-    // auth has hydrated we bounce to home.
-    path: '/auth/callback',
+    // OAuth redirect target. AuthCallbackPage performs the authorization-code exchange, which is
+    // what creates the session — hence its place in the PUBLIC table rather than the protected one.
+    //
+    // ORDER IS LOAD-BEARING: it must sit above the '*' catch-all below, which would otherwise match
+    // the callback URL (arriving as /authCallback?code=…&state=…) and render Not Found before the
+    // code could be spent.
+    path: '/authCallback',
     id: 'Auth callback',
-    element: <Navigate to="/" replace />,
+    element: <AuthCallbackPage />,
     isSideMenu: false,
   },
   {
@@ -100,7 +105,10 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
     isSideMenu: false,
   },
   {
-    path: '/auth/callback',
+    // OAuth redirect target — once the session exists, bounce off the callback URL to home. (The
+    // exchange itself happens on the public route above; this entry only catches a reload of the
+    // callback URL by an already-signed-in user.)
+    path: '/authCallback',
     id: 'Auth callback',
     element: <Navigate to="/dashboard" replace />,
     isSideMenu: false,

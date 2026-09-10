@@ -13,16 +13,17 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * Covers the CBR-specific parts of {@link LoggedUserHelper}: how region-scoped roles are parsed out
- * of the Cognito groups, and how the global and region-scoped gates combine.
+ * of the token's role strings, and how the global and region-scoped gates combine.
  *
- * <p>The identity helpers are not covered here — they need the Cognito userInfo round-trip.
+ * <p>The identity helpers are not covered here — see {@code JwtPrincipalUtil} for those.
+ *
+ * <p>The region-scoped cases below are pinned behaviour for code that is deprecated-for-removal:
+ * legacy CBR has no region scoping, so no real token carries a {@code CBR_REGIONAL_ENGINEER_*}
+ * role. They go with the D3 cleanup, not before it.
  */
 class LoggedUserHelperTest {
 
-  // Null collaborator on purpose: every method exercised here reads authorities off the security
-  // context and never touches the userInfo service. Mocking it would pull Mockito/byte-buddy in,
-  // which the pinned JaCoCo agent cannot instrument.
-  private final LoggedUserHelper helper = new LoggedUserHelper(null);
+  private final LoggedUserHelper helper = new LoggedUserHelper();
 
   @AfterEach
   void clearContext() {
