@@ -11,20 +11,16 @@ import {
 
 import { env } from '@/env';
 
-// ── Cookie helpers ───────────────────────────────────────────────────
-
-/** Reads a browser cookie value by name. Returns '' if not found. */
-export const getCookie = (name: string): string => {
-  const cookie = document.cookie
-    .split(';')
-    .find((cookieValue) => cookieValue.trim().startsWith(name));
-  return cookie ? (cookie.split('=')[1] ?? '') : '';
-};
+// ── Session storage note ─────────────────────────────────────────────
 
 /**
- * Note on token reads: the tokens live in sessionStorage under `oidc-client-ts`'s own keys and are
- * read through the `UserManager` (see `services/keycloak.ts`), never as DOM-visible cookies. The
- * only cookie read directly is the backend-set XSRF token, via {@link getCookie} above.
+ * No cookies are read anywhere in the auth layer. The tokens live in sessionStorage under
+ * `oidc-client-ts`'s own keys and are reached through the `UserManager` (see
+ * `services/keycloak.ts`); the SPA sets the `Authorization` header itself.
+ *
+ * <p>A `getCookie` helper used to sit here for the backend's `XSRF-TOKEN`. The API is a stateless
+ * bearer-token resource server with CSRF disabled (see `SecurityConfiguration`), so there is no
+ * such cookie and nothing was calling it.
  */
 
 /**

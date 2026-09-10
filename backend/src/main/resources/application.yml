@@ -158,7 +158,6 @@ ca:
   bc:
     gov:
       nrs:
-        self-uri: http://localhost:3000
         environment: ${APP_ZONE:local}
         keycloak:
           # The CSS integration's client id. Validated as the token's `azp` — the standard realm is
