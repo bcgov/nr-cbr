@@ -1,245 +1,328 @@
+---
+# Backend deploy Template — consumed by `oc process` in reusable-deploy.yml.
+#
+# Parameters of note:
+#   NAME       Defaults to repo name (nr-cbr).
+#   ZONE       PR number for previews, 'test' for TEST, 'prod' for PROD.
+#              Suffixes every resource name so PR/test/prod resources coexist
+#              in the same namespace.
+#   IMAGE_TAG  GHCR tag. Per-PR builds use the PR number; merge.yml deploys
+#              the same tag to TEST and PROD, then aliases as ':prod'.
+#
+# The image reference uses the BCGov convention:
+#   ghcr.io/<owner>/<repo>/backend:<tag>
+# This differs from the legacy Build-and-Deploy workflow which used
+# ghcr.io/<owner>/cbr-backend:latest.
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: nr-cbr-backend-deploy
 parameters:
   - name: NAME
-    description: Module name
-    required: true
-  - name: COMPONENT
-    description: Component name
-    value: backend
+    description: App name prefix
+    value: nr-cbr
   - name: ZONE
-    description: Deployment zone, e.g. pr-### or prod
+    description: PR number, 'test', or 'prod'
     required: true
   - name: IMAGE_TAG
-    description: Image tag to use
-    required: true
+    description: Container image tag (PR number, 'test', or 'prod')
+    value: latest
   - name: REGISTRY
-    description: Container registry to import from
-    value: ghcr.io
-  - name: ORG_NAME
-    description: Organization name
-    value: bcgov
-  - name: DOMAIN
-    value: apps.silver.devops.gov.bc.ca
+    description: Image registry path (no tag)
+    value: ghcr.io/bcgov/nr-cbr/backend
   - name: MIN_REPLICAS
-    description: The minimum amount of replicas for the horizontal pod autoscaler.
-    value: "2"
+    value: "1"
   - name: MAX_REPLICAS
-    description: The maximum amount of replicas for the horizontal pod autoscaler.
-    value: "5"
-  - name: CPU_REQUEST
-    value: "100m"
-  - name: MEMORY_REQUEST
-    value: "128Mi"
-  - name: MEMORY_LIMIT
-    description: Memory limit for the container (bounds the pod's working set).
-    value: "4Gi"
-  - name: LOG_LEVEL
-    description: Application log level (debug|info|warn|error)
-    value: "info"
+    value: "2"
+  - name: MIN_CPU
+    value: "200m"
+  - name: MIN_MEM
+    value: "500Mi"
+  # Container timezone. Drives the JVM default zone, which the log pattern
+  # (%d in logging.pattern.console) renders against — OpenShift containers are
+  # UTC by default, which puts every log line 7-8 hours off the BC business
+  # day. A named zone resolves from the tzdb bundled in the JDK, so no OS
+  # tzdata package is required on the Alpine base image.
+  - name: TZ
+    value: America/Vancouver
+  - name: APP_LOG_LEVEL
+    value: INFO
+  - name: SPRING_SECURITY_LOG_LEVEL
+    value: INFO
+  - name: SPRING_WEB_LOG_LEVEL
+    value: INFO
+  - name: SPRING_BOOT_AUTOCONFIG_LOG_LEVEL
+    value: INFO
+  - name: SPRING_JPA_SHOW_SQL
+    value: "false"
+  # BC Gov SSO (Keycloak, standard realm). The resource server derives the JWKS URI from the issuer
+  # and validates the token's azp against the client id — the standard realm is shared across BC Gov
+  # apps, so issuer + signature alone do not prove a token was minted for CBR. Same two values the
+  # frontend takes as VITE_KEYCLOAK_URL / VITE_KEYCLOAK_CLIENT_ID; fed from one GitHub variable each.
+  - name: KEYCLOAK_ISSUER_URI
+    description: Realm issuer URI (https://<env>.loginproxy.gov.bc.ca/auth/realms/standard)
+    required: true
+  - name: KEYCLOAK_CLIENT_ID
+    description: The CSS integration's client id, validated as the token's azp
+    required: true
+  # nr-user-lookup-api (the IDIR directory) and the client_credentials service account the backend
+  # presents to it. All optional and currently UNSET — the CI wiring that produced them (the
+  # ensure-keycloak-service-account.sh step, KEYCLOAK_SA_* and USER_LOOKUP_BASE_URL) was removed
+  # until the directory is actually needed, so these fall through to "" and the backend's
+  # UserLookupClient stays inert. The parameters stay declared so restoring it is a workflow change
+  # only. CBR's first consumer is inspection-reviewer administration (Phase 6).
+  - name: USER_LOOKUP_BASE_URL
+    required: false
+    value: ""
+  - name: USER_LOOKUP_TOKEN_URL
+    required: false
+    value: ""
+  - name: USER_LOOKUP_CLIENT_ID
+    required: false
+    value: ""
+  - name: USER_LOOKUP_CLIENT_SECRET
+    required: false
+    value: ""
+  - name: DATABASE_HOST
+    required: true
+  - name: DATABASE_SERVICE_NAME
+    required: true
+  - name: DATABASE_USER
+    required: true
+  - name: DATABASE_PASSWORD
+    required: true
+  - name: KEYSTORE_SECRET
+    required: true
+  # NOTE: no OBJECT_STORAGE_* parameters. CBR will store inspection photos and as-built drawings in
+  # S3-compatible object storage (application.yml reads OBJECT_STORAGE_* with empty defaults), but
+  # attachments are Phase 4 and no bucket is provisioned yet. Re-add the four parameters, their
+  # secretKeyRef env entries and their Secret stringData keys together with the feature — they were
+  # `required: true` here, so a half-restore fails `oc process` outright.
+  # NOTE: no CLAMAV_* parameters. nr-frep scans uploaded attachments through a shared clamd; CBR
+  # has no upload path yet (attachments are Phase 4 — see cbr-modernization-plan.local.md). Add them
+  # back alongside the feature, together with the cross-namespace egress note nr-frep carries.
+
 objects:
+  # ── Deployment ────────────────────────────────────────────
   - apiVersion: apps/v1
     kind: Deployment
     metadata:
+      name: ${NAME}-backend-${ZONE}
       labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
+        app: ${NAME}-backend-${ZONE}
+        app.kubernetes.io/name: ${NAME}-backend
+        app.kubernetes.io/instance: ${ZONE}
     spec:
+      replicas: ${{MIN_REPLICAS}}
       selector:
         matchLabels:
-          deployment: ${NAME}-${ZONE}-${COMPONENT}
+          app: ${NAME}-backend-${ZONE}
+      # Recreate (not RollingUpdate) — matches BCGov template convention.
+      # The brief swap downtime is acceptable for ephemeral PR previews and
+      # avoids racing against the deployer action, which patches strategy
+      # mid-apply and creates a `rollingUpdate set while type=Recreate`
+      # validation error if the Template ships its own RollingUpdate config.
       strategy:
-        type: RollingUpdate
-        rollingUpdate:
-          maxUnavailable: 1
-          maxSurge: 1
+        type: Recreate
       template:
         metadata:
           labels:
-            app: ${NAME}-${ZONE}
-            deployment: ${NAME}-${ZONE}-${COMPONENT}
+            app: ${NAME}-backend-${ZONE}
+            app.kubernetes.io/instance: ${ZONE}
+          annotations:
+            prometheus.io/path: /actuator/prometheus
+            prometheus.io/port: '8080'
+            prometheus.io/scrape: 'true'
         spec:
-          terminationGracePeriodSeconds: 30
-          affinity:
-            podAntiAffinity:
-              preferredDuringSchedulingIgnoredDuringExecution:
-                - weight: 100
-                  podAffinityTerm:
-                    labelSelector:
-                      matchLabels:
-                        deployment: ${NAME}-${ZONE}-${COMPONENT}
-                    topologyKey: kubernetes.io/hostname
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
           initContainers:
-            - name: wait-for-db
-              image: ${REGISTRY}/${ORG_NAME}/${NAME}/migrations:${IMAGE_TAG}
-              command:
-                - /bin/sh
-                - -c
-                - |
-                  echo "Waiting for database to be reachable..."
-                  max_retries=30
-                  attempt=1
-                  until nc -z -v -w3 ${NAME}-${ZONE}-database 5432; do
-                    if [ "$attempt" -ge "$max_retries" ]; then
-                      echo "ERROR: Database ${NAME}-${ZONE}-database:5432 is not reachable after ${max_retries} attempts." >&2
-                      exit 1
-                    fi
-                    echo "Database not ready (attempt ${attempt}/${max_retries}), sleeping..."
-                    attempt=$((attempt + 1))
-                    sleep 2
-                  done
-                  echo "Database is UP!"
-              securityContext:
-                allowPrivilegeEscalation: false
-                runAsNonRoot: true
-                readOnlyRootFilesystem: true
-                capabilities:
-                  drop: ["ALL"]
-                seccompProfile:
-                  type: RuntimeDefault
-              volumeMounts:
-                - name: tmp
-                  mountPath: /tmp
-            - name: migrations
-              image: ${REGISTRY}/${ORG_NAME}/${NAME}/migrations:${IMAGE_TAG}
+            - name: ${NAME}-backend-init
+              image: ghcr.io/bcgov/nr-forest-client/common:prod
               imagePullPolicy: Always
               env:
-                - name: POSTGRES_DATABASE
+                - name: ORACLEDB_HOST
+                  value: ${DATABASE_HOST}
+                - name: ORACLEDB_SECRET
                   valueFrom:
                     secretKeyRef:
-                      name: ${NAME}-${ZONE}-database
-                      key: database-name
-                - name: FLYWAY_URL
-                  value: jdbc:postgresql://${NAME}-${ZONE}-database:5432/$(POSTGRES_DATABASE)
-                - name: FLYWAY_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${NAME}-${ZONE}-database
-                      key: database-user
-                - name: FLYWAY_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${NAME}-${ZONE}-database
-                      key: database-password
-                - name: FLYWAY_DEFAULT_SCHEMA
-                  value: "users"
-                - name: FLYWAY_BASELINE_ON_MIGRATE
-                  value: "true"
+                      name: ${NAME}-backend-secret-${ZONE}
+                      key: KEYSTORE_SECRET
+                - name: ORACLEDB_PORT
+                  value: "1543"
+              volumeMounts:
+                - name: api-cert
+                  mountPath: /cert
+                - name: init-tmp-storage
+                  mountPath: /tmp
               resources:
                 requests:
-                  cpu: 10m
-                  memory: 50Mi
+                  cpu: "200m"
+                  memory: "300Mi"
+                  ephemeral-storage: "50Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "500Mi"
+                  ephemeral-storage: "100Mi"
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
                 readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
-                seccompProfile:
-                  type: RuntimeDefault
-              volumeMounts:
-                - name: tmp
-                  mountPath: /tmp
           containers:
-            - name: ${NAME}
-              image: ${REGISTRY}/${ORG_NAME}/${NAME}/${COMPONENT}:${IMAGE_TAG}
+            - name: ${NAME}-backend
+              image: ${REGISTRY}:${IMAGE_TAG}
               imagePullPolicy: Always
               ports:
-                - name: http
-                  containerPort: 3000
+                - containerPort: 8080
+                  protocol: TCP
               env:
-                - name: LOG_LEVEL
-                  value: ${LOG_LEVEL}
-                - name: POSTGRES_HOST
-                  value: ${NAME}-${ZONE}-database
-                - name: POSTGRES_PORT
-                  value: "5432"
-                - name: POSTGRES_DATABASE
+                - name: TZ
+                  value: ${TZ}
+                - name: SERVER_PORT
+                  value: "8080"
+                - name: KEYCLOAK_ISSUER_URI
+                  value: ${KEYCLOAK_ISSUER_URI}
+                - name: KEYCLOAK_CLIENT_ID
+                  value: ${KEYCLOAK_CLIENT_ID}
+                - name: USER_LOOKUP_BASE_URL
+                  value: ${USER_LOOKUP_BASE_URL}
+                - name: USER_LOOKUP_TOKEN_URL
+                  value: ${USER_LOOKUP_TOKEN_URL}
+                - name: USER_LOOKUP_CLIENT_ID
+                  value: ${USER_LOOKUP_CLIENT_ID}
+                - name: USER_LOOKUP_CLIENT_SECRET
                   valueFrom:
                     secretKeyRef:
-                      name: ${NAME}-${ZONE}-database
-                      key: database-name
-                - name: POSTGRES_USER
+                      name: ${NAME}-backend-secret-${ZONE}
+                      key: USER_LOOKUP_CLIENT_SECRET
+                - name: DATABASE_HOST
+                  value: ${DATABASE_HOST}
+                - name: DATABASE_SERVICE_NAME
+                  value: ${DATABASE_SERVICE_NAME}
+                - name: DATABASE_USER
                   valueFrom:
                     secretKeyRef:
-                      name: ${NAME}-${ZONE}-database
-                      key: database-user
-                - name: POSTGRES_PASSWORD
+                      name: ${NAME}-backend-secret-${ZONE}
+                      key: DATABASE_USER
+                - name: DATABASE_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: ${NAME}-${ZONE}-database
-                      key: database-password
-                - name: POSTGRES_SCHEMA
-                  value: "users"
+                      name: ${NAME}-backend-secret-${ZONE}
+                      key: DATABASE_PASSWORD
+                - name: APP_LOG_LEVEL
+                  value: ${APP_LOG_LEVEL}
+                - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY
+                  value: ${SPRING_SECURITY_LOG_LEVEL}
+                - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB
+                  value: ${SPRING_WEB_LOG_LEVEL}
+                - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_BOOT_AUTOCONFIGURE
+                  value: ${SPRING_BOOT_AUTOCONFIG_LOG_LEVEL}
+                - name: SPRING_JPA_SHOW_SQL
+                  value: ${SPRING_JPA_SHOW_SQL}
+                - name: KEYSTORE_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NAME}-backend-secret-${ZONE}
+                      key: KEYSTORE_SECRET
               resources:
                 requests:
-                  cpu: ${CPU_REQUEST}
-                  memory: ${MEMORY_REQUEST}
+                  cpu: ${MIN_CPU}
+                  memory: ${MIN_MEM}
+                  ephemeral-storage: "200Mi"
                 limits:
-                  memory: ${MEMORY_LIMIT}
+                  cpu: "1000m"
+                  memory: "800Mi"
+                  ephemeral-storage: "500Mi"
+              livenessProbe:
+                httpGet:
+                  path: /actuator/health
+                  port: 8080
+                initialDelaySeconds: 300
+                periodSeconds: 30
+                timeoutSeconds: 5
+                failureThreshold: 5
+                successThreshold: 1
+              readinessProbe:
+                tcpSocket:
+                  port: 8080
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                timeoutSeconds: 5
+                failureThreshold: 20
+                successThreshold: 1
+              volumeMounts:
+                - name: api-cert
+                  mountPath: /cert
+                - name: tls-certs
+                  mountPath: /etc/tls-certs
+                  readOnly: true
+                - name: log-storage
+                  mountPath: /logs
+                - name: app-storage
+                  mountPath: /temp
+                # Load-bearing, do not remove: the container runs with readOnlyRootFilesystem, so
+                # this emptyDir is the only place the JVM can write. Spring spools every
+                # multipart/form-data upload to a temp file here (file-size-threshold=0) instead of
+                # buffering it in heap — without the mount, attachment/photo uploads fail outright.
+                # emptyDir usage counts against the pod's ephemeral-storage limit below.
+                - name: tmp-storage
+                  mountPath: /tmp
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
                 readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
-                seccompProfile:
-                  type: RuntimeDefault
-              volumeMounts:
-                - name: tmp
-                  mountPath: /tmp
-              startupProbe:
-                httpGet:
-                  path: /api/health
-                  port: http
-                periodSeconds: 5
-                failureThreshold: 30
-              readinessProbe:
-                httpGet:
-                  path: /api/health
-                  port: http
-                periodSeconds: 5
-                failureThreshold: 3
-              livenessProbe:
-                httpGet:
-                  path: /api
-                  port: http
-                periodSeconds: 10
-                failureThreshold: 3
-              lifecycle:
-                preStop:
-                  exec:
-                    # distroless/nodejs has no /bin/sleep; exec hooks skip image ENTRYPOINT
-                    command: ["/nodejs/bin/node", "-e", "setTimeout(() => {}, 10000)"]
           volumes:
-            - name: tmp
-              emptyDir:
-                medium: Memory
-                sizeLimit: 256Mi
+            - name: tls-certs
+              secret:
+                secretName: ${NAME}-backend-cert-${ZONE}
+            - name: log-storage
+              emptyDir: {}
+            - name: app-storage
+              emptyDir: {}
+            - name: tmp-storage
+              emptyDir: {}
+            - name: init-tmp-storage
+              emptyDir: {}
+            - name: api-cert
+              persistentVolumeClaim:
+                claimName: ${NAME}-backend-api-cert-${ZONE}
+
+  # ── Service ───────────────────────────────────────────────
   - apiVersion: v1
     kind: Service
     metadata:
+      name: ${NAME}-backend-${ZONE}
       labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
+        app: ${NAME}-backend-${ZONE}
+        app.kubernetes.io/instance: ${ZONE}
+      annotations:
+        service.alpha.openshift.io/serving-cert-secret-name: ${NAME}-backend-cert-${ZONE}
     spec:
-      ports:
-        - name: http
-          port: 80
-          targetPort: 3000
       selector:
-        deployment: ${NAME}-${ZONE}-${COMPONENT}
+        app: ${NAME}-backend-${ZONE}
+      ports:
+        - name: 8080-tcp
+          port: 8080
+          protocol: TCP
+
+  # ── HorizontalPodAutoscaler ───────────────────────────────
   - apiVersion: autoscaling/v2
     kind: HorizontalPodAutoscaler
     metadata:
+      name: ${NAME}-backend-${ZONE}-cpu
       labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
+        app: ${NAME}-backend-${ZONE}
+        app.kubernetes.io/instance: ${ZONE}
     spec:
       scaleTargetRef:
         apiVersion: apps/v1
         kind: Deployment
-        name: ${NAME}-${ZONE}-${COMPONENT}
+        name: ${NAME}-backend-${ZONE}
       minReplicas: ${{MIN_REPLICAS}}
       maxReplicas: ${{MAX_REPLICAS}}
       metrics:
@@ -248,30 +331,77 @@ objects:
             name: cpu
             target:
               type: Utilization
-              averageUtilization: 80
-      behavior:
-        scaleUp:
-          stabilizationWindowSeconds: 30
-          policies:
-            - type: Percent
-              value: 100
-              periodSeconds: 60
-          selectPolicy: Max
-        scaleDown:
-          stabilizationWindowSeconds: 300
-          policies:
-            - type: Percent
-              value: 50
-              periodSeconds: 60
-          selectPolicy: Max
-  - apiVersion: policy/v1
-    kind: PodDisruptionBudget
+              averageUtilization: 200
+
+  # ── PVC for Keystore (per-ZONE so PR previews get their own) ────
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
     metadata:
+      name: ${NAME}-backend-api-cert-${ZONE}
       labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
+        app: ${NAME}-backend-${ZONE}
+        app.kubernetes.io/instance: ${ZONE}
     spec:
-      maxUnavailable: 1
-      selector:
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: 50Mi
+      storageClassName: netapp-file-standard
+
+  # ── Secret ────────────────────────────────────────────────
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: ${NAME}-backend-secret-${ZONE}
+      labels:
+        app: ${NAME}-backend-${ZONE}
+        app.kubernetes.io/instance: ${ZONE}
+    type: Opaque
+    stringData:
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      KEYSTORE_SECRET: ${KEYSTORE_SECRET}
+      USER_LOOKUP_CLIENT_SECRET: ${USER_LOOKUP_CLIENT_SECRET}
+
+  # ── NetworkPolicy: ingress from same-zone frontend + cluster monitoring ──
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: ${NAME}-backend-${ZONE}-ingress
+      labels:
+        app: ${NAME}-backend-${ZONE}
+        app.kubernetes.io/instance: ${ZONE}
+    spec:
+      podSelector:
         matchLabels:
-          deployment: ${NAME}-${ZONE}-${COMPONENT}
+          app: ${NAME}-backend-${ZONE}
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app: ${NAME}-frontend-${ZONE}
+            - namespaceSelector:
+                matchLabels:
+                  network.openshift.io/policy-group: monitoring
+      policyTypes:
+        - Ingress
+
+  # ── NetworkPolicy: permit-all egress (Oracle, object storage, BC Gov SSO, nr-user-lookup-api).
+  #    Explicit permit-all — nr-cbr relies on default-allow egress today; this documents intent
+  #    without restricting existing traffic. ──
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: ${NAME}-backend-${ZONE}-egress
+      labels:
+        app: ${NAME}-backend-${ZONE}
+        app.kubernetes.io/instance: ${ZONE}
+    spec:
+      podSelector:
+        matchLabels:
+          app: ${NAME}-backend-${ZONE}
+      egress:
+        - {}
+      policyTypes:
+        - Egress

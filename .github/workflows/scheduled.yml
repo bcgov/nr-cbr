@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
-      - uses: actions/stale@v11
+      - uses: actions/stale@v10
         with:
           days-before-stale: 14
           days-before-close: 7
@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Clean up PR Deployments
-        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+        uses: bcgov/action-oc-runner@09b5eeae15bdbc7f7a21b406ee2c66a1d5819f8c # v1.6.0
         with:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_token: ${{ secrets.oc_token }}
@@ -94,7 +94,7 @@ jobs:
     permissions:
       contents: write
       pages: write
-    uses: bcgov/quickstart-openshift-helpers/.github/workflows/.schema-spy.yml@a11ad3d1b9288fb40757c4314a62eb86ff227931 # v1.2.1
+    uses: bcgov/quickstart-openshift-helpers/.github/workflows/.schema-spy.yml@ca6579bdadf383a2513397081f963889b92823a4 # v1.1.0
 
   # Run sequentially to reduce chances of rate limiting
   zap:
@@ -109,21 +109,4 @@ jobs:
           allow_issue_writing: true
           issue_title: "ZAP Security Report"
           token: ${{ secrets.GITHUB_TOKEN }}
-          target: https://${{ github.event.repository.name }}-test.apps.silver.devops.gov.bc.ca
-
-  load-tests:
-    name: Load
-    runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        name: [backend, frontend]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1.2.1
-      - uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1.4.0
-        env:
-          BACKEND_URL: https://${{ github.event.repository.name }}-test.apps.silver.devops.gov.bc.ca/api
-          FRONTEND_URL: https://${{ github.event.repository.name }}-test.apps.silver.devops.gov.bc.ca
-        with:
-          path: ./common/tests/load/${{ matrix.name }}-test.js
-          flags: --vus 100 --duration 300s
+          target: https://${{ github.event.repository.name }}-test.apps.gold.devops.gov.bc.ca

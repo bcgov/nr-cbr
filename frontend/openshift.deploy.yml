@@ -1,109 +1,123 @@
+---
+# Frontend deploy Template — consumed by `oc process` in reusable-deploy.yml.
+#
+# VITE_* values are injected into /srv/config.js by docker-entrypoint.sh at
+# container start (runtime config). The Vite-built bundle is env-agnostic;
+# the same image binary serves DEV preview, TEST, and PROD.
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: nr-cbr-frontend-deploy
 parameters:
   - name: NAME
-    description: Module name
-    required: true
-  - name: COMPONENT
-    description: Component name
-    value: frontend
+    description: App name prefix
+    value: nr-cbr
   - name: ZONE
-    description: Deployment zone, e.g. pr-### or prod
+    description: PR number, 'test', or 'prod'
     required: true
+  # NOTE: SLOT and DOMAIN used to live here, but they only ever fed the Route
+  # hostname. The Route moved to openshift.route.yml / openshift.vanity-route.yml,
+  # so both parameters moved with it — don't re-add them here.
   - name: IMAGE_TAG
-    description: Image tag to use
-    required: true
+    description: Container image tag (PR number, 'test', or 'prod')
+    value: latest
   - name: REGISTRY
-    description: Container registry to import from
-    value: ghcr.io
-  - name: ORG_NAME
-    description: Organization name
-    value: bcgov
-  - name: DOMAIN
-    value: apps.silver.devops.gov.bc.ca
-  - name: MIN_REPLICAS
-    description: The minimum amount of replicas for the horizontal pod autoscaler.
+    description: Image registry path (no tag)
+    value: ghcr.io/bcgov/nr-cbr/frontend
+  - name: REPLICAS
+    description: |
+      Frontend pod count. "2" preserves the value that was hardcoded here
+      before parameterization; reusable-deploy.yml raises it for PROD.
     value: "2"
-  - name: MAX_REPLICAS
-    description: The maximum amount of replicas for the horizontal pod autoscaler.
-    value: "5"
-  - name: CPU_REQUEST
-    value: "50m"
-  - name: MEMORY_REQUEST
-    value: "50Mi"
-  - name: MEMORY_LIMIT
-    description: Memory limit for the container (bounds the pod's working set).
-    value: "1Gi"
-  - name: LOG_LEVEL
-    description: Caddy log level (debug|info|warn|error)
-    value: "info"
+  - name: FRONTEND_LOG_LEVEL
+    value: INFO
+  # Runtime VITE_* config (rendered into /srv/config.js by the entrypoint).
+  # BC Gov SSO (Keycloak, standard realm). Two values, and only two — oidc-client-ts discovers the
+  # authorize / token / JWKS / end-session endpoints from the issuer, so there is no logout URL to
+  # configure here. The backend takes the SAME pair as KEYCLOAK_ISSUER_URI / KEYCLOAK_CLIENT_ID;
+  # both templates are fed from one GitHub variable each so the two cannot drift apart.
+  - name: VITE_KEYCLOAK_URL
+    description: Realm issuer URI (https://<env>.loginproxy.gov.bc.ca/auth/realms/standard)
+    required: true
+  - name: VITE_KEYCLOAK_CLIENT_ID
+    description: The CSS integration's client id
+    required: true
+  - name: VITE_BACKEND_URL
+    description: Browser-facing API base path; usually '/api'
+    value: /api
+  # Base path, for serving behind a proxy prefix (e.g. /pub/cbr). Empty means the app is served
+  # from the root, which is the case on every zone today. It is a parameter rather than a build-time
+  # value because the OAuth redirect URI is derived from it at runtime — see services/keycloak.ts.
+  - name: VITE_BASE_PATH
+    description: Path prefix the app is served under; empty for root
+    value: ""
+  # Shared mailbox behind the side nav's "Report an issue" link. Optional: an empty value hides the
+  # link entirely rather than shipping a mailto: that goes nowhere, so an environment with no support
+  # address simply doesn't offer one.
+  - name: VITE_SUPPORT_EMAIL
+    description: Support mailbox for "Report an issue"; empty hides the link
+    value: ""
+  # VITE_ZONE = the deploy zone, now a display label only. Under Cognito it selected the identity
+  # provider (ZONE=42 → identity_provider=42-IDIR, which does not exist), which is why PR zones had
+  # to be remapped to 'dev'. The Keycloak IdP hint is the constant 'azureidir' everywhere, so a
+  # numeric zone is harmless.
+  - name: VITE_ZONE
+    value: dev
+
 objects:
+  # ── Deployment ────────────────────────────────────────────
   - apiVersion: apps/v1
     kind: Deployment
     metadata:
+      name: ${NAME}-frontend-${ZONE}
       labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
+        app: ${NAME}-frontend-${ZONE}
+        app.kubernetes.io/name: ${NAME}-frontend
+        app.kubernetes.io/instance: ${ZONE}
     spec:
+      # ${{...}} (not ${...}) so the value is emitted as a JSON number —
+      # replicas must not be a quoted string.
+      replicas: ${{REPLICAS}}
       selector:
         matchLabels:
-          deployment: ${NAME}-${ZONE}-${COMPONENT}
-      strategy:
-        type: RollingUpdate
-        rollingUpdate:
-          maxUnavailable: 1
-          maxSurge: 1
+          app: ${NAME}-frontend-${ZONE}
       template:
         metadata:
           labels:
-            app: ${NAME}-${ZONE}
-            deployment: ${NAME}-${ZONE}-${COMPONENT}
+            app: ${NAME}-frontend-${ZONE}
+            app.kubernetes.io/instance: ${ZONE}
         spec:
-          terminationGracePeriodSeconds: 30
-          affinity:
-            podAntiAffinity:
-              preferredDuringSchedulingIgnoredDuringExecution:
-                - weight: 100
-                  podAffinityTerm:
-                    labelSelector:
-                      matchLabels:
-                        deployment: ${NAME}-${ZONE}-${COMPONENT}
-                    topologyKey: kubernetes.io/hostname
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
           initContainers:
-            - name: wait-for-backend
-              image: ${REGISTRY}/${ORG_NAME}/${NAME}/${COMPONENT}:${IMAGE_TAG}
+            - name: seed-srv
+              image: ${REGISTRY}:${IMAGE_TAG}
               command:
-                - /bin/sh
+                - sh
                 - -c
-                - |
-                  echo "Waiting for backend to be healthy..."
-                  max_retries=30
-                  attempt=1
-                  until wget -q --spider http://${NAME}-${ZONE}-backend/api/health; do
-                    if [ "$attempt" -ge "$max_retries" ]; then
-                      echo "ERROR: Backend ${NAME}-${ZONE}-backend is not reachable/healthy after ${max_retries} attempts." >&2
-                      exit 1
-                    fi
-                    echo "Backend not ready (attempt ${attempt}/${max_retries}), sleeping..."
-                    attempt=$((attempt + 1))
-                    sleep 2
-                  done
-                  echo "Backend is UP and healthy!"
+                - 'cp -r /srv/. /srv-rw/'
+              volumeMounts:
+                - name: srv
+                  mountPath: /srv-rw
+              resources:
+                requests:
+                  cpu: "20m"
+                  memory: "32Mi"
+                  ephemeral-storage: "50Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "64Mi"
+                  ephemeral-storage: "100Mi"
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
                 readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
-                seccompProfile:
-                  type: RuntimeDefault
-              volumeMounts:
-                - name: caddy-data
-                  mountPath: /tmp/caddy
           containers:
-            - name: ${NAME}
-              image: ${REGISTRY}/${ORG_NAME}/${NAME}/${COMPONENT}:${IMAGE_TAG}
-              imagePullPolicy: Always
+            - name: ${NAME}-frontend
+              image: ${REGISTRY}:${IMAGE_TAG}
               ports:
                 - name: http
                   containerPort: 3000
@@ -111,140 +125,106 @@ objects:
                   containerPort: 3001
               env:
                 - name: LOG_LEVEL
-                  value: ${LOG_LEVEL}
+                  value: ${FRONTEND_LOG_LEVEL}
+                # Caddy reverse-proxies /api* to the same-zone backend Service.
                 - name: BACKEND_URL
-                  value: http://${NAME}-${ZONE}-backend
-                # readOnlyRootFilesystem: true → redirect every writable path
-                # onto an emptyDir. Caddy stores config/data under the XDG dirs
-                # (mounted at /tmp/caddy); Coraza writes SecTmpDir/SecDataDir
-                # under /tmp/coraza; generic temp files go to TMPDIR.
-                - name: XDG_CONFIG_HOME
-                  value: /tmp/caddy
+                  value: http://${NAME}-backend-${ZONE}:8080
                 - name: XDG_DATA_HOME
-                  value: /tmp/caddy
-                - name: TMPDIR
-                  value: /tmp/caddy
+                  value: /tmp
+                - name: XDG_CONFIG_HOME
+                  value: /tmp
+                - name: VITE_KEYCLOAK_URL
+                  value: ${VITE_KEYCLOAK_URL}
+                - name: VITE_KEYCLOAK_CLIENT_ID
+                  value: ${VITE_KEYCLOAK_CLIENT_ID}
+                - name: VITE_BACKEND_URL
+                  value: ${VITE_BACKEND_URL}
+                - name: VITE_BASE_PATH
+                  value: ${VITE_BASE_PATH}
+                - name: VITE_SUPPORT_EMAIL
+                  value: ${VITE_SUPPORT_EMAIL}
+                - name: VITE_ZONE
+                  value: ${VITE_ZONE}
+              volumeMounts:
+                - name: srv
+                  mountPath: /srv
+                - name: tmp
+                  mountPath: /tmp
               resources:
                 requests:
-                  cpu: ${CPU_REQUEST}
-                  memory: ${MEMORY_REQUEST}
+                  cpu: "50m"
+                  memory: "64Mi"
+                  ephemeral-storage: "100Mi"
                 limits:
-                  memory: ${MEMORY_LIMIT}
+                  cpu: "200m"
+                  memory: "128Mi"
+                  ephemeral-storage: "200Mi"
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 3001
+                initialDelaySeconds: 5
+                periodSeconds: 10
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: 3001
+                initialDelaySeconds: 3
+                periodSeconds: 5
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
                 readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
-                seccompProfile:
-                  type: RuntimeDefault
-              volumeMounts:
-                - name: caddy-data
-                  mountPath: /tmp/caddy
-                - name: coraza-tmp
-                  mountPath: /tmp/coraza
-              startupProbe:
-                httpGet:
-                  path: /
-                  port: http
-                periodSeconds: 5
-                failureThreshold: 30
-              readinessProbe:
-                httpGet:
-                  path: /
-                  port: http
-                periodSeconds: 5
-                failureThreshold: 3
-              livenessProbe:
-                httpGet:
-                  path: /health
-                  port: health
-                periodSeconds: 10
-                failureThreshold: 3
-              lifecycle:
-                preStop:
-                  exec:
-                    command: ["/bin/sleep", "10"]
           volumes:
-            - name: caddy-data
-              emptyDir:
-                medium: Memory
-                sizeLimit: 256Mi
-            - name: coraza-tmp
-              emptyDir:
-                medium: Memory
-                sizeLimit: 256Mi
+            - name: srv
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}
+
+  # ── Service ───────────────────────────────────────────────
   - apiVersion: v1
     kind: Service
     metadata:
+      name: ${NAME}-frontend-${ZONE}
       labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
+        app: ${NAME}-frontend-${ZONE}
+        app.kubernetes.io/instance: ${ZONE}
     spec:
+      selector:
+        app: ${NAME}-frontend-${ZONE}
       ports:
         - name: http
-          port: 80
+          protocol: TCP
+          port: 3000
           targetPort: 3000
-      selector:
-        deployment: ${NAME}-${ZONE}-${COMPONENT}
-  - apiVersion: route.openshift.io/v1
-    kind: Route
+
+  # ── Route ─────────────────────────────────────────────────
+  # Deliberately NOT here. The frontend Route lives in its own template so it
+  # can be applied per environment: openshift.route.yml (default cluster
+  # hostname) for TEST and PR previews, openshift.vanity-route.yml
+  # (cbr.nrs.gov.bc.ca) for PROD only. `oc process` emits every object in a
+  # template, so a Route defined here would be created in every environment —
+  # which is exactly what we need to avoid to keep PROD on a single URL.
+  # See the two route templates and the deploy steps in reusable-deploy.yml.
+
+  # ── NetworkPolicy: ingress from OpenShift router ───────────
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
     metadata:
+      name: ${NAME}-frontend-${ZONE}-ingress
       labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
+        app: ${NAME}-frontend-${ZONE}
+        app.kubernetes.io/instance: ${ZONE}
     spec:
-      host: ${NAME}-${ZONE}.${DOMAIN}
-      to:
-        kind: Service
-        name: ${NAME}-${ZONE}-${COMPONENT}
-        weight: 100
-      tls:
-        termination: edge
-        insecureEdgeTerminationPolicy: Redirect
-  - apiVersion: autoscaling/v2
-    kind: HorizontalPodAutoscaler
-    metadata:
-      labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
-    spec:
-      scaleTargetRef:
-        apiVersion: apps/v1
-        kind: Deployment
-        name: ${NAME}-${ZONE}-${COMPONENT}
-      minReplicas: ${{MIN_REPLICAS}}
-      maxReplicas: ${{MAX_REPLICAS}}
-      metrics:
-        - type: Resource
-          resource:
-            name: cpu
-            target:
-              type: Utilization
-              averageUtilization: 80
-      behavior:
-        scaleUp:
-          stabilizationWindowSeconds: 30
-          policies:
-            - type: Percent
-              value: 100
-              periodSeconds: 60
-          selectPolicy: Max
-        scaleDown:
-          stabilizationWindowSeconds: 300
-          policies:
-            - type: Percent
-              value: 50
-              periodSeconds: 60
-          selectPolicy: Max
-  - apiVersion: policy/v1
-    kind: PodDisruptionBudget
-    metadata:
-      labels:
-        app: ${NAME}-${ZONE}
-      name: ${NAME}-${ZONE}-${COMPONENT}
-    spec:
-      maxUnavailable: 1
-      selector:
+      podSelector:
         matchLabels:
-          deployment: ${NAME}-${ZONE}-${COMPONENT}
+          app: ${NAME}-frontend-${ZONE}
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  network.openshift.io/policy-group: ingress
+      policyTypes:
+        - Ingress
