@@ -14,7 +14,7 @@
 
   // Page titles. `h1` covers most; add a page's title class here if it isn't an h1.
   // (nr-frep listed one class per screen — those were its pages, not CBR's.)
-  :is(h1, .dashboard__title) {
+  h1 {
     text-align: left;
     width: 100%;
   }

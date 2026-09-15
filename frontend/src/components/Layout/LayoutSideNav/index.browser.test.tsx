@@ -127,6 +127,26 @@ describe('LayoutSideNav', () => {
     expect(profileLink).toHaveClass('cds--side-nav__link--current');
   });
 
+  it('marks the SECTION active too, which is all the collapsed rail can show', async () => {
+    // With the nav collapsed the children are hidden, so the section itself has to carry the state
+    // or the user loses every trace of where they are. Carbon puts `--active` on the <li> when
+    // `isActive` is passed, which LayoutSideNav derives from the path prefix; the rail stylesheet
+    // paints that. Asserted on the class rather than the paint because the styling is CSS-only.
+    await renderWithProviders('/settings/profile');
+
+    const section = screen.getByText('Settings').closest('li');
+    expect(section).toHaveClass('cds--side-nav__item--active');
+  });
+
+  it('gives the section a title element for the rail tooltip to reuse', async () => {
+    // The collapsed rail has no room for a label, so the tooltip is the real title repurposed —
+    // absolutely positioned and revealed on hover. Reusing the element rather than a data-attribute
+    // guarantees the tooltip says exactly what the expanded nav says.
+    await renderWithProviders('/settings/profile');
+
+    expect(screen.getByText('Settings')).toHaveClass('cds--side-nav__submenu-title');
+  });
+
   it('offers "Report an issue" when a support mailbox is configured', async () => {
     // The app tells users to contact the CBR help desk when something fails; this is the how.
     envMock.VITE_SUPPORT_EMAIL = 'cbr@gov.bc.ca';

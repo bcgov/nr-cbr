@@ -110,24 +110,15 @@
   .#{variables.$bcgov-prefix}--btn__icon {
     position: static;
     inset-inline-end: auto;
-    /* Icon leads the label, app-wide: Carbon renders it as the button's last child, which puts a
-       "+" after "Add feature" — the opposite of the pattern every other control here follows.
-       `order` rather than DOM changes, so it applies to every Carbon button at once. */
-    order: -1;
+    /* Icon AFTER the label — Carbon's own child order, kept. What is changed above is only that it
+       flows beside the text instead of being pinned absolutely to the button's right edge, which
+       left text-only and text+icon buttons looking lopsided.
+
+       An earlier revision reordered it to lead the label app-wide (`order: -1`), with the landing
+       buttons excepted. That is reverted: icons trail their label everywhere, which is both
+       Carbon's default and what the landing buttons already needed, so the exception is gone too. */
     transform: translateY(1px);
   }
-}
-
-/* The landing page's buttons keep Carbon's own order — icon AFTER the label — rather than the
-   app-wide `order: -1` above. They are fixed at 20rem and use `justify-content: space-between`
-   (see pages/Landing/index.scss), which holds the label against the left edge and the icon against
-   the right. That is nr-frep's treatment and what these full-width buttons are designed around;
-   leading with the icon under `space-between` flings the two to opposite edges of the button.
-
-   It also reads better for the offline "Get started" button, whose arrow points the way the button
-   takes you — backwards if placed on the left. All three landing buttons carry `.login-btn`. */
-.#{variables.$bcgov-prefix}--btn.login-btn .#{variables.$bcgov-prefix}--btn__icon {
-  order: 0;
 }
 
 /* ------- Text Input / Text Area / Password Input -------
@@ -538,6 +529,15 @@ this rule ahead of Carbon's base label colour while letting the disabled one thr
 ------------------------------- */
 label.#{variables.$bcgov-prefix}--label:not(.#{variables.$bcgov-prefix}--label--disabled),
 legend.#{variables.$bcgov-prefix}--label:not(.#{variables.$bcgov-prefix}--label--disabled) {
+  color: var(--#{variables.$bcgov-prefix}-text-primary);
+}
+
+/* Toggle labels the same. They are missed by the rule above because Carbon renders a Toggle's label
+   as `<div class="cds--toggle__label-text">` rather than a `<label>`, and paints it
+   `$text-secondary` — so a Toggle sitting in a row of text inputs had a visibly paler label than
+   everything beside it. Disabled toggles keep Carbon's grey, as with the labels above. */
+.#{variables.$bcgov-prefix}--toggle:not(.#{variables.$bcgov-prefix}--toggle--disabled)
+  .#{variables.$bcgov-prefix}--toggle__label-text {
   color: var(--#{variables.$bcgov-prefix}-text-primary);
 }
 

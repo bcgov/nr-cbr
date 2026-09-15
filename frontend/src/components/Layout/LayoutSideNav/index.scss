@@ -91,7 +91,9 @@
   // The tooltip is the link's own label, repurposed: taken out of flow and floated to the right of
   // the icon as a dark pill, hidden until hover. Reusing the real label rather than a data-attribute
   // guarantees it is present and says exactly what the expanded nav says.
-  .side-nav-drawer:not(.side-nav-drawer--open) .#{vars.$bcgov-prefix}--side-nav__link-text {
+  .side-nav-drawer:not(.side-nav-drawer--open) .#{vars.$bcgov-prefix}--side-nav__link-text,
+  .side-nav-drawer:not(.side-nav-drawer--open)
+    .#{vars.$bcgov-prefix}--side-nav__submenu-title {
     position: absolute;
     inset-inline-start: calc(100% + 8px);
     inset-block-start: 50%;
@@ -110,12 +112,74 @@
     transform: translateY(-50%);
     transition: opacity 0.15s ease;
     white-space: nowrap;
+
+    // Carbon gives a section title `text-overflow()` — `overflow-x: hidden` plus an ellipsis — so
+    // it truncates inside the expanded panel. Out here the element IS the tooltip and sizes to its
+    // own text, so the clipping has to be lifted or the label is cut to the width of the rail.
+    overflow: visible;
+    inline-size: auto;
+    max-inline-size: none;
+    text-overflow: clip;
   }
 
   .side-nav-drawer:not(.side-nav-drawer--open)
     .#{vars.$bcgov-prefix}--side-nav__link:hover
-    .#{vars.$bcgov-prefix}--side-nav__link-text {
+    .#{vars.$bcgov-prefix}--side-nav__link-text,
+  .side-nav-drawer:not(.side-nav-drawer--open)
+    .#{vars.$bcgov-prefix}--side-nav__submenu:hover
+    .#{vars.$bcgov-prefix}--side-nav__submenu-title {
     opacity: 1;
+  }
+
+  // ── Sections (SideNavMenu) in the rail ─────────────────────────────────────
+  // A section renders as <button class="__submenu"> + a nested <ul class="__menu">, none of which
+  // the rail rules above match — those were written for SideNavLink, which is the only kind of
+  // entry nr-frep has, so this path had never been exercised. Untreated, the rail shows a chevron
+  // beside the section icon and a stack of unlabelled grey strips where its children are.
+
+  // Nothing to expand into at 48px wide, so the affordance is a lie.
+  .side-nav-drawer:not(.side-nav-drawer--open) .#{vars.$bcgov-prefix}--side-nav__submenu-chevron {
+    display: none;
+  }
+
+  // The children themselves. `!important` because Carbon drives this list open with an inline
+  // max-height once `defaultExpanded` is set, which it is whenever a child route is active — which
+  // is exactly when the rail would otherwise show blank bars.
+  .side-nav-drawer:not(.side-nav-drawer--open) .#{vars.$bcgov-prefix}--side-nav__menu {
+    display: none !important;
+  }
+
+  // Centre the section icon in the strip, the same treatment the link rule above gives a link.
+  .side-nav-drawer:not(.side-nav-drawer--open) .#{vars.$bcgov-prefix}--side-nav__submenu {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-inline: 0 !important;
+    // The button is the tooltip's positioning context, so it must not clip what sticks out past
+    // the 48px strip — the same reason the item list above relaxes its overflow.
+    overflow: visible;
+  }
+
+  // With the children hidden, the section itself has to carry the active state — otherwise the user
+  // loses all trace of where they are the moment they collapse the nav.
+  //
+  // Carbon styles this already, but only for `__submenu[aria-expanded='false']`: it assumes a
+  // section showing its active child needs no highlight of its own. In the rail the child is hidden
+  // and the section stays expanded, so that condition never holds and the highlight never lands.
+  .side-nav-drawer:not(.side-nav-drawer--open)
+    .#{vars.$bcgov-prefix}--side-nav__item--active
+    > .#{vars.$bcgov-prefix}--side-nav__submenu {
+    background-color: $background-selected;
+
+    &::before {
+      position: absolute;
+      background-color: $border-interactive;
+      content: '';
+      inline-size: 3px;
+      inset-block: 0;
+      inset-inline-start: 0;
+    }
   }
 }
 
@@ -144,8 +208,15 @@
 }
 
 // No room for a section label in the rail — the link's hover tooltip already names it.
+//
+// Collapsed to nothing rather than `display: none`, because this element is what pins the support
+// block to the bottom: it carries `margin-block-start: auto` as a flex child of the item list.
+// Removing it from the box tree takes the auto margin with it, and the support icon rides up under
+// the last nav entry instead of staying at the foot of the rail.
 @include breakpoint(lg) {
   .side-nav-drawer:not(.side-nav-drawer--open) .side-nav-support-heading {
-    display: none;
+    block-size: 0;
+    padding-block: 0;
+    overflow: hidden;
   }
 }

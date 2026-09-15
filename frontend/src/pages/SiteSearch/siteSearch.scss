@@ -1,0 +1,94 @@
+@use '@carbon/react/scss/spacing' as *;
+
+.site-search__form {
+  margin-block-end: $spacing-07;
+}
+
+// Four criteria per row, matching nr-frep's search filters. Fixed columns rather than auto-fit:
+// auto-fit packs as many columns as happen to fit, so the row count changes with the window and the
+// fields never line up with the results table below. Stepped down at the Carbon lg and md
+// breakpoints so a column never gets narrower than roughly 13rem.
+.site-search__criteria {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: $spacing-05;
+  // Top-aligned, not bottom-aligned. Every field is label-then-input, so aligning the tops lines the
+  // inputs up — and the longer labels here ("Designated Maintainer Client Number", "Special Access
+  // Requirements") wrap onto two lines, which would push their inputs out of line otherwise.
+  align-items: start;
+
+  @media (max-width: 1055px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Fields holding two inputs need the width of two columns: at ~13rem a pair is unusable.
+.site-search__span-2 {
+  grid-column: span 2;
+
+  @media (max-width: 671px) {
+    grid-column: span 1;
+  }
+}
+
+// "Project File ID#" and its "Br." section sit on one line, as on the legacy form: they are two
+// halves of one identifier, and separating them loses that.
+.site-search__paired {
+  display: flex;
+  gap: $spacing-03;
+
+  > :first-child {
+    flex: 1 1 auto;
+  }
+
+  > :last-child {
+    flex: 0 0 6rem;
+  }
+}
+
+// A "from – to" pair. The fieldset carries the group label so a screen reader announces
+// "Kilometres, From" rather than a bare "From" that could belong to either range on the form.
+.site-search__range {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.site-search__range-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: $spacing-03;
+}
+
+.site-search__range-dash {
+  padding-block-end: $spacing-04;
+}
+
+// Each toggle is its own grid cell, so the two sit on the row beside the fields rather than stacked
+// in a single cell — which left them looking like an afterthought bolted to the end of the row.
+//
+// Carbon puts $spacing-05 under a toggle's label to line its switch up with a text input's field.
+// That is the right gap when the toggle shares a row with inputs, which here it always does.
+.site-search__toggle {
+  align-self: start;
+}
+
+// Search / Clear get a row to themselves, right-aligned. `1 / -1` spans every column at any
+// breakpoint, so they never fill whichever column happened to be left over after the last field.
+.site-search__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-03;
+  margin-block-start: $spacing-03;
+}
+
+// KM is a measurement; right-aligning lets the decimal points line up down the column, which is what
+// the legacy table did with align="right".
+.site-search__numeric {
+  text-align: end;
+}

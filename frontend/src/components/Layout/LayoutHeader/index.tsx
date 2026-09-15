@@ -8,6 +8,7 @@ import { LayoutSideNav } from '@/components/Layout/LayoutSideNav';
 import LayoutHeaderGlobalBar from './LayoutHeaderGlobalBar';
 
 import { APP_FULL_NAME, APP_NAME } from '@/constants/appName';
+import { LANDING_AFTER_LOGIN } from '@/constants/routes';
 import { useLayout } from '@/context/layout/useLayout';
 
 import './index.scss';
@@ -33,7 +34,7 @@ export const LayoutHeader: FC = () => {
       />
       {/* The app name renders in Carbon's prefix style (regular weight) ahead of the bold full name,
           matching the FSPTS header treatment. */}
-      <HeaderName as={Link} to="/dashboard" prefix={APP_NAME}>
+      <HeaderName as={Link} to={LANDING_AFTER_LOGIN} prefix={APP_NAME}>
         {APP_FULL_NAME}
       </HeaderName>
 

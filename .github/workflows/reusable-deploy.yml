@@ -208,6 +208,7 @@ jobs:
             -p VITE_BACKEND_URL="${{ vars.VITE_BACKEND_URL || '/api' }}"
             -p VITE_BASE_PATH="${{ vars.VITE_BASE_PATH }}"
             -p VITE_SUPPORT_EMAIL="${{ vars.SUPPORT_EMAIL }}"
+            -p VITE_ACCESS_REQUEST_EMAIL="${{ vars.ACCESS_REQUEST_EMAIL }}"
             -p VITE_ZONE="${{ vars.VITE_ZONE || inputs.target }}"
           triggers: ${{ inputs.triggers }}
 
