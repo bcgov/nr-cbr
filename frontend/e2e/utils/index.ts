@@ -6,8 +6,7 @@ import { join } from 'node:path';
  * `baseURL` is resolved from BASE_URL so the same suite runs against local dev, a PR preview and
  * TEST — CI passes the deployed host in (see .github/workflows/reusable-tests.yml).
  */
-export const baseURL =
-  process.env.E2E_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:3000';
+export const baseURL = process.env.E2E_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:3000';
 
 /**
  * Where the signed-in browser state is persisted so tests start already authenticated.

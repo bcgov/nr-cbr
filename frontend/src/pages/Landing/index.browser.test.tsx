@@ -74,8 +74,13 @@ describe('LandingPage', () => {
     expect(screen.getByRole('link', { name: 'cbr.access@gov.bc.ca' }).getAttribute('href')).toBe(
       'mailto:cbr.access@gov.bc.ca',
     );
-    // Regional engineer access is granted per org unit, so the request has to name them.
-    expect(screen.getByText(/org unit\(s\) \/ region\(s\) you need regional engineer access for/)).toBeTruthy();
+    // The dialog has to name the roles a requester can ask for, in their own vocabulary — the
+    // person reading it is not the person who provisions access. CBR has no region or client
+    // scoping, so the role is the only thing to choose.
+    expect(screen.getByText(/Read only — search, view and reports/)).toBeTruthy();
+    expect(
+      screen.getByText(/Professional Engineer — also review and sign off inspections/),
+    ).toBeTruthy();
   });
 
   it('hides "Request access" when no mailbox is configured', () => {

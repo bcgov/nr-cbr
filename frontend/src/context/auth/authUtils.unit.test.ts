@@ -156,9 +156,9 @@ describe('extractRoles', () => {
 
   it("drops FAM's per-grant expiry bookkeeping roles", () => {
     // FAM assigns expiry as a role on the person; it is not a role anyone holds.
-    expect(
-      extractRoles({ client_roles: ['CBR_PENG', 'FAM:EXPIRES:2026-09-30:CBR_PENG'] }),
-    ).toEqual(['CBR_PENG']);
+    expect(extractRoles({ client_roles: ['CBR_PENG', 'FAM:EXPIRES:2026-09-30:CBR_PENG'] })).toEqual(
+      ['CBR_PENG'],
+    );
   });
 
   it('returns an empty array when there are no roles at all', () => {

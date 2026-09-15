@@ -1,7 +1,5 @@
 import {
   AVAILABLE_ROLES,
-  CONTRACT_ENGINEER_PREFIX,
-  REGIONAL_ENGINEER_PREFIX,
   type FamLoginUser,
   type IdpProviderType,
   type JwtClaims,
@@ -126,38 +124,19 @@ const resolveUsername = (claims: JwtClaims): string => {
  *   a `null` value (null = global, non-scoped role).
  * - Any other role is ignored.
  *
- * <p>**The two region-scoped branches are dead code**, retained only until the D3 cleanup removes
- * their call sites. Legacy CBR has no region scoping — `CBR_REGIONAL_ENGINEER` and
- * `CBR_CONTRACT_REGIONAL_ENGINEER` are PL/SQL package names, not roles — so no token will carry a
- * role with either prefix. See `DEPRECATED_ROLES` in ./types.
+ * <p>Every CBR role is flat: there is no region, district or client scoping anywhere in the system,
+ * so a role string is either an exact match or not ours. A suffixed role (`CBR_LEVEL_2_DCK`) is
+ * deliberately NOT accepted — the backend's `CbrRoles.isKnown` rejects it for the same reason.
  *
  * @param {string[]} input - Array of role strings from the access token.
  * @returns {USER_PRIVILEGE_TYPE} The parsed privilege object.
  */
 export function parsePrivileges(input: string[]): USER_PRIVILEGE_TYPE {
   const result: USER_PRIVILEGE_TYPE = {};
-  const regionalCodes: string[] = [];
-  const contractCodes: string[] = [];
   for (const item of input) {
-    // CONTRACT first: CBR_CONTRACT_REGIONAL_ENGINEER_ and CBR_REGIONAL_ENGINEER_ are distinct
-    // strings, but testing the narrower role first keeps the ordering safe if either is ever
-    // renamed such that one becomes a prefix of the other.
-    if (item.startsWith(CONTRACT_ENGINEER_PREFIX)) {
-      const code = item.slice(CONTRACT_ENGINEER_PREFIX.length).trim().toUpperCase();
-      if (code) contractCodes.push(code);
-    } else if (item.startsWith(REGIONAL_ENGINEER_PREFIX)) {
-      const code = item.slice(REGIONAL_ENGINEER_PREFIX.length).trim().toUpperCase();
-      if (code) regionalCodes.push(code);
-    } else if (AVAILABLE_ROLES.includes(item as ROLE_TYPE)) {
-      // Direct match against a known global role name.
+    if (AVAILABLE_ROLES.includes(item as ROLE_TYPE)) {
       result[item as ROLE_TYPE] = null; // null = global (non-scoped) role
     }
-  }
-  const dedupeSorted = (codes: string[]) =>
-    [...new Set(codes)].sort((a, b) => a.localeCompare(b));
-  if (regionalCodes.length > 0) result.CBR_REGIONAL_ENGINEER = dedupeSorted(regionalCodes);
-  if (contractCodes.length > 0) {
-    result.CBR_CONTRACT_REGIONAL_ENGINEER = dedupeSorted(contractCodes);
   }
   return result;
 }

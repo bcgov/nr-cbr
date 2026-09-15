@@ -19,23 +19,30 @@ import org.junit.jupiter.api.Test;
  */
 class CbrAuthoritiesTest {
 
-  private static String expected(String floor) {
+  /** Rebuilds the SpEL a capability with this floor should carry, straight from the ladder. */
+  private static String fromLadder(String floor) {
     return "hasAnyAuthority(" + CbrRoles.asAuthorityList(CbrRoles.atLeast(floor)) + ")";
   }
 
   @Test
   @DisplayName("each write capability admits exactly its floor and everything above it")
   void expressionsMatchTheLadder() {
-    assertThat(CbrAuthorities.INSPECTION_WRITE).isEqualTo(expected(CbrRoles.LEVEL_0));
-    assertThat(CbrAuthorities.CONTENT_EDIT).isEqualTo(expected(CbrRoles.LEVEL_1));
-    assertThat(CbrAuthorities.DESTRUCTIVE).isEqualTo(expected(CbrRoles.LEVEL_2));
+    String inspectionWrite = CbrAuthorities.INSPECTION_WRITE;
+    String contentEdit = CbrAuthorities.CONTENT_EDIT;
+    String destructive = CbrAuthorities.DESTRUCTIVE;
+
+    assertThat(inspectionWrite).isEqualTo(fromLadder(CbrRoles.LEVEL_0));
+    assertThat(contentEdit).isEqualTo(fromLadder(CbrRoles.LEVEL_1));
+    assertThat(destructive).isEqualTo(fromLadder(CbrRoles.LEVEL_2));
   }
 
   @Test
   @DisplayName("APPROVE is P.Eng alone — the top of the ladder, so hasAuthority not hasAnyAuthority")
   void approveIsPengOnly() {
+    String approve = CbrAuthorities.APPROVE;
+
     assertThat(CbrRoles.atLeast(CbrRoles.PENG)).containsExactly(CbrRoles.PENG);
-    assertThat(CbrAuthorities.APPROVE).isEqualTo("hasAuthority('CBR_PENG')");
+    assertThat(approve).isEqualTo("hasAuthority('CBR_PENG')");
   }
 
   @Test
@@ -44,7 +51,9 @@ class CbrAuthoritiesTest {
     // A deliberate divergence from legacy, decided 2026-09-15: in WebADE the ADMINISTRATOR role held
     // three privileges and its profile bundled no GENERAL, so an administrator could not open a
     // site. CBR grants them the read surface.
-    assertThat(CbrAuthorities.READ)
+    String read = CbrAuthorities.READ;
+
+    assertThat(read)
         .isEqualTo("hasAnyAuthority(" + CbrRoles.asAuthorityList(CbrRoles.READERS) + ")");
     assertThat(CbrRoles.READERS).containsAll(CbrRoles.LADDER).contains(CbrRoles.ADMIN);
     assertThat(CbrRoles.canRead(Set.of(CbrRoles.ADMIN))).isTrue();
@@ -59,8 +68,10 @@ class CbrAuthoritiesTest {
         CbrAuthorities.DESTRUCTIVE,
         CbrAuthorities.APPROVE);
 
+    String admin = CbrAuthorities.ADMIN;
+
     assertThat(writeCapabilities).noneMatch(expr -> expr.contains(CbrRoles.ADMIN));
-    assertThat(CbrAuthorities.ADMIN).isEqualTo("hasAuthority('CBR_ADMIN')");
+    assertThat(admin).isEqualTo("hasAuthority('CBR_ADMIN')");
 
     // Still off the ladder, so no rank comparison ever admits an administrator to a write gate.
     assertThat(CbrRoles.LADDER).doesNotContain(CbrRoles.ADMIN);
@@ -105,7 +116,9 @@ class CbrAuthoritiesTest {
   void unknownFloorFailsClosed() {
     // rank() returns -1 for anything off the ladder, so a silent `>= -1` would be satisfied by
     // every caller — including one with no roles at all.
-    assertThatThrownBy(() -> CbrRoles.isAtLeast(Set.of(CbrRoles.GENERAL), CbrRoles.ADMIN))
+    Set<String> holder = Set.of(CbrRoles.GENERAL);
+
+    assertThatThrownBy(() -> CbrRoles.isAtLeast(holder, CbrRoles.ADMIN))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> CbrRoles.atLeast("CBR_NOT_A_ROLE"))
         .isInstanceOf(IllegalArgumentException.class);

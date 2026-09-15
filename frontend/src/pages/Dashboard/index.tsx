@@ -2,11 +2,10 @@ import { Column, Grid, InlineNotification } from '@carbon/react';
 
 import type { FC } from 'react';
 
+import { APP_FULL_NAME, APP_NAME } from '@/constants/appName';
 import { useAuthorization } from '@/hooks/useAuthorization';
 
 import './dashboard.scss';
-
-import { APP_FULL_NAME, APP_NAME } from '@/constants/appName';
 
 /**
  * Post-login home.
@@ -18,7 +17,8 @@ import { APP_FULL_NAME, APP_NAME } from '@/constants/appName';
  * inspection, documents, 12 reports, 3 admin screens, search).
  */
 const DashboardPage: FC = () => {
-  const { isSysAdmin, regions, contractRegions, canEdit } = useAuthorization();
+  const { isSysAdmin, isPeng, canRead, canWriteInspection, canEdit, canDelete } =
+    useAuthorization();
 
   return (
     <Grid fullWidth className="default-grid dashboard-grid">
@@ -46,12 +46,16 @@ const DashboardPage: FC = () => {
         <dl className="dashboard__roles">
           <dt>Administrator</dt>
           <dd>{isSysAdmin ? 'yes' : 'no'}</dd>
+          <dt>Can read</dt>
+          <dd>{canRead ? 'yes' : 'no'}</dd>
+          <dt>Can record an inspection</dt>
+          <dd>{canWriteInspection ? 'yes' : 'no'}</dd>
           <dt>Can edit</dt>
           <dd>{canEdit ? 'yes' : 'no'}</dd>
-          <dt>Regional engineer for</dt>
-          <dd>{regions.length ? regions.join(', ') : '—'}</dd>
-          <dt>Contract regional engineer for</dt>
-          <dd>{contractRegions.length ? contractRegions.join(', ') : '—'}</dd>
+          <dt>Can delete / archive</dt>
+          <dd>{canDelete ? 'yes' : 'no'}</dd>
+          <dt>Can sign off inspections</dt>
+          <dd>{isPeng ? 'yes' : 'no'}</dd>
         </dl>
       </Column>
     </Grid>

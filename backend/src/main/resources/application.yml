@@ -113,6 +113,10 @@ cbr:
   general-package-name: CBR_GENERAL
   reporting-package-name: CBR_REPORTING
   admin-package-name: CBR_ADMIN
+  # These two are PACKAGE names, not roles. The packages are live — CBR_REGIONAL_ENGINEER holds the
+  # nine destructive procedures and CBR_CONTRACT_REGIONAL_ENGINEER holds UPDATE_SITE — but the roles
+  # they were named after were retired in WebADE long ago, and CBR has no region scoping of any kind.
+  # See cbr-auth-and-roles.local.md §3.1.
   regional-engineer-package-name: CBR_REGIONAL_ENGINEER
   contract-engineer-package-name: CBR_CONTRACT_REGIONAL_ENGINEER
   # S3-compatible object storage for inspection attachments. Replaces the CROSSING_STRUCTURE_FILE

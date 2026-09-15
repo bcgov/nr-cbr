@@ -192,12 +192,17 @@ const LandingPage: FC = () => {
             <li>Organization</li>
           </ul>
 
-          {/* Region-scoped roles (CBR_REGIONAL_ENGINEER_<code>) are granted per org unit, not globally, so
-              a request that omits the districts can't be actioned. */}
-          <p className="landing-request-modal__group-title">For regional engineer access</p>
+          {/* Every CBR role is flat and province-wide — no region, district or forest-client
+              scoping exists (cbr-auth-and-roles.local.md §3.3), so the only thing a request needs
+              beyond identity is which role. Naming them in the user's own vocabulary rather than as
+              CBR_* strings, since the requester is not the person who provisions them. */}
+          <p className="landing-request-modal__group-title">Which access you need</p>
           <ul>
-            <li>The org unit(s) / region(s) you need regional engineer access for</li>
-            <li>Whether you are a ministry or a contract regional engineer</li>
+            <li>Read only — search, view and reports</li>
+            <li>Inspector Level 1 — also create and edit sites, structures and inspections</li>
+            <li>Inspector Level 2 — also delete, archive and add sites</li>
+            <li>Professional Engineer — also review and sign off inspections</li>
+            <li>Administrator — bulletins and the inspection reviewer list</li>
           </ul>
         </div>
       </Modal>

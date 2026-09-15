@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import type { FamLoginUser, ROLE_TYPE } from '@/context/auth/types';
 
+import { ROLE_CAPABILITIES } from '@/context/auth/types';
 import { useAuth } from '@/context/auth/useAuth';
 
 /**
@@ -12,40 +13,25 @@ import { useAuth } from '@/context/auth/useAuth';
  * actions that would come back 403.
  */
 export type AuthorizationInfo = {
-  /** `true` when the user holds the `CBR_ADMIN` Cognito group. */
+  /** `true` when the user holds the `CBR_ADMIN` role. Administration screens only — plus read. */
   isSysAdmin: boolean;
-  /** `true` when the user holds the `CBR_GENERAL` group. */
+  /** `true` when the user holds `CBR_GENERAL`, the read-only role. */
   isGeneral: boolean;
-  /** `true` when the user holds the `CBR_ENGINEER` group. */
-  isEngineer: boolean;
-  /** `true` when the user may review and seal inspection reports (`CBR_PENG`, or sys-admin). */
+  /** `true` when the user may review and seal inspection reports (`CBR_PENG`). Not implied by admin. */
   isPeng: boolean;
-  /** `true` when the user has at least one recognized CBR role, global or region-scoped. */
+  /** `true` when the user holds any recognized CBR role. */
   hasAnyRole: boolean;
-  /** `true` when the user can perform general write operations. */
+  /** `true` when the user may search, view and run reports. */
+  canRead: boolean;
+  /** `true` when the user may record or amend an inspection (`CBR_LEVEL_0` and above). */
+  canWriteInspection: boolean;
+  /** `true` when the user may create or edit sites and structures (`CBR_LEVEL_1` and above). */
   canEdit: boolean;
   /** `true` when the user can create new resources. Alias for {@link canEdit}. */
   canCreate: boolean;
-  /** Org-unit codes the user is a regional engineer for (from `CBR_REGIONAL_ENGINEER_*`). */
-  regions: string[];
-  /** Org-unit codes the user is a *contract* regional engineer for. */
-  contractRegions: string[];
-  /** `true` when the user holds a regional-engineer role for any region (or is sys-admin). */
-  canAnyRegion: boolean;
   /**
-   * `true` when the user may perform regional-engineer operations — the destructive set: delete
-   * site/structure/inspection/repair/monitor/attachment, and archive a structure — for the given
-   * org-unit code. Sys-admins pass for every region.
-   */
-  canRegion: (orgUnitCode: string | undefined | null) => boolean;
-  /**
-   * `true` when the user may update a site in the given region: a regional engineer, or a contract
-   * regional engineer, whose single legacy privilege was exactly `UPDATE_SITE`.
-   */
-  canUpdateSite: (orgUnitCode: string | undefined | null) => boolean;
-  /**
-   * `true` when the user may delete. Region-scoped: prefer {@link canRegion} with the record's org
-   * unit wherever one is available — this is the coarse, id-less gate only.
+   * `true` when the user may delete, archive, add a site or override inspection status —
+   * `CBR_LEVEL_2` and above.
    */
   canDelete: boolean;
   /** Checks if the user holds a specific role. */
@@ -55,17 +41,19 @@ export type AuthorizationInfo = {
 };
 
 /**
- * Hook providing role-based authorization helpers derived from the authenticated user's Cognito
- * (FAM) groups.
+ * Hook providing role-based authorization helpers derived from the roles on the access token.
+ *
+ * <p>Capabilities come from `ROLE_CAPABILITIES`, which mirrors the backend `CbrAuthorities` matrix.
+ * There is no region or client scoping anywhere in CBR — every role is flat and province-wide.
  *
  * @example
  * ```tsx
- * const { isSysAdmin, canEdit, canRegion } = useAuthorization();
+ * const { isSysAdmin, canEdit, canDelete } = useAuthorization();
  *
  * return (
  *   <>
  *     {canEdit && <Button>Edit</Button>}
- *     {canRegion(site.orgUnitCode) && <Button kind="danger">Delete</Button>}
+ *     {canDelete && <Button kind="danger">Delete</Button>}
  *     {isSysAdmin && <Link to="/admin">Admin</Link>}
  *   </>
  * );
@@ -76,47 +64,35 @@ export const useAuthorization = (): AuthorizationInfo => {
 
   return useMemo<AuthorizationInfo>(() => {
     const roles = user?.roles ?? [];
+    const holds = (allowed: readonly ROLE_TYPE[]) => allowed.some((role) => roles.includes(role));
+
     const isSysAdmin = roles.includes('CBR_ADMIN');
     const isGeneral = roles.includes('CBR_GENERAL');
-    const isEngineer = roles.includes('CBR_ENGINEER');
-    const isPeng = isSysAdmin || roles.includes('CBR_PENG');
+    // Not `isSysAdmin || …`: /approveInspection belongs to CBR_PENG alone. Sealing an inspection is
+    // a professional engineering act tied to a named P.Eng, not an administrative one.
+    const isPeng = roles.includes('CBR_PENG');
 
-    // Region-scoped roles: the privilege value carries the org-unit codes.
-    const regions = user?.privileges?.CBR_REGIONAL_ENGINEER ?? [];
-    const contractRegions = user?.privileges?.CBR_CONTRACT_REGIONAL_ENGINEER ?? [];
+    const canRead = holds(ROLE_CAPABILITIES.read);
+    const canWriteInspection = holds(ROLE_CAPABILITIES.inspectionWrite);
+    const canEdit = holds(ROLE_CAPABILITIES.write);
+    const canDelete = holds(ROLE_CAPABILITIES.destructive);
 
-    const canAnyRegion = isSysAdmin || regions.length > 0;
-
-    const canRegion = (orgUnitCode: string | undefined | null) =>
-      isSysAdmin || (!!orgUnitCode && regions.includes(orgUnitCode.toUpperCase()));
-
-    const canUpdateSite = (orgUnitCode: string | undefined | null) =>
-      canRegion(orgUnitCode) ||
-      (!!orgUnitCode && contractRegions.includes(orgUnitCode.toUpperCase()));
-
-    const canEdit = isSysAdmin || isGeneral || isEngineer || isPeng;
-
-    // A region-only user holds no global role, so include the scoped roles here — otherwise they
-    // would look role-less and be routed to the role-error page. Same reasoning as nr-frep's
-    // per-district CHR editors.
-    const hasAnyRole = canEdit || canAnyRegion || contractRegions.length > 0;
+    // Read is the widest capability and CBR_ADMIN is the only role outside the ladder, so anyone
+    // with a recognised role satisfies it — which makes this the role-error-page gate.
+    const hasAnyRole = canRead;
 
     const hasRole = (role: ROLE_TYPE) => roles.includes(role);
 
     return {
       isSysAdmin,
       isGeneral,
-      isEngineer,
       isPeng,
       hasAnyRole,
+      canRead,
+      canWriteInspection,
       canEdit,
       canCreate: canEdit,
-      regions,
-      contractRegions,
-      canAnyRegion,
-      canRegion,
-      canUpdateSite,
-      canDelete: canAnyRegion,
+      canDelete,
       hasRole,
       user,
     };

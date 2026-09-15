@@ -29,10 +29,6 @@ export const AVAILABLE_ROLES = [
   'CBR_LEVEL_1',
   'CBR_LEVEL_2',
   'CBR_PENG',
-  // ── obsolete in WebADE, zero privilege grants — see DEPRECATED_ROLES below ──
-  'CBR_ENGINEER',
-  'CBR_REGIONAL_ENGINEER',
-  'CBR_CONTRACT_REGIONAL_ENGINEER',
 ] as const;
 
 /**
@@ -58,6 +54,8 @@ export const AVAILABLE_ROLES = [
  */
 export const ROLE_CAPABILITIES = {
   read: ['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'],
+  /** Record or amend an inspection — narrower than `write`, which also covers sites and structures. */
+  inspectionWrite: ['CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'],
   /** The general create/edit surface. `CBR_GENERAL` is read-only; `CBR_LEVEL_0` writes inspections only. */
   write: ['CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'],
   /** Delete / archive / status override. */
@@ -67,47 +65,6 @@ export const ROLE_CAPABILITIES = {
 } as const satisfies Record<string, readonly ROLE_TYPE[]>;
 
 export type ROLE_TYPE = (typeof AVAILABLE_ROLES)[number];
-
-/**
- * Roles retained only so their existing call sites keep compiling. **None of them grants anything.**
- *
- * All three exist in WebADE as `APPLICATION_ROLE` rows whose definitions read literally
- * `OBSOLETE_..._OBSOLETE`, and all three hold **zero `ACTION_LNK` rows** — they grant nothing to
- * anyone. They are what the `roles=` attributes in the legacy `struts-config.xml` were named after:
- * a real role model, retired when `LEVEL_1`/`LEVEL_2` replaced it. The PL/SQL packages kept the old
- * names, which is why `CBR_REGIONAL_ENGINEER` still exists as a package (its nine destructive
- * procedures are exactly `CBR_LEVEL_2`'s privileges) and `CBR_CONTRACT_REGIONAL_ENGINEER` as
- * another (its lone `UPDATE_SITE` is `CBR_LEVEL_1`'s `/saveSite`).
- *
- * There is no region scoping anywhere in the export — no grant carries an org unit. The prefixes
- * below were imported from nr-frep's per-district CHR roles and match nothing.
- *
- * Removing them — here, in `authUtils`, `useAuthorization` and the backend — is the outstanding D3
- * cleanup, deliberately kept out of the Keycloak migration.
- */
-export const DEPRECATED_ROLES = [
-  'CBR_ENGINEER',
-  'CBR_REGIONAL_ENGINEER',
-  'CBR_CONTRACT_REGIONAL_ENGINEER',
-] as const satisfies readonly ROLE_TYPE[];
-
-/**
- * @deprecated No legacy counterpart — see {@link DEPRECATED_ROLES}. Never appears on a token.
- *
- * Note the separator: nr-frep's equivalent prefix had to change from `_` to `-` under Keycloak,
- * because FAM flattens a scoped grant into one role string joined with `-`. That question is moot
- * here — CBR grants no scoped roles, so nothing will ever match this prefix in either spelling.
- */
-export const REGIONAL_ENGINEER_PREFIX = 'CBR_REGIONAL_ENGINEER_';
-
-/**
- * @deprecated No legacy counterpart — see {@link DEPRECATED_ROLES}. Never appears on a token.
- *
- * Note this string contains {@link REGIONAL_ENGINEER_PREFIX} as a substring only if matched
- * loosely; always match with `startsWith` so a contract engineer is never read as a full
- * regional engineer.
- */
-export const CONTRACT_ENGINEER_PREFIX = 'CBR_CONTRACT_REGIONAL_ENGINEER_';
 
 type RoleValue = string[] | null;
 

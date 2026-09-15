@@ -54,7 +54,7 @@ export default defineConfig(({ mode }) => {
         name: 'cbr-build-id',
         transformIndexHtml() {
           return [
-            { tag: 'meta', attrs: { name: "cbr-build", content: BUILD_ID }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'cbr-build', content: BUILD_ID }, injectTo: 'head' },
           ];
         },
       },
@@ -65,7 +65,7 @@ export default defineConfig(({ mode }) => {
         devOptions: { enabled: false },
         manifest: {
           name: 'CBR — Corporate Bridge Register',
-          short_name: "CBR",
+          short_name: 'CBR',
           description: 'Forest and Range Evaluation Program checklists',
           theme_color: '#036',
           background_color: '#ffffff',
