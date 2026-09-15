@@ -28,6 +28,7 @@ window.config = {
   VITE_BACKEND_URL: "$(escape "${VITE_BACKEND_URL:-}")",
   VITE_BASE_PATH: "$(escape "${VITE_BASE_PATH:-}")",
   VITE_SUPPORT_EMAIL: "$(escape "${VITE_SUPPORT_EMAIL:-}")",
+  VITE_ACCESS_REQUEST_EMAIL: "$(escape "${VITE_ACCESS_REQUEST_EMAIL:-}")",
   VITE_ZONE: "$(escape "${VITE_ZONE:-dev}")"
 };
 CONFIG

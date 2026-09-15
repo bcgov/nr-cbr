@@ -13,8 +13,8 @@ test.describe('public routing', () => {
 
   test('a protected path sends an anonymous visitor to the landing page', async ({ page }) => {
     // Not a 404: the route exists, the visitor simply has no session. The public route set has no
-    // /dashboard entry, so the catch-all must not swallow it into Not Found.
-    await page.goto('/dashboard');
+    // /inventory entry, so the catch-all must not swallow it into Not Found.
+    await page.goto('/inventory/site-search');
 
     await expect(page.getByTestId('landing-title')).toBeVisible();
   });

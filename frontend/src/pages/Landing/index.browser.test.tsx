@@ -100,7 +100,7 @@ describe('LandingPage', () => {
     expect(screen.queryByTestId('landing-button__bceid')).toBeNull();
 
     fireEvent.click(screen.getByTestId('landing-button__offline'));
-    expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+    expect(mockNavigate).toHaveBeenCalledWith('/inventory/site-search');
     // Requesting access means sending mail, which is not going to work offline either.
     expect(screen.queryByTestId('landing-request-access')).toBeNull();
   });

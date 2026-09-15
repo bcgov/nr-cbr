@@ -55,7 +55,13 @@ parameters:
   # link entirely rather than shipping a mailto: that goes nowhere, so an environment with no support
   # address simply doesn't offer one.
   - name: VITE_SUPPORT_EMAIL
-    description: Support mailbox for "Report an issue"; empty hides the link
+    description: Support mailbox for "Report an issue"; empty hides the side-nav link
+    value: ""
+  # A different mailbox from the one above — reporting a bug and asking to be provisioned go to
+  # different people. Empty hides the landing page's "Request access" link rather than opening an
+  # empty mailto:.
+  - name: VITE_ACCESS_REQUEST_EMAIL
+    description: Mailbox for access requests; empty hides the landing link
     value: ""
   # VITE_ZONE = the deploy zone, now a display label only. Under Cognito it selected the identity
   # provider (ZONE=42 → identity_provider=42-IDIR, which does not exist), which is why PR zones had
@@ -143,6 +149,8 @@ objects:
                   value: ${VITE_BASE_PATH}
                 - name: VITE_SUPPORT_EMAIL
                   value: ${VITE_SUPPORT_EMAIL}
+                - name: VITE_ACCESS_REQUEST_EMAIL
+                  value: ${VITE_ACCESS_REQUEST_EMAIL}
                 - name: VITE_ZONE
                   value: ${VITE_ZONE}
               volumeMounts:

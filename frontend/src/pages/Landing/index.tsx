@@ -14,6 +14,7 @@ import type { BreakpointType } from '@/hooks/useBreakpoint/types';
 import type { FC } from 'react';
 
 import { APP_FULL_NAME, APP_NAME } from '@/constants/appName';
+import { LANDING_AFTER_LOGIN } from '@/constants/routes';
 import { OFFLINE_SIGNOUT_FLAG } from '@/context/auth/authUtils';
 import { useAuth } from '@/context/auth/useAuth';
 import { useTheme } from '@/context/theme/useTheme';
@@ -140,7 +141,7 @@ const LandingPage: FC = () => {
                 // Offline: IDIR login can't run.
                 <Button
                   type="button"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate(LANDING_AFTER_LOGIN)}
                   renderIcon={ArrowRight}
                   size="md"
                   data-testid="landing-button__offline"
