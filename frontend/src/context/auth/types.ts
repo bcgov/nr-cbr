@@ -58,8 +58,14 @@ export const ROLE_CAPABILITIES = {
   inspectionWrite: ['CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'],
   /** The general create/edit surface. `CBR_GENERAL` is read-only; `CBR_LEVEL_0` writes inspections only. */
   write: ['CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'],
-  /** Delete / archive / status override. */
-  destructive: ['CBR_LEVEL_2'],
+  /**
+   * Delete / archive / add site / status override / bulk upload.
+   *
+   * `CBR_PENG` is included because the ladder is cumulative — the legacy `CBR_MINISTRY_PENG` profile
+   * bundles `LEVEL_2` — and because the backend's `CbrAuthorities.DESTRUCTIVE` admits it. Omitting
+   * it here would hide delete controls from a P.Eng the API would happily let through.
+   */
+  destructive: ['CBR_LEVEL_2', 'CBR_PENG'],
   /** Inspection sign-off. Not `CBR_ADMIN` — see the note above. */
   approve: ['CBR_PENG'],
 } as const satisfies Record<string, readonly ROLE_TYPE[]>;
