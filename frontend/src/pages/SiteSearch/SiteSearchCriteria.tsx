@@ -2,7 +2,7 @@ import { Search as SearchIcon } from '@carbon/icons-react';
 import { Button, Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
 import type { CodeOption, OrgUnitOption, SiteSearchCriteria as Criteria } from './types';
-import type { FC, FormEvent } from 'react';
+import type { FC, SubmitEventHandler } from 'react';
 
 export type CodeTables = {
   siteStatusCodes: CodeOption[];
@@ -44,7 +44,10 @@ const SiteSearchCriteriaForm: FC<Props> = ({
   onSearch,
   onReset,
 }) => {
-  const submit = (event: FormEvent) => {
+  // Typed as the handler rather than the event: React 19 deprecated `FormEvent` ("FormEvent
+  // doesn't actually exist"), and naming the prop's own type — `onSubmit?: SubmitEventHandler<T>` —
+  // means the element decides what the event is instead of this file guessing.
+  const submit: SubmitEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
     onSearch();
   };
