@@ -5,9 +5,7 @@ on:
     branches: [main]
     paths-ignore:
       - '*.md'
-      - '.github/**'
       - '.github/graphics/**'
-      - '!.github/workflows/**'
   workflow_dispatch:
 
 concurrency:
@@ -26,78 +24,161 @@ jobs:
       pr: ${{ steps.pr.outputs.pr }}
     runs-on: ubuntu-24.04
     steps:
-      # Get PR number for squash merges to main
+      # Find the PR number associated with this squash-merged commit on main,
+      # so we can deploy the same image tag that the PR was running.
       - id: pr
-        uses: bcgov/action-get-pr@28b0adf8e4d40720d41f9c87356ce24b0a4bd6af # v0.3.1
+        uses: bcgov/action-get-pr@3931962bf13b3f4702d0013ec7c836f752ff1a3b # v0.3.0
+
   deploy-test:
     name: TEST Deploys (${{ needs.init.outputs.pr }})
     needs: [init]
+    # contents:read here so the nested reusable-deploy jobs can checkout.
+    # Workflow-level `permissions: {}` above sets all scopes to none; the
+    # called workflow can't grant itself more than the caller has.
+    permissions:
+      contents: read
     uses: ./.github/workflows/reusable-deploy.yml
     secrets:
-      db_password: ${{ secrets.db_password }}
       oc_namespace: ${{ secrets.oc_namespace }}
       oc_token: ${{ secrets.oc_token }}
+      database_user: ${{ secrets.database_user }}
+      database_password: ${{ secrets.database_password }}
+      database_host: ${{ secrets.database_host }}
+      database_service_name: ${{ secrets.database_service_name }}
+      keystore_secret: ${{ secrets.keystore_secret }}
     with:
       environment: test
       target: test
       tag: ${{ needs.init.outputs.pr }}
+      backend_replicas: "2"
+      frontend_replicas: "2"
 
-  tests:
-    name: Tests
-    needs: [deploy-test]
-    uses: ./.github/workflows/reusable-tests.yml
-    with:
-      target: test
+  # ── Playwright E2E: DISABLED 2026-09-09 ══════════════════════════════
+  #
+  # Unattended CI login is not currently possible. CBR's CSS integration brokers IDIR - MFA
+  # (`kc_idp_hint=azureidir`), and a second factor is by construction something the credentials in
+  # E2E_IDIR_USER / E2E_IDIR_PASSWORD cannot supply — `auth.setup.ts` cannot get a session, so every
+  # spec fails at setup rather than on anything it is testing.
+  #
+  # Re-enabling needs ONE of:
+  #   - an MFA-exempt service account from the IDIR team, or
+  #   - a test strategy that never goes through the browser login (API-level, or a mocked session).
+  #
+  # The suite itself is current and runs locally against a deployed environment:
+  #   cd frontend && npm run e2e:login && E2E_BASE_URL=<url> npm run e2e
+  # It already handles this migration — `e2e/fixtures.ts` saves and restores the sessionStorage half
+  # of the session, which Playwright's own storageState does not capture. Leave that in place.
+  #
+  # NOTE: unit and browser-mode tests are NOT affected. `analysis.yml` still runs `npm run
+  # test:coverage` (Vitest, which installs Chromium via the pretest hook) on every PR and merge.
+  #
+  # tests:
+  #   name: Tests
+  #   needs: [deploy-test]
+  #   permissions:
+  #     contents: read
+  #   uses: ./.github/workflows/reusable-tests.yml
+  #   secrets:
+  #     e2e_idir_user: ${{ secrets.E2E_IDIR_USER }}
+  #     e2e_idir_password: ${{ secrets.E2E_IDIR_PASSWORD }}
+  #   with:
+  #     target: test
 
-  deploy-prod:
-    name: PROD Deploys (${{ needs.init.outputs.pr }})
-    needs: [tests, init]
-    uses: ./.github/workflows/reusable-deploy.yml
-    secrets:
-      db_password: ${{ secrets.db_password }}
-      oc_namespace: ${{ secrets.oc_namespace }}
-      oc_token: ${{ secrets.oc_token }}
-    with:
-      environment: prod
-      target: prod
-      tag: ${{ needs.init.outputs.pr }}
+  # ── PROD deploy + monitor + promote: DISABLED ════════════════════════
+  #
+  # CBR has never deployed to PROD, and must not until go-live. The three jobs
+  # below are commented out rather than guarded by an `if:` so that no
+  # combination of inputs, re-run or workflow_dispatch can reach production —
+  # a condition is something you can get wrong, an absent job is not.
+  #
+  # Merges to main deploy TEST only (see `deploy-test` above). PR previews go
+  # to the dev namespace via pr-open.yml.
+  #
+  # They are disabled AS A SET, and must be re-enabled as a set: `monitor-prod`
+  # and `promote` declare `needs: [deploy-prod]`, so uncommenting any one of
+  # them on its own makes the WHOLE workflow file invalid — every run fails,
+  # including TEST.
+  #
+  # Before the first PROD enable, confirm all of:
+  #   - The OpenShift licence plate and the prod namespace exist, and the
+  #     `prod` GitHub Environment carries oc_namespace / oc_token.
+  #   - VANITY_HOST is set on the `prod` Environment, plus the three
+  #     VANITY_TLS_* secrets. PROD is deliberately given NO default cluster
+  #     route (reusable-deploy.yml applies openshift.route.yml only when
+  #     target != 'prod'), so a missing VANITY_HOST skips the vanity Route in
+  #     silence and leaves production with no public URL at all.
+  #   - The CSS integration has PROD's redirect URI registered, and
+  #     KEYCLOAK_ISSUER_URI / KEYCLOAK_CLIENT_ID point at the PROD realm.
+  #   - The Oracle credentials on the `prod` Environment reach the PROD
+  #     database, not TEST.
+  #
+  # deploy-prod:
+  #   name: PROD Deploys (${{ needs.init.outputs.pr }})
+  #   needs: [tests, init]
+  #   permissions:
+  #     contents: read
+  #   uses: ./.github/workflows/reusable-deploy.yml
+  #   secrets:
+  #     oc_namespace: ${{ secrets.oc_namespace }}
+  #     oc_token: ${{ secrets.oc_token }}
+  #     database_user: ${{ secrets.database_user }}
+  #     database_password: ${{ secrets.database_password }}
+  #     database_host: ${{ secrets.database_host }}
+  #     database_service_name: ${{ secrets.database_service_name }}
+  #     keystore_secret: ${{ secrets.keystore_secret }}
+  #     # PROD vanity Route (cbr.nrs.gov.bc.ca) — the ONLY public URL on prod.
+  #     # Consumed only when the `prod` environment also defines the VANITY_HOST
+  #     # variable; the deploy step skips itself otherwise, which would leave
+  #     # prod with no route at all. See frontend/openshift.vanity-route.yml.
+  #     vanity_tls_certificate: ${{ secrets.VANITY_TLS_CERTIFICATE }}
+  #     vanity_tls_key: ${{ secrets.VANITY_TLS_KEY }}
+  #     vanity_tls_ca_certificate: ${{ secrets.VANITY_TLS_CA_CERTIFICATE }}
+  #   with:
+  #     environment: prod
+  #     target: prod
+  #     tag: ${{ needs.init.outputs.pr }}
+  #     backend_replicas: "3"
+  #     frontend_replicas: "3"
 
-  # Sync Sysdig email alerts for PROD. No-ops cleanly if SYSDIG_API_TOKEN is
-  # unset or monitoring/alerts/ is empty — adoption is gradual. Alert
-  # templates live in monitoring/alerts/ in this repo; add or remove files
-  # there to customize the alert set.
-  monitor-prod:
-    name: Sysdig Monitor (PROD)
-    needs: [deploy-prod]
-    runs-on: ubuntu-24.04
-    environment: prod
-    permissions:
-      contents: read
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-      # 0.0.3 is the first version with __APP__ template substitution, which
-      # monitoring/alerts/*.json depend on — don't downgrade this pin.
-      - uses: bcgov/actions/sysdig-monitor@4ad61a784f1c17765b03d8d6de9737c1d3f4c0f2 # v0.5.0
-        with:
-          sysdig_api_token: ${{ secrets.SYSDIG_API_TOKEN }}
-          oc_namespace: ${{ secrets.oc_namespace }}
-          app: ${{ github.event.repository.name }}
+  # # Sync Sysdig email alerts for PROD. No-ops cleanly if SYSDIG_API_TOKEN is
+  # # unset — adoption is gradual. Alert templates live in monitoring/alerts/.
+  # monitor-prod:
+  #   name: Sysdig Monitor (PROD)
+  #   needs: [deploy-prod]
+  #   runs-on: ubuntu-24.04
+  #   environment: prod
+  #   permissions:
+  #     contents: read
+  #   timeout-minutes: 5
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     # Consolidated from bcgov/action-sysdig-monitor into the bcgov/actions
+  #     # suite. v0.5.0 is the first release carrying sysdig-monitor, and it
+  #     # keeps the __APP__ template substitution that monitoring/alerts/*.json
+  #     # depend on — don't downgrade this pin.
+  #     - uses: bcgov/actions/sysdig-monitor@4ad61a784f1c17765b03d8d6de9737c1d3f4c0f2 # v0.5.0
+  #       with:
+  #         sysdig_api_token: ${{ secrets.SYSDIG_API_TOKEN }}
+  #         oc_namespace: ${{ secrets.oc_namespace }}
+  #         app: nr-cbr
 
-  promote:
-    name: Promote Images
-    needs: [deploy-prod, init]
-    runs-on: ubuntu-slim
-    permissions:
-      packages: write
-    strategy:
-      matrix:
-        package: [migrations, backend, frontend]
-    timeout-minutes: 1
-    steps:
-      - uses: shrink/actions-docker-registry-tag@e6aaef25c595b6e0edd18bf4c7dbfea3abd43299 # v5
-        with:
-          registry: ghcr.io
-          repository: ${{ github.repository }}/${{ matrix.package }}
-          target: ${{ needs.init.outputs.pr }}
-          tags: prod
+  # # After PROD is up, alias the PR image as :prod in GHCR. Creates a durable
+  # # record of "this is the image running in production right now" and a
+  # # rollback target.
+  # promote:
+  #   name: Promote Images
+  #   needs: [deploy-prod, init]
+  #   runs-on: ubuntu-slim
+  #   permissions:
+  #     packages: write
+  #   strategy:
+  #     matrix:
+  #       package: [backend, frontend]
+  #   timeout-minutes: 1
+  #   steps:
+  #     - uses: shrink/actions-docker-registry-tag@e6aaef25c595b6e0edd18bf4c7dbfea3abd43299 # v5
+  #       with:
+  #         registry: ghcr.io
+  #         repository: ${{ github.repository }}/${{ matrix.package }}
+  #         target: ${{ needs.init.outputs.pr }}
+  #         tags: prod

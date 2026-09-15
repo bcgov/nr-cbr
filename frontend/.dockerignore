@@ -17,8 +17,21 @@ node_modules
 # App-specific exclusions
 coverage
 cypress
-e2e
 migrations
 output
 test
 tests
+
+# NOTE: `e2e` is deliberately NOT excluded.
+#
+# tsconfig.json references tsconfig.e2e.json, whose include is ["e2e/**/*", "playwright.config.ts"],
+# and `npm run deploy` runs `tsc -b` — which builds every referenced project. Excluding e2e while
+# keeping playwright.config.ts leaves that config importing './e2e/utils' from a directory that is
+# not in the build context, and the image build fails with:
+#
+#   playwright.config.ts(3,25): error TS2307: Cannot find module './e2e/utils'
+#
+# Excluding playwright.config.ts as well does not help — tsconfig.e2e.json would then match no
+# inputs at all (TS18003). This is a multi-stage build and only /app/dist reaches the final image,
+# so carrying the e2e sources through the build stage costs context size and nothing else.
+# nr-frep, which this tsconfig layout came from, ships no frontend .dockerignore at all.

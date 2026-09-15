@@ -1,98 +1,264 @@
-# Reusable Deploy - Lite Mode Verification
+# Reusable Deploy
+#
+# Adapted from the BCGov quickstart-openshift template
+# (https://github.com/bcgov/quickstart-openshift) to drop the Postgres
+# database job — we use an external shared Oracle, not a per-PR DB.
+#
+# Each service Template (backend/frontend) is `oc process`-ed with parameters
+# specific to that service. Splitting into named jobs (rather than a matrix
+# with conditional params) keeps the wiring readable.
 name: Reusable Deploy
 
 on:
   workflow_call:
     inputs:
       environment:
-        description: GitHub/OpenShift environment
+        description: GitHub/OpenShift environment (e.g. dev, test, prod)
         default: ""
         type: string
       target:
-        description: Deployment target; usually PR number, test or prod
+        description: Deployment target; usually PR number, 'test' or 'prod'
         default: ${{ github.event.number }}
+        type: string
+      slot:
+        description: |
+          Route hostname slot — PR # mod-50'd into a fixed pool of pre-registered
+          registered redirect URIs (see pr-open.yml). Omit for TEST/PROD; defaults to
+          `target` in that case so the host stays `nr-cbr-{test,prod}.apps...`.
+        default: ""
         type: string
       tag:
         description: Container tag
         default: ${{ github.event.number }}
         type: string
+      backend_replicas:
+        description: |
+          Backend pod count. Sets Deployment.spec.replicas AND both ends of the
+          backend HPA (MIN_REPLICAS = MAX_REPLICAS), so the count is pinned
+          rather than autoscaled — predictable against the namespace quota.
+          Defaults to "1" so PR previews stay light; merge.yml sets "2" for
+          TEST and "3" for PROD.
+        default: "1"
+        type: string
+      frontend_replicas:
+        description: |
+          Frontend pod count. Defaults to "2" — the value hardcoded in
+          frontend/openshift.deploy.yml before this was parameterized, so PR
+          previews and TEST are unchanged. merge.yml sets "2" for TEST and "3"
+          for PROD.
+        default: "2"
+        type: string
       triggers:
-        description: Triggers for deployment
+        description: Triggers for deployment (paths that must change)
         default: ""
         type: string
 
     secrets:
-      db_password:
-        description: Database password
-        required: true
       oc_namespace:
         description: OpenShift namespace
         required: true
       oc_token:
         description: OpenShift token
         required: true
+      database_user:
+        description: Oracle DATABASE_USER
+        required: true
+      database_password:
+        description: Oracle DATABASE_PASSWORD
+        required: true
+      database_host:
+        description: Oracle host
+        required: true
+      database_service_name:
+        description: Oracle service name
+        required: true
+      keystore_secret:
+        description: Oracle keystore passphrase
+        required: true
+      vanity_tls_certificate:
+        description: |
+          PEM leaf/server certificate for the PROD vanity Route hostname
+          (vars.VANITY_HOST). Applied only on PROD when VANITY_HOST is set.
+        required: false
+      vanity_tls_key:
+        description: |
+          PEM private key (unencrypted) matching vanity_tls_certificate.
+        required: false
+      vanity_tls_ca_certificate:
+        description: |
+          PEM CA chain for the vanity certificate: the Entrust intermediate
+          followed by the Sectigo R46 cross-signing root. See the chain notes
+          in frontend/openshift.vanity-route.yml.
+        required: false
+
     outputs:
       triggered:
         description: Has deployment been triggered?
-        value: ${{ jobs.init.outputs.triggered }}
+        value: ${{ jobs.frontend.outputs.triggered }}
 
 permissions: {}
 
 jobs:
-  init:
-    name: Deploy (init)
+  backend:
+    name: Deploy (backend)
     environment: ${{ inputs.environment }}
-    outputs:
-      triggered: ${{ steps.deploy.outputs.triggered }}
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: bcgov/action-deployer-openshift@27a85b7b157bfc9c3c9bf0aca53bcd288d4d2506 # v4.2.1
-        id: deploy
-        env:
-          DB_PASSWORD: ${{ secrets.db_password }}
-        with:
-          file: common/openshift.init.yml
-          oc_namespace: ${{ secrets.oc_namespace }}
-          oc_server: ${{ vars.oc_server }}
-          oc_token: ${{ secrets.oc_token }}
-          overwrite: true
-          parameters: -p DB_PASSWORD="$DB_PASSWORD"
-            -p ZONE="${{ inputs.target }}"
-            -p NAME="${{ github.event.repository.name }}"
-          triggers: ${{ inputs.triggers }}
-          debug: true
-
-  deploy:
-    name: Deploy (${{ matrix.name }})
-    environment: ${{ inputs.environment }}
-    needs: [init]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    strategy:
-      matrix:
-        name: [database, backend, frontend]
-        include:
-          - name: database
-            file: common/openshift.database.yml
-            parameters: -p DB_PVC_SIZE="256Mi"
-          - name: backend
-            file: backend/openshift.deploy.yml
-            parameters: -p IMAGE_TAG="${{ inputs.tag }}"
-          - name: frontend
-            file: frontend/openshift.deploy.yml
-            parameters: -p IMAGE_TAG="${{ inputs.tag }}"
+    permissions:
+      contents: read
     outputs:
       triggered: ${{ steps.deploy.outputs.triggered }}
+    # Plumb sensitive values through job-level env vars rather than expanding
+    # `${{ secrets.* }}` directly inside the `parameters` string. The deployer
+    # action ultimately runs:
+    #   TEMPLATE="$(oc process ... ${{ inputs.parameters }} ...)"
+    # which means GHA substitutes the literal secret into a bash double-quoted
+    # context. Any `$X` inside the value (where X is an unset name) gets
+    # variable-expanded by bash and silently dropped along with its leading
+    # `$`. Going through env + `"$VAR"` means bash performs only a single
+    # expansion to the literal value; characters inside that value are not
+    # re-parsed for `$`/`'`/`"` semantics.
+    env:
+      DATABASE_PASSWORD: ${{ secrets.database_password }}
+      KEYSTORE_SECRET: ${{ secrets.keystore_secret }}
     steps:
-      - uses: bcgov/action-deployer-openshift@27a85b7b157bfc9c3c9bf0aca53bcd288d4d2506 # v4.2.1
+      - uses: bcgov/action-deployer-openshift@f7bd61ec357fb1dfd1d43f1287bcd21382d06348 # v4.1.0
         id: deploy
         with:
-          file: ${{ matrix.file }}
+          file: backend/openshift.deploy.yml
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_server: ${{ vars.oc_server }}
           oc_token: ${{ secrets.oc_token }}
-          debug: true
-          parameters: -p ZONE="${{ inputs.target }}"
-            -p NAME="${{ github.event.repository.name }}"
-            ${{ matrix.parameters }}
+          # debug: true is intentionally OFF. With debug on, the deployer
+          # logs the processed Template (including K8s Secret stringData),
+          # and GitHub's secret-masking misses values that contain JSON-
+          # special characters (<, >, &, etc.) once they get re-encoded.
+          # If you need to debug a deploy, enable this temporarily on a
+          # commit that uses NON-sensitive placeholder values.
+          debug: false
+          overwrite: true
+          parameters:
+            -p ZONE="${{ inputs.target }}"
+            -p NAME="nr-cbr"
+            -p IMAGE_TAG="${{ inputs.tag }}"
+            -p MIN_REPLICAS="${{ inputs.backend_replicas }}"
+            -p MAX_REPLICAS="${{ inputs.backend_replicas }}"
+            -p KEYCLOAK_ISSUER_URI="${{ vars.KEYCLOAK_ISSUER_URI }}"
+            -p KEYCLOAK_CLIENT_ID="${{ vars.KEYCLOAK_CLIENT_ID }}"
+            -p DATABASE_HOST="${{ secrets.database_host }}"
+            -p DATABASE_SERVICE_NAME="${{ secrets.database_service_name }}"
+            -p DATABASE_USER="${{ secrets.database_user }}"
+            -p DATABASE_PASSWORD="$DATABASE_PASSWORD"
+            -p KEYSTORE_SECRET="$KEYSTORE_SECRET"
+          triggers: ${{ inputs.triggers }}
+
+  frontend:
+    name: Deploy (frontend)
+    environment: ${{ inputs.environment }}
+    needs: [backend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      triggered: ${{ steps.deploy.outputs.triggered }}
+    # Job-level so the vanity step's `if:` can read it (a step's own `env` is
+    # not available to that step's `if`). Environment-scoped var — set only on
+    # the `prod` environment; empty everywhere else, which skips the step.
+    env:
+      VANITY_HOST: ${{ vars.VANITY_HOST }}
+    steps:
+      - uses: bcgov/action-deployer-openshift@f7bd61ec357fb1dfd1d43f1287bcd21382d06348 # v4.1.0
+        id: deploy
+        with:
+          file: frontend/openshift.deploy.yml
+          oc_namespace: ${{ secrets.oc_namespace }}
+          oc_server: ${{ vars.oc_server }}
+          oc_token: ${{ secrets.oc_token }}
+          # debug: true is intentionally OFF. With debug on, the deployer
+          # logs the processed Template (including K8s Secret stringData),
+          # and GitHub's secret-masking misses values that contain JSON-
+          # special characters (<, >, &, etc.) once they get re-encoded.
+          # If you need to debug a deploy, enable this temporarily on a
+          # commit that uses NON-sensitive placeholder values.
+          debug: false
+          overwrite: true
+          # VITE_KEYCLOAK_URL / VITE_KEYCLOAK_CLIENT_ID below read the SAME two GitHub variables the
+          # backend job reads as KEYCLOAK_ISSUER_URI / KEYCLOAK_CLIENT_ID. The container env var
+          # names differ (VITE_ is load-bearing — Vite only exposes VITE_* to the bundle, and the
+          # entrypoint only copies VITE_*), but the CI variables must NOT: four variables holding two
+          # values is a pair nothing keeps in agreement, and both drifts fail only AFTER a successful
+          # sign-in, which sends you looking at roles instead of config.
+          #
+          # `-p X=""` OVERRIDES a template default rather than falling back to it, so every optional
+          # variable repeats its default below with `||`. VITE_BACKEND_URL is the one that bites:
+          # unset would ship an empty API base and every call would 404 against the SPA's own
+          # origin. KEYCLOAK_* stay bare on purpose — they are required on both sides, so an empty
+          # value should fail the deploy rather than be papered over.
+          #
+          # Keep comments out of the `parameters:` block itself — it is a multi-line plain scalar, and
+          # a '#' line inside it terminates the scalar and breaks the workflow parse.
+          parameters:
+            -p ZONE="${{ inputs.target }}"
+            -p NAME="nr-cbr"
+            -p IMAGE_TAG="${{ inputs.tag }}"
+            -p REPLICAS="${{ inputs.frontend_replicas }}"
+            -p VITE_KEYCLOAK_URL="${{ vars.KEYCLOAK_ISSUER_URI }}"
+            -p VITE_KEYCLOAK_CLIENT_ID="${{ vars.KEYCLOAK_CLIENT_ID }}"
+            -p VITE_BACKEND_URL="${{ vars.VITE_BACKEND_URL || '/api' }}"
+            -p VITE_BASE_PATH="${{ vars.VITE_BASE_PATH }}"
+            -p VITE_SUPPORT_EMAIL="${{ vars.SUPPORT_EMAIL }}"
+            -p VITE_ZONE="${{ vars.VITE_ZONE || inputs.target }}"
+          triggers: ${{ inputs.triggers }}
+
+      # Default cluster-domain Route (nr-cbr-<slot>.apps.gold...). Applied on
+      # every environment EXCEPT prod — PROD is served ONLY by the vanity Route
+      # below, so it gets no default route and has a single public URL. TEST and
+      # PR previews have no custom hostname and need this. Its own template
+      # because `oc process` can't skip an object per environment.
+      - name: Default Route (non-PROD)
+        if: ${{ inputs.target != 'prod' }}
+        uses: bcgov/action-deployer-openshift@f7bd61ec357fb1dfd1d43f1287bcd21382d06348 # v4.1.0
+        with:
+          file: frontend/openshift.route.yml
+          oc_namespace: ${{ secrets.oc_namespace }}
+          oc_server: ${{ vars.oc_server }}
+          oc_token: ${{ secrets.oc_token }}
+          debug: false
+          overwrite: true
+          parameters:
+            -p NAME="nr-cbr"
+            -p ZONE="${{ inputs.target }}"
+            -p SLOT="${{ inputs.slot || inputs.target }}"
+          triggers: ${{ inputs.triggers }}
+
+      # PROD vanity Route (cbr.nrs.gov.bc.ca). On PROD this is the ONLY public
+      # Route — the default-route step above is skipped for prod.
+      #
+      # Runs only on PROD and only when the vanity host is configured
+      # (VANITY_HOST unset -> skipped), so TEST and PR previews are unaffected.
+      # The cert / key / chain are multiline PEM secrets: routed through env
+      # and passed as "$VAR" (single bash expansion) so their newlines survive
+      # — same reasoning as DATABASE_PASSWORD in the backend job above.
+      - name: Vanity Route (PROD)
+        if: ${{ inputs.target == 'prod' && env.VANITY_HOST != '' }}
+        uses: bcgov/action-deployer-openshift@f7bd61ec357fb1dfd1d43f1287bcd21382d06348 # v4.1.0
+        env:
+          VANITY_TLS_CERTIFICATE: ${{ secrets.vanity_tls_certificate }}
+          VANITY_TLS_KEY: ${{ secrets.vanity_tls_key }}
+          VANITY_TLS_CA_CERTIFICATE: ${{ secrets.vanity_tls_ca_certificate }}
+        with:
+          file: frontend/openshift.vanity-route.yml
+          oc_namespace: ${{ secrets.oc_namespace }}
+          oc_server: ${{ vars.oc_server }}
+          oc_token: ${{ secrets.oc_token }}
+          debug: false
+          overwrite: true
+          parameters:
+            -p NAME="nr-cbr"
+            -p ZONE="${{ inputs.target }}"
+            -p VANITY_HOST="$VANITY_HOST"
+            -p VANITY_TLS_CERTIFICATE="$VANITY_TLS_CERTIFICATE"
+            -p VANITY_TLS_KEY="$VANITY_TLS_KEY"
+            -p VANITY_TLS_CA_CERTIFICATE="$VANITY_TLS_CA_CERTIFICATE"
           triggers: ${{ inputs.triggers }}
