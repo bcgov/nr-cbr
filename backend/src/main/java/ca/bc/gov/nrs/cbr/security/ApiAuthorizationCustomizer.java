@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  * (see {@link CbrAuthorities}), mirroring nr-fspts.
  *
  * <p>The previous URL-level role rules (PUT/POST/… → write authorities, {@code /admin/**} → sys-admin)
- * were dropped in favour of the per-endpoint model. {@link RoleConstants} still backs the
+ * were dropped in favour of the per-endpoint model. {@link CbrRoles} still backs the
  * {@code @PreAuthorize} expressions and can be reinstated here as a coarse backstop if desired.
  */
 @Component

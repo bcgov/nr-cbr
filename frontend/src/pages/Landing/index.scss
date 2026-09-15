@@ -52,6 +52,15 @@
         .login-btn {
           width: 20rem;
           max-width: 100%;
+          // The width is fixed at 20rem, so the contents have to be told where to sit.
+          // `space-between` holds the label at the left edge and the icon at the right, which is
+          // what these full-width buttons want; elsewhere in the app buttons size to their content
+          // and the icon simply leads the label.
+          //
+          // This pairs with the `.login-btn` icon rule in styles/_overrides.scss, which restores
+          // Carbon's icon-after-label order for these three buttons only. The two go together: with
+          // the app-wide `order: -1` still applied, `space-between` would pin the icon to the far
+          // left and the label to the far right.
           justify-content: space-between;
         }
       }

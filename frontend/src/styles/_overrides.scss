@@ -2,6 +2,26 @@
 
 @use "./variables" as variables;
 
+/* Carbon ships @font-face blocks for IBM Plex whose URLs are prefixed with `~@ibm/plex`
+   (@carbon/styles/scss/_config.scss). The `~` is a webpack convention meaning "resolve from
+   node_modules"; Vite does not implement it, so the URL is emitted verbatim, the dev server answers
+   it with index.html, and the browser reports one `OTS parsing error: invalid sfntVersion` per face
+   — 1008821359 being the bytes `<!do`. The production build says the same thing more quietly:
+   "didn't resolve at build time, it will remain unchanged to be resolved at runtime".
+
+   Turning the emission off rather than repointing it, because the fonts were never being served:
+   this application is BC Gov, not IBM, and its font stack is BCSans with a Verdana/Arial fallback
+   (see the header rule below). Nothing rendered in Plex before this change either — the faces
+   simply failed to load — so this removes ~40 failed requests and the console noise and alters
+   nothing on screen.
+
+   If Plex is ever genuinely wanted, set $font-path to a served location instead of disabling this;
+   `/node_modules/@ibm/plex` works in dev and breaks in a build, so it would need the files copied
+   into the bundle. */
+@use "@carbon/styles/scss/config" with (
+  $css--font-face: false
+);
+
 @use "@carbon/react/scss/themes";
 @use "@carbon/react/scss/theme" with (
   $fallback: themes.$white,
@@ -98,11 +118,15 @@
   }
 }
 
-/* The one icon that belongs after its label: an arrow pointing the way the button takes you reads
-   backwards on the left. Applies to the landing page's "Get started", not to the login buttons
-   beside it — those lead with their icon like everything else. */
-.#{variables.$bcgov-prefix}--btn[data-testid='landing-button__offline']
-  .#{variables.$bcgov-prefix}--btn__icon {
+/* The landing page's buttons keep Carbon's own order — icon AFTER the label — rather than the
+   app-wide `order: -1` above. They are fixed at 20rem and use `justify-content: space-between`
+   (see pages/Landing/index.scss), which holds the label against the left edge and the icon against
+   the right. That is nr-frep's treatment and what these full-width buttons are designed around;
+   leading with the icon under `space-between` flings the two to opposite edges of the button.
+
+   It also reads better for the offline "Get started" button, whose arrow points the way the button
+   takes you — backwards if placed on the left. All three landing buttons carry `.login-btn`. */
+.#{variables.$bcgov-prefix}--btn.login-btn .#{variables.$bcgov-prefix}--btn__icon {
   order: 0;
 }
 

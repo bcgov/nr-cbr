@@ -97,7 +97,7 @@ class LoggedUserHelperTest {
   @Test
   @DisplayName("sys-admin passes every region check without holding a region role")
   void sysAdminPassesEveryRegion() {
-    authenticateWith(RoleConstants.SYS_ADMIN_AUTHORITY);
+    authenticateWith(CbrRoles.ADMIN);
 
     assertThat(helper.regionalEngineerCodes()).isEmpty();
     assertThat(helper.canAnyRegion()).isTrue();
@@ -116,11 +116,29 @@ class LoggedUserHelperTest {
   }
 
   @Test
-  @DisplayName("global write authorities grant canEdit; a region-only user does not")
-  void globalWriteAuthorities() {
-    authenticateWith(RoleConstants.GENERAL_AUTHORITY);
-    assertThat(helper.canEdit()).isTrue();
-    assertThat(helper.canWrite()).isTrue();
+  @DisplayName("CBR_GENERAL is read-only: it must not pass a write gate")
+  void generalIsReadOnly() {
+    // Pinned against the WebADE export: all 24 of GENERAL's ACTION_LNK rows are /show* privileges,
+    // and CBR_READ_ONLY is a profile holding GENERAL and nothing else. The Oracle role of the same
+    // name IS broad — the CBR_GENERAL package carries most of the write surface — so the temptation
+    // to treat this as a write role is real, and it would hand every read-only user the edit
+    // surface. The application-layer check is the only thing that ever constrained them.
+    authenticateWith(CbrRoles.GENERAL);
+
+    assertThat(helper.canEdit()).isFalse();
+    assertThat(helper.canWrite()).isFalse();
+    assertThat(helper.isPeng()).isFalse();
+  }
+
+  @Test
+  @DisplayName("Level 1 and above carry the create/edit surface")
+  void writeAuthoritiesGrantEdit() {
+    for (String role : CbrRoles.atLeast(CbrRoles.LEVEL_1)) {
+      SecurityContextHolder.clearContext();
+      authenticateWith(role);
+      assertThat(helper.canEdit()).as("canEdit for %s", role).isTrue();
+      assertThat(helper.canWrite()).as("canWrite for %s", role).isTrue();
+    }
 
     SecurityContextHolder.clearContext();
     authenticateWith("CBR_REGIONAL_ENGINEER_DCK");
@@ -129,17 +147,22 @@ class LoggedUserHelperTest {
   }
 
   @Test
-  @DisplayName("P.Eng is recognised, and sys-admin implies it")
+  @DisplayName("P.Eng is the only role that signs off — sys-admin does NOT imply it")
   void pengAuthority() {
-    authenticateWith(RoleConstants.PENG_AUTHORITY);
+    authenticateWith(CbrRoles.PENG);
     assertThat(helper.isPeng()).isTrue();
 
+    // The export is unambiguous: /approveInspection is held by PROFESSIONAL_ENGINEER alone, and the
+    // CBR_ADMINISTRATOR profile bundles no role other than ADMINISTRATOR — which carries three
+    // privileges, none of them /approveInspection or /pEngAccess. Sealing an inspection is a
+    // professional engineering act, not an administrative one; letting an admin through here would
+    // put a non-engineer's name on a sealed engineering document.
     SecurityContextHolder.clearContext();
-    authenticateWith(RoleConstants.SYS_ADMIN_AUTHORITY);
-    assertThat(helper.isPeng()).isTrue();
+    authenticateWith(CbrRoles.ADMIN);
+    assertThat(helper.isPeng()).isFalse();
 
     SecurityContextHolder.clearContext();
-    authenticateWith(RoleConstants.GENERAL_AUTHORITY);
+    authenticateWith(CbrRoles.GENERAL);
     assertThat(helper.isPeng()).isFalse();
   }
 

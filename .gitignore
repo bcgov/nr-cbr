@@ -381,6 +381,11 @@ pyrightconfig.json
 **/*.jceks
 **/keystore.*
 **/truststore.*
+# The Oracle TCPS truststore. Extensionless, so none of the patterns above catch it. Copied from a
+# running pod for local dev (procedure in compose.yml's header) and read via TRUSTSTORE_PATH; it is
+# environment material, not source, and its password lives in the gitignored application-local.yml.
+**/cert/jssecacerts
+**/jssecacerts
 # Spring Boot application properties with secrets
 **/application-local.properties
 **/application-prod.properties

@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * The lookups below need the CBR repositories, which land with the domain port. The open question
  * they depend on is which org-unit column defines a region — {@code CROSSING_SITE} carries
  * {@code MANAGEMENT_ORG_UNIT_NO}, {@code BUSINESS_AREA_ORG_UNIT_NO} and {@code ORG_UNIT_NO}, and
- * {@code CBR_ORG_UNIT} rolls districts into areas. See {@link RoleConstants#REGIONAL_ENGINEER_PREFIX}.
+ * {@code CBR_ORG_UNIT} rolls districts into areas. See {@link ObsoleteRoles#REGIONAL_ENGINEER_PREFIX}.
  * Until that is settled these methods deliberately fail closed rather than guess.
  */
 @Component("cbrAuth")

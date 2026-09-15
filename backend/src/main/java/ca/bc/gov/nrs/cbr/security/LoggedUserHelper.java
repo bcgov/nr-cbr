@@ -63,10 +63,26 @@ public class LoggedUserHelper {
   }
 
   /**
-   * Returns {@code true} if the user holds the {@code CBR_ADMIN} authority.
+   * Returns {@code true} if the user holds {@link CbrRoles#ADMIN}.
+   *
+   * <p>Off the ladder: this says nothing about read or write access, because the legacy
+   * {@code CBR_ADMINISTRATOR} profile carries neither.
    */
   public boolean isSysAdmin() {
-    return getAuthorities().contains(RoleConstants.SYS_ADMIN_AUTHORITY);
+    return CbrRoles.isAdministrator(getAuthorities());
+  }
+
+  /**
+   * The caller's single effective ladder role, or {@code null} if they hold none — which includes an
+   * administrator. Capabilities are never the union of several roles; see {@link CbrRoles}.
+   */
+  public String effectiveRole() {
+    return CbrRoles.effectiveRole(getAuthorities());
+  }
+
+  /** True when the caller's effective ladder role is at or above {@code minimum}. */
+  public boolean isAtLeast(String minimum) {
+    return CbrRoles.isAtLeast(getAuthorities(), minimum);
   }
 
   /**
@@ -74,7 +90,7 @@ public class LoggedUserHelper {
    * ({@code CBR_GENERAL}).
    */
   public boolean isGeneral() {
-    return getAuthorities().contains(RoleConstants.GENERAL_AUTHORITY);
+    return getAuthorities().contains(CbrRoles.GENERAL);
   }
 
   /**
@@ -82,7 +98,7 @@ public class LoggedUserHelper {
    * ({@code CBR_ENGINEER}).
    */
   public boolean isEngineer() {
-    return getAuthorities().contains(RoleConstants.ENGINEER_AUTHORITY);
+    return getAuthorities().contains(ObsoleteRoles.ENGINEER_AUTHORITY);
   }
 
   /**
@@ -104,7 +120,7 @@ public class LoggedUserHelper {
    * can grant it without CBR needing a user-to-region table of its own.
    */
   public Set<String> regionalEngineerCodes() {
-    return codesWithPrefix(RoleConstants.REGIONAL_ENGINEER_PREFIX);
+    return codesWithPrefix(ObsoleteRoles.REGIONAL_ENGINEER_PREFIX);
   }
 
   /**
@@ -114,18 +130,56 @@ public class LoggedUserHelper {
    * {@code UPDATE_SITE}.
    */
   public Set<String> contractEngineerCodes() {
-    return codesWithPrefix(RoleConstants.CONTRACT_ENGINEER_PREFIX);
+    return codesWithPrefix(ObsoleteRoles.CONTRACT_ENGINEER_PREFIX);
   }
 
-  /** True if the user holds any global role that permits writing. */
+  /**
+   * True if the user holds a role carrying the general create/edit surface.
+   *
+   * <p>{@code CBR_GENERAL} is deliberately not among them — the export shows all 24 of its
+   * privileges are {@code /show*}, so a read-only user must fail this. Floor is
+   * {@link CbrRoles#LEVEL_1} — the same floor {@link CbrAuthorities#CONTENT_EDIT} uses.
+   */
   public boolean canEdit() {
-    Set<String> authorities = getAuthorities();
-    return Arrays.stream(RoleConstants.WRITE_AUTHORITIES).anyMatch(authorities::contains);
+    return isAtLeast(CbrRoles.LEVEL_1);
   }
 
-  /** True if the user may review and seal inspection reports (P.Eng, or sys-admin). */
+  /** True when the caller may record or amend an inspection. Floor {@link CbrRoles#LEVEL_0}. */
+  public boolean canWriteInspection() {
+    return isAtLeast(CbrRoles.LEVEL_0);
+  }
+
+  /** True when the caller may delete, archive or override inspection status. Floor {@link CbrRoles#LEVEL_2}. */
+  public boolean canDestroy() {
+    return isAtLeast(CbrRoles.LEVEL_2);
+  }
+
+  /**
+   * True when the caller may read CBR's records — any ladder role, or {@link CbrRoles#ADMIN}.
+   *
+   * <p>Not a rank comparison: an administrator holds no ladder role, so {@code isAtLeast(GENERAL)}
+   * would deny them. See {@link CbrRoles#READERS}.
+   */
+  public boolean canRead() {
+    return CbrRoles.canRead(getAuthorities());
+  }
+
+  /**
+   * True if the user may review and seal inspection reports.
+   *
+   * <p><b>Sys-admin does NOT imply this.</b> An earlier version returned
+   * {@code isSysAdmin() || PENG}, on the usual assumption that an administrator can do anything.
+   * The WebADE export disproves it: {@code ADMINISTRATOR} holds exactly three privileges
+   * ({@code /showBulletinAdmin}, {@code /showInspectionReviewerAdmin}, {@code /showWelcome}) and the
+   * {@code CBR_ADMINISTRATOR} profile bundles no other role, while {@code /approveInspection} is
+   * held by {@code PROFESSIONAL_ENGINEER} alone.
+   *
+   * <p>That separation is the point: sealing an inspection is a professional engineering act tied to
+   * a named P.Eng, not an administrative one. Holding the role is still only half of it — the
+   * workflow also binds to a {@code STRUCTURE_INSPECTION_REVIEWER} row keyed by userid.
+   */
   public boolean isPeng() {
-    return isSysAdmin() || getAuthorities().contains(RoleConstants.PENG_AUTHORITY);
+    return getAuthorities().contains(CbrRoles.PENG);
   }
 
   /**
