@@ -10,11 +10,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tag,
 } from '@carbon/react';
 import { Link } from 'react-router-dom';
 
 import type { SiteSearchResult } from './types';
 import type { FC } from 'react';
+
+import { siteStatusLabel, siteStatusTagType } from '@/utils/siteStatus';
 
 type Props = {
   results: SiteSearchResult[];
@@ -115,7 +118,21 @@ const SiteSearchResults: FC<Props> = ({
                   <TableCell>
                     {site.forestFileId}-{site.roadSectionId}
                   </TableCell>
-                  <TableCell>{site.crossingSiteStatusDescription}</TableCell>
+                  <TableCell>
+                    {/* A pill, as nr-frep renders a status. The colour comes from the code and the
+                        label from the description — see utils/siteStatus for why that way round.
+                        Nothing is rendered at all for a site with no status, rather than an empty
+                        pill: "Incomplete Data?" exists to find those, and a bare outline would read
+                        as a status whose name failed to load. */}
+                    {site.crossingSiteStatusCode || site.crossingSiteStatusDescription ? (
+                      <Tag type={siteStatusTagType(site.crossingSiteStatusCode)} size="sm">
+                        {siteStatusLabel(
+                          site.crossingSiteStatusCode,
+                          site.crossingSiteStatusDescription,
+                        )}
+                      </Tag>
+                    ) : null}
+                  </TableCell>
                   {canDelete && (
                     <TableCell>
                       <Button

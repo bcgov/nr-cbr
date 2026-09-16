@@ -7,6 +7,13 @@ $layout-side-nav-width: 16rem;
 // reachable. Fixed so the content margin (components/Layout/index.scss) tracks it exactly.
 $layout-side-nav-rail: 3rem;
 
+// Height of one side-nav row — sections, their children, plain links, and the profile panel's links
+// alike. Carbon's own is 2rem; this is the taller row the CBR design calls for, and it is
+// deliberately the same 3rem as the rail above, which makes every entry a square when collapsed.
+// Applied app-wide in styles/_overrides.scss; see LayoutSideNav/index.scss for the one case Carbon
+// overrides more specifically.
+$layout-side-nav-row-height: 3rem;
+
 /* ------------------------------ CBR blue ------------------------------
 The BC Gov design-system blue scale, the same palette nr-fspts carries in `styles/bcgov/_colors.scss`
 — named by their scale step so the two apps can be compared step-for-step rather than hex-for-hex.

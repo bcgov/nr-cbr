@@ -1,5 +1,12 @@
 import { Email } from '@carbon/icons-react';
-import { SideNav, SideNavItems, SideNavLink, SideNavMenu, SideNavMenuItem } from '@carbon/react';
+import {
+  SideNav,
+  SideNavDivider,
+  SideNavItems,
+  SideNavLink,
+  SideNavMenu,
+  SideNavMenuItem,
+} from '@carbon/react';
 import { type FC } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -32,16 +39,6 @@ export const LayoutSideNav: FC = () => {
   // offline-capable routes.
   const menuEntries =
     online && isLoggedIn ? getMenuEntries(user?.roles || []) : getOfflineMenuEntries();
-
-  const renderIcon = (route: MenuItem) => {
-    const Icon = route.icon;
-    return (
-      <div className="cds--side-nav__icon">
-        {Icon ? <Icon /> : null}
-        <span className="cds--side-nav__link-text">{route.id}</span>
-      </div>
-    );
-  };
 
   const renderMenuLink = (route: MenuItem) => (
     <SideNavLink
@@ -76,7 +73,11 @@ export const LayoutSideNav: FC = () => {
             to={childPath(route.path, childRoute)}
             isActive={childPath(route.path, childRoute) === location.pathname}
           >
-            {renderIcon(childRoute)}
+            {/* The bare label, not a wrapped one. SideNavMenuItem already puts its children inside
+                a `__link-text` span, so anything wrapped here lands nested inside that span — and
+                a `__side-nav__icon` wrapper in particular is `flex: 0 0 1rem`, which squeezed every
+                child label down to a 16px column of ellipsis. */}
+            {childRoute.id}
           </SideNavMenuItem>
         ))}
       </SideNavMenu>
@@ -100,6 +101,11 @@ export const LayoutSideNav: FC = () => {
             users to "contact the CBR help desk" when something fails; this is the how. */}
         {supportEmail && (
           <>
+            {/* The rule above the block, and the thing that pins it down: the divider carries the
+                `margin-block-start: auto`. It is the one element of the three that is present in
+                both the panel and the rail, so the pinning survives the collapse — the heading it
+                used to sit on is squeezed to zero height at rail width. */}
+            <SideNavDivider className="side-nav-support-divider" />
             <li className="side-nav-support-heading" aria-hidden="true">
               Support
             </li>

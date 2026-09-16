@@ -1,7 +1,7 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { PagedResponse, SiteSearchCriteria, SiteSearchResult } from '@/pages/SiteSearch/types';
-import type { UseQueryResult } from '@tanstack/react-query';
+import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
 
@@ -35,3 +35,24 @@ export const useSiteSearch = (
     // which reads as a search that found nothing rather than one still loading.
     placeholderData: keepPreviousData,
   });
+
+/**
+ * Deletes a site, then makes every search result reflect it.
+ *
+ * <p>Invalidating the whole `site-search` key rather than removing the row locally: the deleted site
+ * changes the total and therefore the paging, and a page that drops a row without re-counting shows
+ * "20 matches" over nineteen rows. Refetching is one request and cannot disagree with the server.
+ *
+ * <p>The error is deliberately not translated here. A 409 arrives with a sentence naming what still
+ * references the site — an archived structure, a close-proximity inspection — and the user cannot
+ * see either of those from the results table, so replacing it with "could not delete" would leave
+ * them with no next step.
+ */
+export const useDeleteSite = (): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (siteId: string) => API.siteSearch.deleteSite(siteId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [SITE_SEARCH_QUERY_KEY] }),
+  });
+};

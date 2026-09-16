@@ -546,16 +546,34 @@ legend.#{variables.$bcgov-prefix}--label:not(.#{variables.$bcgov-prefix}--label-
 - Left icons use "link-primary" color
 - Add a right border for the panel
 ------------------------------------------------------ */
-.#{variables.$bcgov-prefix}--side-nav__menu,
-  .#{variables.$bcgov-prefix}--side-nav__menu-item,
-  a.#{variables.$bcgov-prefix}--side-nav__link,
+
+/* Every side-nav ROW is 48px rather than Carbon's 32px. It lives here rather than in the nav's own
+   stylesheet because the profile panel builds its links out of `SideNavLink` too, and the two have
+   to agree.
+
+   `.cds--side-nav__menu` used to be in this list and had to come out. It is not a row: it is the
+   <ul> holding an expanded section's children. Capping it at 3rem left room for exactly one child,
+   and its <li> clips what overflows — so a section with six children rendered the first and
+   silently swallowed the other five, the one marked current among them.
+
+   `__menu-item` stays: that one IS a row, the <li> around a single child link. */
+.#{variables.$bcgov-prefix}--side-nav__menu-item,
+a.#{variables.$bcgov-prefix}--side-nav__link,
 button.#{variables.$bcgov-prefix}--side-nav__submenu,
 .#{variables.$bcgov-prefix}--side-nav__link {
-  height: 3rem;
+  height: variables.$layout-side-nav-row-height;
 }
 
-// Note: this changed to link-primary, previous code is secondary
-.#{variables.$bcgov-prefix}--side-nav__icon {
+/* Nav icons are drawn in link-primary rather than Carbon's `$icon-secondary` grey.
+
+   Not the submenu chevron, though. It carries `__icon` like the rest, so it was being painted blue
+   along with them — but it is an affordance for opening a section, not a thing to look at, and the
+   design keeps it the same grey as the label beside it. Excluded the way Carbon excludes it from
+   its own `__icon` rules, which leaves Carbon's default fill in place: `$icon-secondary`,
+   darkening to `$icon-primary` while the section is active. */
+.#{variables.$bcgov-prefix}--side-nav__icon:not(
+    .#{variables.$bcgov-prefix}--side-nav__submenu-chevron
+  ) {
   svg {
     fill: var(--#{variables.$bcgov-prefix}-link-primary) !important;
   }

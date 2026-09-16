@@ -147,6 +147,91 @@ describe('LayoutSideNav', () => {
     expect(screen.getByText('Settings')).toHaveClass('cds--side-nav__submenu-title');
   });
 
+  /**
+   * A child link has to fill its 3rem row, or a selected child paints two thirds of its row and
+   * stops. Carbon holds the <a> at 2rem through a selector more specific than the app-wide rule in
+   * `styles/_overrides.scss`, so the nav's own stylesheet finishes the job.
+   *
+   * <p>Asserted on the declaration rather than the rendered height: only the component's own SCSS
+   * is loaded here — nothing in the browser setup pulls in Carbon's ui-shell CSS — so the link is
+   * still `display: inline` in this environment and reports a height of `auto` however tall the
+   * rule makes it. Reading the declaration back still catches the rule ceasing to match, which is
+   * the failure worth guarding. The rest of the nav's metrics are verified visually.
+   */
+  it('makes a child link fill its 48px row', async () => {
+    await renderWithProviders('/settings/profile');
+
+    const child = screen.getByText('Profile').closest('a') as Element;
+
+    expect(getComputedStyle(child).blockSize).toBe('48px');
+    expect(getComputedStyle(child).minBlockSize).toBe('48px');
+  });
+
+  /**
+   * Regression. Child labels used to be passed through the icon renderer, which wrapped them in a
+   * `cds--side-nav__icon` — `flex: 0 0 1rem`. SideNavMenuItem then nested that inside its own
+   * `__link-text`, and the label was squeezed into a 16px column of ellipsis.
+   *
+   * Asserted as "not truncated" rather than as an absolute width, because the failure being guarded
+   * against is the text not fitting its own box, whatever the panel is sized at.
+   */
+  it('renders a child label at full width rather than clipping it to the icon column', async () => {
+    await renderWithProviders('/settings/profile');
+
+    const label = screen.getByText('Profile');
+    expect(label.querySelector('.cds--side-nav__icon')).toBeNull();
+    expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
+  });
+
+  /**
+   * The rail has no room for a label, so the hover tooltip is the only thing naming an icon. It is
+   * drawn with Carbon's own tooltip tokens and a caret pointing back at the icon; the caret is a
+   * pseudo-element, so it is asserted through getComputedStyle rather than the DOM.
+   */
+  it('draws the rail tooltip in the inverse theme with a caret pointing at the icon', async () => {
+    await page.viewport(DESKTOP[0], DESKTOP[1]);
+    layoutMock.isSideNavExpanded = false;
+    await renderWithProviders();
+
+    const label = screen.getByText('Dashboard');
+    const tooltip = getComputedStyle(label);
+    const caret = getComputedStyle(label, '::before');
+
+    // $background-inverse / $text-inverse in the white theme.
+    expect(tooltip.backgroundColor).toBe('rgb(57, 57, 57)');
+    expect(tooltip.color).toBe('rgb(255, 255, 255)');
+    // Hidden until hover — the rule that reveals it is :hover, which this does not simulate.
+    expect(tooltip.opacity).toBe('0');
+    // A right border alone on a zero-sized box renders as a triangle pointing left.
+    expect(caret.borderInlineEndWidth).toBe('4px');
+    expect(caret.borderInlineEndColor).toBe('rgb(57, 57, 57)');
+  });
+
+  it('rules off the support block and keeps it pinned to the bottom', async () => {
+    // The divider carries the `margin-block-start: auto` that pins the block down, and it is the
+    // one part of the block that survives the collapse to a rail — the heading is squeezed to zero
+    // height there, so pinning from the heading would have let the support icon ride up under the
+    // last nav entry.
+    envMock.VITE_SUPPORT_EMAIL = 'cbr@gov.bc.ca';
+    await renderWithProviders();
+
+    const divider = document.querySelector('.side-nav-support-divider') as HTMLElement;
+    expect(divider).toBeTruthy();
+    // Above the heading, not below it.
+    expect(divider.nextElementSibling).toHaveClass('side-nav-support-heading');
+
+    // The pinning itself. The nav has no height of its own in this environment (Carbon's ui-shell
+    // CSS, which gives it one, is not loaded here), so give it one: with free space to distribute,
+    // the auto margin should drive the divider to the foot rather than leave it under Settings.
+    const nav = document.querySelector('.side-nav-drawer') as HTMLElement;
+    nav.style.height = '600px';
+    const lastEntry = screen.getByText('Settings').closest('li') as HTMLElement;
+
+    expect(divider.getBoundingClientRect().top).toBeGreaterThan(
+      lastEntry.getBoundingClientRect().bottom + 100,
+    );
+  });
+
   it('offers "Report an issue" when a support mailbox is configured', async () => {
     // The app tells users to contact the CBR help desk when something fails; this is the how.
     envMock.VITE_SUPPORT_EMAIL = 'cbr@gov.bc.ca';

@@ -58,6 +58,9 @@ export type SiteSearchResult = {
   crossingName: string;
   forestFileId: string;
   roadSectionId: string;
+  /** The raw code — decides the colour of the status pill. See `utils/siteStatus`. */
+  crossingSiteStatusCode: string;
+  /** The decoded status — what the pill reads. */
   crossingSiteStatusDescription: string;
 };
 

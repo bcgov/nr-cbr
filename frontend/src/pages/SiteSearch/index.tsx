@@ -10,6 +10,7 @@ import { EMPTY_CRITERIA, type SiteSearchCriteria, type SiteSearchResult } from '
 
 import './siteSearch.scss';
 
+import type { ApiError } from '@/config/api/types';
 import type { FC } from 'react';
 
 import { useAuthorization } from '@/hooks/useAuthorization';
@@ -22,7 +23,7 @@ import {
   useSpecialAccessCodes,
   useStructureInspectionStatusCodes,
 } from '@/hooks/useConfiguration';
-import { useSiteSearch } from '@/hooks/useSiteSearch';
+import { useDeleteSite, useSiteSearch } from '@/hooks/useSiteSearch';
 
 /**
  * Site Search — the first screen of the Inventory section.
@@ -34,8 +35,27 @@ import { useSiteSearch } from '@/hooks/useSiteSearch';
  * legacy `CBR.FIND_SITES_BY_CRITERIA` — see `SiteSearchSpecifications` for the two places the
  * results deliberately differ from legacy. Paging and ordering are the server's.
  *
- * <p>Deleting a site is still unwired: the modal confirms and closes.
+ * <p>Deleting a site is a hard delete and cannot be undone — see `SiteService.delete`. It is
+ * reachable only to a role holding the destructive capability, and only behind a confirmation.
  */
+/**
+ * The server's explanation for a failed delete, or a fallback.
+ *
+ * <p>A 409 body is an RFC 7807 problem detail whose `detail` says what still references the site.
+ * That sentence is the whole value of the response — it is the only place the user learns that an
+ * archived structure or a close-proximity inspection is in the way, neither of which the results
+ * table shows.
+ */
+const messageFor = (error: unknown, siteId: string): string => {
+  const body = (error as ApiError | undefined)?.body;
+  const detail =
+    body !== null && typeof body === 'object' && 'detail' in body ? body.detail : undefined;
+
+  return typeof detail === 'string' && detail.trim() !== ''
+    ? detail
+    : `Site ${siteId} could not be deleted. Try again, or contact support if this continues.`;
+};
+
 const SiteSearchPage: FC = () => {
   const { canDelete } = useAuthorization();
 
@@ -52,9 +72,19 @@ const SiteSearchPage: FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [pendingDelete, setPendingDelete] = useState<SiteSearchResult | null>(null);
+  /**
+   * Why the last delete was refused, if it was.
+   *
+   * <p>Held on the page rather than read from the mutation, because the modal closes on failure and
+   * the mutation's error would go with it. The server's sentence is shown verbatim: a 409 names
+   * what still references the site, and archived structures and close-proximity inspections are
+   * both invisible from this table.
+   */
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Carbon's Pagination is one-based; the backend, like Spring Data, is zero-based.
   const results = useSiteSearch(submitted, page - 1, pageSize);
+  const deleteSite = useDeleteSite();
 
   const siteStatusCodes = useSiteStatusCodes();
   const structureInspectionStatusCodes = useStructureInspectionStatusCodes();
@@ -126,7 +156,6 @@ const SiteSearchPage: FC = () => {
       <PageTitle
         title="Site Search"
         subtitle="Find a crossing site by location, tenure, maintainer or status."
-        experimental
         breadCrumbs={[{ name: 'Inventory', path: '/inventory' }]}
       />
 
@@ -168,6 +197,19 @@ const SiteSearchPage: FC = () => {
 
       {/* Legacy renders the results block only after a search (`<c:if test="${search}">`), so an
           untouched page is the form alone rather than an empty table implying zero matches. */}
+      {deleteError !== null && (
+        <Column sm={4} md={8} lg={16}>
+          <InlineNotification
+            kind="error"
+            lowContrast
+            title="The site was not deleted"
+            subtitle={deleteError}
+            data-testid="site-delete-error"
+            onCloseButtonClick={() => setDeleteError(null)}
+          />
+        </Column>
+      )}
+
       {submitted !== null && (
         <Column sm={4} md={8} lg={16}>
           {results.isError ? (
@@ -202,11 +244,27 @@ const SiteSearchPage: FC = () => {
       <DestructiveModal
         open={pendingDelete !== null}
         title="Delete site"
-        message={`Are you sure you would like to delete site ${pendingDelete?.id ?? ''}?`}
+        message={
+          `Are you sure you would like to delete site ${pendingDelete?.id ?? ''}? ` +
+          'This cannot be undone.'
+        }
         confirmButtonText="Delete"
+        loading={deleteSite.isPending}
         onCancel={() => setPendingDelete(null)}
-        // No backend to call yet, so confirming just closes. The wiring point is here.
-        onConfirm={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const site = pendingDelete;
+          if (site === null) {
+            return;
+          }
+          setDeleteError(null);
+          deleteSite.mutate(site.id, {
+            onSuccess: () => setPendingDelete(null),
+            onError: (error) => {
+              setPendingDelete(null);
+              setDeleteError(messageFor(error, site.id));
+            },
+          });
+        }}
       />
     </Grid>
   );
