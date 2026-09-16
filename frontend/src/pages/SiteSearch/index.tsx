@@ -1,5 +1,5 @@
 import { Column, Grid, InlineNotification } from '@carbon/react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import DestructiveModal from '@/components/core/DestructiveModal';
 import PageTitle from '@/components/core/PageTitle';
@@ -13,6 +13,15 @@ import './siteSearch.scss';
 import type { FC } from 'react';
 
 import { useAuthorization } from '@/hooks/useAuthorization';
+import {
+  useForestDistricts,
+  useManagementAreas,
+  useReferenceDataState,
+  useSiteStatusCodes,
+  useSiteTypeCodes,
+  useSpecialAccessCodes,
+  useStructureInspectionStatusCodes,
+} from '@/hooks/useConfiguration';
 
 /**
  * Site Search — the first screen of the Inventory section.
@@ -20,11 +29,10 @@ import { useAuthorization } from '@/hooks/useAuthorization';
  * <p>Legacy equivalent: `showSiteSearch.do` → `SiteSearchAction` → `site_search.jsp`, gated on the
  * `/showSiteSearch` privilege, which every role that can read holds.
  *
- * <p><b>UI only — there is no backend yet.</b> The criteria form, the results table and the
- * authorization gates are real; nothing queries. The code-table selects are empty because their
- * contents live in the database and have never been extracted (`cbr-modernization-plan.local.md`
- * item 0.1), and the search itself will go through `CBR.FIND_SITES_BY_CRITERIA`, which takes a
- * caller-built `WHERE` clause plus a bind array rather than fixed parameters.
+ * <p><b>The search itself is not wired yet.</b> The criteria form, the results table, the
+ * authorization gates and all six dropdowns are real; running a search still returns nothing. It
+ * will go through `CBR.FIND_SITES_BY_CRITERIA`, which takes a caller-built `WHERE` clause plus a
+ * bind array rather than fixed parameters.
  */
 const SiteSearchPage: FC = () => {
   const { canDelete } = useAuthorization();
@@ -40,18 +48,53 @@ const SiteSearchPage: FC = () => {
    * change of source, not a change of shape.
    */
   const [results] = useState<SiteSearchResult[]>([]);
-  const [codeTables] = useState<CodeTables>({
-    siteStatusCodes: [],
-    structureInspectionStatusCodes: [],
-    specialAccessCodes: [],
-    siteTypeCodes: [],
-    forestDistricts: [],
-    managementAreas: [],
-  });
+
+  const siteStatusCodes = useSiteStatusCodes();
+  const structureInspectionStatusCodes = useStructureInspectionStatusCodes();
+  const specialAccessCodes = useSpecialAccessCodes();
+  const siteTypeCodes = useSiteTypeCodes();
+  const forestDistricts = useForestDistricts();
+  // Management areas are the former districts inside the selected one, so this refetches — under
+  // its own cache key — whenever Forest District changes, and does not run at all until one is
+  // picked. Legacy does the same by posting the form back on change.
+  const managementAreas = useManagementAreas(criteria.orgUnit);
+
+  const referenceData = useReferenceDataState();
+
+  /**
+   * A failed lookup falls back to an empty list rather than blocking the form: every criterion is
+   * optional, so a search still runs without a Status or Site Type filter. The failure is surfaced
+   * below instead — an empty dropdown with no explanation reads as "there are none".
+   */
+  const codeTables = useMemo<CodeTables>(
+    () => ({
+      siteStatusCodes: siteStatusCodes.data ?? [],
+      structureInspectionStatusCodes: structureInspectionStatusCodes.data ?? [],
+      specialAccessCodes: specialAccessCodes.data ?? [],
+      siteTypeCodes: siteTypeCodes.data ?? [],
+      forestDistricts: forestDistricts.data ?? [],
+      managementAreas: managementAreas.data ?? [],
+    }),
+    [
+      siteStatusCodes.data,
+      structureInspectionStatusCodes.data,
+      specialAccessCodes.data,
+      siteTypeCodes.data,
+      forestDistricts.data,
+      managementAreas.data,
+    ],
+  );
 
   const updateCriteria = useCallback(
     <K extends keyof SiteSearchCriteria>(field: K, value: SiteSearchCriteria[K]) => {
-      setCriteria((current) => ({ ...current, [field]: value }));
+      setCriteria((current) => ({
+        ...current,
+        [field]: value,
+        // Changing the district changes which management areas exist, so a selection made under
+        // the old one has to go. Leaving it would submit a management area that is not in the list
+        // the user can now see — a filter they cannot tell is applied.
+        ...(field === 'orgUnit' ? { managementOrgUnit: '' } : {}),
+      }));
     },
     [],
   );
@@ -79,23 +122,38 @@ const SiteSearchPage: FC = () => {
       />
 
       <Column sm={4} md={8} lg={16}>
-        <InlineNotification
-          kind="info"
-          lowContrast
-          hideCloseButton
-          title="Not connected yet"
-          subtitle={
-            'The form and results table are in place, but no search runs and the dropdowns are ' +
-            'empty — the code tables have not been extracted from the database yet.'
-          }
-        />
+        {referenceData.isError ? (
+          <InlineNotification
+            kind="error"
+            lowContrast
+            hideCloseButton
+            title="Some filters could not be loaded"
+            subtitle={
+              'One or more of the dropdown lists is unavailable, so those filters are empty. ' +
+              'Every other criterion still works.'
+            }
+            data-testid="site-search-codes-error"
+          />
+        ) : (
+          <InlineNotification
+            kind="info"
+            lowContrast
+            hideCloseButton
+            title="Search is not connected yet"
+            subtitle={
+              'The form, the results table and every dropdown are in place, but running a search ' +
+              'returns nothing yet.'
+            }
+          />
+        )}
       </Column>
 
       <Column sm={4} md={8} lg={16}>
         <SiteSearchCriteriaForm
           criteria={criteria}
           codeTables={codeTables}
-          codeTablesLoading={false}
+          codeTablesLoading={referenceData.isLoading}
+          managementAreasLoading={managementAreas.isFetching}
           onChange={updateCriteria}
           onSearch={search}
           onReset={reset}

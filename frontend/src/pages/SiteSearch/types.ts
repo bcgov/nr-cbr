@@ -7,17 +7,12 @@
  * parameters, so whatever assembles it needs to know exactly which criterion each value came from.
  */
 
-/** A code-table entry: the four `<html:options>` collections the legacy form populates. */
-export type CodeOption = {
-  code: string;
-  description: string;
-};
-
-/** An org-unit entry — Forest District and Management Area both use this shape. */
-export type OrgUnitOption = {
-  orgUnitNo: string;
-  orgUnitName: string;
-};
+/**
+ * The reference types the form's selects are built from. Declared in `@/types/configuration`
+ * because every screen draws on the same 37 code tables, and re-exported here so this file stays
+ * the one place the Site Search screen's shapes are named.
+ */
+export type { CodeOption, OrgUnitOption } from '@/types/configuration';
 
 /**
  * The 17 criteria the legacy form offers. Every one is optional: the legacy search runs with none

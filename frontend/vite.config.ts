@@ -126,7 +126,7 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
     },
     optimizeDeps: {
-      include: ['@tanstack/react-query', 'oidc-client-ts', 'react-dom/client'],
+      include: ['@tanstack/react-query', 'axios', 'oidc-client-ts', 'react-dom/client'],
     },
     server: {
       host: devHost,

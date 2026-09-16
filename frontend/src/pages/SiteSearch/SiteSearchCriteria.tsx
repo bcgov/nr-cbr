@@ -18,6 +18,12 @@ type Props = {
   codeTables: CodeTables;
   /** Disables the selects while their contents are still unknown. */
   codeTablesLoading?: boolean;
+  /**
+   * Management areas alone, because they are the one list that reloads mid-form — they depend on
+   * the chosen Forest District. Folding this into {@link codeTablesLoading} would grey out the
+   * whole form every time the user changed district.
+   */
+  managementAreasLoading?: boolean;
   onChange: <K extends keyof Criteria>(field: K, value: Criteria[K]) => void;
   onSearch: () => void;
   onReset: () => void;
@@ -40,6 +46,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
   criteria,
   codeTables,
   codeTablesLoading = false,
+  managementAreasLoading = false,
   onChange,
   onSearch,
   onReset,
@@ -86,12 +93,17 @@ const SiteSearchCriteriaForm: FC<Props> = ({
     </Select>
   );
 
-  const orgUnitSelect = (field: keyof Criteria, labelText: string, options: OrgUnitOption[]) => (
+  const orgUnitSelect = (
+    field: keyof Criteria,
+    labelText: string,
+    options: OrgUnitOption[],
+    loading = codeTablesLoading,
+  ) => (
     <Select
       id={`site-search-${field}`}
       data-testid={`site-search-${field}`}
       labelText={labelText}
-      disabled={codeTablesLoading}
+      disabled={loading}
       value={String(criteria[field])}
       onChange={(event) => onChange(field, event.target.value as never)}
     >
@@ -138,7 +150,12 @@ const SiteSearchCriteriaForm: FC<Props> = ({
         {text('clientLocationCode', 'Client Location Code', 2)}
 
         {orgUnitSelect('orgUnit', 'Forest District', codeTables.forestDistricts)}
-        {orgUnitSelect('managementOrgUnit', 'Management Area', codeTables.managementAreas)}
+        {orgUnitSelect(
+          'managementOrgUnit',
+          'Management Area',
+          codeTables.managementAreas,
+          codeTablesLoading || managementAreasLoading,
+        )}
         {range('kiloStart', 'kiloEnd', 'Kilometres')}
         {range('userKmStart', 'userKmEnd', 'User Kilometres')}
 
