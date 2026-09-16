@@ -91,27 +91,47 @@
   // The tooltip is the link's own label, repurposed: taken out of flow and floated to the right of
   // the icon as a dark pill, hidden until hover. Reusing the real label rather than a data-attribute
   // guarantees it is present and says exactly what the expanded nav says.
+  //
+  // Styled off Carbon's own tooltip rather than invented colours: `$background-inverse` /
+  // `$text-inverse` are the pair the design system uses for a tooltip in both themes, so this stays
+  // legible if the app is ever themed dark — a hard-coded near-black pill would not.
   .side-nav-drawer:not(.side-nav-drawer--open) .#{vars.$bcgov-prefix}--side-nav__link-text,
   .side-nav-drawer:not(.side-nav-drawer--open)
     .#{vars.$bcgov-prefix}--side-nav__submenu-title {
     position: absolute;
-    inset-inline-start: calc(100% + 8px);
+    // 4px clear of the rail — exactly the width of the caret below, so the caret bridges the gap
+    // and the tooltip reads as attached to the icon rather than floating near it.
+    inset-inline-start: calc(100% + 4px);
     inset-block-start: 50%;
     z-index: 9500;
-    padding: 6px 10px;
-    border-radius: 4px;
-    background: #131315;
+    padding: $spacing-02 $spacing-03;
+    border-radius: 2px;
+    background: $background-inverse;
     box-shadow: 0 2px 6px rgb(0 0 0 / 20%);
     // `!important` beats Carbon's `__link:hover .__link-text` colour, which would paint the text dark
     // against the dark pill at the exact moment it becomes visible.
-    color: #fff !important;
+    color: $text-inverse !important;
     font-size: 12px;
-    line-height: 1;
+    font-weight: 400;
+    line-height: 1rem;
     opacity: 0;
     pointer-events: none;
     transform: translateY(-50%);
     transition: opacity 0.15s ease;
     white-space: nowrap;
+
+    // The caret. A zero-sized box whose right border is the only painted edge, which renders as a
+    // triangle pointing back at the icon. On the label element itself rather than a wrapper because
+    // there is no wrapper — the tooltip IS the label.
+    &::before {
+      position: absolute;
+      border-block: 4px solid transparent;
+      border-inline-end: 4px solid $background-inverse;
+      content: '';
+      inset-block-start: 50%;
+      inset-inline-end: 100%;
+      transform: translateY(-50%);
+    }
 
     // Carbon gives a section title `text-overflow()` — `overflow-x: hidden` plus an ellipsis — so
     // it truncates inside the expanded panel. Out here the element IS the tooltip and sizes to its
@@ -183,9 +203,50 @@
   }
 }
 
+// ── Row metrics ────────────────────────────────────────────────────────────
+// The 3rem row height is set app-wide in `styles/_overrides.scss`, which is where the profile
+// panel's links pick it up too. One case needs finishing here.
+//
+// A CHILD link. `styles/_overrides.scss` sizes the <li> around it, but Carbon sizes the <a> itself
+// through `.cds--side-nav__menu a.cds--side-nav__link`, which is the more specific selector and
+// keeps it at 2rem. The link would then be a 32px box inside a 48px row — invisible until a row is
+// selected or hovered, at which point the fill covers two thirds of its row and stops.
+.side-nav-drawer {
+  .#{vars.$bcgov-prefix}--side-nav__menu a.#{vars.$bcgov-prefix}--side-nav__link {
+    block-size: vars.$layout-side-nav-row-height;
+    min-block-size: vars.$layout-side-nav-row-height;
+  }
+}
+
+// Carbon draws top-level entries in `heading-compact-01`, which is 600 — the same weight it uses to
+// mark the *current* page. That leaves the selected row distinguishable only by its grey fill. The
+// design separates the two: everything is regular, and weight means "you are here".
+//
+// Scoped away from the current link rather than reset afterwards, because
+// `a.cds--side-nav__link--current` is the less specific of the two selectors and would lose.
+.side-nav-drawer {
+  a.#{vars.$bcgov-prefix}--side-nav__link:not(
+      .#{vars.$bcgov-prefix}--side-nav__link--current
+    ):not([aria-current='page']),
+  .#{vars.$bcgov-prefix}--side-nav__submenu {
+    font-weight: 400;
+  }
+
+  // An OPEN section is not itself the current page — one of the children on show is, and that child
+  // is already bold. Carbon bolds the section title whenever the section is active, which put two
+  // bold rows on screen at once and made the section look like the selection.
+  //
+  // Only while open: closed and active, in the rail or with the section collapsed, the title is the
+  // only thing left that can say "you are here", and there it keeps Carbon's weight.
+  .#{vars.$bcgov-prefix}--side-nav__submenu[aria-expanded='true']
+    .#{vars.$bcgov-prefix}--side-nav__submenu-title {
+    font-weight: 400;
+  }
+}
+
 // Support block pinned to the bottom of the nav. The drawer and its item list are flex columns so
-// `margin-block-start: auto` on the heading pushes it (and the link under it) down, regardless of
-// how many role-dependent entries render above.
+// `margin-block-start: auto` on the divider pushes it (and the heading and link under it) down,
+// regardless of how many role-dependent entries render above.
 .side-nav-drawer.#{vars.$bcgov-prefix}--side-nav {
   display: flex;
   flex-direction: column;
@@ -197,22 +258,26 @@
   flex-direction: column;
 }
 
-// padding-inline-start matches Carbon's 2rem link indent, so the heading lines up with the labels
-// above it rather than with the icons.
-.side-nav-support-heading {
+// The rule above the support block. Carbon already gives `__divider` its 1px line and 0.5rem/1rem
+// margins; all this adds is the pinning, and a `flex-basis` — without it the 1px line is a flex item
+// in an `auto`-sized column and the browser is free to round it away.
+.side-nav-support-divider.#{vars.$bcgov-prefix}--side-nav__divider {
+  flex: 0 0 auto;
   margin-block-start: auto;
-  padding-block: 0 0.25rem;
-  padding-inline: 2rem 1rem;
+}
+
+// Aligned to the icon column (1rem), not the label column, so the heading and the divider above it
+// share one left edge.
+.side-nav-support-heading {
+  padding-block: $spacing-03 $spacing-02;
+  padding-inline: $spacing-05 $spacing-05;
   color: var(--#{vars.$bcgov-prefix}-text-secondary);
   @include type.type-style('label-01');
 }
 
-// No room for a section label in the rail — the link's hover tooltip already names it.
-//
-// Collapsed to nothing rather than `display: none`, because this element is what pins the support
-// block to the bottom: it carries `margin-block-start: auto` as a flex child of the item list.
-// Removing it from the box tree takes the auto margin with it, and the support icon rides up under
-// the last nav entry instead of staying at the foot of the rail.
+// No room for a section label in the rail — the link's hover tooltip already names it. The divider
+// above it stays: at 1rem margins either side it is a 1rem rule in a 3rem strip, which still reads
+// as a separator, and it is what pins the block to the bottom now.
 @include breakpoint(lg) {
   .side-nav-drawer:not(.side-nav-drawer--open) .side-nav-support-heading {
     block-size: 0;

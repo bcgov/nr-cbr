@@ -157,11 +157,20 @@ public class CrossingSiteEntity {
   /**
    * Used only by the "Designated Maintainer" criterion, which matches on the client's name.
    *
-   * <p>{@code NO_CONSTRAINT} for the same reason as the road section: {@code V_CLIENT_PUBLIC} is a
-   * view. The real foreign key on this column points at {@code FOREST_CLIENT}, which this
-   * application is not granted — and the view does not necessarily expose every client that table
-   * holds, so {@code @NotFound(IGNORE)} is needed here too, for the same reason and with the same
-   * meaning: a client this application cannot see reads as no client, not as a failed search.
+   * <p>{@code NO_CONSTRAINT} because {@code V_CLIENT_PUBLIC} is a view and nothing can key to it.
+   * The real constraint on this column is {@code CRS_CL_FK1}, a composite key over
+   * {@code (CLIENT_NUMBER, CLIENT_LOCN_CODE)} pointing at {@code CLIENT_LOCATION} — which in turn
+   * keys to {@code FOREST_CLIENT} via {@code CL_FC_FK}. So a non-null client number does resolve,
+   * transitively, and the view withholds no rows: it is {@code SELECT six columns FROM
+   * forest_client} with no filter.
+   *
+   * <p>{@code @NotFound(IGNORE)} is kept regardless, for a narrower reason than the road section's.
+   * Hibernate cannot see a guarantee that runs through a table this mapping never mentions, so it
+   * builds a lazy proxy and throws {@code EntityNotFoundException} the moment the results mapping
+   * reads one that is missing. The guarantee also holds only while the data does: this is a view
+   * over a table CBR does not own, reached through a constraint on a column pair only half of which
+   * is mapped here. A search returning a 500 because one site's client went missing is a poor trade
+   * against a cell rendering empty.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @NotFound(action = NotFoundAction.IGNORE)

@@ -144,6 +144,9 @@ class SiteSearchServiceTest {
       assertThat(result.orgUnitCode()).isEqualTo("DPG");
       assertThat(result.orgUnitName()).isEqualTo("Prince George");
       assertThat(result.forestServiceRoad()).isEqualTo("Bowron FSR");
+      // Code and description both travel: the description is the label, the code decides the
+      // colour of the pill it sits in.
+      assertThat(result.crossingSiteStatusCode()).isEqualTo("ACT");
       assertThat(result.crossingSiteStatusDescription()).isEqualTo("Active");
       // Keeps the column's own scale: "12.50", not "12.5" and not "1.25E+1".
       assertThat(result.pointOfCommencementDistance()).isEqualTo("12.50");

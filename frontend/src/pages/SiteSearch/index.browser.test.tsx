@@ -27,7 +27,7 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 
 // Mocked at the service rather than at the hook, so the query key, the fallback to an empty list
 // and the error branch are all exercised by these tests instead of being stubbed past.
-const siteSearchApi = vi.hoisted(() => ({ searchSites: vi.fn() }));
+const siteSearchApi = vi.hoisted(() => ({ searchSites: vi.fn(), deleteSite: vi.fn() }));
 
 vi.mock('@/services/APIs', () => ({
   default: { configuration: api, siteSearch: siteSearchApi },
@@ -70,6 +70,7 @@ const site = (id: string) => ({
   crossingName: 'Deadman Creek',
   forestFileId: 'R00123',
   roadSectionId: '01',
+  crossingSiteStatusCode: 'ACT',
   crossingSiteStatusDescription: 'Active',
 });
 
@@ -88,6 +89,8 @@ beforeEach(() => {
   });
   siteSearchApi.searchSites.mockReset();
   siteSearchApi.searchSites.mockResolvedValue(emptyPage());
+  siteSearchApi.deleteSite.mockReset();
+  siteSearchApi.deleteSite.mockResolvedValue(undefined);
 });
 
 const search = () => fireEvent.click(screen.getByTestId('site-search-submit'));
@@ -400,6 +403,47 @@ describe('SiteSearchPage — results', () => {
     expect(screen.getByText('DPG')).toBeInTheDocument();
   });
 
+  it('renders the status as a coloured pill', async () => {
+    siteSearchApi.searchSites.mockResolvedValue({
+      ...emptyPage(),
+      content: [
+        site('SITE-1'),
+        {
+          ...site('SITE-2'),
+          crossingSiteStatusCode: 'BAR',
+          crossingSiteStatusDescription: 'Barricaded',
+        },
+      ],
+      totalElements: 2,
+      totalPages: 1,
+    });
+    renderPage();
+
+    await searchAndWait();
+
+    // The colour comes from the code, so a reworded description cannot silently change it.
+    expect(screen.getByText('Active').closest('.cds--tag')).toHaveClass('cds--tag--green');
+    expect(screen.getByText('Barricaded').closest('.cds--tag')).toHaveClass('cds--tag--red');
+  });
+
+  it('shows no pill at all for a site with no status', async () => {
+    // "Incomplete Data?" exists to find these. An empty outlined pill would read as a status whose
+    // name failed to load.
+    siteSearchApi.searchSites.mockResolvedValue({
+      ...emptyPage(),
+      content: [
+        { ...site('NO-STATUS'), crossingSiteStatusCode: null, crossingSiteStatusDescription: null },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+    });
+    renderPage();
+
+    await searchAndWait();
+
+    expect(screen.getByTestId('site-row-NO-STATUS').querySelector('.cds--tag')).toBeNull();
+  });
+
   it('renders the legacy columns in the legacy order', async () => {
     renderPage();
     await searchAndWait();
@@ -438,6 +482,67 @@ describe('SiteSearchPage — the Delete column is privilege-gated', () => {
 });
 
 describe('SiteSearchPage — the dropdowns come from the server', () => {
+  it('names the unfiltered option rather than leaving it blank', async () => {
+    // A blank first option reads as a value that failed to load, and gives a user who has set the
+    // filter no obvious way to unset it.
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent('Any status');
+    });
+    expect(screen.getByTestId('site-search-siteTypeCode')).toHaveTextContent('Any site type');
+    expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('Any district');
+  });
+
+  it('keeps the unfiltered option valueless, so choosing it clears the filter', async () => {
+    api.getSiteStatusCodes.mockResolvedValue([{ code: 'ACT', description: 'Active' }]);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent('ACT - Active');
+    });
+
+    fireEvent.change(screen.getByTestId('site-search-siteStatusCode'), {
+      target: { value: 'ACT' },
+    });
+    fireEvent.change(screen.getByTestId('site-search-siteStatusCode'), { target: { value: '' } });
+    await searchAndWait();
+
+    expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(
+      expect.objectContaining({ siteStatusCode: '' }),
+      0,
+      20,
+    );
+  });
+
+  it('tells the user a district is needed before Management Area means anything', async () => {
+    // The list is empty by design until a district is chosen, so "Any management area" would be
+    // offering a filter over nothing.
+    api.getForestDistricts.mockResolvedValue([
+      { orgUnitNo: '18', orgUnitCode: 'DPG', orgUnitName: 'Prince George' },
+    ]);
+    api.getManagementAreas.mockResolvedValue([
+      { orgUnitNo: '26', orgUnitCode: 'DRV', orgUnitName: 'Robson Valley' },
+    ]);
+    renderPage();
+    expect(screen.getByTestId('site-search-managementOrgUnit')).toHaveTextContent(
+      'Select a forest district first',
+    );
+    // The districts have to be on the page first: a <select> silently ignores a value it has no
+    // option for, so firing the change early leaves the criterion blank and the test green for the
+    // wrong reason.
+    await waitFor(() => {
+      expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('DPG - Prince George');
+    });
+
+    fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('site-search-managementOrgUnit')).toHaveTextContent(
+        'Any management area',
+      );
+    });
+  });
+
   it('labels an option "CODE - Description", as nr-frep does', async () => {
     // The code is what the business says out loud and what appears on paper; the description alone
     // leaves the user translating between the two.
@@ -660,5 +765,98 @@ describe('SiteSearchPage — backend status', () => {
       'href',
       '/inventory/site/SITE-1',
     );
+  });
+});
+
+describe('SiteSearchPage — deleting a site', () => {
+  const oneResult = () => ({
+    ...emptyPage(),
+    content: [site('SITE-1')],
+    totalElements: 1,
+    totalPages: 1,
+  });
+
+  /** Searches, then opens the confirmation for the single result. */
+  const openDeleteConfirmation = async () => {
+    siteSearchApi.searchSites.mockResolvedValue(oneResult());
+    renderPage(true);
+    await searchAndWait();
+
+    fireEvent.click(screen.getByTestId('site-delete-SITE-1'));
+    await screen.findByText('Delete site');
+  };
+
+  it('asks before deleting, and says it cannot be undone', async () => {
+    // A hard delete with no history row behind it. The warning is the only thing standing between
+    // a mis-click and unrecoverable data.
+    await openDeleteConfirmation();
+
+    expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument();
+    expect(siteSearchApi.deleteSite).not.toHaveBeenCalled();
+  });
+
+  it('deletes nothing when the confirmation is dismissed', async () => {
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Cancel'));
+
+    expect(siteSearchApi.deleteSite).not.toHaveBeenCalled();
+  });
+
+  it('deletes the site that was chosen', async () => {
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(siteSearchApi.deleteSite).toHaveBeenCalledWith('SITE-1');
+    });
+  });
+
+  it('re-runs the search afterwards rather than dropping the row locally', async () => {
+    // The deleted site changes the total and therefore the paging. A page that removes a row
+    // without re-counting shows "20 matches" above nineteen rows.
+    await openDeleteConfirmation();
+    const searchesBefore = siteSearchApi.searchSites.mock.calls.length;
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(siteSearchApi.searchSites.mock.calls.length).toBeGreaterThan(searchesBefore);
+    });
+  });
+
+  it('shows the server’s reason when the delete is refused', async () => {
+    // The 409 detail is the only place the user learns that an archived structure is in the way —
+    // the results table shows no structures at all.
+    siteSearchApi.deleteSite.mockRejectedValue({
+      body: { detail: 'Site SITE-1 has 2 associated archived structure(s) and cannot be deleted.' },
+    });
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    expect(await screen.findByTestId('site-delete-error')).toBeInTheDocument();
+    expect(screen.getByText(/2 associated archived structure\(s\)/)).toBeInTheDocument();
+  });
+
+  it('falls back to its own wording when the failure carries no explanation', async () => {
+    siteSearchApi.deleteSite.mockRejectedValue(new Error('network'));
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    expect(await screen.findByTestId('site-delete-error')).toBeInTheDocument();
+    expect(screen.getByText(/could not be deleted/i)).toBeInTheDocument();
+  });
+
+  it('offers no delete at all to a user without the capability', async () => {
+    // Legacy wraps the column in <cbr:authorize grantedAction="/deleteSite">. The backend refuses
+    // as well; this is the half that stops the action being offered in the first place.
+    siteSearchApi.searchSites.mockResolvedValue(oneResult());
+    renderPage(false);
+    await searchAndWait();
+
+    expect(screen.queryByTestId('site-delete-SITE-1')).not.toBeInTheDocument();
   });
 });

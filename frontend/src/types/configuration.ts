@@ -24,3 +24,16 @@ export type OrgUnitOption = {
   orgUnitCode: string;
   orgUnitName: string;
 };
+
+/** The Carbon `Tag` colours this application uses. Mirrors nr-frep's `StatusTagType`. */
+export type StatusTagType =
+  | 'red'
+  | 'magenta'
+  | 'purple'
+  | 'blue'
+  | 'cyan'
+  | 'teal'
+  | 'green'
+  | 'gray'
+  | 'cool-gray'
+  | 'warm-gray';

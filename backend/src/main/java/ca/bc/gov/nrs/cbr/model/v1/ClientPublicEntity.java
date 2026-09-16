@@ -28,7 +28,11 @@ import org.hibernate.annotations.Immutable;
  *       substitution deliberately.</li>
  * </ul>
  *
- * <p>The view exposes six columns; only the two used here are mapped.
+ * <p><b>It hides columns, not clients.</b> The definition is {@code SELECT six columns FROM
+ * forest_client} with no {@code WHERE} — every row, and its own comment says so: "A view to provide
+ * a subset of columns from FOREST_CLIENT". What it withholds is the identifying detail on the
+ * individuals that table also holds: birthdate, client identification, registry numbers. Of the six
+ * it does expose, only the two used here are mapped.
  */
 @Entity
 @Immutable

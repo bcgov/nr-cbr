@@ -100,7 +100,19 @@ const SiteSearchCriteriaForm: FC<Props> = ({
     />
   );
 
-  const codeSelect = (field: keyof Criteria, labelText: string, options: CodeOption[]) => (
+  /**
+   * A code-table dropdown.
+   *
+   * <p>`anyText` is the unfiltered option, and it says so in words — "Any status" rather than a
+   * blank line, which is how nr-frep writes it. A blank first option reads as a value that failed
+   * to load, and gives a user who has set the filter no obvious way to unset it.
+   */
+  const codeSelect = (
+    field: keyof Criteria,
+    labelText: string,
+    anyText: string,
+    options: CodeOption[],
+  ) => (
     <Select
       id={`site-search-${field}`}
       data-testid={`site-search-${field}`}
@@ -109,8 +121,8 @@ const SiteSearchCriteriaForm: FC<Props> = ({
       value={String(criteria[field])}
       onChange={(event) => onChange(field, event.target.value as never)}
     >
-      {/* The legacy form's blank first option: no filter on this criterion. */}
-      <SelectItem value="" text="" />
+      {/* The legacy form's blank first option, given words. The value is still "" — no filter. */}
+      <SelectItem value="" text={anyText} />
       {options.map((option) => (
         <SelectItem
           key={option.code}
@@ -127,6 +139,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
   const orgUnitSelect = (
     field: keyof Criteria,
     labelText: string,
+    anyText: string,
     options: OrgUnitOption[],
     loading = codeTablesLoading,
   ) => (
@@ -138,7 +151,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
       value={String(criteria[field])}
       onChange={(event) => onChange(field, event.target.value as never)}
     >
-      <SelectItem value="" text="" />
+      <SelectItem value="" text={anyText} />
       {options.map((option) => (
         <SelectItem
           key={option.orgUnitNo}
@@ -192,7 +205,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
     <form onSubmit={submit} data-testid="site-search-form" className="site-search__form">
       <div className="site-search__criteria">
         {text('siteId', 'Site #', 14)}
-        {codeSelect('siteStatusCode', 'Status', codeTables.siteStatusCodes)}
+        {codeSelect('siteStatusCode', 'Status', 'Any status', codeTables.siteStatusCodes)}
 
         <div className="site-search__paired site-search__span-2">
           {text('forestFileId', 'Project File ID#', 10)}
@@ -202,6 +215,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
         {codeSelect(
           'structureInspectionStatusCode',
           'Inspection Status',
+          'Any inspection status',
           codeTables.structureInspectionStatusCodes,
         )}
         {text('forestServiceRoad', 'Forest Service Road', 20)}
@@ -209,10 +223,13 @@ const SiteSearchCriteriaForm: FC<Props> = ({
         {text('crossingName', 'Crossing Name', 20)}
         {text('clientLocationCode', 'Client Location Code', 2)}
 
-        {orgUnitSelect('orgUnit', 'Forest District', codeTables.forestDistricts)}
+        {orgUnitSelect('orgUnit', 'Forest District', 'Any district', codeTables.forestDistricts)}
         {orgUnitSelect(
           'managementOrgUnit',
           'Management Area',
+          // Until a district is chosen this list is empty by design, so "Any management area" would
+          // be offering a filter over nothing. Saying what is missing is the more useful blank.
+          criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
           codeTables.managementAreas,
           codeTablesLoading || managementAreasLoading,
         )}
@@ -222,9 +239,10 @@ const SiteSearchCriteriaForm: FC<Props> = ({
         {codeSelect(
           'specialAccessCode',
           'Special Access Requirements',
+          'Any requirement',
           codeTables.specialAccessCodes,
         )}
-        {codeSelect('siteTypeCode', 'Site Type', codeTables.siteTypeCodes)}
+        {codeSelect('siteTypeCode', 'Site Type', 'Any site type', codeTables.siteTypeCodes)}
         {text('primaryUserName', 'Designated Maintainer', 35)}
 
         {/* Toggles rather than checkboxes. Both are filters that are either applied or not, and a

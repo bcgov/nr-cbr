@@ -112,6 +112,7 @@ public class SiteSearchService {
         site.getCrossingName(),
         site.getForestFileId(),
         site.getRoadSectionId(),
+        site.getCrossingSiteStatusCode(),
         from(site.getStatus(), CrossingSiteStatusCodeEntity::getDescription));
   }
 

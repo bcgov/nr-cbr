@@ -33,6 +33,24 @@ export class SiteSearchService extends HttpClient {
       query: { ...populated(criteria), pageNumber, pageSize },
     });
   }
+
+  /**
+   * Deletes a site.
+   *
+   * <p>204 on success. 404 if it is already gone, 409 if a structure or inspection still references
+   * it — the body carries a sentence naming what, which the caller should show rather than replace
+   * with wording of its own.
+   *
+   * <p><b>Irreversible.</b> The backend issues a hard delete and CBR keeps no history row for a
+   * site, so nothing can undo this.
+   */
+  deleteSite(siteId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/sites/{siteId}',
+      path: { siteId },
+    });
+  }
 }
 
 /** Drops blank strings and false booleans, leaving only the criteria the user actually set. */
