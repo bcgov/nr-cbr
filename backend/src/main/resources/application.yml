@@ -62,6 +62,17 @@ spring:
         javax.net.ssl.trustStorePassword: ${KEYSTORE_SECRET}
   jpa:
     show-sql: false
+    # CBR owns no tables. The schema is deployed from bcgov-c/nr-mof-db and the app connects as
+    # PROXY_FSA_CBR_READ_WRITE_USER, which has object grants and no CREATE privileges at all.
+    # `none` is already the default against a non-embedded datasource; it is pinned because the
+    # default flips to create-drop the moment a test swaps in H2, and an accidental DDL run against
+    # THE is not a mistake that stays local.
+    hibernate:
+      ddl-auto: none
+    # No session held open for the duration of the request. Every repository call returns fully
+    # loaded objects to the service, so leaving this on would only hold a pooled connection across
+    # view rendering and let a lazy-load defect reach production as a working page.
+    open-in-view: false
     properties:
       hibernate:
         format_sql: false
