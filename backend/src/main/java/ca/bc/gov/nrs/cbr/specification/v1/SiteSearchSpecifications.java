@@ -36,6 +36,50 @@ public final class SiteSearchSpecifications {
   /** Legacy's {@code Search.LIKE} is an unanchored, case-sensitive contains. */
   private static final String WILDCARD = "%";
 
+  /*
+   * Entity attribute names.
+   *
+   * These are strings because the Criteria API takes strings, and a wrong one fails at runtime with
+   * "Unable to locate Attribute" rather than at compile time. Naming each once means a rename in
+   * CrossingSiteEntity has one place to follow rather than a dozen, and a typo is a compile error
+   * here instead of a 500 on whichever criterion happened to carry it.
+   *
+   * The alternative is the generated JPA static metamodel (CrossingSiteEntity_.roadSectionId),
+   * which would make them compile-checked outright. That needs hibernate-jpamodelgen wired into the
+   * build alongside Lombok; worth doing if this file grows siblings, and overkill for one.
+   */
+  private static final String SITE_ID = "crossingSiteId";
+  private static final String CROSSING_NAME = "crossingName";
+  private static final String FOREST_FILE_ID = "forestFileId";
+  private static final String ROAD_SECTION_ID = "roadSectionId";
+  private static final String ROAD_SEGMENT_ID = "roadSegmentId";
+  private static final String SITE_STATUS_CODE = "crossingSiteStatusCode";
+  private static final String INSPECTION_STATUS_CODE = "structureInspectionStatusCode";
+  private static final String SITE_TYPE_CODE = "crossingSiteTypeCode";
+  private static final String SPECIAL_ACCESS_CODE = "specialAccessRqmtCode";
+  private static final String CLIENT_NUMBER = "clientNumber";
+  private static final String CLIENT_LOCATION_CODE = "clientLocnCode";
+  private static final String ORG_UNIT_NO = "orgUnitNo";
+  private static final String MANAGEMENT_ORG_UNIT_NO = "managementOrgUnitNo";
+  private static final String CAPITAL_ROAD_IND = "capitalRoadInd";
+  private static final String KILOMETRES = "pointOfCommencementDistance";
+  private static final String USER_KM = "userKm";
+
+  /* The associations, and the one column read through each. */
+  private static final String ORG_UNIT = "orgUnit";
+  private static final String ORG_UNIT_CODE = "orgUnitCode";
+  private static final String ROAD_SECTION = "roadSection";
+  private static final String ROAD_SECTION_NAME = "roadSectName";
+  private static final String CLIENT = "client";
+  private static final String CLIENT_NAME = "clientName";
+  private static final String STATUS = "status";
+
+  /** The value {@code CAPITAL_ROAD_IND} carries when a road is a capital road. */
+  private static final String YES = "Y";
+
+  /** The site type that carries road and location detail — see {@link #incomplete}. */
+  private static final String CROSSING = "CRS";
+
   /**
    * Builds the predicate for a set of criteria.
    *
@@ -50,39 +94,39 @@ public final class SiteSearchSpecifications {
       // Straight scalar columns on CROSSING_SITE. No join is needed for any of these, which is why
       // the Forest District and Management Area filters read the *_NO columns rather than going
       // through the org-unit associations.
-      contains(builder, root.get("crossingSiteId"), criteria.siteId()).ifPresent(predicates::add);
-      contains(builder, root.get("forestFileId"), criteria.forestFileId()).ifPresent(predicates::add);
-      contains(builder, root.get("roadSectionId"), criteria.roadSectionId())
+      contains(builder, root.get(SITE_ID), criteria.siteId()).ifPresent(predicates::add);
+      contains(builder, root.get(FOREST_FILE_ID), criteria.forestFileId()).ifPresent(predicates::add);
+      contains(builder, root.get(ROAD_SECTION_ID), criteria.roadSectionId())
           .ifPresent(predicates::add);
-      contains(builder, root.get("crossingName"), criteria.crossingName())
+      contains(builder, root.get(CROSSING_NAME), criteria.crossingName())
           .ifPresent(predicates::add);
 
-      equals(builder, root.get("crossingSiteStatusCode"), criteria.siteStatusCode())
+      equals(builder, root.get(SITE_STATUS_CODE), criteria.siteStatusCode())
           .ifPresent(predicates::add);
-      equals(builder, root.get("structureInspectionStatusCode"),
+      equals(builder, root.get(INSPECTION_STATUS_CODE),
           criteria.structureInspectionStatusCode()).ifPresent(predicates::add);
-      equals(builder, root.get("specialAccessRqmtCode"), criteria.specialAccessCode())
+      equals(builder, root.get(SPECIAL_ACCESS_CODE), criteria.specialAccessCode())
           .ifPresent(predicates::add);
-      equals(builder, root.get("crossingSiteTypeCode"), criteria.siteTypeCode())
+      equals(builder, root.get(SITE_TYPE_CODE), criteria.siteTypeCode())
           .ifPresent(predicates::add);
-      equals(builder, root.get("clientNumber"), criteria.clientNumber()).ifPresent(predicates::add);
-      equals(builder, root.get("clientLocnCode"), criteria.clientLocationCode())
+      equals(builder, root.get(CLIENT_NUMBER), criteria.clientNumber()).ifPresent(predicates::add);
+      equals(builder, root.get(CLIENT_LOCATION_CODE), criteria.clientLocationCode())
           .ifPresent(predicates::add);
 
-      equalsNumber(builder, root.get("orgUnitNo"), criteria.orgUnit()).ifPresent(predicates::add);
-      equalsNumber(builder, root.get("managementOrgUnitNo"), criteria.managementOrgUnit())
+      equalsNumber(builder, root.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
+      equalsNumber(builder, root.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
           .ifPresent(predicates::add);
 
       // Capital Road is a Y/N indicator, and the filter is one-way: switched on it means "capital
       // roads only", switched off it means "do not filter" — not "non-capital roads only". Legacy
       // adds the criterion only when the box is ticked, and the toggle's wording follows from that.
       if (Boolean.TRUE.equals(criteria.capitalRoad())) {
-        predicates.add(builder.equal(root.get("capitalRoadInd"), "Y"));
+        predicates.add(builder.equal(root.get(CAPITAL_ROAD_IND), YES));
       }
 
-      range(builder, root.get("pointOfCommencementDistance"), criteria.kiloStart(),
+      range(builder, root.get(KILOMETRES), criteria.kiloStart(),
           criteria.kiloEnd()).ifPresent(predicates::add);
-      range(builder, root.get("userKm"), criteria.userKmStart(), criteria.userKmEnd())
+      range(builder, root.get(USER_KM), criteria.userKmStart(), criteria.userKmEnd())
           .ifPresent(predicates::add);
 
       if (Boolean.TRUE.equals(criteria.incomplete())) {
@@ -94,13 +138,13 @@ public final class SiteSearchSpecifications {
       // inner join would have done anyway — but only for these criteria, rather than for the whole
       // query.
       if (StringUtils.hasText(criteria.forestServiceRoad())) {
-        From<?, ?> roadSection = root.join("roadSection", JoinType.LEFT);
-        contains(builder, roadSection.get("roadSectName"), criteria.forestServiceRoad())
+        From<?, ?> roadSection = root.join(ROAD_SECTION, JoinType.LEFT);
+        contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
             .ifPresent(predicates::add);
       }
       if (StringUtils.hasText(criteria.primaryUserName())) {
-        From<?, ?> client = root.join("client", JoinType.LEFT);
-        contains(builder, client.get("clientName"), criteria.primaryUserName())
+        From<?, ?> client = root.join(CLIENT, JoinType.LEFT);
+        contains(builder, client.get(CLIENT_NAME), criteria.primaryUserName())
             .ifPresent(predicates::add);
       }
 
@@ -124,19 +168,19 @@ public final class SiteSearchSpecifications {
    */
   private static Predicate incomplete(CriteriaBuilder builder, Root<CrossingSiteEntity> root) {
     Predicate crossingSpecific = builder.and(
-        builder.equal(root.get("crossingSiteTypeCode"), "CRS"),
+        builder.equal(root.get(SITE_TYPE_CODE), CROSSING),
         builder.or(
-            root.get("roadSegmentId").isNull(),
-            root.get("forestFileId").isNull(),
-            root.get("roadSectionId").isNull(),
-            root.get("crossingName").isNull(),
-            root.get("pointOfCommencementDistance").isNull()));
+            root.get(ROAD_SEGMENT_ID).isNull(),
+            root.get(FOREST_FILE_ID).isNull(),
+            root.get(ROAD_SECTION_ID).isNull(),
+            root.get(CROSSING_NAME).isNull(),
+            root.get(KILOMETRES).isNull()));
 
     return builder.or(
-        root.get("crossingSiteStatusCode").isNull(),
-        root.get("structureInspectionStatusCode").isNull(),
-        root.get("orgUnitNo").isNull(),
-        root.get("crossingSiteTypeCode").isNull(),
+        root.get(SITE_STATUS_CODE).isNull(),
+        root.get(INSPECTION_STATUS_CODE).isNull(),
+        root.get(ORG_UNIT_NO).isNull(),
+        root.get(SITE_TYPE_CODE).isNull(),
         crossingSpecific);
   }
 
@@ -171,15 +215,15 @@ public final class SiteSearchSpecifications {
         || long.class.equals(query.getResultType())) {
       return;
     }
-    From<?, ?> orgUnit = (From<?, ?>) root.fetch("orgUnit", JoinType.LEFT);
-    From<?, ?> roadSection = (From<?, ?>) root.fetch("roadSection", JoinType.LEFT);
-    root.fetch("status", JoinType.LEFT);
+    From<?, ?> orgUnit = (From<?, ?>) root.fetch(ORG_UNIT, JoinType.LEFT);
+    From<?, ?> roadSection = (From<?, ?>) root.fetch(ROAD_SECTION, JoinType.LEFT);
+    root.fetch(STATUS, JoinType.LEFT);
 
     query.orderBy(
-        builder.asc(orgUnit.get("orgUnitCode")),
-        builder.asc(roadSection.get("roadSectName")),
-        builder.asc(root.get("roadSectionId")),
-        builder.asc(root.get("pointOfCommencementDistance")));
+        builder.asc(orgUnit.get(ORG_UNIT_CODE)),
+        builder.asc(roadSection.get(ROAD_SECTION_NAME)),
+        builder.asc(root.get(ROAD_SECTION_ID)),
+        builder.asc(root.get(KILOMETRES)));
   }
 
   private static Optional<Predicate> contains(

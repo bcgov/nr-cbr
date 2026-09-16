@@ -35,7 +35,7 @@ import org.hibernate.annotations.Immutable;
 @Entity
 @Immutable
 @Table(name = "CBR_ROAD_SECTION_VW", schema = "THE")
-@IdClass(CbrRoadSectionEntity.RoadSectionId.class)
+@IdClass(CbrRoadSectionEntity.Key.class)
 @Getter
 @ToString
 @EqualsAndHashCode(of = {"forestFileId", "roadSectionId"})
@@ -56,12 +56,20 @@ public class CbrRoadSectionEntity {
   @Column(name = "ROAD_SECT_NAME", length = 30)
   private String roadSectName;
 
-  /** The composite key. A plain class rather than a record: JPA requires a no-arg constructor. */
+  /**
+   * The composite key.
+   *
+   * <p>A plain class rather than a record, because JPA requires a no-arg constructor. Named
+   * {@code Key} rather than {@code RoadSectionId}: the field below must be called
+   * {@code roadSectionId} — {@code @IdClass} matches its fields to the entity's {@code @Id} fields
+   * by name — and a class differing from its own field only by capitalisation is a genuine
+   * readability trap, as well as a Sonar finding. The class is the half that can move.
+   */
   @Getter
   @EqualsAndHashCode
   @NoArgsConstructor
   @AllArgsConstructor
-  public static class RoadSectionId implements Serializable {
+  public static class Key implements Serializable {
     private String forestFileId;
     private String roadSectionId;
   }

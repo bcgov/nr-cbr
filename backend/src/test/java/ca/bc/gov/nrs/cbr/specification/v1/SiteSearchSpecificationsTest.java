@@ -249,8 +249,8 @@ class SiteSearchSpecificationsTest {
     @Test
     @DisplayName("User Kilometres To works on its own — the legacy guard tests the wrong field")
     void userKilometresUpperBoundStandsAlone() {
-      // Legacy guards this bound with `if (getKiloEnd() != null && ...)` while applying
-      // getUserKmEnd(), so the box does nothing unless an unrelated one is filled.
+      // Legacy guards this bound on whether the Kilometres upper bound is filled, while applying
+      // the User Km one — the wrong getter, copy-pasted — so the box does nothing on its own.
       givenSupportingRows();
       persist(completeSite("LOW").userKm(new BigDecimal("5.00")).build());
       persist(completeSite("HIGH").userKm(new BigDecimal("50.00")).build());
