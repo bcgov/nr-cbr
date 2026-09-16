@@ -2,7 +2,7 @@ import { queryOptions, useQueries, useQuery, useQueryClient } from '@tanstack/re
 import { useEffect } from 'react';
 
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
-import type { FetchQueryOptions, UseQueryResult } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 
 import { THREE_HOURS } from '@/config/react-query/TimeUnits';
 import API from '@/services/APIs';
@@ -58,11 +58,15 @@ export const forestDistrictsQuery = queryOptions({
 });
 
 /**
- * Every parameterless lookup — the set that is worth warming up front.
+ * Every parameterless lookup — the set that is worth warming up front, and the set whose combined
+ * loading and error state the form reads.
  *
  * <p>`as const` keeps this a tuple of five distinct option types rather than an array of their
  * union: four resolve to `CodeOption[]` and one to `OrgUnitOption[]`, and widening them to a union
  * would leave `useQueries` unable to type each result.
+ *
+ * <p><b>Adding a lookup here means adding it to {@link usePrefetchConfiguration} too.</b> That
+ * duplication is deliberate — see the note there.
  */
 const PREFETCHABLE = [
   siteStatusCodesQuery,
@@ -150,10 +154,19 @@ export const useReferenceDataState = (): ReferenceDataState =>
  * the one screen a signed-out user is supposed to be able to sit on. Gating on the session is what
  * makes prefetching safe here, not an optimisation.
  *
- * <p>Failures are deliberately swallowed: `prefetchQuery` never rejects, and a warm-up that did not
- * work should cost the user nothing. The screen that actually needs the data reports its own
- * failure, with the context to explain what is missing.
+ * <p>Failures are deliberately swallowed. A warm-up that did not work should cost the user nothing:
+ * the screen that actually needs the data reports its own failure, with the context to explain what
+ * is missing. `query` rejects on error — unlike the `prefetchQuery` it replaces — so the `catch` is
+ * what keeps a failed lookup from surfacing as an unhandled rejection.
+ *
+ * <p>The five calls are written out rather than looped over {@link PREFETCHABLE}. `query` infers its
+ * generics from the options it is given, and iterating the tuple hands it the union of two payload
+ * types, which no single call can satisfy; the previous version got around that with a cast to a
+ * now-deprecated type. Five typed calls are worth more than the loop, at the cost of naming each
+ * lookup twice.
  */
+const ignoreWarmUpFailure = () => undefined;
+
 export const usePrefetchConfiguration = (enabled: boolean): void => {
   const queryClient = useQueryClient();
 
@@ -163,11 +176,10 @@ export const usePrefetchConfiguration = (enabled: boolean): void => {
     }
     // Each no-ops when the cache already holds data inside its staleTime, so this costs one round
     // of requests per session rather than one per sign-in-shaped state change.
-    PREFETCHABLE.forEach((options) => {
-      // Cast because the five entries resolve to two different payload types and no single
-      // prefetchQuery signature accepts both. Nothing here depends on the payload type: the call
-      // runs the queryFn and puts the result in the cache under the key the options already carry.
-      void queryClient.prefetchQuery(options as unknown as FetchQueryOptions);
-    });
+    void queryClient.query(siteStatusCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(structureInspectionStatusCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(specialAccessCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(siteTypeCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(forestDistrictsQuery).catch(ignoreWarmUpFailure);
   }, [enabled, queryClient]);
 };
