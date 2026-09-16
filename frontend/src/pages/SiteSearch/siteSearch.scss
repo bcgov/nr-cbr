@@ -1,7 +1,11 @@
 @use '@carbon/react/scss/spacing' as *;
 
+// No margin below the form. The criteria and the results are separate columns of the page grid, and
+// `.default-grid` already puts its own `row-gap` between them — a margin here stacks on top of that,
+// which left the Search button and the results table nearly two inches apart. The grid's gap is the
+// app-wide rhythm between page sections; this screen has no reason to be the exception.
 .site-search__form {
-  margin-block-end: $spacing-07;
+  margin-block-end: 0;
 }
 
 // Four criteria per row, matching nr-frep's search filters. Fixed columns rather than auto-fit:
@@ -58,19 +62,57 @@
   margin: 0;
 }
 
+// The pair sits at the left of its two-column cell rather than filling it. Legacy sized these
+// `size="8"`, and the values are short — a kilometre bound is at most `999999.99`. Stretched across
+// half the form they read as though a long value is expected, and the two boxes end up far enough
+// apart that the "–" stops tying them together.
+//
+// `align-items: flex-start` so the dash and the boxes stay put when one of them grows an invalid
+// message underneath; `flex-end` aligned to the bottom of the taller box and dragged the valid one
+// down with it.
 .site-search__range-inputs {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: $spacing-03;
 }
 
-.site-search__range-dash {
-  padding-block-end: $spacing-04;
+// The two boxes share the column between them. No explicit width: the grid column is the width, so
+// the "To" box ends on the same line as the field above and below it at every breakpoint, and the
+// pair narrows with the rest of the form rather than needing a breakpoint of its own.
+//
+// `min-inline-size: 0` because a flex item will not shrink below its content's intrinsic width
+// otherwise, and Carbon's input has one — without it the pair overflows its column at the narrowest
+// layout instead of shrinking.
+.site-search__range-inputs .cds--form-item {
+  flex: 1;
+  min-inline-size: 0;
 }
 
-// Each toggle is its own grid cell, so the two sit on the row beside the fields rather than stacked
-// in a single cell — which left them looking like an afterthought bolted to the end of the row.
+.site-search__range-dash {
+  // Centred on the first input row by matching Carbon's own field height, rather than by an offset
+  // measured from the labels above it. An offset has to be re-derived whenever anything about the
+  // labels changes — which is exactly what went wrong when the "From" / "To" labels were hidden —
+  // and it silently drifts instead of failing. A line box the height of the field cannot.
+  block-size: 2.5rem;
+  line-height: 2.5rem;
+}
+
+// The two toggles share one grid cell, side by side and close together. A cell each spread them a
+// column apart, which read as two unrelated controls; a toggle is also far narrower than the field a
+// column is sized for, so most of that space was empty.
 //
+// `flex-wrap` because the pair is sized by its two labels, not by the switches: "Designated
+// Maintainer Client Number"-length text in a narrow column would overflow, and wrapping to two lines
+// is the right answer there rather than a breakpoint of its own.
+.site-search__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  align-self: start;
+  column-gap: $spacing-06;
+  row-gap: $spacing-05;
+}
+
 // Carbon puts $spacing-05 under a toggle's label to line its switch up with a text input's field.
 // That is the right gap when the toggle shares a row with inputs, which here it always does.
 .site-search__toggle {

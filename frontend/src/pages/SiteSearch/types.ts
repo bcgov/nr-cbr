@@ -83,3 +83,17 @@ export const EMPTY_CRITERIA: SiteSearchCriteria = {
   capitalRoad: false,
   primaryUserName: '',
 };
+
+/**
+ * One page of results plus the true total. Mirrors the backend's `PagedResponse`.
+ *
+ * <p>`pageNumber` is zero-based, as Spring Data's is. Carbon's `Pagination` is one-based, so the
+ * page component converts at its own edge rather than either side pretending otherwise.
+ */
+export type PagedResponse<T> = {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  pageNumber: number;
+  pageSize: number;
+};

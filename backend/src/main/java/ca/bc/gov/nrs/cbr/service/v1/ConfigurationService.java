@@ -184,6 +184,7 @@ public class ConfigurationService {
 
   private static OrgUnitResponse toOrgUnit(CbrOrgUnitEntity entity) {
     // The number is a String on the wire because it is a <select> value, never arithmetic.
-    return new OrgUnitResponse(String.valueOf(entity.getOrgUnitNo()), entity.getOrgUnitName());
+    return new OrgUnitResponse(
+        String.valueOf(entity.getOrgUnitNo()), entity.getOrgUnitCode(), entity.getOrgUnitName());
   }
 }

@@ -7,6 +7,7 @@ import GlobalErrorPage from '@/pages/GlobalError';
 import LandingPage from '@/pages/Landing';
 import NotFoundPage from '@/pages/NotFound';
 import RoleErrorPage from '@/pages/RoleError';
+import SiteDetailPage from '@/pages/SiteDetail';
 import SiteSearchPage from '@/pages/SiteSearch';
 
 import ProtectedRoute from './ProtectedRoute';
@@ -147,6 +148,24 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         ),
         isSideMenu: true,
         // Legacy gate: /showSiteSearch, which every role that can read holds.
+        roles: [...ROLE_CAPABILITIES.read],
+      },
+      {
+        // Reached from a site number in the search results, not from the side menu — hence
+        // isSideMenu false. The parameter is the CROSSING_SITE_ID, a natural key of up to 14
+        // characters rather than a sequence, so it is a string and always will be.
+        path: 'site/:siteId',
+        id: 'Site',
+        element: (
+          <ProtectedRoute>
+            <Layout>
+              <SiteDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: false,
+        // Legacy gate: /showSite. Same capability as the search that leads here — a user who can
+        // find a site can open it.
         roles: [...ROLE_CAPABILITIES.read],
       },
     ],
