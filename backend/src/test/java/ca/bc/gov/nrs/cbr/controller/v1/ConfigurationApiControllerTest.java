@@ -32,7 +32,7 @@ class ConfigurationApiControllerTest {
   }
 
   private static List<OrgUnitResponse> orgUnits(String marker) {
-    return List.of(new OrgUnitResponse(marker, marker));
+    return List.of(new OrgUnitResponse(marker, marker, marker));
   }
 
   @Test

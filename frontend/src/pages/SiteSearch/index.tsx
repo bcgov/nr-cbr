@@ -22,6 +22,7 @@ import {
   useSpecialAccessCodes,
   useStructureInspectionStatusCodes,
 } from '@/hooks/useConfiguration';
+import { useSiteSearch } from '@/hooks/useSiteSearch';
 
 /**
  * Site Search — the first screen of the Inventory section.
@@ -29,25 +30,31 @@ import {
  * <p>Legacy equivalent: `showSiteSearch.do` → `SiteSearchAction` → `site_search.jsp`, gated on the
  * `/showSiteSearch` privilege, which every role that can read holds.
  *
- * <p><b>The search itself is not wired yet.</b> The criteria form, the results table, the
- * authorization gates and all six dropdowns are real; running a search still returns nothing. It
- * will go through `CBR.FIND_SITES_BY_CRITERIA`, which takes a caller-built `WHERE` clause plus a
- * bind array rather than fixed parameters.
+ * <p>The search runs against `/api/v1/sites/search`, which is a JPA Specification rather than the
+ * legacy `CBR.FIND_SITES_BY_CRITERIA` — see `SiteSearchSpecifications` for the two places the
+ * results deliberately differ from legacy. Paging and ordering are the server's.
+ *
+ * <p>Deleting a site is still unwired: the modal confirms and closes.
  */
 const SiteSearchPage: FC = () => {
   const { canDelete } = useAuthorization();
 
   const [criteria, setCriteria] = useState<SiteSearchCriteria>(EMPTY_CRITERIA);
-  const [searched, setSearched] = useState(false);
+  /**
+   * The criteria the current results belong to — a snapshot taken when Search was pressed.
+   *
+   * <p>Kept apart from the live form state on purpose. The query is keyed on this, so binding it to
+   * the form would run a search on every keystroke; and editing a field after a search would
+   * silently change what the visible results claim to be. `null` means no search has been run,
+   * which is what keeps the results table off the screen entirely.
+   */
+  const [submitted, setSubmitted] = useState<SiteSearchCriteria | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [pendingDelete, setPendingDelete] = useState<SiteSearchResult | null>(null);
 
-  /**
-   * Empty until a backend exists. Kept as state rather than a constant so wiring the query is a
-   * change of source, not a change of shape.
-   */
-  const [results] = useState<SiteSearchResult[]>([]);
+  // Carbon's Pagination is one-based; the backend, like Spring Data, is zero-based.
+  const results = useSiteSearch(submitted, page - 1, pageSize);
 
   const siteStatusCodes = useSiteStatusCodes();
   const structureInspectionStatusCodes = useStructureInspectionStatusCodes();
@@ -100,13 +107,15 @@ const SiteSearchPage: FC = () => {
   );
 
   const search = useCallback(() => {
+    // Back to page one: the previous page number belongs to the previous result set, and page 4 of
+    // a search that now matches twelve sites is an empty table.
     setPage(1);
-    setSearched(true);
-  }, []);
+    setSubmitted(criteria);
+  }, [criteria]);
 
   const reset = useCallback(() => {
     setCriteria(EMPTY_CRITERIA);
-    setSearched(false);
+    setSubmitted(null);
     setPage(1);
   }, []);
 
@@ -121,8 +130,16 @@ const SiteSearchPage: FC = () => {
         breadCrumbs={[{ name: 'Inventory', path: '/inventory' }]}
       />
 
-      <Column sm={4} md={8} lg={16}>
-        {referenceData.isError ? (
+      {/* The Column itself is conditional, not just its contents. Rendered around `null` it is
+          still a grid item, so the page paid `.default-grid`'s row-gap twice — once above the empty
+          row and once below — and the form sat an extra 2.5rem below the page title for a notice
+          that was not there.
+
+          This is what is left of the "not connected yet" notice that lived here while the search
+          was a stub. That one was true then and is not now; leaving it would have told users their
+          real results were fake. */}
+      {referenceData.isError && (
+        <Column sm={4} md={8} lg={16}>
           <InlineNotification
             kind="error"
             lowContrast
@@ -134,19 +151,8 @@ const SiteSearchPage: FC = () => {
             }
             data-testid="site-search-codes-error"
           />
-        ) : (
-          <InlineNotification
-            kind="info"
-            lowContrast
-            hideCloseButton
-            title="Search is not connected yet"
-            subtitle={
-              'The form, the results table and every dropdown are in place, but running a search ' +
-              'returns nothing yet.'
-            }
-          />
-        )}
-      </Column>
+        </Column>
+      )}
 
       <Column sm={4} md={8} lg={16}>
         <SiteSearchCriteriaForm
@@ -162,20 +168,32 @@ const SiteSearchPage: FC = () => {
 
       {/* Legacy renders the results block only after a search (`<c:if test="${search}">`), so an
           untouched page is the form alone rather than an empty table implying zero matches. */}
-      {searched && (
+      {submitted !== null && (
         <Column sm={4} md={8} lg={16}>
-          <SiteSearchResults
-            results={results}
-            totalItems={results.length}
-            page={page}
-            pageSize={pageSize}
-            canDelete={canDelete}
-            onPageChange={({ page: nextPage, pageSize: nextPageSize }) => {
-              setPage(nextPage);
-              setPageSize(nextPageSize);
-            }}
-            onDelete={setPendingDelete}
-          />
+          {results.isError ? (
+            <InlineNotification
+              kind="error"
+              lowContrast
+              hideCloseButton
+              title="The search could not be run"
+              subtitle="Nothing was changed. Try again, or narrow the criteria."
+              data-testid="site-search-error"
+            />
+          ) : (
+            <SiteSearchResults
+              results={results.data?.content ?? []}
+              totalItems={results.data?.totalElements ?? 0}
+              loading={results.isPending || results.isPlaceholderData}
+              page={page}
+              pageSize={pageSize}
+              canDelete={canDelete}
+              onPageChange={({ page: nextPage, pageSize: nextPageSize }) => {
+                setPage(nextPage);
+                setPageSize(nextPageSize);
+              }}
+              onDelete={setPendingDelete}
+            />
+          )}
         </Column>
       )}
 

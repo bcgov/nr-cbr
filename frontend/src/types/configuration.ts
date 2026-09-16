@@ -15,8 +15,12 @@ export type CodeOption = {
 /**
  * An org-unit entry — Forest District and Management Area both use this shape. Mirrors the
  * backend's `OrgUnitResponse`.
+ *
+ * <p>`orgUnitNo` is the submitted value; the code and name are what the user reads. The code is not
+ * unique across the whole org hierarchy, which is why it is not the value.
  */
 export type OrgUnitOption = {
   orgUnitNo: string;
+  orgUnitCode: string;
   orgUnitName: string;
 };

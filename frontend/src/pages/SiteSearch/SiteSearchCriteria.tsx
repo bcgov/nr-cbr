@@ -1,6 +1,8 @@
 import { Search as SearchIcon } from '@carbon/icons-react';
 import { Button, Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
+import { criteriaErrors } from './validation';
+
 import type { CodeOption, OrgUnitOption, SiteSearchCriteria as Criteria } from './types';
 import type { FC, SubmitEventHandler } from 'react';
 
@@ -42,6 +44,17 @@ type Props = {
  * stepping to two and then one as the window narrows, which the legacy table did not do at all.
  * Fields that hold a pair of inputs span two columns; see the stylesheet.
  */
+/**
+ * "DCK - Chilliwack Natural Resource District", the form nr-frep uses for both code lists and org
+ * units, and the same string the results table shows for a district.
+ *
+ * <p>Joined rather than interpolated so a missing half degrades to the other one instead of
+ * rendering "DCK - undefined" or a leading dash — reference data is not ours and a row with one
+ * column empty is not worth breaking a dropdown over.
+ */
+const label = (code: string | null, description: string | null): string =>
+  [code, description].filter(Boolean).join(' - ');
+
 const SiteSearchCriteriaForm: FC<Props> = ({
   criteria,
   codeTables,
@@ -54,8 +67,17 @@ const SiteSearchCriteriaForm: FC<Props> = ({
   // Typed as the handler rather than the event: React 19 deprecated `FormEvent` ("FormEvent
   // doesn't actually exist"), and naming the prop's own type — `onSubmit?: SubmitEventHandler<T>` —
   // means the element decides what the event is instead of this file guessing.
+  const errors = criteriaErrors(criteria);
+  const hasErrors = Object.keys(errors).length > 0;
+
   const submit: SubmitEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
+    // Legacy runs the same check server-side and re-renders the form with a page-level message.
+    // Stopping here keeps the messages beside the boxes they belong to; the backend rejects the
+    // same values with a 400, because the browser is not the only caller.
+    if (hasErrors) {
+      return;
+    }
     onSearch();
   };
 
@@ -63,7 +85,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
     field: keyof Criteria,
     labelText: string,
     maxLength: number,
-    extra?: { placeholder?: string },
+    extra?: { placeholder?: string; inputMode?: 'decimal'; hideLabel?: boolean },
   ) => (
     <TextInput
       id={`site-search-${field}`}
@@ -71,6 +93,8 @@ const SiteSearchCriteriaForm: FC<Props> = ({
       labelText={labelText}
       maxLength={maxLength}
       value={String(criteria[field])}
+      invalid={field in errors}
+      invalidText={errors[field]}
       onChange={(event) => onChange(field, event.target.value as never)}
       {...extra}
     />
@@ -88,7 +112,14 @@ const SiteSearchCriteriaForm: FC<Props> = ({
       {/* The legacy form's blank first option: no filter on this criterion. */}
       <SelectItem value="" text="" />
       {options.map((option) => (
-        <SelectItem key={option.code} value={option.code} text={option.description} />
+        <SelectItem
+          key={option.code}
+          value={option.code}
+          // "ACT - Active", as nr-frep renders a code list. The code is what the business says out
+          // loud and what appears in reports and on paper; the description alone leaves a user
+          // translating between the two.
+          text={label(option.code, option.description)}
+        />
       ))}
     </Select>
   );
@@ -109,21 +140,50 @@ const SiteSearchCriteriaForm: FC<Props> = ({
     >
       <SelectItem value="" text="" />
       {options.map((option) => (
-        <SelectItem key={option.orgUnitNo} value={option.orgUnitNo} text={option.orgUnitName} />
+        <SelectItem
+          key={option.orgUnitNo}
+          // The number, not the code: it is what CROSSING_SITE.ORG_UNIT_NO holds, and the code is
+          // not unique across the org hierarchy. Only the label changes here.
+          value={option.orgUnitNo}
+          text={label(option.orgUnitCode, option.orgUnitName)}
+        />
       ))}
     </Select>
   );
 
-  /** A "from – to" pair. Legacy rendered these as two inputs either side of a hyphen. */
+  /**
+   * A "from – to" pair of kilometre bounds. Legacy rendered these as two inputs either side of a
+   * hyphen, `size="8" maxlength="8"`.
+   *
+   * <p>`maxLength` is 9 rather than legacy's 8: the column is `NUMBER(8,2)`, so `999999.99` is a
+   * legal value and eight characters cannot hold it. Legacy's limit forbids a value its own
+   * validator accepts.
+   *
+   * <p>`inputMode="decimal"` rather than `type="number"`: a number input brings spinners, which are
+   * meaningless on a search bound, and browsers silently discard a non-numeric value instead of
+   * showing it back — which would leave the field-level message describing something the user can no
+   * longer see.
+   *
+   * <p>One grid column for the pair, not two. Two boxes this short inside a two-column cell filled
+   * the first half and left the second half empty, so the "To" box ended just past the column
+   * boundary and lined up with nothing on the rows above or below.
+   *
+   * <p>"From" and "To" are `hideLabel`, so they name the boxes for a screen reader without taking a
+   * second row of label above them. Visible, they pushed these inputs a label-height below every
+   * other field on the row — the legend occupies the row that a plain field's label does, and the
+   * From/To labels then sat underneath it. Legacy has no such labels either: one `Kilometres:`, two
+   * boxes, a hyphen. The placeholder carries the same hint back visually, inside the box, where it
+   * costs no height.
+   */
   const range = (from: keyof Criteria, to: keyof Criteria, labelText: string) => (
-    <fieldset className="site-search__range site-search__span-2">
+    <fieldset className="site-search__range">
       <legend className="cds--label">{labelText}</legend>
       <div className="site-search__range-inputs">
-        {text(from, 'From', 8)}
+        {text(from, 'From', 9, { inputMode: 'decimal', hideLabel: true, placeholder: 'From' })}
         <span aria-hidden="true" className="site-search__range-dash">
           –
         </span>
-        {text(to, 'To', 8)}
+        {text(to, 'To', 9, { inputMode: 'decimal', hideLabel: true, placeholder: 'To' })}
       </div>
     </fieldset>
   );
@@ -170,25 +230,31 @@ const SiteSearchCriteriaForm: FC<Props> = ({
         {/* Toggles rather than checkboxes. Both are filters that are either applied or not, and a
             toggle states its current position in words ("Off"/"On") instead of leaving the user to
             read a tick — which matters for "Incomplete Data?", where an unticked box is ambiguous
-            between "not filtering on this" and "show only complete records". */}
-        <Toggle
-          id="site-search-incomplete"
-          data-testid="site-search-incomplete"
-          className="site-search__toggle"
-          labelText="Incomplete Data?"
-          size="sm"
-          toggled={criteria.incomplete}
-          onToggle={(checked) => onChange('incomplete', checked)}
-        />
-        <Toggle
-          id="site-search-capitalRoad"
-          data-testid="site-search-capitalRoad"
-          className="site-search__toggle"
-          labelText="Capital Road"
-          size="sm"
-          toggled={criteria.capitalRoad}
-          onToggle={(checked) => onChange('capitalRoad', checked)}
-        />
+            between "not filtering on this" and "show only complete records".
+
+            The two share one grid cell. A cell each put a column's width between them, which read as
+            two unrelated controls rather than the pair of filters they are — and a toggle is much
+            narrower than the field a column is sized for, so most of that space was empty. */}
+        <div className="site-search__toggles">
+          <Toggle
+            id="site-search-incomplete"
+            data-testid="site-search-incomplete"
+            className="site-search__toggle"
+            labelText="Incomplete Data?"
+            size="sm"
+            toggled={criteria.incomplete}
+            onToggle={(checked) => onChange('incomplete', checked)}
+          />
+          <Toggle
+            id="site-search-capitalRoad"
+            data-testid="site-search-capitalRoad"
+            className="site-search__toggle"
+            labelText="Capital Road"
+            size="sm"
+            toggled={criteria.capitalRoad}
+            onToggle={(checked) => onChange('capitalRoad', checked)}
+          />
+        </div>
 
         <div className="site-search__actions">
           <Button kind="ghost" type="button" onClick={onReset} data-testid="site-search-reset">

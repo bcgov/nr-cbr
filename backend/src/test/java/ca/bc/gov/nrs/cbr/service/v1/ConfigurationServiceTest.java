@@ -45,8 +45,9 @@ class ConfigurationServiceTest {
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes, inspectionStatusCodes, specialAccessCodes, siteTypeCodes, orgUnits);
 
-  private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String name) {
-    return CbrOrgUnitEntity.builder().orgUnitNo(orgUnitNo).orgUnitName(name).build();
+  private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
+    return CbrOrgUnitEntity.builder()
+        .orgUnitNo(orgUnitNo).orgUnitCode(code).orgUnitName(name).build();
   }
 
   @Test
@@ -96,19 +97,21 @@ class ConfigurationServiceTest {
   @DisplayName("renders an org unit's number as text, because it is a <select> value")
   void mapsOrgUnits() {
     when(orgUnits.findForestDistricts())
-        .thenReturn(List.of(orgUnit(1809L, "Chilliwack Natural Resource District")));
+        .thenReturn(List.of(orgUnit(1809L, "DCK", "Chilliwack Natural Resource District")));
 
     assertThat(service.getForestDistricts())
-        .containsExactly(new OrgUnitResponse("1809", "Chilliwack Natural Resource District"));
+        .containsExactly(
+            new OrgUnitResponse("1809", "DCK", "Chilliwack Natural Resource District"));
   }
 
   @Test
   @DisplayName("scopes management areas to the district that was asked for")
   void passesTheDistrictThrough() {
-    when(orgUnits.findManagementAreas(1812L)).thenReturn(List.of(orgUnit(21L, "Thompson Valley")));
+    when(orgUnits.findManagementAreas(1812L))
+        .thenReturn(List.of(orgUnit(21L, "DKA", "Thompson Rivers")));
 
     assertThat(service.getManagementAreas("1812"))
-        .containsExactly(new OrgUnitResponse("21", "Thompson Valley"));
+        .containsExactly(new OrgUnitResponse("21", "DKA", "Thompson Rivers"));
     verify(orgUnits).findManagementAreas(1812L);
   }
 
