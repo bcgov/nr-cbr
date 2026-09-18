@@ -30,17 +30,14 @@
   }
 }
 
-// Fields holding two inputs need the width of two columns: at ~13rem a pair is unusable.
-.site-search__span-2 {
-  grid-column: span 2;
-
-  @media (max-width: 671px) {
-    grid-column: span 1;
-  }
-}
-
 // "Project File ID#" and its "Br." section sit on one line, as on the legacy form: they are two
 // halves of one identifier, and separating them loses that.
+//
+// One grid column between them, the same as every other criterion — the pair is one identifier, so
+// it gets one field's worth of room. Given two columns it reads wrong in both halves: "Project File
+// ID#" takes all the slack and renders at twice the width of anything else on the form, for a value
+// the column caps at 10 characters, while "Br." is pushed to the far side of the row where the two
+// no longer look related.
 .site-search__paired {
   display: flex;
   gap: $spacing-03;

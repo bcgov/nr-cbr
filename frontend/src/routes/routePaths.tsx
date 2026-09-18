@@ -1,9 +1,10 @@
-import { Location as LocationIcon } from '@carbon/icons-react';
+import { Inspection as InspectionIcon, Location as LocationIcon } from '@carbon/icons-react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 
 import Layout from '@/components/Layout';
 import AuthCallbackPage from '@/pages/AuthCallback';
 import GlobalErrorPage from '@/pages/GlobalError';
+import InspectionSearchPage from '@/pages/InspectionSearch';
 import LandingPage from '@/pages/Landing';
 import NotFoundPage from '@/pages/NotFound';
 import RoleErrorPage from '@/pages/RoleError';
@@ -21,9 +22,9 @@ import { ROLE_CAPABILITIES } from '@/context/auth/types';
  * Route table, ported from nr-frep. Three sets, selected by auth state in AppRoutes: public
  * (unauthenticated), no-role (authenticated but holding no recognised CBR group), and protected.
  *
- * <p>Site Search is the only protected destination so far. The inventory this grows into is in
- * cbr-overview.local.md §5: site, structure (7 tabs), inspection, documents, 12 report criteria
- * pages, 3 admin pages and the search pages; the sections they hang under are in
+ * <p>Site Search and Inspection Search are the protected destinations so far. The inventory they
+ * grow into is in cbr-overview.local.md §5: site, structure (7 tabs), inspection, documents, 12
+ * report criteria pages, 3 admin pages and the search pages; the sections they hang under are in
  * cbr-navigation.local.md §1.
  *
  * <p>nr-frep also carries an offline route set (getOfflineRoutes / getOfflineMenuEntries) served
@@ -166,6 +167,37 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         isSideMenu: false,
         // Legacy gate: /showSite. Same capability as the search that leads here — a user who can
         // find a site can open it.
+        roles: [...ROLE_CAPABILITIES.read],
+      },
+    ],
+  },
+  {
+    // Inspection — the legacy menu's second section (cbr-navigation.local.md §1). Same shape as
+    // Inventory above: `children` is nav structure that getProtectedRoutes() flattens, and the
+    // element is the redirect /inspection itself resolves to.
+    //
+    // Two further legacy items hang here once they exist: Add Inspection (`/showInspection` **and**
+    // `/saveInspection` — both gates, so the blank form is not offered to someone who cannot save
+    // it) and Download Offline Client (`/showOfflineInspection`).
+    path: '/inspection',
+    id: 'Inspection',
+    icon: InspectionIcon,
+    element: <Navigate to="/inspection/inspection-search" replace />,
+    isSideMenu: true,
+    children: [
+      {
+        path: 'inspection-search',
+        id: 'Inspection Search',
+        element: (
+          <ProtectedRoute>
+            <Layout>
+              <InspectionSearchPage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: true,
+        // Legacy gate: /showInspectionSearch, which sits at the GENERAL floor alongside
+        // /showSiteSearch — every role that can read holds it.
         roles: [...ROLE_CAPABILITIES.read],
       },
     ],

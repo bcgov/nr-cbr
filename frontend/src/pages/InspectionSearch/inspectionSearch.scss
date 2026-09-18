@@ -1,0 +1,203 @@
+@use '@carbon/react/scss/spacing' as *;
+
+// No margin below the form. The criteria and the results are separate columns of the page grid, and
+// `.default-grid` already puts its own `row-gap` between them — a margin here stacks on top of that.
+// Same reasoning as Site Search; the two screens share a rhythm.
+.inspection-search__form {
+  margin-block-end: 0;
+}
+
+// Four criteria per row, matching Site Search and nr-frep's search filters. Fixed columns rather
+// than auto-fit: auto-fit packs as many columns as happen to fit, so the row count changes with the
+// window and the fields never line up with the results table below.
+.inspection-search__criteria {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: $spacing-05;
+  // Top-aligned, not bottom-aligned: every field is label-then-input, and the longer labels here
+  // ("Inspection Report Status", "Forest Service Road") wrap onto two lines in a narrow column,
+  // which would push their inputs out of line otherwise.
+  align-items: start;
+
+  @media (max-width: 1055px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Fields holding two inputs, a range, or a stack of controls need the width of two columns.
+.inspection-search__span-2 {
+  grid-column: span 2;
+
+  @media (max-width: 671px) {
+    grid-column: span 1;
+  }
+}
+
+// "Project File ID#" and its "Br." section sit on one line, as on the legacy form: they are two
+// halves of one identifier, and separating them loses that.
+//
+// One grid column between them, the same as every other criterion — the pair is one identifier, so
+// it gets one field's worth of room. Given two columns it reads wrong in both halves: "Project File
+// ID#" takes all the slack and renders at twice the width of anything else on the form, for a value
+// the column caps at 10 characters, while "Br." is pushed to the far side of the row where the two
+// no longer look related.
+.inspection-search__paired {
+  display: flex;
+  gap: $spacing-03;
+
+  > :first-child {
+    flex: 1 1 auto;
+  }
+
+  > :last-child {
+    flex: 0 0 6rem;
+  }
+}
+
+// The inspection date range. The fieldset carries the group label so a screen reader announces
+// "Inspection Date, From" rather than a bare "From".
+.inspection-search__range {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+// `align-items: flex-start` so the dash and the boxes stay put when one of them grows an invalid
+// message underneath; aligning to the bottom drags the valid box down with the taller one.
+.inspection-search__range-inputs {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-03;
+}
+
+// The two pickers share the cell between them. `min-inline-size: 0` because a flex item will not
+// shrink below its content's intrinsic width otherwise, and Carbon's date input has one — 18rem,
+// which `.cbr-date-picker` in `_overrides.scss` already unpins, but only down to its content.
+// Without this the pair overflows its column at the narrowest layout instead of shrinking.
+.inspection-search__range-inputs .cds--form-item {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.inspection-search__range-dash {
+  // Centred on the first input row by matching Carbon's own field height, rather than by an offset
+  // measured from the labels above it — an offset has to be re-derived whenever anything about the
+  // labels changes, and it drifts silently instead of failing.
+  block-size: 2.5rem;
+  line-height: 2.5rem;
+}
+
+// The four filter toggles, under one legend.
+//
+// Pinned to the first column rather than merely being two columns wide, so the block always starts
+// a row. Left to flow it lands in whatever two cells the criteria happen to leave over — beside
+// "Reviewed By" — and pushes Sort By onto a row of its own, which is the one arrangement the
+// two-by-two layout below exists to avoid.
+//
+// This is what decides where the form's empty cells fall. Its fields come to 18 columns, which does
+// not divide by four, so two cells are always spare; pinning puts them at the end of the criteria,
+// where the form breaks between what is being searched for and how, rather than in the middle of a
+// row or under the last row.
+.inspection-search__toggles {
+  grid-column: 1 / span 2;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  align-self: start;
+
+  @media (max-width: 671px) {
+    grid-column: 1 / span 1;
+  }
+}
+
+// Two columns of two, on the same $spacing-05 gutter as the form's own grid, so each switch sits
+// directly under the field above it rather than wherever its label text happened to end.
+//
+// A flex row is what this replaces. Flex sizes each item to its own label, so four questions of four
+// different lengths put the switches at four arbitrary positions, with gaps that look uneven because
+// they are measuring different things.
+//
+// One column below the form's own two-column breakpoint: the block is half the form's width there,
+// so a column of it would be a quarter — narrower than any of these questions.
+// The column gutter stays $spacing-05 — it is what keeps these aligned with the form's own columns.
+// The row gutter does not have to match it and is tighter, because a row here is a label and a
+// switch rather than a full field.
+.inspection-search__toggles-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: $spacing-05;
+  row-gap: $spacing-03;
+  align-items: stretch;
+
+  @media (max-width: 1055px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// The switches share one baseline even though the labels above them do not all wrap to the same
+// number of lines: each toggle fills the full height of its cell, and the label text takes up the
+// slack, so the switch is pushed to the bottom of the tallest label on the row.
+//
+// Without this a one-line label puts its switch a line higher than a two-line one — which is exactly
+// the ragged row this replaces, just in the other direction.
+// `block-size`, never `display: flex`, on the toggle itself. Carbon's first child is the real
+// control — a `<button role="switch">` it hides with a 1px clip rather than by taking it out of
+// flow — so turning this into a flex container makes that button a flex item, and it eats 16px off
+// the start of every label.
+.inspection-search__toggle {
+  block-size: 100%;
+}
+
+// The label is already the whole visible control; stretching it to the cell's height is what lets
+// the text below take up the slack.
+.inspection-search__toggle .cds--toggle__label {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+}
+
+// `flex: 1` on the text, not `margin-block-start: auto` on the switch: growing the text keeps the
+// gap below it as a minimum instead of replacing it.
+//
+// That minimum is tightened to $spacing-03. Carbon's own $spacing-05 exists to line a switch up with
+// the field of a text input beside it, which is the right gap for a toggle sharing a row with
+// inputs — these four have their own block and share a row with nothing, so the extra 8px is only
+// distance between a question and its answer.
+.inspection-search__toggle .cds--toggle__label-text {
+  flex: 1;
+  margin-block-end: $spacing-03;
+}
+
+.inspection-search__sort {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  align-self: start;
+}
+
+// Search / Clear get a row to themselves, right-aligned. `1 / -1` spans every column at any
+// breakpoint, so they never fill whichever column happened to be left over after the last field.
+.inspection-search__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-03;
+  margin-block-start: $spacing-03;
+}
+
+// KM is a measurement; right-aligning lets the decimal points line up down the column, which is what
+// the legacy table did with align="right".
+.inspection-search__numeric {
+  text-align: end;
+}
+
+// The "enter at least one criterion" notice, on its own full-width row directly above the buttons —
+// next to the Search button that triggered it, rather than at the top of a form the user has
+// scrolled past.
+.inspection-search__notice {
+  grid-column: 1 / -1;
+}
