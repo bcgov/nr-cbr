@@ -4,7 +4,10 @@ import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
@@ -15,7 +18,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
- * Reference lookups that populate the UI's dropdowns. All six are live.
+ * Reference lookups that populate the UI's dropdowns. All ten are live.
  *
  * <h3>Two ways into the data, and when each applies</h3>
  * These are read with Spring Data JPA — an entity, a repository, a query — because each legacy
@@ -25,10 +28,12 @@ import org.springframework.stereotype.Service;
  * "new code versus old".
  *
  * <h3>The predicates are not obvious, and they are not this layer's business</h3>
- * Three of the six legacy queries do something that reads as a defect and is not: site statuses are
- * inner-joined to an xref that decides whether a code is published at all; none of the four code
- * lists filters out expired codes; and management areas return <em>only</em> expired org units. Each
- * is explained where the query lives, in the repository. This class deliberately holds none of that
+ * Several of the legacy queries do something that reads as a defect and is not: site statuses and
+ * structure types are inner-joined to an xref that decides whether a code is published at all;
+ * management areas return <em>only</em> expired org units; and the code lists disagree with each
+ * other about expired codes — six keep them, structure type/class alone drops them, because legacy
+ * asks for that one list with a different flag. Each is explained where the query lives, in the
+ * repository. This class deliberately holds none of that
  * — it fetches, caches and maps, so that a change to what a lookup means is a change in one place.
  *
  * <h3>Caching</h3>
@@ -62,6 +67,9 @@ public class ConfigurationService {
   private final StructureInspectionStatusCodeRepository structureInspectionStatusCodeRepository;
   private final SpecialAccessRequirementCodeRepository specialAccessRequirementCodeRepository;
   private final CrossingSiteTypeCodeRepository crossingSiteTypeCodeRepository;
+  private final StructureTypeClassCodeRepository structureTypeClassCodeRepository;
+  private final StrctreInspectionTypeCodeRepository strctreInspectionTypeCodeRepository;
+  private final InspectionReportStatusCodeRepository inspectionReportStatusCodeRepository;
   private final CbrOrgUnitRepository cbrOrgUnitRepository;
 
   public ConfigurationService(
@@ -69,11 +77,17 @@ public class ConfigurationService {
       StructureInspectionStatusCodeRepository structureInspectionStatusCodeRepository,
       SpecialAccessRequirementCodeRepository specialAccessRequirementCodeRepository,
       CrossingSiteTypeCodeRepository crossingSiteTypeCodeRepository,
+      StructureTypeClassCodeRepository structureTypeClassCodeRepository,
+      StrctreInspectionTypeCodeRepository strctreInspectionTypeCodeRepository,
+      InspectionReportStatusCodeRepository inspectionReportStatusCodeRepository,
       CbrOrgUnitRepository cbrOrgUnitRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
     this.crossingSiteTypeCodeRepository = crossingSiteTypeCodeRepository;
+    this.structureTypeClassCodeRepository = structureTypeClassCodeRepository;
+    this.strctreInspectionTypeCodeRepository = strctreInspectionTypeCodeRepository;
+    this.inspectionReportStatusCodeRepository = inspectionReportStatusCodeRepository;
     this.cbrOrgUnitRepository = cbrOrgUnitRepository;
   }
 
@@ -132,6 +146,52 @@ public class ConfigurationService {
   }
 
   /**
+   * Structure types and classes — {@code THE.STRUCTURE_TYPE_CLASS_CODE}, in dropdown display order.
+   *
+   * <p>Replaces {@code CBR_GENERAL.FIND_STRUCTURE_TYPES}. This is the one code list on the
+   * Inspection Search form that hides retired codes; see
+   * {@link StructureTypeClassCodeRepository#findAllCurrentInDisplayOrder()} for why that is legacy's
+   * behaviour rather than an inconsistency introduced here.
+   */
+  @Cacheable("structureTypeClassCodes")
+  public List<CodeOptionResponse> getStructureTypeClassCodes() {
+    return structureTypeClassCodeRepository.findAllCurrentInDisplayOrder().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getStructureTypeClassCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * Inspection types — {@code THE.STRCTRE_INSPECTION_TYPE_CODE}, by description.
+   *
+   * <p>Replaces {@code CBR_GENERAL.FIND_INSPECTION_TYPE_CODES}, which returns its rows in no
+   * particular order — see
+   * {@link StrctreInspectionTypeCodeRepository#findAllByOrderByDescriptionAsc()}.
+   */
+  @Cacheable("inspectionTypeCodes")
+  public List<CodeOptionResponse> getInspectionTypeCodes() {
+    return strctreInspectionTypeCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity -> new CodeOptionResponse(
+            entity.getStrctreInspectionTypeCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * Inspection report statuses — {@code THE.INSPECTION_REPORT_STATUS_CODE}, by description.
+   *
+   * <p>Replaces {@code CBR_GENERAL.FIND_INSPCTN_RPT_STATUSES}. Includes the expired {@code ACC} and
+   * the machine-set {@code OFL}, both deliberately — see
+   * {@link InspectionReportStatusCodeRepository#findAllByOrderByDescriptionAsc()}.
+   */
+  @Cacheable("inspectionReportStatusCodes")
+  public List<CodeOptionResponse> getInspectionReportStatusCodes() {
+    return inspectionReportStatusCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity -> new CodeOptionResponse(
+            entity.getInspectionReportStatusCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
    * Forest districts — the current districts, by name.
    *
    * <p>Replaces {@code CBR_GENERAL.FIND_FOREST_DISTRICTS}. Read through the {@code CBR_ORG_UNIT}
@@ -140,6 +200,21 @@ public class ConfigurationService {
   @Cacheable("forestDistricts")
   public List<OrgUnitResponse> getForestDistricts() {
     return cbrOrgUnitRepository.findForestDistricts().stream()
+        .map(ConfigurationService::toOrgUnit)
+        .toList();
+  }
+
+  /**
+   * BCTS business areas, by name.
+   *
+   * <p>Replaces {@code CBR_GENERAL.FIND_BUSINESS_AREAS}. Read through the {@code CBR_ORG_UNIT}
+   * view, which CBR does not own. Unlike management areas this takes no parameter: a business area
+   * is BC Timber Sales' own geography rather than a subdivision of a forest district, and a site
+   * can carry one of each.
+   */
+  @Cacheable("businessAreas")
+  public List<OrgUnitResponse> getBusinessAreas() {
+    return cbrOrgUnitRepository.findBusinessAreas().stream()
         .map(ConfigurationService::toOrgUnit)
         .toList();
   }

@@ -19,13 +19,13 @@ import org.springframework.web.bind.annotation.RequestParam;
  *
  * <p>One endpoint per list rather than a single bundle. The lists are cached independently, change
  * on entirely different schedules, and only one of them — management areas — takes a parameter; a
- * bundle would have to re-fetch the other five every time a district changed.
+ * bundle would have to re-fetch the other nine every time a district changed.
  *
  * <p><b>Every method is gated on {@link CbrAuthorities#READ}</b>, which nr-frep's equivalent does
  * not do — it leaves its lookups at "any authenticated caller". The stricter line is taken here
- * because these six lists exist to fill in the Site Search form, and that form is READ-gated: a
- * token holder with no CBR role has nothing to do with them. Read is the weakest capability CBR
- * has, so this excludes only callers who could not use the answer.
+ * because these lists exist to fill in the Site Search and Inspection Search forms, and both are
+ * READ-gated: a token holder with no CBR role has nothing to do with them. Read is the weakest
+ * capability CBR has, so this excludes only callers who could not use the answer.
  */
 @RequestMapping("/api/v1/configuration")
 public interface ConfigurationApiEndpoint {
@@ -50,10 +50,30 @@ public interface ConfigurationApiEndpoint {
   @GetMapping("/site-type-codes")
   ResponseEntity<List<CodeOptionResponse>> getSiteTypeCodes();
 
+  /** Structure types and classes — the Type/Class select. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/structure-type-class-codes")
+  ResponseEntity<List<CodeOptionResponse>> getStructureTypeClassCodes();
+
+  /** Inspection types — the Inspection Type select. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/inspection-type-codes")
+  ResponseEntity<List<CodeOptionResponse>> getInspectionTypeCodes();
+
+  /** Inspection report statuses — the Inspection Report Status select. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/inspection-report-status-codes")
+  ResponseEntity<List<CodeOptionResponse>> getInspectionReportStatusCodes();
+
   /** Forest districts — the Forest District select. */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/forest-districts")
   ResponseEntity<List<OrgUnitResponse>> getForestDistricts();
+
+  /** BCTS business areas — the BCTS Business Area select. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/business-areas")
+  ResponseEntity<List<OrgUnitResponse>> getBusinessAreas();
 
   /**
    * Management areas within one forest district — the Management Area select, which is repopulated
