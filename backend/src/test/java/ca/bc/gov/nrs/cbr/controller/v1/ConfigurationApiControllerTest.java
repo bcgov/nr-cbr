@@ -17,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 /**
  * Checks that each lookup reaches the matching service method.
  *
- * <p>Six near-identical one-line delegations is exactly where a copy-paste slip lives — and because
+ * <p>Ten near-identical one-line delegations is exactly where a copy-paste slip lives — and because
  * every one of them returns a {@code List} of the same type, the wrong call compiles and, today,
  * even returns the same empty list. Giving each stub a distinguishable value is what makes the
  * mix-up visible.
@@ -42,21 +42,30 @@ class ConfigurationApiControllerTest {
     when(service.getStructureInspectionStatusCodes()).thenReturn(codes("inspection"));
     when(service.getSpecialAccessCodes()).thenReturn(codes("access"));
     when(service.getSiteTypeCodes()).thenReturn(codes("type"));
+    when(service.getStructureTypeClassCodes()).thenReturn(codes("typeClass"));
+    when(service.getInspectionTypeCodes()).thenReturn(codes("inspectionType"));
+    when(service.getInspectionReportStatusCodes()).thenReturn(codes("reportStatus"));
 
     assertThat(controller.getSiteStatusCodes().getBody()).isEqualTo(codes("status"));
     assertThat(controller.getStructureInspectionStatusCodes().getBody())
         .isEqualTo(codes("inspection"));
     assertThat(controller.getSpecialAccessCodes().getBody()).isEqualTo(codes("access"));
     assertThat(controller.getSiteTypeCodes().getBody()).isEqualTo(codes("type"));
+    assertThat(controller.getStructureTypeClassCodes().getBody()).isEqualTo(codes("typeClass"));
+    assertThat(controller.getInspectionTypeCodes().getBody()).isEqualTo(codes("inspectionType"));
+    assertThat(controller.getInspectionReportStatusCodes().getBody())
+        .isEqualTo(codes("reportStatus"));
   }
 
   @Test
   @DisplayName("each org-unit list comes from its own service method")
   void orgUnitListsDelegate() {
     when(service.getForestDistricts()).thenReturn(orgUnits("district"));
+    when(service.getBusinessAreas()).thenReturn(orgUnits("business"));
     when(service.getManagementAreas("1809")).thenReturn(orgUnits("area"));
 
     assertThat(controller.getForestDistricts().getBody()).isEqualTo(orgUnits("district"));
+    assertThat(controller.getBusinessAreas().getBody()).isEqualTo(orgUnits("business"));
     assertThat(controller.getManagementAreas("1809").getBody()).isEqualTo(orgUnits("area"));
   }
 
