@@ -207,7 +207,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
         {text('siteId', 'Site #', 14)}
         {codeSelect('siteStatusCode', 'Status', 'Any status', codeTables.siteStatusCodes)}
 
-        <div className="site-search__paired site-search__span-2">
+        <div className="site-search__paired">
           {text('forestFileId', 'Project File ID#', 10)}
           {text('roadSectionId', 'Br.', 30)}
         </div>

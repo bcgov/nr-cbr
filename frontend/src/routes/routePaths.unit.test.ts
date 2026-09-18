@@ -37,12 +37,36 @@ describe('getMenuEntries', () => {
     },
   );
 
+  it('offers Inspection with Inspection Search beneath it to a reader', () => {
+    const inspection = entry(['CBR_GENERAL'], 'Inspection');
+
+    expect(inspection).toBeDefined();
+    expect(inspection?.path).toBe('/inspection');
+    expect(inspection?.children?.map((child) => child.id)).toEqual(['Inspection Search']);
+    expect(inspection?.children?.[0].path).toBe('inspection-search');
+  });
+
+  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
+    'shows Inspection Search to %s — every role that can read',
+    (role) => {
+      // /showInspectionSearch sits at the GENERAL floor alongside /showSiteSearch.
+      expect(entry([role], 'Inspection')?.children?.map((c) => c.id)).toEqual([
+        'Inspection Search',
+      ]);
+    },
+  );
+
+  it('orders the sections as the legacy menu did — Inventory, then Inspection', () => {
+    expect(idsOf(['CBR_GENERAL'])).toEqual(['Inventory', 'Inspection']);
+  });
+
   it('drops a section entirely when the user can reach none of its children', () => {
     // The legacy defect this exists to avoid: MenuTag wrote the section header before testing
     // whether any item survived authorization, so an administrator saw four empty headings above
     // two working links (cbr-navigation.local.md §3).
     expect(idsOf([])).not.toContain('Inventory');
     expect(idsOf(['SOME_UNRELATED_ROLE'])).not.toContain('Inventory');
+    expect(idsOf(['SOME_UNRELATED_ROLE'])).not.toContain('Inspection');
   });
 
   it('never returns a parent with an empty children array', () => {
@@ -83,10 +107,12 @@ describe('getProtectedRoutes', () => {
 
   it('registers each child at its absolute path', () => {
     expect(paths()).toContain('/inventory/site-search');
+    expect(paths()).toContain('/inspection/inspection-search');
   });
 
-  it('keeps the section path itself, so /inventory resolves', () => {
+  it('keeps the section path itself, so /inventory and /inspection resolve', () => {
     expect(paths()).toContain('/inventory');
+    expect(paths()).toContain('/inspection');
   });
 
   it('registers every path exactly once', () => {
