@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
+import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -9,6 +10,7 @@ import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -70,7 +72,6 @@ public final class SiteSearchSpecifications {
   private static final String ORG_UNIT_CODE = "orgUnitCode";
   private static final String ROAD_SECTION = "roadSection";
   private static final String ROAD_SECTION_NAME = "roadSectName";
-  private static final String CLIENT = "client";
   private static final String CLIENT_NAME = "clientName";
   private static final String STATUS = "status";
 
@@ -91,67 +92,119 @@ public final class SiteSearchSpecifications {
     return (root, query, builder) -> {
       List<Predicate> predicates = new ArrayList<>();
 
-      // Straight scalar columns on CROSSING_SITE. No join is needed for any of these, which is why
-      // the Forest District and Management Area filters read the *_NO columns rather than going
-      // through the org-unit associations.
-      contains(builder, root.get(SITE_ID), criteria.siteId()).ifPresent(predicates::add);
-      contains(builder, root.get(FOREST_FILE_ID), criteria.forestFileId()).ifPresent(predicates::add);
-      contains(builder, root.get(ROAD_SECTION_ID), criteria.roadSectionId())
-          .ifPresent(predicates::add);
-      contains(builder, root.get(CROSSING_NAME), criteria.crossingName())
-          .ifPresent(predicates::add);
+      scalarCriteria(builder, root, criteria, predicates);
+      toggleCriteria(builder, root, criteria, predicates);
+      maintainedBy(builder, query, root, criteria.primaryUserName()).ifPresent(predicates::add);
+      joinedCriteriaAndProjection(root, query, builder, criteria, predicates);
 
-      equals(builder, root.get(SITE_STATUS_CODE), criteria.siteStatusCode())
-          .ifPresent(predicates::add);
-      equals(builder, root.get(INSPECTION_STATUS_CODE),
-          criteria.structureInspectionStatusCode()).ifPresent(predicates::add);
-      equals(builder, root.get(SPECIAL_ACCESS_CODE), criteria.specialAccessCode())
-          .ifPresent(predicates::add);
-      equals(builder, root.get(SITE_TYPE_CODE), criteria.siteTypeCode())
-          .ifPresent(predicates::add);
-      equals(builder, root.get(CLIENT_NUMBER), criteria.clientNumber()).ifPresent(predicates::add);
-      equals(builder, root.get(CLIENT_LOCATION_CODE), criteria.clientLocationCode())
-          .ifPresent(predicates::add);
-
-      equalsNumber(builder, root.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
-      equalsNumber(builder, root.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
-          .ifPresent(predicates::add);
-
-      // Capital Road is a Y/N indicator, and the filter is one-way: switched on it means "capital
-      // roads only", switched off it means "do not filter" — not "non-capital roads only". Legacy
-      // adds the criterion only when the box is ticked, and the toggle's wording follows from that.
-      if (Boolean.TRUE.equals(criteria.capitalRoad())) {
-        predicates.add(builder.equal(root.get(CAPITAL_ROAD_IND), YES));
-      }
-
-      range(builder, root.get(KILOMETRES), criteria.kiloStart(),
-          criteria.kiloEnd()).ifPresent(predicates::add);
-      range(builder, root.get(USER_KM), criteria.userKmStart(), criteria.userKmEnd())
-          .ifPresent(predicates::add);
-
-      if (Boolean.TRUE.equals(criteria.incomplete())) {
-        predicates.add(incomplete(builder, root));
-      }
-
-      // The two joined criteria. LEFT so that a site with no road section or no client is still a
-      // candidate for the other filters; the predicate itself then excludes it, which is what an
-      // inner join would have done anyway — but only for these criteria, rather than for the whole
-      // query.
-      if (StringUtils.hasText(criteria.forestServiceRoad())) {
-        From<?, ?> roadSection = root.join(ROAD_SECTION, JoinType.LEFT);
-        contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
-            .ifPresent(predicates::add);
-      }
-      if (StringUtils.hasText(criteria.primaryUserName())) {
-        From<?, ?> client = root.join(CLIENT, JoinType.LEFT);
-        contains(builder, client.get(CLIENT_NAME), criteria.primaryUserName())
-            .ifPresent(predicates::add);
-      }
-
-      fetchAndOrder(root, query, builder);
-
-      return predicates.isEmpty() ? builder.conjunction() : builder.and(predicates.toArray(new Predicate[0]));
+      return allOf(builder, predicates);
     };
+  }
+
+  /**
+   * Everything that reads a column of {@code CROSSING_SITE} directly.
+   *
+   * <p>No join is needed for any of these, which is why the Forest District and Management Area
+   * filters read the {@code *_NO} columns rather than going through the org-unit associations.
+   */
+  private static void scalarCriteria(
+      CriteriaBuilder builder,
+      Root<CrossingSiteEntity> root,
+      SiteSearchCriteria criteria,
+      List<Predicate> predicates) {
+    contains(builder, root.get(SITE_ID), criteria.siteId()).ifPresent(predicates::add);
+    contains(builder, root.get(FOREST_FILE_ID), criteria.forestFileId()).ifPresent(predicates::add);
+    contains(builder, root.get(ROAD_SECTION_ID), criteria.roadSectionId())
+        .ifPresent(predicates::add);
+    contains(builder, root.get(CROSSING_NAME), criteria.crossingName()).ifPresent(predicates::add);
+
+    equals(builder, root.get(SITE_STATUS_CODE), criteria.siteStatusCode())
+        .ifPresent(predicates::add);
+    equals(builder, root.get(INSPECTION_STATUS_CODE), criteria.structureInspectionStatusCode())
+        .ifPresent(predicates::add);
+    equals(builder, root.get(SPECIAL_ACCESS_CODE), criteria.specialAccessCode())
+        .ifPresent(predicates::add);
+    equals(builder, root.get(SITE_TYPE_CODE), criteria.siteTypeCode()).ifPresent(predicates::add);
+    equals(builder, root.get(CLIENT_NUMBER), criteria.clientNumber()).ifPresent(predicates::add);
+    equals(builder, root.get(CLIENT_LOCATION_CODE), criteria.clientLocationCode())
+        .ifPresent(predicates::add);
+
+    equalsNumber(builder, root.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
+    equalsNumber(builder, root.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
+        .ifPresent(predicates::add);
+
+    range(builder, root.get(KILOMETRES), criteria.kiloStart(), criteria.kiloEnd())
+        .ifPresent(predicates::add);
+    range(builder, root.get(USER_KM), criteria.userKmStart(), criteria.userKmEnd())
+        .ifPresent(predicates::add);
+  }
+
+  /**
+   * The two checkbox criteria, both of which filter one way only.
+   *
+   * <p>"Capital Road" switched on means capital roads only; switched off it means "do not filter",
+   * <em>not</em> "non-capital roads only". Legacy adds the criterion only when the box is ticked,
+   * and the toggle's wording on both screens follows from that. "Incomplete Data?" is the same
+   * shape over a disjunction rather than a column — see {@link #incomplete}.
+   */
+  private static void toggleCriteria(
+      CriteriaBuilder builder,
+      Root<CrossingSiteEntity> root,
+      SiteSearchCriteria criteria,
+      List<Predicate> predicates) {
+    if (Boolean.TRUE.equals(criteria.capitalRoad())) {
+      predicates.add(builder.equal(root.get(CAPITAL_ROAD_IND), YES));
+    }
+    if (Boolean.TRUE.equals(criteria.incomplete())) {
+      predicates.add(incomplete(builder, root));
+    }
+  }
+
+  /**
+   * The road section: filtered on by one criterion, displayed by every results row, joined once for
+   * both.
+   *
+   * <p>LEFT, so a site with no road section is still a candidate for every other criterion; the
+   * predicate then excludes it, which is what an inner join would have done anyway — but only for
+   * this criterion rather than for the whole query.
+   *
+   * <p><b>One join, not two.</b> It used to be created twice — a plain join here and a fetch in the
+   * projection — because {@code root.fetch(X)} is a new join every time and never reuses
+   * {@code root.join(X)}. That put two left joins to {@code CBR_ROAD_SECTION_VW}, a materialized
+   * view reached over a database link, in every search that filtered on Forest Service Road. The
+   * same mistake in Inspection Search cost far more, because the join it duplicated carried a
+   * correlated subquery.
+   *
+   * <p>It is joined at all only when something needs it: the projection always does, the filter
+   * does when set, and a count query that does neither leaves the view alone.
+   */
+  private static void joinedCriteriaAndProjection(
+      Root<CrossingSiteEntity> root,
+      CriteriaQuery<?> query,
+      CriteriaBuilder builder,
+      SiteSearchCriteria criteria,
+      List<Predicate> predicates) {
+    boolean projecting = returnsEntities(query);
+    boolean filtering = StringUtils.hasText(criteria.forestServiceRoad());
+    if (!projecting && !filtering) {
+      return;
+    }
+
+    From<?, ?> roadSection = joinOrFetch(root, ROAD_SECTION, projecting);
+    if (filtering) {
+      contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
+          .ifPresent(predicates::add);
+    }
+    if (projecting) {
+      fetchAndOrder(root, roadSection, query, builder);
+    }
+  }
+
+  /** Every predicate that was set, or a tautology when none was — the unfiltered search. */
+  private static Predicate allOf(CriteriaBuilder builder, List<Predicate> predicates) {
+    return predicates.isEmpty()
+        ? builder.conjunction()
+        : builder.and(predicates.toArray(new Predicate[0]));
   }
 
   /**
@@ -207,16 +260,17 @@ public final class SiteSearchSpecifications {
    * <h3>Why both are skipped for the count query</h3>
    * A count has no ordering, and a fetch join in one is invalid — Hibernate rejects it, because
    * there is no entity to fetch into. Spring Data runs the count from this same specification, so
-   * the guard is what lets one specification serve both.
+   * the guard is what lets one specification serve both. The guard itself is now on the caller,
+   * which needs the same answer to decide whether the road section is a fetch or a plain join.
+   *
+   * @param roadSection the join {@code matching} already made, reused here rather than made again
    */
   private static void fetchAndOrder(
-      Root<CrossingSiteEntity> root, CriteriaQuery<?> query, CriteriaBuilder builder) {
-    if (query == null || Long.class.equals(query.getResultType())
-        || long.class.equals(query.getResultType())) {
-      return;
-    }
+      Root<CrossingSiteEntity> root,
+      From<?, ?> roadSection,
+      CriteriaQuery<?> query,
+      CriteriaBuilder builder) {
     From<?, ?> orgUnit = (From<?, ?>) root.fetch(ORG_UNIT, JoinType.LEFT);
-    From<?, ?> roadSection = (From<?, ?>) root.fetch(ROAD_SECTION, JoinType.LEFT);
     root.fetch(STATUS, JoinType.LEFT);
 
     query.orderBy(
@@ -224,6 +278,76 @@ public final class SiteSearchSpecifications {
         builder.asc(roadSection.get(ROAD_SECTION_NAME)),
         builder.asc(root.get(ROAD_SECTION_ID)),
         builder.asc(root.get(KILOMETRES)));
+  }
+
+  /**
+   * "Designated Maintainer" — the sites whose client number belongs to a client whose name matches.
+   *
+   * <p>A subquery rather than a join, and the reason is the mapping this replaced.
+   * {@code CrossingSiteEntity} used to carry a {@code @ManyToOne} to the client for this one
+   * criterion. That association was unusable as written and expensive as configured:
+   *
+   * <ul>
+   *   <li><b>It loaded on every row of every search, whether or not anyone filtered on it.</b> It
+   *       was marked {@code FetchType.LAZY}, but it also carried {@code @NotFound(IGNORE)} — and
+   *       Hibernate cannot honour both, because it has to look for the row before it can choose
+   *       between an entity and a null. Nothing on either search screen displays a maintainer, so
+   *       it was never fetched, so it loaded one select at a time: up to a full page of extra round
+   *       trips, invisible on any page where the sites happened to share a client. Inspection Search
+   *       inherited the same cost through the same mapping.</li>
+   *   <li><b>It was keyed on {@code CLIENT_NUMBER} alone,</b> where the real constraint
+   *       ({@code CRS_CL_FK1}) is the pair {@code (CLIENT_NUMBER, CLIENT_LOCN_CODE)}. Good enough to
+   *       filter by name; not the right key to resolve <em>which</em> client, which is what a screen
+   *       showing a maintainer would need. Legacy agrees: {@code site.jsp} fetches the maintainer
+   *       with its own keyed request on both columns rather than joining it into the site query.</li>
+   * </ul>
+   *
+   * <p>The predicate is unchanged in meaning. A site with no client number is excluded either way —
+   * a null foreign key produces no join row, and {@code null IN (…)} is unknown — and so is one
+   * whose client the view does not return. It is also safer in one respect: a left join to a view
+   * that returned two rows for a client number would duplicate the site in the results and inflate
+   * the total, which {@code IN} cannot do.
+   */
+  private static Optional<Predicate> maintainedBy(
+      CriteriaBuilder builder,
+      CriteriaQuery<?> query,
+      Root<CrossingSiteEntity> root,
+      String name) {
+    if (!StringUtils.hasText(name)) {
+      return Optional.empty();
+    }
+    Subquery<String> clients = query.subquery(String.class);
+    Root<ClientPublicEntity> client = clients.from(ClientPublicEntity.class);
+    clients.select(client.get(CLIENT_NUMBER))
+        .where(builder.like(client.get(CLIENT_NAME), WILDCARD + name.trim() + WILDCARD));
+
+    return Optional.of(root.get(CLIENT_NUMBER).in(clients));
+  }
+
+  /**
+   * Whether this execution of the specification returns entities rather than a count.
+   *
+   * <p>Spring Data runs the page and the count from the same specification. A fetch join in a count
+   * is invalid — Hibernate rejects it — and a count has no ordering, so both are guarded on this.
+   */
+  private static boolean returnsEntities(CriteriaQuery<?> query) {
+    return query != null
+        && !Long.class.equals(query.getResultType())
+        && !long.class.equals(query.getResultType());
+  }
+
+  /**
+   * One left join, fetched when the query returns entities.
+   *
+   * <p>The cast is safe and is the standard way to use a fetch as a join: Hibernate's {@code Fetch}
+   * implementations are {@code Join}s. It is what lets one join serve both the predicate and the
+   * projection instead of creating a second one.
+   */
+  private static From<?, ?> joinOrFetch(
+      Root<CrossingSiteEntity> root, String attribute, boolean projecting) {
+    return projecting
+        ? (From<?, ?>) root.fetch(attribute, JoinType.LEFT)
+        : root.join(attribute, JoinType.LEFT);
   }
 
   private static Optional<Predicate> contains(

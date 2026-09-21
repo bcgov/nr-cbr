@@ -32,7 +32,12 @@ import org.springframework.data.domain.PageRequest;
  *
  * <p>H2 stands in for Oracle, so this proves the predicates and the joins, not Oracle's behaviour.
  */
-@DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
+@DataJpaTest(properties = {
+    "spring.jpa.hibernate.ddl-auto=create-drop",
+    // For the query-shape tests, which read the SQL Hibernate actually emits.
+    "spring.jpa.properties.hibernate.session_factory.statement_inspector="
+        + "ca.bc.gov.nrs.cbr.specification.v1.CapturingStatementInspector",
+})
 class SiteSearchSpecificationsTest {
 
   @Autowired
@@ -386,6 +391,113 @@ class SiteSearchSpecificationsTest {
           .siteTypeCode("").primaryUserName("  ").build();
 
       assertThat(search(criteria)).containsExactly("SITE-1");
+    }
+  }
+
+  @Nested
+  @DisplayName("the shape of the query")
+  class QueryShape {
+
+    private String sqlFor(SiteSearchCriteria criteria) {
+      entityManager.flush();
+      entityManager.clear();
+      CapturingStatementInspector.clear();
+      repository.findAll(SiteSearchSpecifications.matching(criteria), PageRequest.of(0, 20));
+      return CapturingStatementInspector.lastContaining("crossing_site");
+    }
+
+    @Test
+    @DisplayName("joins each table once, whichever criteria are set")
+    void joinsEachTableOnce() {
+      // root.fetch(X) is a new join every time — it never reuses an earlier root.join(X). The road
+      // section was created both ways: a plain join for the Forest Service Road filter and a fetch
+      // for the projection, so filtering on that one criterion put two left joins to
+      // CBR_ROAD_SECTION_VW — a materialized view reached over a database link — in every such
+      // search. Harmless enough here to go unnoticed; the same mistake in Inspection Search
+      // duplicated a join carrying a correlated subquery and cost eighteen seconds.
+      givenSupportingRows();
+      persist(completeSite("SITE-1").build());
+
+      for (SiteSearchCriteria criteria : List.of(
+          SiteSearchCriteria.builder().siteId("SITE").build(),
+          SiteSearchCriteria.builder().forestServiceRoad("Bowron").build(),
+          SiteSearchCriteria.builder().primaryUserName("CANFOR").build(),
+          SiteSearchCriteria.builder().forestServiceRoad("Bowron").primaryUserName("CANFOR")
+              .build())) {
+        String sql = sqlFor(criteria);
+
+        assertThat(sql).isNotEmpty();
+        assertThat(CapturingStatementInspector.occurrences(sql, "cbr_road_section_vw"))
+            .as("road section, for criteria %s", criteria)
+            .isEqualTo(1);
+        assertThat(CapturingStatementInspector.occurrences(sql, "the.org_unit ")).isEqualTo(1);
+        assertThat(CapturingStatementInspector.occurrences(sql, "the.crossing_site ")).isEqualTo(1);
+        assertThat(CapturingStatementInspector.occurrences(sql, "the.crossing_site_status_code "))
+            .isEqualTo(1);
+      }
+    }
+
+    @Test
+    @DisplayName("reads a page in one statement, with nothing loaded lazily per row")
+    void oneStatementPerPage() {
+      givenSupportingRows();
+      for (int i = 1; i <= 5; i++) {
+        // A distinct maintainer per site, as a real page of results would have.
+        String clientNumber = "0000200" + i;
+        entityManager.persist(ClientPublicEntity.builder()
+            .clientNumber(clientNumber).clientName("MAINTAINER " + i).build());
+        persist(completeSite("SITE-" + i).clientNumber(clientNumber).build());
+      }
+      entityManager.flush();
+      entityManager.clear();
+      CapturingStatementInspector.clear();
+
+      List<CrossingSiteEntity> found = repository
+          .findAll(SiteSearchSpecifications.matching(SiteSearchCriteria.builder().siteId("SITE")
+              .build()), PageRequest.of(0, 20))
+          .getContent();
+      // Touch everything a results row renders. Anything unfetched issues its select here.
+      found.forEach(site -> {
+        site.getOrgUnit().getOrgUnitCode();
+        site.getRoadSection();
+        site.getStatus();
+      });
+
+      assertThat(found).hasSize(5);
+      assertThat(CapturingStatementInspector.count())
+          .as("one select for the page, and no per-row follow-ups: %s",
+              CapturingStatementInspector.all())
+          .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("never joins the client — it is a subquery, and only when filtered on")
+    void clientIsNeverJoined() {
+      // CrossingSiteEntity used to carry a @ManyToOne to the client for this one criterion, marked
+      // LAZY but also @NotFound(IGNORE) — which Hibernate cannot honour together, because it must
+      // look for the row before it can choose between an entity and a null. Nothing on either
+      // search screen displays a maintainer, so it was never fetched, so it loaded one select per
+      // row. The association is gone; the filter is an IN subquery, which touches the view only
+      // when someone actually filters by maintainer.
+      givenSupportingRows();
+      persist(completeSite("SITE-1").build());
+
+      assertThat(CapturingStatementInspector.occurrences(
+          sqlFor(SiteSearchCriteria.builder().siteId("SITE").build()), "v_client_public"))
+          .as("not referenced at all when no maintainer filter is set")
+          .isZero();
+
+      String filtered = sqlFor(SiteSearchCriteria.builder().primaryUserName("CANFOR").build());
+      assertThat(CapturingStatementInspector.occurrences(filtered, "v_client_public"))
+          .as("referenced once, in the subquery, when it is")
+          .isEqualTo(1);
+      // Matched loosely on purpose: Hibernate's exact parenthesisation around a subquery is its
+      // own business and has changed between versions. What this pins is that the view is reached
+      // through an IN rather than a join.
+      assertThat(filtered)
+          .as("as a subquery rather than a join")
+          .containsPattern("client_number in \\(+\\s*select")
+          .doesNotContain("join the.v_client_public");
     }
   }
 }

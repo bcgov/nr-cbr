@@ -3,7 +3,6 @@ import {
   Button,
   DatePicker,
   DatePickerInput,
-  InlineNotification,
   RadioButton,
   RadioButtonGroup,
   Select,
@@ -11,10 +10,10 @@ import {
   TextInput,
   Toggle,
 } from '@carbon/react';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 
 import { PROJECT_BRANCH_KM_DATE_SORT, STRUCTURE_ID_DATE_SORT } from './types';
-import { MONTH_PATTERN, criteriaErrors, hasCriteria, isMonth } from './validation';
+import { MONTH_PATTERN, criteriaErrors, isMonth } from './validation';
 
 import type {
   CodeOption,
@@ -124,17 +123,6 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
   const hasErrors = Object.keys(errors).length > 0;
 
   /**
-   * Whether the user has already tried to search an empty form.
-   *
-   * <p>The message only appears after a submit, not while the form is merely untouched — an empty
-   * form is the normal starting state and telling the user off for it before they have done
-   * anything is noise. It clears itself the moment a criterion is entered, because the condition it
-   * describes is no longer true; that is why the flag records the attempt rather than the message.
-   */
-  const [attemptedEmpty, setAttemptedEmpty] = useState(false);
-  const showEmptyError = attemptedEmpty && !hasCriteria(criteria);
-
-  /**
    * What each calendar has been told, held still while a month is half-typed.
    *
    * <p>Carbon pushes `value` down into flatpickr on every change, and flatpickr answers a value it
@@ -155,16 +143,16 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
   // prop's own type means the element decides what the event is instead of this file guessing.
   const submit: SubmitEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
-    // Legacy's `errors.search.select`: an empty form is refused rather than answered with every
-    // inspection ever recorded.
-    if (!hasCriteria(criteria)) {
-      setAttemptedEmpty(true);
-      return;
-    }
-    setAttemptedEmpty(false);
-    // Legacy runs the same checks server-side and re-renders the form with page-level messages.
-    // Stopping here keeps the messages beside the boxes they belong to; the backend will reject the
-    // same values with a 400, because the browser is not the only caller.
+    // Legacy refuses an empty form here with `errors.search.select`, and so did this screen until
+    // the search was wired. It does not any more, for the same reason Site Search does not: that
+    // refusal exists because the legacy query was unpaginated, so "no criteria" meant returning
+    // every inspection in the province in one page. The search is paged server-side now, which
+    // makes "show me everything, twenty at a time" an ordinary and cheap request. The two search
+    // screens have to agree on this, and they do.
+    //
+    // Legacy runs the field checks server-side too and re-renders the form with page-level
+    // messages. Stopping here keeps the messages beside the boxes they belong to; the backend will
+    // reject the same values with a 400, because the browser is not the only caller.
     if (hasErrors) {
       return;
     }
@@ -496,22 +484,6 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
             />
           </RadioButtonGroup>
         </fieldset>
-
-        {showEmptyError && (
-          <div className="inspection-search__notice">
-            <InlineNotification
-              kind="warning"
-              lowContrast
-              hideCloseButton
-              title="Enter at least one criterion"
-              subtitle={
-                'An inspection search needs something to narrow it — a site, a structure, a date ' +
-                'range, a district or any other filter above.'
-              }
-              data-testid="inspection-search-empty-error"
-            />
-          </div>
-        )}
 
         <div className="inspection-search__actions">
           <Button

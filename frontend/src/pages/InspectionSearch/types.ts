@@ -15,6 +15,9 @@
  */
 export type { CodeOption, OrgUnitOption } from '@/types/configuration';
 
+/** The paging envelope every search endpoint answers with. */
+export type { PagedResponse } from '@/types/api';
+
 /**
  * One reviewer, as the "Reviewed By" select needs them — `STRUCTURE_INSPECTION_REVIEWER` joined to
  * the user who may sign off an inspection.
@@ -47,9 +50,10 @@ export type InspectionSortBy = typeof STRUCTURE_ID_DATE_SORT | typeof PROJECT_BR
 /**
  * The 19 criteria the legacy form offers, in its own order.
  *
- * <p>Every one is optional individually, but not collectively: legacy refuses an empty form with
- * `errors.search.select` rather than returning every inspection ever recorded. See
- * `validation.ts`.
+ * <p>Every one is optional, including all of them at once. Legacy refuses an empty form with
+ * `errors.search.select`, because its query was unpaginated and "no criteria" meant every
+ * inspection in the province in one response; the search is paged server-side now, and Site Search
+ * answers an empty form for the same reason.
  *
  * <p><b>Road Responsibility is deliberately absent.</b> `InspectionSearchForm` still carries
  * `roadResponsibilityCode` — it validates it, maps it into the search and reads it back out — but
@@ -100,30 +104,39 @@ export type InspectionSearchCriteria = {
  * <p>The code earns its place because two of the row's behaviours turn on it and neither is
  * derivable from the description: an `OFL` row is not a link, and it is the only row that offers
  * delete.
+ *
+ * <p><b>Every field but `id` is nullable, and that is the server's shape rather than a precaution.</b>
+ * `INSPECTION_DATE` is a nullable column; `CROSSING_STRUCTURE_NAME`, the crossing name, the project
+ * file and the kilometre are all nullable too; and the district, the road section and the decoded
+ * status come through left joins that a real row can miss. `InspectionSearchService.toResult` maps
+ * each of those with a null-tolerant read for exactly that reason. Declaring them `string` here said
+ * otherwise, and the first live search found it — a null `inspectionDate` reached
+ * `formatInspectionDate`, which called `.trim()` on it and took the whole page down.
  */
 export type InspectionSearchResult = {
+  /** `STRUCTURE_INSPECTION.INSPECTION_ID`. The only field the server can always fill. */
   id: string;
   /** ISO `yyyy-MM-dd`; the table prints it as `yyyy/MM/dd`, as legacy's `<fmt:formatDate>` does. */
-  inspectionDate: string;
+  inspectionDate: string | null;
   /** The raw code — decides the colour of the status pill, the link and the delete control. */
-  inspectionReportStatusCode: string;
+  inspectionReportStatusCode: string | null;
   /** The decoded status — what the pill reads. */
-  inspectionReportStatusDescription: string;
+  inspectionReportStatusDescription: string | null;
   /**
    * The site the structure sat at when the inspection happened, which is not necessarily where it
    * sits now — hence legacy's `siteAtTimeOfInspection` rather than a plain site id.
    */
-  siteAtTimeOfInspection: string;
-  structureName: string;
+  siteAtTimeOfInspection: string | null;
+  structureName: string | null;
   /** Shown in the District Code column; `orgUnitName` is its tooltip in legacy, a suffix here. */
-  orgUnitCode: string;
-  orgUnitName: string;
-  forestServiceRoad: string;
+  orgUnitCode: string | null;
+  orgUnitName: string | null;
+  forestServiceRoad: string | null;
   /** The KM column — `POINT_OF_COMMENCEMENT_DISTANCE`. */
-  pointOfCommencementDistance: string;
-  crossingName: string;
-  forestFileId: string;
-  roadSectionId: string;
+  pointOfCommencementDistance: string | null;
+  crossingName: string | null;
+  forestFileId: string | null;
+  roadSectionId: string | null;
 };
 
 export const EMPTY_CRITERIA: InspectionSearchCriteria = {

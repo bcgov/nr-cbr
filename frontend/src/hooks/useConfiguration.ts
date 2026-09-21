@@ -51,6 +51,30 @@ export const siteTypeCodesQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const structureTypeClassCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'structure-type-class-codes'],
+  queryFn: () => API.configuration.getStructureTypeClassCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const inspectionTypeCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'inspection-type-codes'],
+  queryFn: () => API.configuration.getInspectionTypeCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const inspectionReportStatusCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'inspection-report-status-codes'],
+  queryFn: () => API.configuration.getInspectionReportStatusCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const businessAreasQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'business-areas'],
+  queryFn: () => API.configuration.getBusinessAreas(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 export const forestDistrictsQuery = queryOptions({
   queryKey: [CONFIGURATION_QUERY_KEY, 'forest-districts'],
   queryFn: () => API.configuration.getForestDistricts(),
@@ -58,22 +82,34 @@ export const forestDistrictsQuery = queryOptions({
 });
 
 /**
- * Every parameterless lookup — the set that is worth warming up front, and the set whose combined
- * loading and error state the form reads.
+ * The parameterless lookups each search screen draws on.
  *
- * <p>`as const` keeps this a tuple of five distinct option types rather than an array of their
- * union: four resolve to `CodeOption[]` and one to `OrgUnitOption[]`, and widening them to a union
- * would leave `useQueries` unable to type each result.
+ * <p>Grouped per screen rather than kept as one list of everything, because a screen's selects are
+ * disabled while *its* reference data loads: one shared group would have Site Search waiting on the
+ * four inspection lists it never reads, and Inspection Search waiting on site statuses. Forest
+ * districts are in both because both filter by district.
+ *
+ * <p>`as const` keeps each a tuple of distinct option types rather than an array of their union —
+ * some resolve to `CodeOption[]` and some to `OrgUnitOption[]`, and widening them would leave
+ * `useQueries` unable to type each result.
  *
  * <p><b>Adding a lookup here means adding it to {@link usePrefetchConfiguration} too.</b> That
  * duplication is deliberate — see the note there.
  */
-const PREFETCHABLE = [
+const SITE_SEARCH_LOOKUPS = [
   siteStatusCodesQuery,
   structureInspectionStatusCodesQuery,
   specialAccessCodesQuery,
   siteTypeCodesQuery,
   forestDistrictsQuery,
+] as const;
+
+const INSPECTION_SEARCH_LOOKUPS = [
+  structureTypeClassCodesQuery,
+  inspectionTypeCodesQuery,
+  inspectionReportStatusCodesQuery,
+  forestDistrictsQuery,
+  businessAreasQuery,
 ] as const;
 
 /**
@@ -105,6 +141,17 @@ export const useSpecialAccessCodes = (): UseQueryResult<CodeOption[]> =>
 
 export const useSiteTypeCodes = (): UseQueryResult<CodeOption[]> => useQuery(siteTypeCodesQuery);
 
+export const useStructureTypeClassCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(structureTypeClassCodesQuery);
+
+export const useInspectionTypeCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(inspectionTypeCodesQuery);
+
+export const useInspectionReportStatusCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(inspectionReportStatusCodesQuery);
+
+export const useBusinessAreas = (): UseQueryResult<OrgUnitOption[]> => useQuery(businessAreasQuery);
+
 export const useForestDistricts = (): UseQueryResult<OrgUnitOption[]> =>
   useQuery(forestDistrictsQuery);
 
@@ -120,21 +167,26 @@ export type ReferenceDataState = {
   isError: boolean;
 };
 
+const combineReferenceData = (
+  results: readonly { isLoading: boolean; isError: boolean }[],
+): ReferenceDataState => ({
+  isLoading: results.some((result) => result.isLoading),
+  isError: results.some((result) => result.isError),
+});
+
 /**
- * The loading and error state of the parameterless lookups, as one answer.
+ * The loading and error state of the lookups Site Search draws on, as one answer.
  *
  * <p>`useQueries` rather than reading each hook's flags at the call site: the selects are all
  * disabled or all not, and a screen assembling that from five booleans gets it subtly wrong the
  * first time a sixth is added.
  */
-export const useReferenceDataState = (): ReferenceDataState =>
-  useQueries({
-    queries: PREFETCHABLE,
-    combine: (results) => ({
-      isLoading: results.some((result) => result.isLoading),
-      isError: results.some((result) => result.isError),
-    }),
-  });
+export const useSiteReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: SITE_SEARCH_LOOKUPS, combine: combineReferenceData });
+
+/** The same, for the lookups Inspection Search draws on. */
+export const useInspectionReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: INSPECTION_SEARCH_LOOKUPS, combine: combineReferenceData });
 
 /**
  * Warms the parameterless lookups once, in the background, as soon as there is a session.
@@ -159,11 +211,11 @@ export const useReferenceDataState = (): ReferenceDataState =>
  * is missing. `query` rejects on error — unlike the `prefetchQuery` it replaces — so the `catch` is
  * what keeps a failed lookup from surfacing as an unhandled rejection.
  *
- * <p>The five calls are written out rather than looped over {@link PREFETCHABLE}. `query` infers its
- * generics from the options it is given, and iterating the tuple hands it the union of two payload
- * types, which no single call can satisfy; the previous version got around that with a cast to a
- * now-deprecated type. Five typed calls are worth more than the loop, at the cost of naming each
- * lookup twice.
+ * <p>The calls are written out rather than looped over the two tuples above. `query` infers its
+ * generics from the options it is given, and iterating a tuple hands it the union of two payload
+ * types, which no single call can satisfy; an earlier version got around that with a cast to a
+ * now-deprecated type. Typed calls are worth more than the loop, at the cost of naming each lookup
+ * twice.
  */
 const ignoreWarmUpFailure = () => undefined;
 
@@ -181,5 +233,9 @@ export const usePrefetchConfiguration = (enabled: boolean): void => {
     void queryClient.query(specialAccessCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(siteTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(forestDistrictsQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(structureTypeClassCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(inspectionTypeCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(inspectionReportStatusCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(businessAreasQuery).catch(ignoreWarmUpFailure);
   }, [enabled, queryClient]);
 };

@@ -40,7 +40,11 @@ describe('ConfigurationService', () => {
     ['getStructureInspectionStatusCodes', 'structure-inspection-status-codes'],
     ['getSpecialAccessCodes', 'special-access-codes'],
     ['getSiteTypeCodes', 'site-type-codes'],
+    ['getStructureTypeClassCodes', 'structure-type-class-codes'],
+    ['getInspectionTypeCodes', 'inspection-type-codes'],
+    ['getInspectionReportStatusCodes', 'inspection-report-status-codes'],
     ['getForestDistricts', 'forest-districts'],
+    ['getBusinessAreas', 'business-areas'],
   ] as const)('calls the %s endpoint', async (method, path) => {
     const { service, request } = withMockedRequest();
 

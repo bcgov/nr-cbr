@@ -18,10 +18,15 @@ import type { FC } from 'react';
 
 import { useAuthorization } from '@/hooks/useAuthorization';
 import {
+  useBusinessAreas,
   useForestDistricts,
+  useInspectionReferenceDataState,
+  useInspectionReportStatusCodes,
+  useInspectionTypeCodes,
   useManagementAreas,
-  useReferenceDataState,
+  useStructureTypeClassCodes,
 } from '@/hooks/useConfiguration';
+import { useInspectionSearch } from '@/hooks/useInspectionSearch';
 
 /**
  * Inspection Search — the first screen of the Inspection section.
@@ -30,16 +35,21 @@ import {
  * `inspection_search.jsp`, gated on the `/showInspectionSearch` privilege, which every role that
  * can read holds.
  *
- * <p><b>UI only — there is no inspection search endpoint yet.</b> The criteria form, its validation,
- * the results table and the authorization gates are real and complete; nothing queries. This is the
- * same shape Site Search shipped in first (#8), and the wiring points are marked below.
+ * <p>The search runs against {@code /api/v1/inspections/search}. What each criterion means, and the
+ * four places the query diverges from the legacy stored procedure, are documented on the backend's
+ * `InspectionSearchSpecifications` rather than repeated here.
  *
- * <p>Two of the seven dropdowns are live — Forest District and Management Area, which
- * `/api/v1/configuration` already serves. The other five are empty because nothing serves them yet:
- * inspection report statuses, structure type/class, inspection types, BCTS business areas and the
- * reviewer list. Four are ordinary code tables; the reviewer list is not, and may not survive at all
- * — `cbr-auth-and-roles.local.md` §6 recommends moving the reviewer permission into FAM, which would
- * re-source it from `UserLookupClient` (decision D4).
+ * <p>Six of the seven dropdowns are live off `/api/v1/configuration`. The seventh, Reviewed By, is
+ * empty on purpose rather than for want of an endpoint: it is the one list that is not a code table,
+ * and `cbr-auth-and-roles.local.md` §6 recommends moving the reviewer permission into FAM and
+ * deleting the admin screen that maintains it — which would re-source the list from
+ * `UserLookupClient` rather than from `STRUCTURE_INSPECTION_REVIEWER` (decision D4). Building it
+ * against the table first would be building it twice.
+ *
+ * <p><b>Delete is still a stub.</b> The control is gated correctly and the confirmation modal is
+ * real, but there is no delete endpoint yet, so confirming closes the dialog and changes nothing.
+ * Now that the rest of the screen queries for real, that gap is worth closing before a user with
+ * `CBR_LEVEL_2` finds it — the wiring point is marked on the modal below.
  */
 const InspectionSearchPage: FC = () => {
   /**
@@ -60,18 +70,20 @@ const InspectionSearchPage: FC = () => {
   const [pageSize, setPageSize] = useState(20);
   const [pendingDelete, setPendingDelete] = useState<InspectionSearchResult | null>(null);
 
-  /**
-   * Empty until an endpoint exists. Kept as state rather than a constant so wiring the query is a
-   * change of source, not a change of shape — the same way Site Search was wired later.
-   */
-  const [results] = useState<InspectionSearchResult[]>([]);
-
+  const structureTypeClassCodes = useStructureTypeClassCodes();
+  const inspectionTypeCodes = useInspectionTypeCodes();
+  const inspectionReportStatusCodes = useInspectionReportStatusCodes();
+  const businessAreas = useBusinessAreas();
   const forestDistricts = useForestDistricts();
   // Management areas are the former districts inside the selected one, so this refetches — under
   // its own cache key — whenever Forest District changes, and does not run at all until one is
   // picked. Legacy does the same by posting the whole form back on change.
   const managementAreas = useManagementAreas(criteria.orgUnitNo);
-  const referenceData = useReferenceDataState();
+  const referenceData = useInspectionReferenceDataState();
+
+  // `page` is 1-based because Carbon's Pagination is; the backend is 0-based, so the conversion
+  // happens here rather than either side pretending otherwise.
+  const results = useInspectionSearch(submitted, page - 1, pageSize);
 
   /**
    * A failed lookup falls back to an empty list rather than blocking the form: every criterion is
@@ -80,17 +92,27 @@ const InspectionSearchPage: FC = () => {
    */
   const codeTables = useMemo<CodeTables>(
     () => ({
-      // The five the configuration endpoint does not serve yet. Listed rather than omitted so the
-      // form's shape is the finished one and wiring each is a one-line change here.
-      structureTypeClassCodes: [],
-      inspectionTypeCodes: [],
-      inspectionReportStatusCodes: [],
-      businessAreas: [],
+      // The one list the configuration endpoint does not serve yet. Listed rather than omitted so
+      // the form's shape is the finished one and wiring it is a one-line change here. It is held
+      // back on purpose: `cbr-auth-and-roles.local.md` §6 recommends moving the reviewer permission
+      // into FAM and deleting the admin screen that maintains it, which would re-source this list
+      // from `UserLookupClient` rather than from STRUCTURE_INSPECTION_REVIEWER (decision D4).
       inspectionReviewers: [],
+      structureTypeClassCodes: structureTypeClassCodes.data ?? [],
+      inspectionTypeCodes: inspectionTypeCodes.data ?? [],
+      inspectionReportStatusCodes: inspectionReportStatusCodes.data ?? [],
+      businessAreas: businessAreas.data ?? [],
       forestDistricts: forestDistricts.data ?? [],
       managementAreas: managementAreas.data ?? [],
     }),
-    [forestDistricts.data, managementAreas.data],
+    [
+      structureTypeClassCodes.data,
+      inspectionTypeCodes.data,
+      inspectionReportStatusCodes.data,
+      businessAreas.data,
+      forestDistricts.data,
+      managementAreas.data,
+    ],
   );
 
   const updateCriteria = useCallback(
@@ -131,21 +153,6 @@ const InspectionSearchPage: FC = () => {
         breadCrumbs={[{ name: 'Inspection', path: '/inspection' }]}
       />
 
-      <Column sm={4} md={8} lg={16}>
-        <InlineNotification
-          kind="info"
-          lowContrast
-          hideCloseButton
-          title="Not connected yet"
-          subtitle={
-            'The form and results table are in place, but no search runs. Forest District and ' +
-            'Management Area are live; the other five dropdowns are empty until the configuration ' +
-            'endpoint serves them.'
-          }
-          data-testid="inspection-search-placeholder"
-        />
-      </Column>
-
       {referenceData.isError && (
         <Column sm={4} md={8} lg={16}>
           <InlineNotification
@@ -178,18 +185,30 @@ const InspectionSearchPage: FC = () => {
           untouched page is the form alone rather than an empty table implying zero matches. */}
       {submitted !== null && (
         <Column sm={4} md={8} lg={16}>
-          <InspectionSearchResults
-            results={results}
-            totalItems={results.length}
-            page={page}
-            pageSize={pageSize}
-            canDelete={canDelete}
-            onPageChange={({ page: nextPage, pageSize: nextPageSize }) => {
-              setPage(nextPage);
-              setPageSize(nextPageSize);
-            }}
-            onDelete={setPendingDelete}
-          />
+          {results.isError ? (
+            <InlineNotification
+              kind="error"
+              lowContrast
+              hideCloseButton
+              title="The search could not be run"
+              subtitle="Nothing was changed. Try again, or narrow the criteria."
+              data-testid="inspection-search-error"
+            />
+          ) : (
+            <InspectionSearchResults
+              results={results.data?.content ?? []}
+              totalItems={results.data?.totalElements ?? 0}
+              loading={results.isPending || results.isPlaceholderData}
+              page={page}
+              pageSize={pageSize}
+              canDelete={canDelete}
+              onPageChange={({ page: nextPage, pageSize: nextPageSize }) => {
+                setPage(nextPage);
+                setPageSize(nextPageSize);
+              }}
+              onDelete={setPendingDelete}
+            />
+          )}
         </Column>
       )}
 

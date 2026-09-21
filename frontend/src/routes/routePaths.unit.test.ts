@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { getMenuEntries, getOfflineMenuEntries, getProtectedRoutes } from './routePaths';
+import {
+  getMenuEntries,
+  getNoRoleRoutes,
+  getOfflineMenuEntries,
+  getProtectedRoutes,
+  getPublicRoutes,
+} from './routePaths';
 
 /**
  * The side nav is derived from the same role list the API enforces against, so these cases are the
@@ -130,5 +136,23 @@ describe('getOfflineMenuEntries', () => {
   it('is empty until the offline flow exists', () => {
     // An offline nav pointing at online-only screens would be worse than none.
     expect(getOfflineMenuEntries()).toEqual([]);
+  });
+});
+
+describe('every route has an error boundary', () => {
+  // React-router routes an error to the errorElement of the route that threw, or the nearest one
+  // above it. These route sets are flat siblings, so an errorElement on the `*` catch-all — which
+  // is where the only two in this file used to be — protects nothing but the catch-all. A throw
+  // inside any real page fell through to react-router's built-in screen, which opens "Unexpected
+  // Application Error!" and closes with a stack trace and a note addressed to the developer.
+  it.each([
+    ['public', getPublicRoutes()],
+    ['no-role', getNoRoleRoutes()],
+    ['protected', getProtectedRoutes()],
+  ])('covers every %s route', (_name, routes) => {
+    expect(routes.length).toBeGreaterThan(0);
+    routes.forEach((route) => {
+      expect(route.errorElement, `${route.path} has no errorElement`).toBeDefined();
+    });
   });
 });

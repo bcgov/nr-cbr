@@ -21,27 +21,6 @@ const monthKey = (value: string): string => {
 export type CriteriaErrors = Partial<Record<keyof InspectionSearchCriteria, string>>;
 
 /**
- * Whether the form carries at least one criterion.
- *
- * <p>Legacy's `InspectionSearchForm.isEmpty()`, with one deliberate difference:
- * `findMovedStructures` does not count on its own. It is not a filter — it switches what a site
- * number means — so legacy's version lets a form holding only that tick pass the guard, build a
- * search with no criteria in it, and then hit `if(!search.isEmpty())` in the action, which skips the
- * query entirely. The user gets no error, no results and no reason. Requiring a real criterion says
- * what is missing instead.
- *
- * <p>`sortBy` is not a criterion, and legacy does not treat it as one either — it always holds a
- * value.
- */
-export const hasCriteria = (criteria: InspectionSearchCriteria): boolean =>
-  Object.entries(criteria).some(([field, value]) => {
-    if (field === 'sortBy' || field === 'findMovedStructures') {
-      return false;
-    }
-    return typeof value === 'boolean' ? value : value !== '';
-  });
-
-/**
  * Field-level messages for whatever is currently wrong.
  *
  * <p>One entry per offending box. Legacy raises a single page-level "Inspection Date must be in

@@ -172,6 +172,9 @@ class SiteServiceTest {
   @DisplayName("leaves the children of other sites alone")
   void doesNotTouchOtherRows() {
     givenSite("SITE-1");
+    // SITE-2 has to exist: CRS_CS_FK is a real foreign key in Oracle, and it became one here too
+    // once CrossingStructureEntity mapped the site as an association for Inspection Search.
+    givenSite("SITE-2");
     givenStructure(1L, "SITE-2", "Y");
 
     service.delete("SITE-1");

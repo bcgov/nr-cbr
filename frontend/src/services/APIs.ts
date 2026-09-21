@@ -1,4 +1,5 @@
 import { ConfigurationService } from './configuration.service';
+import { InspectionSearchService } from './inspectionSearch.service';
 import { SiteSearchService } from './siteSearch.service';
 
 import type { APIConfig } from '@/config/api/types';
@@ -52,6 +53,7 @@ BackendApiConfig.TOKEN = async () => {
 const API = {
   configuration: new ConfigurationService(BackendApiConfig),
   siteSearch: new SiteSearchService(BackendApiConfig),
+  inspectionSearch: new InspectionSearchService(BackendApiConfig),
 } as const;
 
 export default API;

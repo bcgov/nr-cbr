@@ -28,6 +28,13 @@ import org.hibernate.annotations.Immutable;
  *       substitution deliberately.</li>
  * </ul>
  *
+ * <p><b>Read through a subquery, never an association.</b> Nothing maps a relationship to this
+ * entity: {@code SiteSearchSpecifications.maintainedBy} selects matching client numbers and the site
+ * query tests its own {@code CLIENT_NUMBER} against them. A screen that eventually shows a
+ * maintainer wants a keyed lookup on {@code (CLIENT_NUMBER, CLIENT_LOCN_CODE)} — the pair
+ * {@code CRS_CL_FK1} actually constrains, and the pair legacy's {@code site.jsp} asks for in its own
+ * request — rather than a join into the search.
+ *
  * <p><b>It hides columns, not clients.</b> The definition is {@code SELECT six columns FROM
  * forest_client} with no {@code WHERE} — every row, and its own comment says so: "A view to provide
  * a subset of columns from FOREST_CLIENT". What it withholds is the identifying detail on the

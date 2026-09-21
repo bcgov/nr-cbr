@@ -79,7 +79,6 @@ export const PUBLIC_ROUTES: RouteDescription[] = [
     id: 'Not Found',
     element: <NotFoundPage />,
     isSideMenu: false,
-    errorElement: <GlobalErrorPage />,
   },
 ];
 
@@ -217,17 +216,64 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
       </Layout>
     ),
     isSideMenu: false,
-    errorElement: <GlobalErrorPage />,
   },
 ];
 
 // --- Accessors -----------------------------------------------------------
 
 /** Returns the public (unauthenticated) route array. */
-export const getPublicRoutes = (): RouteDescription[] => PUBLIC_ROUTES;
+export const getPublicRoutes = (): RouteDescription[] => guarded(PUBLIC_ROUTES, PLAIN_ERROR);
 
 /** Returns the route array for an authenticated user with no recognised role. */
-export const getNoRoleRoutes = (): RouteDescription[] => NO_ROLE_ROUTES;
+export const getNoRoleRoutes = (): RouteDescription[] => guarded(NO_ROLE_ROUTES, PLAIN_ERROR);
+
+/**
+ * Gives every route an error boundary.
+ *
+ * <p>React-router only routes an error to the {@link RouteObject#errorElement} of the route that
+ * threw, or the nearest one above it. These routes are flat and siblings, so an `errorElement` on
+ * the `*` catch-all — which is where the two in this file used to sit — covers nothing but the
+ * catch-all itself. Every real page was unprotected, and a throw inside one fell through to
+ * react-router's built-in screen: "Unexpected Application Error!", the message, a stack trace, and
+ * a note addressed to the developer. That is what a user saw when a search result with no
+ * inspection date reached the results table.
+ *
+ * <p>Applied here rather than repeated on each route so that a page added later cannot forget it.
+ * A route that wants its own handling can still set `errorElement` itself — this only fills the gap.
+ *
+ * <p>nr-frep does the same thing in its own `getProtectedRoutes`, and applies it to the protected
+ * set alone. Covering the public and no-role sets too costs nothing and means a crash on the
+ * landing page is not the raw react-router screen either.
+ *
+ * @param errorElement what to show instead of the route — see {@link CHROME_ERROR} and
+ *                     {@link PLAIN_ERROR}, which differ only in whether the app chrome survives
+ */
+const guarded = (routes: RouteDescription[], errorElement: React.ReactNode): RouteDescription[] =>
+  routes.map((route) => ({ errorElement, ...route }));
+
+/**
+ * The error page with the header and side nav still around it, for route sets whose pages carry a
+ * {@link Layout} of their own.
+ *
+ * <p>This is the difference between a contained failure and a dead end. Each protected page
+ * supplies its own `Layout`, so when react-router swaps the failed route for its error element the
+ * navigation goes with it; wrapping it back keeps every other screen one click away. nr-frep wraps
+ * its error element the same way and for the same reason.
+ */
+const CHROME_ERROR = (
+  <Layout>
+    <GlobalErrorPage />
+  </Layout>
+);
+
+/**
+ * The error page on its own, for the public and no-role sets.
+ *
+ * <p>Their pages render without a {@link Layout} — a signed-out user has no side nav to show and no
+ * screens to navigate to — so wrapping here would put app chrome in front of someone who has not
+ * signed in.
+ */
+const PLAIN_ERROR = <GlobalErrorPage />;
 
 /**
  * The protected routes, flattened for react-router.
@@ -242,19 +288,22 @@ export const getNoRoleRoutes = (): RouteDescription[] => NO_ROLE_ROUTES;
  * real layout route would wrap them twice.
  */
 export const getProtectedRoutes = (): RouteDescription[] =>
-  PROTECTED_ROUTES.flatMap((route) => {
-    if (!route.children?.length) return [route];
+  guarded(
+    PROTECTED_ROUTES.flatMap((route) => {
+      if (!route.children?.length) return [route];
 
-    const { children, ...parent } = route;
-    return [
-      parent,
-      ...children.map((child) => ({
-        ...child,
-        // Children carry a path relative to their section, the same way the side nav joins them.
-        path: `${route.path}/${child.path}`,
-      })),
-    ];
-  });
+      const { children, ...parent } = route;
+      return [
+        parent,
+        ...children.map((child) => ({
+          ...child,
+          // Children carry a path relative to their section, the same way the side nav joins them.
+          path: `${route.path}/${child.path}`,
+        })),
+      ];
+    }),
+    CHROME_ERROR,
+  );
 
 /**
  * Side-nav entries for the given roles: the protected routes flagged `isSideMenu` whose `roles`
