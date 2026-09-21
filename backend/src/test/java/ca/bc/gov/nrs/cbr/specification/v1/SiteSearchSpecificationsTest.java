@@ -471,24 +471,33 @@ class SiteSearchSpecificationsTest {
     }
 
     @Test
-    @DisplayName("fetches the client although no column shows it, because @NotFound forces it eager")
-    void clientIsFetchedDespiteNotBeingDisplayed() {
-      // CrossingSiteEntity.client carries @NotFound(IGNORE), which Hibernate cannot honour together
-      // with FetchType.LAZY — it must look for the row before it can choose between an entity and a
-      // null. So the association loads either way; the only question is whether it loads with the
-      // page or one select at a time. Joining it is what makes that answer "with the page".
+    @DisplayName("never joins the client — it is a subquery, and only when filtered on")
+    void clientIsNeverJoined() {
+      // CrossingSiteEntity used to carry a @ManyToOne to the client for this one criterion, marked
+      // LAZY but also @NotFound(IGNORE) — which Hibernate cannot honour together, because it must
+      // look for the row before it can choose between an entity and a null. Nothing on either
+      // search screen displays a maintainer, so it was never fetched, so it loaded one select per
+      // row. The association is gone; the filter is an IN subquery, which touches the view only
+      // when someone actually filters by maintainer.
       givenSupportingRows();
       persist(completeSite("SITE-1").build());
 
       assertThat(CapturingStatementInspector.occurrences(
           sqlFor(SiteSearchCriteria.builder().siteId("SITE").build()), "v_client_public"))
-          .as("joined for the projection even with no maintainer filter")
+          .as("not referenced at all when no maintainer filter is set")
+          .isZero();
+
+      String filtered = sqlFor(SiteSearchCriteria.builder().primaryUserName("CANFOR").build());
+      assertThat(CapturingStatementInspector.occurrences(filtered, "v_client_public"))
+          .as("referenced once, in the subquery, when it is")
           .isEqualTo(1);
-      assertThat(CapturingStatementInspector.occurrences(
-          sqlFor(SiteSearchCriteria.builder().primaryUserName("CANFOR").build()),
-          "v_client_public"))
-          .as("and still only once when it is also filtered on")
-          .isEqualTo(1);
+      // Matched loosely on purpose: Hibernate's exact parenthesisation around a subquery is its
+      // own business and has changed between versions. What this pins is that the view is reached
+      // through an IN rather than a join.
+      assertThat(filtered)
+          .as("as a subquery rather than a join")
+          .containsPattern("client_number in \\(+\\s*select")
+          .doesNotContain("join the.v_client_public");
     }
   }
 }

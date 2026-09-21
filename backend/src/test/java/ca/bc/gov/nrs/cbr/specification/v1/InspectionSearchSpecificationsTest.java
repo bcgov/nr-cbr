@@ -260,10 +260,21 @@ class InspectionSearchSpecificationsTest {
     @DisplayName("an inspection whose site has no org unit is still returned")
     void orgUnitIsOptional() {
       // Divergence 3: legacy INNER JOINs CBR_ORG_UNIT, so a site pointing at an org unit the view
-      // has no branch for disappears from the results entirely. Here it appears with a blank code.
-      givenCompleteInspection(1L, "SUB");
+      // has no branch for disappears from the results entirely. Here it appears, with a blank
+      // District Code — which is what the legacy screen shows for such a site anyway, when it shows
+      // it at all.
+      //
+      // The site is built here rather than through givenSite() because that helper always points at
+      // a district; the whole point of this case is a site that does not.
+      entityManager.persist(CrossingSiteEntity.builder()
+          .crossingSiteId("site-orphan")
+          .crossingName("Deadman Creek")
+          .orgUnitNo(null)
+          .build());
+      givenStructure(300L, "BR000003", "site-orphan");
+      givenInspection(2L, 300L, LocalDate.of(2026, 6, 15), "SUB");
 
-      assertThat(search(criteria().siteId("site-1").build())).containsExactly(1L);
+      assertThat(search(criteria().siteId("site-orphan").build())).containsExactly(2L);
     }
 
     @Test

@@ -37,9 +37,18 @@ import org.hibernate.annotations.NotFoundAction;
  * numbers and the audit stamps are left off until a screen reads them.
  *
  * <h2>Every association is optional, and that is load-bearing</h2>
- * Legacy joins all four with {@code LEFT OUTER JOIN}. A site with no status, no org unit, no road
- * section or no client must still appear in the results — "incomplete data" is a thing users
- * deliberately search for, and it is exactly those sites whose joins are empty. Any query built on
+ * Legacy joins these with {@code LEFT OUTER JOIN}. A site with no status, no org unit or no road
+ * section must still appear in the results — "incomplete data" is a thing users deliberately search
+ * for, and it is exactly those sites whose joins are empty.
+ *
+ * <p><b>There is deliberately no association to the client.</b> The "Designated Maintainer"
+ * criterion matches on the client's name, and it used to do so through a {@code @ManyToOne} here.
+ * That mapping loaded on every row of every search whether or not anyone filtered on it — marked
+ * {@code FetchType.LAZY}, but also {@code @NotFound(IGNORE)}, which Hibernate cannot honour at the
+ * same time — and nothing on any screen displays a maintainer, so it was never fetched and loaded
+ * one select at a time. It was also keyed on {@code CLIENT_NUMBER} alone where the real constraint
+ * is the pair with {@code CLIENT_LOCN_CODE}. The criterion is a subquery now; see
+ * {@code SiteSearchSpecifications.maintainedBy}. Any query built on
  * this entity has to say {@code JoinType.LEFT} explicitly: a path expression such as
  * {@code root.get("orgUnit").get("orgUnitCode")} produces an <em>inner</em> join and silently drops
  * the very rows the "Incomplete Data?" filter exists to find.
@@ -47,7 +56,7 @@ import org.hibernate.annotations.NotFoundAction;
 @Entity
 @Table(name = "CROSSING_SITE", schema = "THE")
 @Getter
-@ToString(exclude = {"status", "orgUnit", "roadSection", "client"})
+@ToString(exclude = {"status", "orgUnit", "roadSection"})
 @EqualsAndHashCode(of = "crossingSiteId")
 @NoArgsConstructor
 @AllArgsConstructor
@@ -167,27 +176,4 @@ public class CrossingSiteEntity {
       foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
   private CbrRoadSectionEntity roadSection;
 
-  /**
-   * Used only by the "Designated Maintainer" criterion, which matches on the client's name.
-   *
-   * <p>{@code NO_CONSTRAINT} because {@code V_CLIENT_PUBLIC} is a view and nothing can key to it.
-   * The real constraint on this column is {@code CRS_CL_FK1}, a composite key over
-   * {@code (CLIENT_NUMBER, CLIENT_LOCN_CODE)} pointing at {@code CLIENT_LOCATION} — which in turn
-   * keys to {@code FOREST_CLIENT} via {@code CL_FC_FK}. So a non-null client number does resolve,
-   * transitively, and the view withholds no rows: it is {@code SELECT six columns FROM
-   * forest_client} with no filter.
-   *
-   * <p>{@code @NotFound(IGNORE)} is kept regardless, for a narrower reason than the road section's.
-   * Hibernate cannot see a guarantee that runs through a table this mapping never mentions, so it
-   * builds a lazy proxy and throws {@code EntityNotFoundException} the moment the results mapping
-   * reads one that is missing. The guarantee also holds only while the data does: this is a view
-   * over a table CBR does not own, reached through a constraint on a column pair only half of which
-   * is mapped here. A search returning a 500 because one site's client went missing is a poor trade
-   * against a cell rendering empty.
-   */
-  @ManyToOne(fetch = FetchType.LAZY)
-  @NotFound(action = NotFoundAction.IGNORE)
-  @JoinColumn(name = "CLIENT_NUMBER", insertable = false, updatable = false,
-      foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
-  private ClientPublicEntity client;
 }

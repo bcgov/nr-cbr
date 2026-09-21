@@ -102,7 +102,6 @@ public final class InspectionSearchSpecifications {
   private static final String SITE = "site";
   private static final String ORG_UNIT = "orgUnit";
   private static final String ROAD_SECTION = "roadSection";
-  private static final String CLIENT = "client";
 
   /* Columns on CROSSING_STRUCTURE. */
   private static final String STRUCTURE_NAME = "crossingStructureName";
@@ -113,7 +112,6 @@ public final class InspectionSearchSpecifications {
   private static final String SITE_ID = "crossingSiteId";
   private static final String FOREST_FILE_ID = "forestFileId";
   private static final String ROAD_SECTION_ID = "roadSectionId";
-  private static final String CROSSING_NAME = "crossingName";
   private static final String KILOMETRES = "pointOfCommencementDistance";
   private static final String ORG_UNIT_NO = "orgUnitNo";
   private static final String MANAGEMENT_ORG_UNIT_NO = "managementOrgUnitNo";
@@ -216,14 +214,6 @@ public final class InspectionSearchSpecifications {
       From<?, ?> orgUnit = joinOrFetch(site, ORG_UNIT, JoinType.LEFT, projecting);
       if (projecting) {
         joinOrFetch(status, STATUS_CODE, JoinType.LEFT, true);
-        // No column of this screen shows the site's designated maintainer, and no criterion filters
-        // on it — but {@code CrossingSiteEntity.client} carries {@code @NotFound(IGNORE)}, which
-        // Hibernate cannot honour alongside {@code FetchType.LAZY}: it has to look for the row
-        // before it can choose between an entity and a null. So the association loads whatever the
-        // fetch type says, and the only question is whether it loads with the page or one select at
-        // a time. This makes it the page. Site Search inherits the same problem from the same
-        // mapping and answers it the same way.
-        joinOrFetch(site, CLIENT, JoinType.LEFT, true);
       }
 
       contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
