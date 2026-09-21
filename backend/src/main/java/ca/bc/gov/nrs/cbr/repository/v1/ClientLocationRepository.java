@@ -72,6 +72,33 @@ public interface ClientLocationRepository
       @Param("clientNumber") String clientNumber, Pageable limit);
 
   /**
+   * One maintainer, by the pair a site records.
+   *
+   * <p>Not restricted to maintainers in use, unlike the two lookups above: this is asked *because*
+   * a site names it, so the restriction is already satisfied — and a site pointing at a location
+   * that has since been removed should still say who it points at rather than nothing.
+   *
+   * <p>A list rather than one row: nothing constrains {@code V_CLIENT_PUBLIC} to a single row per
+   * client number, and a duplicate there would turn a detail screen into a 500 for a reason that
+   * has nothing to do with the site.
+   */
+  @Query("""
+      SELECT new ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult(
+               location.clientNumber,
+               location.clientLocnCode,
+               client.clientName,
+               location.clientLocnName,
+               location.city)
+        FROM ClientLocationEntity location
+        JOIN ClientPublicEntity client
+          ON client.clientNumber = location.clientNumber
+       WHERE location.clientNumber = :clientNumber
+         AND location.clientLocnCode = :clientLocnCode
+      """)
+  List<ClientLookupResult> findMaintainer(
+      @Param("clientNumber") String clientNumber, @Param("clientLocnCode") String clientLocnCode);
+
+  /**
    * By name, division or city — a case-insensitive contains match on each.
    *
    * <p><b>{@code UPPER} on both sides, which is legacy's behaviour and not this application's

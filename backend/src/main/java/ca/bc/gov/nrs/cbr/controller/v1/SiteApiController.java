@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.endpoint.v1.SiteApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.SiteSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.SiteService;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,11 @@ public class SiteApiController implements SiteApiEndpoint {
   public ResponseEntity<PagedResponse<SiteSearchResult>> searchSites(
       SiteSearchCriteria criteria, int pageNumber, int pageSize) {
     return ResponseEntity.ok(siteSearchService.search(criteria, pageNumber, pageSize));
+  }
+
+  @Override
+  public ResponseEntity<SiteDetailResponse> getSite(String siteId) {
+    return ResponseEntity.ok(siteService.findById(siteId));
   }
 
   @Override
