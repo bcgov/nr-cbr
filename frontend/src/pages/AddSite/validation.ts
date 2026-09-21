@@ -40,61 +40,65 @@ const ALWAYS_REQUIRED = {
 const blank = (value: string) => value.trim() === '';
 
 /**
- * Per-field messages: what is missing, and what is the wrong shape.
+ * The fields that must be filled in, each judged on its own.
  *
- * <p>Beside the box rather than at the top of the page. Legacy collects every one of these into a
- * single `ActionMessages.GLOBAL_MESSAGE` list rendered above the form, so a user with three
- * problems reads three sentences and then has to find the three boxes they name.
- *
- * <p>`mode` decides whether the "too little" rules run — see {@link ValidationMode}. Everything
- * here is one rule set either way, so what the form says while the user types can never contradict
- * what it says when they press Save.
+ * <p>Three of them are conditional, and the condition is the site type: a storage site has no
+ * crossing to name and no point on a road to measure to, and a recreation site is identified by
+ * its project rather than by a district's road network. Legacy applies the same three exemptions.
  */
-export const fieldErrors = (site: SiteFormValues, mode: ValidationMode = 'settled'): SiteErrors => {
+const requiredErrors = (site: SiteFormValues): SiteErrors => {
   const errors: SiteErrors = {};
-  const settled = mode === 'settled';
 
-  // Required: the archetypal "too little" rule. An empty box is where every field starts, so
-  // saying so on the first keystroke would mark the form red for filling it in normally.
-  if (settled) {
-    for (const [field, label] of Object.entries(ALWAYS_REQUIRED)) {
-      if (blank(site[field as keyof SiteFormValues] as string)) {
-        errors[field as keyof SiteFormValues] = `${label} is required.`;
-      }
+  for (const [field, label] of Object.entries(ALWAYS_REQUIRED)) {
+    if (blank(site[field as keyof SiteFormValues] as string)) {
+      errors[field as keyof SiteFormValues] = `${label} is required.`;
     }
-
-    // A storage site holds portable structures rather than spanning anything, so it has no
-    // crossing to name and no point on a road to measure to.
-    const isStorage = site.crossingSiteTypeCode === SITE_TYPE.STORAGE;
-    if (!isStorage && blank(site.crossingName)) {
-      errors.crossingName = 'Crossing Name is required.';
-    }
-    if (!isStorage && blank(site.pointOfCommencementDistance)) {
-      errors.pointOfCommencementDistance = 'Kilometres is required.';
-    }
-
-    // A recreation site is identified by its project, not by a district's road network.
-    if (site.crossingSiteTypeCode !== SITE_TYPE.RECREATION && blank(site.orgUnitNo)) {
-      errors.orgUnitNo = 'Forest District is required.';
-    }
-
-    Object.assign(errors, missingCoordinates(site));
   }
 
+  const conditional: [keyof SiteFormValues, string, boolean][] = [
+    ['crossingName', 'Crossing Name', site.crossingSiteTypeCode !== SITE_TYPE.STORAGE],
+    ['pointOfCommencementDistance', 'Kilometres', site.crossingSiteTypeCode !== SITE_TYPE.STORAGE],
+    ['orgUnitNo', 'Forest District', site.crossingSiteTypeCode !== SITE_TYPE.RECREATION],
+  ];
+  for (const [field, label, applies] of conditional) {
+    if (applies && blank(site[field] as string)) {
+      errors[field] = `${label} is required.`;
+    }
+  }
+
+  return Object.assign(errors, missingCoordinates(site));
+};
+
+/**
+ * The two kilometre boxes, which must hold a decimal that fits `NUMBER(8,2)`.
+ *
+ * <p>`"12."` is a number half written, so it is left alone until the user moves on. `"12.345"` and
+ * `"abc"` are not — no further typing rescues either, and the third decimal place is gone the
+ * moment it is typed.
+ */
+const kilometreErrors = (site: SiteFormValues, mode: ValidationMode): SiteErrors => {
+  const errors: SiteErrors = {};
+
   for (const field of ['pointOfCommencementDistance', 'userKm'] as const) {
-    const value = site[field];
-    if (blank(value)) continue;
-    // "12." is a number half written, so it is left alone until the user moves on. "12.345" and
-    // "abc" are not — no further typing rescues either, and the third decimal place is gone the
-    // moment it is typed.
-    if (!settled && isNumberInProgress(value)) continue;
-    if (!KILOMETRE.test(value.trim())) {
+    const value = site[field].trim();
+    const halfWritten = mode === 'typing' && isNumberInProgress(value);
+    if (value !== '' && !halfWritten && !KILOMETRE.test(value)) {
       errors[field] = 'Must be a number, e.g. 12.5';
     }
   }
 
-  // Over the column's byte limit. The counter beside the field has been saying so as the user
-  // typed; this is what stops the save, because nothing truncates on their behalf.
+  return errors;
+};
+
+/**
+ * Free text past the byte limit of the column behind it.
+ *
+ * <p>The counter beside the field has been saying so as the user typed; this is what stops the
+ * save, because nothing truncates on their behalf.
+ */
+const textLimitErrors = (site: SiteFormValues): SiteErrors => {
+  const errors: SiteErrors = {};
+
   for (const [field, limit] of Object.entries(SITE_TEXT_LIMITS)) {
     const message = overLimitError(site[field as keyof SiteFormValues] as string, limit);
     if (message) {
@@ -102,9 +106,35 @@ export const fieldErrors = (site: SiteFormValues, mode: ValidationMode = 'settle
     }
   }
 
-  Object.assign(errors, coordinateErrors(site, mode));
   return errors;
 };
+
+/**
+ * Per-field messages: what is missing, and what is the wrong shape.
+ *
+ * <p>Beside the box rather than at the top of the page. Legacy collects every one of these into a
+ * single `ActionMessages.GLOBAL_MESSAGE` list rendered above the form, so a user with three
+ * problems reads three sentences and then has to find the three boxes they name.
+ *
+ * <p>`mode` decides whether the "too little" rules run — see {@link ValidationMode}. Those are the
+ * required ones, and they are the whole of what `'typing'` leaves out: an empty box is where every
+ * field starts, so saying so on the first keystroke would mark the form red for anyone filling it
+ * in normally. Everything here is one rule set either way, so what the form says while the user
+ * types can never contradict what it says when they press Save.
+ *
+ * <p><b>Order is load-bearing.</b> The range rules come last so that a specific complaint wins
+ * over a general one on the same box — degrees out of range while seconds is still blank reads as
+ * "must be 0–90", not "Latitude is required".
+ */
+export const fieldErrors = (
+  site: SiteFormValues,
+  mode: ValidationMode = 'settled',
+): SiteErrors => ({
+  ...(mode === 'settled' ? requiredErrors(site) : {}),
+  ...kilometreErrors(site, mode),
+  ...textLimitErrors(site),
+  ...coordinateErrors(site, mode),
+});
 
 /** Longitude and Latitude, each as its three parts. */
 const COORDINATES = [

@@ -41,12 +41,10 @@ const UnsavedChangesGuard: FC = () => {
     if (!isDirty) {
       return;
     }
-    // `preventDefault` is the modern form; the returnValue assignment is what older browsers read.
-    // Neither can set the message — every browser shows its own — so nothing here tries to.
-    const confirmUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
+    // `preventDefault` alone. Assigning `returnValue` is the older way of saying the same thing
+    // and is deprecated; every browser this application supports acts on the cancellation. Neither
+    // form can set the message — the browser supplies its own — so nothing here tries to.
+    const confirmUnload = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', confirmUnload);
     return () => window.removeEventListener('beforeunload', confirmUnload);
   }, [isDirty]);

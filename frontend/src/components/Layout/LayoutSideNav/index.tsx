@@ -40,8 +40,12 @@ export const LayoutSideNav: FC = () => {
   const menuEntries =
     online && isLoggedIn ? getMenuEntries(user?.roles || []) : getOfflineMenuEntries();
 
-  const childPath = (parentPath: string, child: MenuItem) =>
-    `${parentPath}${child.path ? `/${child.path}` : ''}`;
+  const childPath = (parentPath: string, child: MenuItem) => {
+    // The suffix on its own line rather than a template nested inside a template. A child with no
+    // path of its own is the section's own path — it is the section's index route.
+    const suffix = child.path ? `/${child.path}` : '';
+    return `${parentPath}${suffix}`;
+  };
 
   /** The child of this section the user is on, if they are on one. */
   const activeChild = (route: MenuItem) =>
