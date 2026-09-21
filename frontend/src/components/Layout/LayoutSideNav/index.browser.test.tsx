@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { page } from '@vitest/browser/context';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, it, expect, vi } from 'vitest';
@@ -12,11 +12,15 @@ const { envMock } = vi.hoisted(() => ({ envMock: {} as Record<string, string> })
 vi.mock('@/env', () => ({ env: envMock }));
 
 // Mutable so a case can collapse the nav; defaults to expanded like every existing case assumes.
-const { layoutMock } = vi.hoisted(() => ({ layoutMock: { isSideNavExpanded: true } }));
+const { layoutMock, openSideNav } = vi.hoisted(() => ({
+  layoutMock: { isSideNavExpanded: true },
+  openSideNav: vi.fn(),
+}));
 vi.mock('@/context/layout/useLayout', () => ({
   useLayout: () => ({
     isSideNavExpanded: layoutMock.isSideNavExpanded,
     closeSideNav: () => {},
+    openSideNav,
   }),
 }));
 
@@ -67,6 +71,7 @@ const MOBILE: [number, number] = [390, 844];
 describe('LayoutSideNav', () => {
   afterEach(async () => {
     layoutMock.isSideNavExpanded = true;
+    openSideNav.mockClear();
     await page.viewport(DESKTOP[0], DESKTOP[1]);
   });
 
@@ -139,28 +144,50 @@ describe('LayoutSideNav', () => {
 
   /**
    * The rail is 48px wide and hides both the submenu and its chevron, so a section rendered as
-   * Carbon's `SideNavMenu` would be a button toggling a list that can never appear — the user
-   * presses the icon and nothing happens, which is exactly what was reported. In the rail the
-   * section is a link instead, to its own path, which redirects to its first child.
+   * Carbon's `SideNavMenu` is a button toggling a list that can never appear — press the icon and
+   * nothing happens. It expands the nav instead.
    */
-  it('makes a collapsed section navigate rather than toggle a submenu that cannot open', async () => {
+  it('expands the nav when a collapsed section is pressed, rather than navigating', async () => {
     layoutMock.isSideNavExpanded = false;
     await renderWithProviders('/dashboard');
 
-    const section = screen.getByTestId('side-nav-link-Settings');
-    expect(section.tagName).toBe('A');
-    expect(section).toHaveAttribute('href', '/settings');
-    // The disclosure button is gone, so there is nothing left that swallows the click.
-    expect(document.querySelector('.cds--side-nav__submenu')).toBeNull();
+    const section = screen.getByTestId('side-nav-section-Settings');
+    // A button, not a link: a section stands for several pages and its icon names none of them, so
+    // there is no page a press could go to that would not be a guess.
+    expect(section.tagName).toBe('BUTTON');
+    expect(section).not.toHaveAttribute('href');
+
+    fireEvent.click(section);
+
+    expect(openSideNav).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the section and the page within it, which is all the rail can show', async () => {
+    // One icon stands for the whole section, so without the second half the user cannot tell which
+    // of its pages they are on. The label is also the tooltip — the rail stylesheet floats this
+    // same element beside the icon on hover.
+    layoutMock.isSideNavExpanded = false;
+    await renderWithProviders('/settings/profile');
+
+    expect(screen.getByTestId('side-nav-section-Settings')).toHaveTextContent('Settings: Profile');
+  });
+
+  it('names the section alone when the user is not on any of its pages', async () => {
+    layoutMock.isSideNavExpanded = false;
+    await renderWithProviders('/dashboard');
+
+    const section = screen.getByTestId('side-nav-section-Settings');
+    expect(section).toHaveTextContent('Settings');
+    expect(section).not.toHaveTextContent(':');
   });
 
   it('lights the collapsed section for a child route, whose path it never exactly matches', async () => {
     // `/settings` is never the address bar's value — it redirects to `/settings/profile` — so the
-    // rail link has to match on the prefix or the user loses every trace of where they are.
+    // rail control has to match on the prefix or the user loses every trace of where they are.
     layoutMock.isSideNavExpanded = false;
     await renderWithProviders('/settings/profile');
 
-    expect(screen.getByTestId('side-nav-link-Settings')).toHaveClass(
+    expect(screen.getByTestId('side-nav-section-Settings')).toHaveClass(
       'cds--side-nav__link--current',
     );
   });

@@ -30,7 +30,7 @@ export const LayoutSideNav: FC = () => {
    * container start, and reading it here keeps the component testable without module resets.
    */
   const supportEmail = env.VITE_SUPPORT_EMAIL?.trim() ?? '';
-  const { isSideNavExpanded } = useLayout();
+  const { isSideNavExpanded, openSideNav } = useLayout();
   const location = useLocation();
   const { user, isLoggedIn } = useAuth();
   const online = useOnlineStatus();
@@ -40,31 +40,70 @@ export const LayoutSideNav: FC = () => {
   const menuEntries =
     online && isLoggedIn ? getMenuEntries(user?.roles || []) : getOfflineMenuEntries();
 
-  /**
-   * An entry as a link.
-   *
-   * <p>`isActive` is an exact match for a leaf and a prefix match for a section, because a
-   * section's own path is never the address the user is on — `/inventory` redirects straight to
-   * `/inventory/site-search` — so an exact test would leave the rail with nothing lit.
-   */
-  const renderMenuLink = (route: MenuItem, isSection = false) => (
+  const childPath = (parentPath: string, child: MenuItem) => {
+    // The suffix on its own line rather than a template nested inside a template. A child with no
+    // path of its own is the section's own path — it is the section's index route.
+    const suffix = child.path ? `/${child.path}` : '';
+    return `${parentPath}${suffix}`;
+  };
+
+  /** The child of this section the user is on, if they are on one. */
+  const activeChild = (route: MenuItem) =>
+    route.children?.find((child) => childPath(route.path, child) === location.pathname);
+
+  /** A leaf entry: a link straight to its page. */
+  const renderMenuLink = (route: MenuItem) => (
     <SideNavLink
       data-testid={`side-nav-link-${route.id}`}
       key={route.id}
       as={Link}
       to={route.path}
-      isActive={
-        isSection ? location.pathname.startsWith(route.path) : route.path === location.pathname
-      }
+      isActive={route.path === location.pathname}
       renderIcon={route.icon}
     >
       {route.id}
     </SideNavLink>
   );
 
+  /**
+   * A section in the collapsed rail: a button that expands the nav, and nothing else.
+   *
+   * <p><b>It deliberately does not navigate.</b> A section has several pages under it and the icon
+   * names none of them, so going anywhere would be picking one on the user's behalf — and the page
+   * they wanted would be one they had to leave again. Expanding is the only move that answers what
+   * the press actually asked, which is "show me what is in here".
+   *
+   * <p><b>The label carries both levels</b> — "Inventory: Add Site" — because the rail shows one
+   * icon for a section and the user otherwise has no way to tell which of its pages they are on.
+   * The label is also the tooltip: the rail stylesheet takes this same element out of flow and
+   * floats it beside the icon on hover, so what is written here is what is read there.
+   *
+   * <p>Rendered through `SideNavLink` as a `button` rather than as a bare element of its own, so it
+   * inherits every rail rule already written for a link — the icon centring, the tooltip, the
+   * active highlight — instead of a second copy of them that could drift.
+   */
+  const renderRailSection = (route: MenuItem) => {
+    const current = activeChild(route);
+    return (
+      <SideNavLink
+        data-testid={`side-nav-section-${route.id}`}
+        key={route.id}
+        as="button"
+        type="button"
+        // Prefix, not an exact match: a section's own path is never the address the user is on —
+        // `/inventory` redirects to a child — so an exact test would leave the rail unlit.
+        isActive={location.pathname.startsWith(route.path)}
+        renderIcon={route.icon}
+        // Accurate as written: this only ever renders while the nav is collapsed.
+        aria-expanded={false}
+        onClick={openSideNav}
+      >
+        {current ? `${route.id}: ${current.id}` : route.id}
+      </SideNavLink>
+    );
+  };
+
   const renderMenuItem = (route: MenuItem) => {
-    const childPath = (parentPath: string, route: MenuItem) =>
-      `${parentPath}${route.path ? `/${route.path}` : ''}`;
     return (
       <SideNavMenu
         data-testid={`side-nav-menu-${route.id}`}
@@ -101,17 +140,16 @@ export const LayoutSideNav: FC = () => {
       className={`side-nav-drawer${isSideNavExpanded ? ' side-nav-drawer--open' : ''}`}
     >
       <SideNavItems>
-        {/* A section is a disclosure in the panel and a plain link in the rail.
+        {/* A section is a disclosure in the panel and a button in the rail.
             `SideNavMenu` is a <button> that toggles a nested list, and at 48px wide there is
             nowhere for that list to go — the rail stylesheet hides both the list and its chevron —
-            so pressing the icon would expand something that can never appear and the user would
-            get no navigation at all. As a link it goes to the section's own path, which redirects
-            to its first child (see routePaths), so the icon lands where it looks like it should. */}
-        {menuEntries.map((route) =>
-          route.children && isSideNavExpanded
-            ? renderMenuItem(route)
-            : renderMenuLink(route, Boolean(route.children)),
-        )}
+            so pressing the icon would expand something that can never appear. In the rail it
+            becomes a control that opens the nav instead, which is the only thing a section icon
+            can honestly promise when it stands for several pages. */}
+        {menuEntries.map((route) => {
+          if (!route.children) return renderMenuLink(route);
+          return isSideNavExpanded ? renderMenuItem(route) : renderRailSection(route);
+        })}
         {/* Support — pinned to the bottom of the nav regardless of how many role-dependent entries
             render above it (see the flex rules in index.scss). A plain mailto: rather than a route:
             it opens the user's own mail client with the shared mailbox pre-addressed. The app tells

@@ -2,6 +2,7 @@ import { Inspection as InspectionIcon, Location as LocationIcon } from '@carbon/
 import { Navigate, type RouteObject } from 'react-router-dom';
 
 import Layout from '@/components/Layout';
+import AddSitePage from '@/pages/AddSite';
 import AuthCallbackPage from '@/pages/AuthCallback';
 import GlobalErrorPage from '@/pages/GlobalError';
 import InspectionSearchPage from '@/pages/InspectionSearch';
@@ -149,6 +150,29 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         isSideMenu: true,
         // Legacy gate: /showSiteSearch, which every role that can read holds.
         roles: [...ROLE_CAPABILITIES.read],
+      },
+      {
+        // Second in the legacy Inventory menu, between Site Search and Structure Search
+        // (cbr-navigation.local.md §1).
+        //
+        // TWO GATES, as legacy has: the link points at `/showSite` but the menu wraps it in
+        // `<cbr:authorize grantedAction="/addSite">`, so both view *and* create are needed for it
+        // to appear — the link opens a blank form, and offering that to someone who cannot save it
+        // is a dead end. `/showSite` sits at the GENERAL floor and `/addSite` at LEVEL_2, and the
+        // profiles nest, so the pair resolves to LEVEL_2. That is `destructive` here, which is
+        // named for its commonest members but is defined as exactly the LEVEL_2 privilege set —
+        // add site included. It excludes CBR_ADMIN, which holds `/showSite` and writes nothing.
+        path: 'add-site',
+        id: 'Add Site',
+        element: (
+          <ProtectedRoute>
+            <Layout>
+              <AddSitePage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: true,
+        roles: [...ROLE_CAPABILITIES.destructive],
       },
       {
         // Reached from a site number in the search results, not from the side menu — hence

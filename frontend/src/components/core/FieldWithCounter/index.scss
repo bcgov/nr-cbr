@@ -1,0 +1,40 @@
+@use '../../../styles/variables' as vars;
+
+.cbr-field {
+  position: relative;
+
+  .#{vars.$bcgov-prefix}--form-item {
+    margin-block-end: 0;
+  }
+
+  // Room for the count parked at the end of the label's line, so a long label runs out of width
+  // before it runs into the number rather than overlapping it.
+  .#{vars.$bcgov-prefix}--label {
+    padding-inline-end: 5rem;
+  }
+}
+
+// On the label's line, not below the field: the count belongs to the label that names the limit,
+// and out of flow it costs no height — under the field it sits marooned in the gap to whatever
+// comes next. Anchored to `.cbr-field`, whose first line box is the label's.
+.cbr-field__footer {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cbr-field__counter {
+  flex-shrink: 0;
+  color: var(--cds-text-secondary, #525252);
+  font-size: 0.75rem;
+  // Digits stop jittering as the count changes, which they do on every keystroke.
+  font-variant-numeric: tabular-nums;
+  line-height: 1rem;
+
+  &--over {
+    color: var(--cds-text-error, #da1e28);
+    font-weight: 600;
+  }
+}

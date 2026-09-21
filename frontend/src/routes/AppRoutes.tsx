@@ -3,6 +3,7 @@ import { Suspense, useEffect, useMemo, type FC } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 
 import { LayoutProvider } from '@/context/layout/LayoutProvider';
+import { UnsavedChangesProvider } from '@/context/unsavedChanges/UnsavedChangesProvider';
 import { getNoRoleRoutes, getProtectedRoutes, getPublicRoutes } from '@/routes/routePaths';
 
 import { useAuth } from '@/context/auth/useAuth';
@@ -58,15 +59,20 @@ const AppRoutes: FC = () => {
     // Above the router on purpose: each route mounts its own <Layout>, so layout state held inside
     // one would reset on every navigation (the side nav springing back open mid-task).
     <LayoutProvider>
-      <Suspense fallback={displayLoading()}>
-        {/* Keyed so a change of route set remounts the provider. RouterProvider subscribes to the
+      {/* Above the router for the same reason as LayoutProvider: the flag has to outlive the
+          navigation it is blocking, and a provider mounted per route would be torn down by exactly
+          the transition it exists to intercept. */}
+      <UnsavedChangesProvider>
+        <Suspense fallback={displayLoading()}>
+          {/* Keyed so a change of route set remounts the provider. RouterProvider subscribes to the
             router it is first given and ignores a later one, so swapping the prop alone left the
             previous set's page on screen. Every other transition between sets happens through a
             full page load (the OAuth redirect, the end-session redirect), which hides this — until
             an in-place set swap is needed, as nr-frep found with offline sign-out. Only fires when
             the set changes, never on navigation. */}
-        <RouterProvider key={routeSetId} router={browserRouter} />
-      </Suspense>
+          <RouterProvider key={routeSetId} router={browserRouter} />
+        </Suspense>
+      </UnsavedChangesProvider>
     </LayoutProvider>
   );
 };

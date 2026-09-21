@@ -39,9 +39,34 @@ describe('getMenuEntries', () => {
     (role) => {
       // /showSiteSearch sits at the GENERAL floor, and CBR_ADMIN gained read in the 2026-09-15
       // decision, so there is no CBR role that can sign in and not see this.
-      expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).toEqual(['Site Search']);
+      expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).toContain('Site Search');
     },
   );
+
+  it.each(['CBR_LEVEL_2', 'CBR_PENG'])('shows Add Site to %s', (role) => {
+    // Add Site carries two gates — /showSite to open the blank form and /addSite to save it — and
+    // the profiles nest, so the pair resolves to the higher of the two, LEVEL_2. CBR_PENG bundles
+    // LEVEL_2 and so holds it as well.
+    expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).toContain('Add Site');
+  });
+
+  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_ADMIN'])(
+    'hides Add Site from %s',
+    (role) => {
+      // CBR_LEVEL_1 is the one worth stating: it holds /saveSite and can edit an existing site,
+      // but /addSite is a LEVEL_2 privilege — legacy groups creating a site with the deletes and
+      // the status override, not with the ordinary edits. CBR_ADMIN can read every site and write
+      // none.
+      expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).not.toContain('Add Site');
+    },
+  );
+
+  it('orders the Inventory items as the legacy menu did — Site Search, then Add Site', () => {
+    expect(entry(['CBR_LEVEL_2'], 'Inventory')?.children?.map((c) => c.id)).toEqual([
+      'Site Search',
+      'Add Site',
+    ]);
+  });
 
   it('offers Inspection with Inspection Search beneath it to a reader', () => {
     const inspection = entry(['CBR_GENERAL'], 'Inspection');
