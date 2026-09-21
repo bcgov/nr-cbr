@@ -147,11 +147,22 @@
   }
 
   // ── Sections in the rail ───────────────────────────────────────────────────
-  // Nothing here. A section is a `SideNavMenu` — <button class="__submenu"> wrapping a nested
-  // <ul class="__menu"> — only while the nav is open; in the rail LayoutSideNav renders it as a
-  // `SideNavLink` instead, because a disclosure with nowhere to disclose into navigates nowhere.
-  // So the rail rules above, written for links, are all a section needs, and Carbon's own
-  // `__link--current` paints the active one.
+  // A section is a `SideNavMenu` — <button class="__submenu"> wrapping a nested <ul class="__menu">
+  // — only while the nav is open. In the rail LayoutSideNav renders it through `SideNavLink` as a
+  // <button> that expands the nav, so every rule above applies to it unchanged: the icon centring,
+  // the tooltip built from `__link-text`, and Carbon's own `__link--current` on the active one.
+  //
+  // What those rules do not cover is that it is a <button> and not an <a>, which arrives with user
+  // agent chrome of its own — a border, a grey face and a centred 13px system font.
+  button.#{vars.$bcgov-prefix}--side-nav__link {
+    inline-size: 100%;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: start;
+  }
 }
 
 // ── Row metrics ────────────────────────────────────────────────────────────

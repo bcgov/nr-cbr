@@ -9,6 +9,8 @@ const TestComponent = () => {
   const {
     isSideNavExpanded,
     toggleSideNav,
+    openSideNav,
+    closeSideNav,
     isHeaderPanelOpen,
     toggleHeaderPanel,
     closeHeaderPanel,
@@ -29,6 +31,8 @@ const TestComponent = () => {
       <span data-testid="side-nav">{sideNav ? 'expanded' : 'collapsed'}</span>
       <span data-testid="header-panel">{headerPanel ? 'open' : 'closed'}</span>
       <button onClick={toggleSideNav}>Toggle SideNav</button>
+      <button onClick={openSideNav}>Open SideNav</button>
+      <button onClick={closeSideNav}>Close SideNav</button>
       <button onClick={toggleHeaderPanel}>Toggle HeaderPanel</button>
       <button onClick={closeHeaderPanel}>Close HeaderPanel</button>
     </>
@@ -62,6 +66,22 @@ describe('LayoutContext', () => {
     expect(value.textContent).not.toBe(initial);
     act(() => btn.click());
     expect(value.textContent).toBe(initial);
+  });
+
+  it('openSideNav only ever opens, however many times it is pressed', async () => {
+    // The rail's section buttons call this, and they render only while the nav is collapsed. A
+    // toggle in their place would close the nav again on a second press — the opposite of what a
+    // control that says "show me what is in here" promises.
+    await renderWithProvider();
+    const value = screen.getByTestId('side-nav');
+
+    act(() => screen.getByText('Close SideNav').click());
+    expect(value.textContent).toBe('collapsed');
+
+    act(() => screen.getByText('Open SideNav').click());
+    expect(value.textContent).toBe('expanded');
+    act(() => screen.getByText('Open SideNav').click());
+    expect(value.textContent).toBe('expanded');
   });
 
   it('toggleHeaderPanel and closeHeaderPanel work as expected', async () => {

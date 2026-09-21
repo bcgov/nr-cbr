@@ -342,7 +342,12 @@ $types: "error", "info", "success", "warning";
 .required-asterisk {
   color: var(--#{variables.$bcgov-prefix}-text-error);
   font-size: 1.1rem;
-  line-height: 1;
+  /* Zero, not 1. At 1.1rem the marker's own line box is taller than the 0.75rem label it sits in,
+     so it grew the label and pushed the input beneath it down — a required field's box sat a few
+     pixels lower than the optional one beside it, and a row of fields no longer lined up. With no
+     line height the glyph paints outside the line box rather than growing it, which is what
+     `vertical-align: middle` then centres it on. */
+  line-height: 0;
   vertical-align: middle;
 }
 

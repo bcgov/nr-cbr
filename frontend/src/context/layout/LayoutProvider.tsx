@@ -25,6 +25,7 @@ const LayoutStateProvider = ({ children }: { children: React.ReactNode }) => {
         isSideNavExpanded,
         toggleSideNav: () => setSideNavExpanded((prev) => !prev),
         closeSideNav: () => setSideNavExpanded(false),
+        openSideNav: () => setSideNavExpanded(true),
         isHeaderPanelOpen,
         toggleHeaderPanel: () => setHeaderPanelOpen((prev) => !prev),
         closeHeaderPanel: () => setHeaderPanelOpen(false),
