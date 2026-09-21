@@ -50,31 +50,45 @@ const renderTable = (
 };
 
 describe('InspectionSearchResults', () => {
-  it('shows every column the legacy table does', () => {
+  it('shows every column the legacy table does, in the order the screen arranges them', () => {
+    // Order, not just presence — the previous version of this test looped over the names and
+    // asserted each was somewhere on the page, so it went on passing when the columns were
+    // rearranged. District and road lead, because they are what a reader scans down to find a
+    // crossing; the status sits last, beside the Actions column it governs.
     renderTable([inspection()]);
 
-    for (const header of [
-      'Id',
-      'Inspection Date',
-      'Status',
-      'Site #',
-      'Structure Name',
-      'District Code',
-      'Forest Service Road',
-      'KM',
-      'Crossing Name',
-      'Project File ID#-Br.',
-    ]) {
-      expect(screen.getByRole('columnheader', { name: header })).toBeInTheDocument();
-    }
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent?.trim())).toEqual(
+      [
+        'Id',
+        'District Code',
+        'Forest Service Road',
+        'Inspection Date',
+        'Site #',
+        'Structure Name',
+        'KM',
+        'Crossing Name',
+        'Project File ID#-Br.',
+        'Status',
+      ],
+    );
   });
 
-  it('prints the date as yyyy/MM/dd, as the legacy <fmt:formatDate> does', () => {
-    // The column is read down as a sequence, and a fixed-width numeric date sorts by eye where a
-    // month name does not.
+  it('puts the Actions column after the status, when it is shown at all', () => {
+    renderTable([inspection()], { canDelete: true });
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent?.trim());
+
+    expect(headers).toHaveLength(11);
+    expect(headers.at(-2)).toBe('Status');
+    expect(headers.at(-1)).toBe('Actions');
+  });
+
+  it('prints the date in the application format, not the legacy one', () => {
+    // This column used to carry its own formatter producing legacy's yyyy/MM/dd. One format across
+    // every screen is worth more than matching a table users are leaving behind.
     renderTable([inspection()]);
 
-    expect(screen.getByText('2026/01/31')).toBeInTheDocument();
+    expect(screen.getByText('Jan 31, 2026')).toBeInTheDocument();
   });
 
   it('joins the district code to its name instead of hiding the name in a tooltip', () => {

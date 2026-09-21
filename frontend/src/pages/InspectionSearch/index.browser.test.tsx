@@ -21,7 +21,18 @@ const api = vi.hoisted(() => ({
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
 }));
-const searchApi = vi.hoisted(() => ({ searchInspections: vi.fn() }));
+const searchApi = vi.hoisted(() => ({
+  searchInspections: vi.fn(),
+  deleteInspection: vi.fn(),
+}));
+
+// The delete outcome is a toast, so the page reads the notification context. Mocked rather than
+// wrapped in a real NotificationProvider so the assertions are on what the page asked to show, not
+// on Carbon's rendering of it — which NotificationProvider's own test already covers.
+const display = vi.hoisted(() => vi.fn());
+vi.mock('@/context/notification/useNotification', () => ({
+  useNotification: () => ({ display }),
+}));
 
 vi.mock('@/hooks/useAuthorization', () => ({
   useAuthorization: () => authorization,
@@ -92,6 +103,11 @@ beforeEach(() => {
   });
   searchApi.searchInspections.mockReset();
   searchApi.searchInspections.mockResolvedValue(page([]));
+  searchApi.deleteInspection.mockReset();
+  searchApi.deleteInspection.mockResolvedValue(undefined);
+  // Shared across tests because vi.hoisted runs once — without this a "was a toast shown"
+  // assertion passes on a call the previous test made.
+  display.mockClear();
 });
 
 const search = () => fireEvent.click(screen.getByTestId('inspection-search-submit'));
@@ -137,6 +153,42 @@ describe('InspectionSearchPage — criteria form', () => {
     ]) {
       expect(screen.getByTestId(`inspection-search-${field}`)).toBeInTheDocument();
     }
+  });
+
+  it('disables Reviewed By, which has nothing behind it yet', async () => {
+    // The one filter on this form with no source: decision D4 has not settled whether reviewers
+    // come from STRUCTURE_INSPECTION_REVIEWER or from FAM. Left enabled it would offer a filter
+    // whose only option is "Anyone" — the same as not filtering — so a user could believe they had
+    // narrowed a search when they had not.
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('inspection-search-inspectionReviewerId')).toBeDisabled();
+    });
+    expect(screen.getByText('Not available yet')).toBeInTheDocument();
+  });
+
+  it('leaves every other filter usable', async () => {
+    // The reviewer is disabled on its own account, not because the form is still loading — so the
+    // rest of the form must not be disabled with it.
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('inspection-search-inspectionTypeCode')).toBeEnabled();
+    });
+    expect(screen.getByTestId('inspection-search-siteId')).toBeEnabled();
+  });
+
+  it('is not badged as under construction, because it works', async () => {
+    // The badge tells users not to trust what they are seeing. Searching, paging, sorting and
+    // deleting all run against real endpoints now, so it would be saying something untrue about
+    // results that are correct. The one unfinished control says so on itself instead.
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Inspection Search')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/under construction/i)).toBeNull();
   });
 
   it('does not offer Road Responsibility', () => {
@@ -350,8 +402,8 @@ describe('InspectionSearchPage — searching', () => {
 
     await screen.findByTestId('inspection-search-results');
     expect(screen.getByText('BR000001')).toBeInTheDocument();
-    // The date column is printed yyyy/MM/dd, as legacy's <fmt:formatDate> does.
-    expect(screen.getByText('2026/06/15')).toBeInTheDocument();
+    // The application's date format, the same one every other screen uses.
+    expect(screen.getByText('Jun 15, 2026')).toBeInTheDocument();
     expect(screen.getByText('Submitted')).toBeInTheDocument();
   });
 
@@ -525,5 +577,127 @@ describe('InspectionSearchPage — reference data', () => {
     search();
 
     expect(await screen.findByTestId('inspection-search-results')).toBeInTheDocument();
+  });
+});
+
+describe('InspectionSearchPage — deleting an offline inspection', () => {
+  const offlineRow = {
+    ...inspectionRow,
+    inspectionReportStatusCode: 'OFL',
+    inspectionReportStatusDescription: 'Offline',
+  };
+
+  /** Search, then press the delete icon on the one offline row, so the dialog is open. */
+  const openDeleteConfirmation = async () => {
+    searchApi.searchInspections.mockResolvedValue(page([offlineRow]));
+    renderPage(true);
+    type('siteId', '12345');
+    search();
+    await screen.findByTestId('inspection-search-results');
+
+    fireEvent.click(screen.getByTestId(`inspection-delete-${offlineRow.id}`));
+    await screen.findByText(/Are you sure you would like to delete offline inspection/);
+  };
+
+  it('asks before deleting, and says what else goes with it', async () => {
+    // The cascade is the part a user cannot see: attachments, repairs, monitor items and the
+    // status history go too, and nothing records that the inspection existed.
+    await openDeleteConfirmation();
+
+    expect(screen.getByText(/attachments, repairs, monitor items and history/)).toBeInTheDocument();
+    expect(screen.getByText(/cannot be undone/)).toBeInTheDocument();
+    expect(searchApi.deleteInspection).not.toHaveBeenCalled();
+  });
+
+  it('does not delete when the dialog is cancelled', async () => {
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Cancel'));
+
+    expect(searchApi.deleteInspection).not.toHaveBeenCalled();
+  });
+
+  it('deletes on confirm and says so', async () => {
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => expect(searchApi.deleteInspection).toHaveBeenCalledWith(offlineRow.id));
+    await waitFor(() => {
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: `Inspection ${offlineRow.id} deleted` }),
+      );
+    });
+  });
+
+  it('re-runs the search afterwards, so the total and the paging stay honest', async () => {
+    // Dropping the row locally would leave "1 match" over an empty table. Refetching is one
+    // request and cannot disagree with the server.
+    await openDeleteConfirmation();
+    const searchesBefore = searchApi.searchInspections.mock.calls.length;
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(searchApi.searchInspections.mock.calls.length).toBeGreaterThan(searchesBefore);
+    });
+  });
+
+  it('shows the server’s reason when the delete is refused', async () => {
+    // A 409 means the inspection stopped being offline while the results were on screen. The status
+    // it names is the only way the user learns that — the table they are looking at is stale.
+    searchApi.deleteInspection.mockRejectedValue({
+      body: { detail: 'Inspection 42 is SUB and cannot be deleted.' },
+    });
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'error',
+          title: 'The inspection was not deleted',
+          subtitle: 'Inspection 42 is SUB and cannot be deleted.',
+        }),
+      );
+    });
+  });
+
+  it('falls back to its own wording when the failure carries no explanation', async () => {
+    searchApi.deleteInspection.mockRejectedValue({ body: null });
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ subtitle: expect.stringMatching(/could not be deleted/i) }),
+      );
+    });
+  });
+
+  it('offers no delete at all to a user without the capability', async () => {
+    // Legacy wraps the control in <cbr:authorize grantedAction="/deleteInspection">. The backend
+    // refuses as well; this is the half that stops the action being offered in the first place.
+    searchApi.searchInspections.mockResolvedValue(page([offlineRow]));
+    renderPage(false);
+    type('siteId', '12345');
+    search();
+    await screen.findByTestId('inspection-search-results');
+
+    expect(screen.queryByTestId(`inspection-delete-${offlineRow.id}`)).toBeNull();
+  });
+
+  it('offers no delete on a row that is not offline', async () => {
+    // Only an offline inspection can be deleted, and the server enforces it — but the control is
+    // not offered either, so the refusal is not something a user has to discover.
+    searchApi.searchInspections.mockResolvedValue(page([inspectionRow]));
+    renderPage(true);
+    type('siteId', '12345');
+    search();
+    await screen.findByTestId('inspection-search-results');
+
+    expect(screen.queryByTestId(`inspection-delete-${inspectionRow.id}`)).toBeNull();
   });
 });

@@ -106,4 +106,16 @@ describe('InspectionSearchService', () => {
     expect(urlOf(request)).toContain('pageNumber=3');
     expect(urlOf(request)).toContain('pageSize=50');
   });
+
+  it('calls the delete endpoint with the inspection in the path', async () => {
+    // The id is a path segment, not a query parameter — a slip to the latter is a 405 on a URL
+    // that still looks plausible in a log.
+    const { service, request } = withMockedRequest();
+
+    await service.deleteInspection('42');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/api/v1/inspections/42', method: 'DELETE' }),
+    );
+  });
 });

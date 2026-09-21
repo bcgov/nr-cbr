@@ -17,6 +17,7 @@ import { Link } from 'react-router-dom';
 import type { InspectionSearchResult } from './types';
 import type { FC } from 'react';
 
+import { formatShortDate } from '@/utils/date';
 import {
   inspectionStatusLabel,
   inspectionStatusTagType,
@@ -34,28 +35,6 @@ type Props = {
   canDelete: boolean;
   onPageChange: (next: { page: number; pageSize: number }) => void;
   onDelete: (inspection: InspectionSearchResult) => void;
-};
-
-/**
- * `2026-01-31` → `2026/01/31`, the format legacy's `<fmt:formatDate pattern="yyyy/MM/dd">` prints.
- *
- * <p>Kept rather than folded into the app's `formatShortDate` ("Jan 31, 2026"): this column is read
- * down as a sequence of inspections, and a fixed-width numeric date sorts by eye where a month name
- * does not. Anything that is not an ISO date is passed through untouched, so a malformed value from
- * the server shows as itself instead of as an empty cell.
- *
- * <p><b>The date can be missing.</b> `STRUCTURE_INSPECTION.INSPECTION_DATE` is a nullable column and
- * real rows leave it unset. An earlier version took a plain `string` and called `.trim()` on it,
- * which turned one such row into a blank page for the whole application — the results table renders
- * inside the router, so a throw here escapes to the route's error boundary rather than to an empty
- * cell.
- */
-const formatInspectionDate = (value: string | null): string => {
-  const date = value?.trim();
-  if (!date) {
-    return '';
-  }
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date.replaceAll('-', '/') : date;
 };
 
 /**
@@ -109,15 +88,21 @@ const InspectionSearchResults: FC<Props> = ({
           <TableHead>
             <TableRow>
               <TableHeader>Id</TableHeader>
-              <TableHeader>Inspection Date</TableHeader>
-              <TableHeader>Status</TableHeader>
-              <TableHeader>Site #</TableHeader>
-              <TableHeader>Structure Name</TableHeader>
+              {/* District and road lead the row, ahead of the inspection's own columns: they are
+                  what a reader scans down to find the crossing they are after, and the date and
+                  status are what they read once they have found it. */}
               <TableHeader>District Code</TableHeader>
               <TableHeader>Forest Service Road</TableHeader>
+              <TableHeader>Inspection Date</TableHeader>
+              <TableHeader>Site #</TableHeader>
+              <TableHeader>Structure Name</TableHeader>
               <TableHeader>KM</TableHeader>
               <TableHeader>Crossing Name</TableHeader>
               <TableHeader>Project File ID#-Br.</TableHeader>
+              {/* Last of the data columns, next to Actions: the status is what decides whether a
+                  row offers delete at all, so the two sit together rather than at opposite ends of
+                  a ten-column table. */}
+              <TableHeader>Status</TableHeader>
               {/* "Actions", not "Delete": the column is gated on the destructive capability, but
                   naming it after its only current occupant would have to be renamed the moment a
                   second one lands. Hidden entirely when the user cannot delete, as legacy does. */}
@@ -144,7 +129,41 @@ const InspectionSearchResults: FC<Props> = ({
                       <Link to={`/inspection/${inspection.id}`}>{inspection.id}</Link>
                     )}
                   </TableCell>
-                  <TableCell>{formatInspectionDate(inspection.inspectionDate)}</TableCell>
+                  {/* "DPG — Prince George Natural Resource District", as nr-frep renders an org
+                      unit. Legacy shows the bare code with the name in a title attribute, which its
+                      6%-wide column forced — a tooltip only reaches a user who already suspects
+                      there is more to see, and never reaches one reading on a touchscreen. */}
+                  <TableCell>
+                    {[inspection.orgUnitCode, inspection.orgUnitName].filter(Boolean).join(' — ')}
+                  </TableCell>
+                  <TableCell>{inspection.forestServiceRoad}</TableCell>
+                  {/* The application's date format, not legacy's `yyyy/MM/dd`. This column used to
+                      carry its own formatter for parity with `<fmt:formatDate>`; one format across
+                      every screen is worth more than matching a table users are leaving behind.
+                      `formatShortDate` also returns '' for a missing date, which this column needs —
+                      `INSPECTION_DATE` is nullable. */}
+                  <TableCell>{formatShortDate(inspection.inspectionDate)}</TableCell>
+                  {/* The site the structure sat at when the inspection happened, which is not
+                      necessarily where it sits now — so it links to that site, not to the
+                      structure's current one. */}
+                  <TableCell>
+                    {inspection.siteAtTimeOfInspection ? (
+                      <Link to={`/inventory/site/${inspection.siteAtTimeOfInspection}`}>
+                        {inspection.siteAtTimeOfInspection}
+                      </Link>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>{inspection.structureName}</TableCell>
+                  <TableCell className="inspection-search__numeric">
+                    {inspection.pointOfCommencementDistance}
+                  </TableCell>
+                  <TableCell>{inspection.crossingName}</TableCell>
+                  {/* "R00123-01". Joined rather than interpolated so a row missing one half shows
+                      the other on its own instead of a stranded hyphen, and a row missing both
+                      shows an empty cell — the same treatment the district column gets above. */}
+                  <TableCell>
+                    {[inspection.forestFileId, inspection.roadSectionId].filter(Boolean).join('-')}
+                  </TableCell>
                   <TableCell>
                     {/* A pill, as nr-frep renders a status. The colour comes from the code and the
                         label from the description — see utils/inspectionStatus. Nothing at all for a
@@ -162,35 +181,6 @@ const InspectionSearchResults: FC<Props> = ({
                         )}
                       </Tag>
                     ) : null}
-                  </TableCell>
-                  {/* The site the structure sat at when the inspection happened, which is not
-                      necessarily where it sits now — so it links to that site, not to the
-                      structure's current one. */}
-                  <TableCell>
-                    {inspection.siteAtTimeOfInspection ? (
-                      <Link to={`/inventory/site/${inspection.siteAtTimeOfInspection}`}>
-                        {inspection.siteAtTimeOfInspection}
-                      </Link>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>{inspection.structureName}</TableCell>
-                  {/* "DPG — Prince George Natural Resource District", as nr-frep renders an org
-                      unit. Legacy shows the bare code with the name in a title attribute, which its
-                      6%-wide column forced — a tooltip only reaches a user who already suspects
-                      there is more to see, and never reaches one reading on a touchscreen. */}
-                  <TableCell>
-                    {[inspection.orgUnitCode, inspection.orgUnitName].filter(Boolean).join(' — ')}
-                  </TableCell>
-                  <TableCell>{inspection.forestServiceRoad}</TableCell>
-                  <TableCell className="inspection-search__numeric">
-                    {inspection.pointOfCommencementDistance}
-                  </TableCell>
-                  <TableCell>{inspection.crossingName}</TableCell>
-                  {/* "R00123-01". Joined rather than interpolated so a row missing one half shows
-                      the other on its own instead of a stranded hyphen, and a row missing both
-                      shows an empty cell — the same treatment the district column gets above. */}
-                  <TableCell>
-                    {[inspection.forestFileId, inspection.roadSectionId].filter(Boolean).join('-')}
                   </TableCell>
                   {canDelete && (
                     <TableCell>
