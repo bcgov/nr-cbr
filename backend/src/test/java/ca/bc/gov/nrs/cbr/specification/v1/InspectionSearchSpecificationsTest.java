@@ -304,6 +304,20 @@ class InspectionSearchSpecificationsTest {
     }
 
     @Test
+    @DisplayName("and match regardless of case, as legacy's UPPER(col) LIKE UPPER(?) does")
+    void ignoreCase() {
+      // `generateWhere` case-folds every LIKE criterion whose SearchCriteriaDTO does not opt out,
+      // and nothing on this form does. Without it an inspector searching for "smith" found nothing
+      // unless they matched the stored casing exactly.
+      givenCompleteInspection(1L, "SUB");
+
+      assertThat(search(criteria().inspectorName("smith").build())).containsExactly(1L);
+      assertThat(search(criteria().inspectorName("SMITH").build())).containsExactly(1L);
+      // The negative still holds: folding both sides is one edit away from matching everything.
+      assertThat(search(criteria().inspectorName("jones").build())).isEmpty();
+    }
+
+    @Test
     @DisplayName("code criteria are an exact match")
     void codesAreExact() {
       givenCompleteInspection(1L, "SUB");

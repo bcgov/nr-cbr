@@ -303,6 +303,62 @@ class SiteSearchSpecificationsTest {
       assertThat(search(SiteSearchCriteria.builder().primaryUserName("CANFOR").build()))
           .containsExactly("CANFOR");
     }
+
+    @Test
+    @DisplayName("matches the maintainer whatever case the user typed")
+    void maintainerIgnoresCase() {
+      // The case that made this worth fixing. CLIENT_NAME is stored upper-cased, so a user typing
+      // the company's name the way it is written — "Canfor" — matched nothing at all.
+      givenSupportingRows();
+      persist(completeSite("CANFOR").build());
+
+      assertThat(search(SiteSearchCriteria.builder().primaryUserName("canfor").build()))
+          .containsExactly("CANFOR");
+      assertThat(search(SiteSearchCriteria.builder().primaryUserName("CaNfOr").build()))
+          .containsExactly("CANFOR");
+    }
+  }
+
+  @Nested
+  @DisplayName("case")
+  class CaseFolding {
+
+    /**
+     * Legacy's {@code generateWhere} case-folds every {@code LIKE} criterion, and none of the site
+     * search form's criteria opt out. Asserted per field rather than on the helper, because what
+     * matters is that each one reaches it.
+     */
+    @Test
+    @DisplayName("every text criterion matches regardless of case")
+    void textCriteriaIgnoreCase() {
+      givenSupportingRows();
+      persist(completeSite("SITE-1").crossingName("Deadman Creek").build());
+
+      assertThat(search(SiteSearchCriteria.builder().crossingName("deadman").build()))
+          .containsExactly("SITE-1");
+      assertThat(search(SiteSearchCriteria.builder().crossingName("DEADMAN CREEK").build()))
+          .containsExactly("SITE-1");
+      assertThat(search(SiteSearchCriteria.builder().siteId("site-1").build()))
+          .containsExactly("SITE-1");
+      assertThat(search(SiteSearchCriteria.builder().forestFileId("r00123").build()))
+          .containsExactly("SITE-1");
+      assertThat(search(SiteSearchCriteria.builder().forestServiceRoad("bowron").build()))
+          .containsExactly("SITE-1");
+    }
+
+    @Test
+    @DisplayName("still does not match something that is simply not there")
+    void doesNotMatchEverything() {
+      // Folding both sides is one edit away from comparing nothing at all, and a test that only
+      // asserts matches would pass just as well against a predicate that always holds.
+      givenSupportingRows();
+      persist(completeSite("SITE-1").crossingName("Deadman Creek").build());
+
+      assertThat(search(SiteSearchCriteria.builder().crossingName("bowron river").build()))
+          .isEmpty();
+      assertThat(search(SiteSearchCriteria.builder().primaryUserName("west fraser").build()))
+          .isEmpty();
+    }
   }
 
   @Nested

@@ -53,10 +53,22 @@ export class SiteSearchService extends HttpClient {
   }
 }
 
-/** Drops blank strings and false booleans, leaving only the criteria the user actually set. */
+/**
+ * The form fields that exist for the screen rather than for the server.
+ *
+ * <p>`maintainerLabel` is what the Designated Maintainer combo box displays; the criteria it stands
+ * for are `clientNumber` and `clientLocationCode`, which travel on their own. Sending it would put
+ * a client's name in every search URL to no effect.
+ */
+const DISPLAY_ONLY: ReadonlySet<string> = new Set(['maintainerLabel']);
+
+/** Drops blank strings, false booleans and display-only fields, leaving the criteria that matter. */
 const populated = (criteria: SiteSearchCriteria): Record<string, string | boolean> => {
   const query: Record<string, string | boolean> = {};
   for (const [field, value] of Object.entries(criteria)) {
+    if (DISPLAY_ONLY.has(field)) {
+      continue;
+    }
     if (typeof value === 'string' && value.trim() !== '') {
       query[field] = value.trim();
     } else if (value === true) {
