@@ -1,7 +1,9 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -9,13 +11,19 @@ import static org.mockito.Mockito.when;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SpecialAccessRequirementCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StrctreInspectionTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import java.util.List;
@@ -25,7 +33,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Each lookup reads its own table and maps it to the right two fields.
  *
- * <p>Six methods that each fetch a list and map it are exactly where a copy-paste slip lives: every
+ * <p>Ten methods that each fetch a list and map it are exactly where a copy-paste slip lives: every
  * one returns the same type, so calling the wrong repository or reading the wrong getter compiles
  * and returns a plausible list. Each stub below carries a value that identifies where it came from,
  * which is what makes such a mix-up visible.
@@ -40,10 +48,23 @@ class ConfigurationServiceTest {
       mock(SpecialAccessRequirementCodeRepository.class);
   private final CrossingSiteTypeCodeRepository siteTypeCodes =
       mock(CrossingSiteTypeCodeRepository.class);
+  private final StructureTypeClassCodeRepository structureTypeClassCodes =
+      mock(StructureTypeClassCodeRepository.class);
+  private final StrctreInspectionTypeCodeRepository inspectionTypeCodes =
+      mock(StrctreInspectionTypeCodeRepository.class);
+  private final InspectionReportStatusCodeRepository inspectionReportStatusCodes =
+      mock(InspectionReportStatusCodeRepository.class);
   private final CbrOrgUnitRepository orgUnits = mock(CbrOrgUnitRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
-      siteStatusCodes, inspectionStatusCodes, specialAccessCodes, siteTypeCodes, orgUnits);
+      siteStatusCodes,
+      inspectionStatusCodes,
+      specialAccessCodes,
+      siteTypeCodes,
+      structureTypeClassCodes,
+      inspectionTypeCodes,
+      inspectionReportStatusCodes,
+      orgUnits);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -65,6 +86,15 @@ class ConfigurationServiceTest {
     when(siteTypeCodes.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
         CrossingSiteTypeCodeEntity.builder()
             .crossingSiteTypeCode("TY").description("from the type table").build()));
+    when(structureTypeClassCodes.findAllCurrentInDisplayOrder()).thenReturn(List.of(
+        StructureTypeClassCodeEntity.builder()
+            .structureTypeClassCode("TC").description("from the type class table").build()));
+    when(inspectionTypeCodes.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        StrctreInspectionTypeCodeEntity.builder()
+            .strctreInspectionTypeCode("IT").description("from the inspection type table").build()));
+    when(inspectionReportStatusCodes.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        InspectionReportStatusCodeEntity.builder()
+            .inspectionReportStatusCode("RS").description("from the report status table").build()));
 
     assertThat(service.getSiteStatusCodes())
         .containsExactly(new CodeOptionResponse("ST", "from the status table"));
@@ -74,6 +104,12 @@ class ConfigurationServiceTest {
         .containsExactly(new CodeOptionResponse("AC", "from the access table"));
     assertThat(service.getSiteTypeCodes())
         .containsExactly(new CodeOptionResponse("TY", "from the type table"));
+    assertThat(service.getStructureTypeClassCodes())
+        .containsExactly(new CodeOptionResponse("TC", "from the type class table"));
+    assertThat(service.getInspectionTypeCodes())
+        .containsExactly(new CodeOptionResponse("IT", "from the inspection type table"));
+    assertThat(service.getInspectionReportStatusCodes())
+        .containsExactly(new CodeOptionResponse("RS", "from the report status table"));
   }
 
   @Test
@@ -102,6 +138,33 @@ class ConfigurationServiceTest {
     assertThat(service.getForestDistricts())
         .containsExactly(
             new OrgUnitResponse("1809", "DCK", "Chilliwack Natural Resource District"));
+  }
+
+  @Test
+  @DisplayName("business areas and forest districts read different branches of the same view")
+  void businessAreasAreNotDistricts() {
+    // Both are OrgUnitResponse over CBR_ORG_UNIT, so calling the wrong repository method compiles
+    // and returns a list that looks right. The branch is the only thing telling them apart.
+    when(orgUnits.findForestDistricts())
+        .thenReturn(List.of(orgUnit(1809L, "DCK", "a district")));
+    when(orgUnits.findBusinessAreas())
+        .thenReturn(List.of(orgUnit(1833L, "TCC", "a business area")));
+
+    assertThat(service.getForestDistricts())
+        .containsExactly(new OrgUnitResponse("1809", "DCK", "a district"));
+    assertThat(service.getBusinessAreas())
+        .containsExactly(new OrgUnitResponse("1833", "TCC", "a business area"));
+  }
+
+  @Test
+  @DisplayName("business areas take no district — they are not a subdivision of one")
+  void businessAreasAreUnscoped() {
+    when(orgUnits.findBusinessAreas()).thenReturn(List.of());
+
+    assertThat(service.getBusinessAreas()).isEmpty();
+
+    verify(orgUnits).findBusinessAreas();
+    verify(orgUnits, never()).findManagementAreas(anyLong());
   }
 
   @Test

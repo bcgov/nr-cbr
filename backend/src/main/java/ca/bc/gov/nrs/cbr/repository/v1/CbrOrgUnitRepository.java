@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * The two org-unit lookups, both over the {@code THE.CBR_ORG_UNIT} view.
+ * The three org-unit lookups, all over the {@code THE.CBR_ORG_UNIT} view.
  *
  * <p>Read-only: the view is a union of six {@code SELECT}s and nothing here writes through it. The
  * inherited {@code JpaRepository} write methods are unusable against it and would fail at the
@@ -18,7 +18,8 @@ import org.springframework.stereotype.Repository;
  * districts, and an inverted {@code SYSDATE > EXPIRY_DATE} plus a code length and a level for
  * management areas. Both are re-derivations of something the view has already decided: each branch
  * of the union stamps an {@code ORG_UNIT_TYPE}, and those two predicates each select exactly one
- * branch.
+ * branch. Business areas are the clearest case of all: the legacy predicate and the {@code T}
+ * branch's {@code WHERE} clause are the same three conditions.
  *
  * <p>Naming the branch is equivalent, and the equivalence is total rather than approximate:
  * {@code ROLLUP_DIST_NO} is {@code NULL} in the {@code T}, {@code R}, {@code A} and {@code RD}
@@ -48,6 +49,16 @@ public interface CbrOrgUnitRepository extends JpaRepository<CbrOrgUnitEntity, Lo
    */
   String OBSOLETE_DISTRICT = "O";
 
+  /**
+   * A BCTS business area.
+   *
+   * <p>The one branch of the view that is not a district at all: BC Timber Sales runs its own
+   * geography, and {@code CROSSING_SITE.BUSINESS_AREA_ORG_UNIT_NO} records it independently of the
+   * district in {@code ORG_UNIT_NO}. A site can carry both, which is why this is a third filter on
+   * the search form rather than a level of the same hierarchy.
+   */
+  String BUSINESS_AREA = "T";
+
   List<CbrOrgUnitEntity> findAllByOrgUnitTypeOrderByOrgUnitNameAsc(String orgUnitType);
 
   List<CbrOrgUnitEntity> findAllByOrgUnitTypeAndRollupDistNoOrderByOrgUnitNameAsc(
@@ -60,6 +71,19 @@ public interface CbrOrgUnitRepository extends JpaRepository<CbrOrgUnitEntity, Lo
    */
   default List<CbrOrgUnitEntity> findForestDistricts() {
     return findAllByOrgUnitTypeOrderByOrgUnitNameAsc(CURRENT_DISTRICT);
+  }
+
+  /**
+   * The BCTS business areas, by name — the BCTS Business Area dropdown.
+   *
+   * <p>Replaces {@code CBR.FIND_BUSINESS_AREAS}, whose predicate is
+   * {@code ORG_LEVEL_CODE = 'T' AND LENGTH(ORG_UNIT_CODE) = 3 AND SYSDATE BETWEEN EFFECTIVE_DATE
+   * AND EXPIRY_DATE} — which is, character for character, the definition of the view's {@code T}
+   * branch. Naming the branch is not an approximation of that procedure here; it is the same three
+   * conditions, applied once instead of twice.
+   */
+  default List<CbrOrgUnitEntity> findBusinessAreas() {
+    return findAllByOrgUnitTypeOrderByOrgUnitNameAsc(BUSINESS_AREA);
   }
 
   /**

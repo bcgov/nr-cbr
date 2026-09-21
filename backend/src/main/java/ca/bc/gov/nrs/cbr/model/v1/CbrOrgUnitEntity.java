@@ -20,9 +20,9 @@ import org.hibernate.annotations.Immutable;
  * <p>CBR reads {@code ORG_UNIT} and owns none of it (cbr-data-model.local.md §6). The view is a
  * union of six branches, each stamping an {@code ORG_UNIT_TYPE}: business areas ({@code T}), current
  * districts ({@code D}), regions ({@code R}), <b>obsolete districts ({@code O})</b>, the three
- * hard-coded areas ({@code A}), and recreation districts ({@code RD}). The two lookups here read
- * the {@code D} and {@code O} branches, and both are keyed by a real {@code ORG_UNIT_NO}, which is
- * why mapping it as the identifier is safe — the {@code RD} branch synthesises ids
+ * hard-coded areas ({@code A}), and recreation districts ({@code RD}). The three lookups here read
+ * the {@code D}, {@code O} and {@code T} branches, and each is keyed by a real {@code ORG_UNIT_NO},
+ * which is why mapping it as the identifier is safe — the {@code RD} branch synthesises ids
  * ({@code 1000000000 + ROWNUM}) and would not be.
  *
  * <p>Every branch except the obsolete one filters to currently-effective rows, so the view is

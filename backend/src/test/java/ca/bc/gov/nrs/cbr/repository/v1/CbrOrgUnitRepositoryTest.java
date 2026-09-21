@@ -12,11 +12,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 /**
- * The two org-unit queries, against a real database.
+ * The three org-unit queries, against a real database.
  *
- * <p>Worth testing beyond "do the method names parse": these are the only two lookups whose
- * predicates select rather than just sort, and what they select on — {@code ORG_UNIT_TYPE} — is the
- * view's stamp for which branch a row came from, not a column of any table.
+ * <p>Worth testing beyond "do the method names parse": these are the only lookups whose predicates
+ * select rather than just sort, and what they select on — {@code ORG_UNIT_TYPE} — is the view's
+ * stamp for which branch a row came from, not a column of any table.
  *
  * <p><b>H2 stands in for Oracle, and it is a flat table rather than the view.</b> That is the limit
  * of what these prove: the fixtures below set {@code orgUnitType} by hand, where in production the
@@ -70,6 +70,20 @@ class CbrOrgUnitRepositoryTest {
         .build());
   }
 
+  /** A BCTS business area: the view's {@code T} branch, which carries no rollup district. */
+  private void givenBusinessArea(long orgUnitNo, String code, String name) {
+    entityManager.persist(CbrOrgUnitEntity.builder()
+        .orgUnitNo(orgUnitNo)
+        .orgUnitCode(code)
+        .orgUnitName(name)
+        .orgLevelCode("T")
+        .orgUnitType(CbrOrgUnitRepository.BUSINESS_AREA)
+        .rollupDistNo(null)
+        .effectiveDate(LONG_AGO)
+        .expiryDate(FUTURE)
+        .build());
+  }
+
   @BeforeEach
   void clear() {
     entityManager.createQuery("DELETE FROM CbrOrgUnitEntity").executeUpdate();
@@ -92,13 +106,38 @@ class CbrOrgUnitRepositoryTest {
     givenDistrict(18L, "DPG", "Prince George");
     givenObsoleteDistrict(26L, "DRV", "Robson Valley", 18L);
     // A business area — the view's T branch. Note it shares neither the type nor a rollup district.
-    entityManager.persist(CbrOrgUnitEntity.builder()
-        .orgUnitNo(1833L).orgUnitCode("RNI").orgUnitName("North Area").orgLevelCode("T")
-        .orgUnitType("T").rollupDistNo(null).effectiveDate(LONG_AGO).expiryDate(FUTURE).build());
+    givenBusinessArea(1833L, "RNI", "North Area");
 
     assertThat(repository.findForestDistricts())
         .extracting(CbrOrgUnitEntity::getOrgUnitName)
         .containsExactly("Prince George");
+  }
+
+  @Test
+  @DisplayName("business areas are the T branch, by name")
+  void findsBusinessAreasByName() {
+    givenBusinessArea(1835L, "TSN", "Seaward-Tlasta Business Area");
+    givenBusinessArea(1833L, "TBA", "Babine Business Area");
+
+    assertThat(repository.findBusinessAreas())
+        .extracting(CbrOrgUnitEntity::getOrgUnitName)
+        .containsExactly("Babine Business Area", "Seaward-Tlasta Business Area");
+  }
+
+  @Test
+  @DisplayName("business areas exclude districts, current and retired alike")
+  void businessAreasExcludeDistricts() {
+    // BCTS runs its own geography: a business area is not a level of the district hierarchy, and a
+    // site records one in BUSINESS_AREA_ORG_UNIT_NO alongside its district in ORG_UNIT_NO. A query
+    // that leaned on ORG_LEVEL_CODE alone would still separate these, but only by accident — the
+    // branch is what says which question is being asked.
+    givenBusinessArea(1833L, "TBA", "Babine Business Area");
+    givenDistrict(18L, "DPG", "Prince George");
+    givenObsoleteDistrict(26L, "DRV", "Robson Valley", 18L);
+
+    assertThat(repository.findBusinessAreas())
+        .extracting(CbrOrgUnitEntity::getOrgUnitName)
+        .containsExactly("Babine Business Area");
   }
 
   @Test
