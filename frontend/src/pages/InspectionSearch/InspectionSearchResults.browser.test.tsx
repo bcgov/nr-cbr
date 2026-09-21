@@ -7,9 +7,9 @@ import InspectionSearchResults from './InspectionSearchResults';
 import type { InspectionSearchResult } from './types';
 
 /**
- * The results table is tested directly rather than through the page, because the page has no search
- * to run yet — and because the two behaviours worth pinning here both turn on the status code,
- * which is a property of a row and not of the screen around it.
+ * The results table is tested directly rather than through the page, because the behaviours worth
+ * pinning here are properties of a row rather than of the screen around it — the status code, and
+ * what the table does with the many columns the server is allowed to leave empty.
  */
 const inspection = (overrides: Partial<InspectionSearchResult> = {}): InspectionSearchResult => ({
   id: '4001',
@@ -142,6 +142,41 @@ describe('InspectionSearchResults', () => {
     fireEvent.click(screen.getByTestId('inspection-delete-4002'));
 
     expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: '4002' }));
+  });
+
+  it('renders a row whose every optional column is empty', () => {
+    // Every field but the id is nullable, and this is what the server sends for a sparse row: a
+    // nullable INSPECTION_DATE, a structure with no name, and three left joins that missed. An
+    // earlier version of the date formatter took a plain string and called .trim() on it, which
+    // turned exactly this row into react-router's "Unexpected Application Error!" screen for the
+    // whole application.
+    renderTable([
+      inspection({
+        inspectionDate: null,
+        inspectionReportStatusDescription: null,
+        structureName: null,
+        orgUnitCode: null,
+        orgUnitName: null,
+        forestServiceRoad: null,
+        pointOfCommencementDistance: null,
+        crossingName: null,
+        forestFileId: null,
+        roadSectionId: null,
+      }),
+    ]);
+
+    // It renders at all, and the columns that do have values still carry them.
+    expect(screen.getByTestId('inspection-search-results')).toBeInTheDocument();
+    expect(screen.getByText('S-00123')).toBeInTheDocument();
+    // The pill falls back to the raw code when the description is missing.
+    expect(screen.getByText('SUB')).toBeInTheDocument();
+  });
+
+  it('shows the surviving half of the project file rather than a stranded hyphen', () => {
+    renderTable([inspection({ forestFileId: 'R00123', roadSectionId: null })]);
+
+    expect(screen.getByText('R00123')).toBeInTheDocument();
+    expect(screen.queryByText('R00123-')).toBeNull();
   });
 
   it('uses the legacy wording when nothing matched', () => {

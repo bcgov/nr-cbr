@@ -43,9 +43,20 @@ type Props = {
  * down as a sequence of inspections, and a fixed-width numeric date sorts by eye where a month name
  * does not. Anything that is not an ISO date is passed through untouched, so a malformed value from
  * the server shows as itself instead of as an empty cell.
+ *
+ * <p><b>The date can be missing.</b> `STRUCTURE_INSPECTION.INSPECTION_DATE` is a nullable column and
+ * real rows leave it unset. An earlier version took a plain `string` and called `.trim()` on it,
+ * which turned one such row into a blank page for the whole application — the results table renders
+ * inside the router, so a throw here escapes to the route's error boundary rather than to an empty
+ * cell.
  */
-const formatInspectionDate = (value: string): string =>
-  /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value.trim().replaceAll('-', '/') : value;
+const formatInspectionDate = (value: string | null): string => {
+  const date = value?.trim();
+  if (!date) {
+    return '';
+  }
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date.replaceAll('-', '/') : date;
+};
 
 /**
  * Inspection Search results.
@@ -175,8 +186,11 @@ const InspectionSearchResults: FC<Props> = ({
                     {inspection.pointOfCommencementDistance}
                   </TableCell>
                   <TableCell>{inspection.crossingName}</TableCell>
+                  {/* "R00123-01". Joined rather than interpolated so a row missing one half shows
+                      the other on its own instead of a stranded hyphen, and a row missing both
+                      shows an empty cell — the same treatment the district column gets above. */}
                   <TableCell>
-                    {inspection.forestFileId}-{inspection.roadSectionId}
+                    {[inspection.forestFileId, inspection.roadSectionId].filter(Boolean).join('-')}
                   </TableCell>
                   {canDelete && (
                     <TableCell>

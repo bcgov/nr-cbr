@@ -81,13 +81,26 @@ public class CrossingSiteEntity {
   @Column(name = "SPECIAL_ACCESS_RQMT_CODE", length = 10)
   private String specialAccessRqmtCode;
 
-  /** Forest District. One of three org-unit columns on this table, and the one the screen filters. */
+  /** Forest District. The first of this table's three org-unit columns. */
   @Column(name = "ORG_UNIT_NO")
   private Long orgUnitNo;
 
   /** Management Area — a former district (see {@code CbrOrgUnitRepository}). */
   @Column(name = "MANAGEMENT_ORG_UNIT_NO")
   private Long managementOrgUnitNo;
+
+  /**
+   * BCTS Business Area — the third org-unit column, and not a level of the other two.
+   *
+   * <p>BC Timber Sales runs its own geography, so a site can carry a district and a business area at
+   * once. Site Search does not offer it; Inspection Search does, which is why it is mapped.
+   *
+   * <p>None of the three is read for authorization. They were once thought to be the open question
+   * blocking the FAM role design and are not — no WebADE profile is organization-secured, so there
+   * is no regional scope to enforce (cbr-data-model.local.md §2).
+   */
+  @Column(name = "BUSINESS_AREA_ORG_UNIT_NO")
+  private Long businessAreaOrgUnitNo;
 
   @Column(name = "ROAD_SEGMENT_ID")
   private Long roadSegmentId;

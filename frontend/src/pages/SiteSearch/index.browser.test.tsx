@@ -21,6 +21,14 @@ vi.mock('@/hooks/useAuthorization', () => ({
   useAuthorization: () => authorization,
 }));
 
+// The delete outcome is a toast now, so the page reads the notification context. Mocked rather
+// than wrapped in a real NotificationProvider so the assertions are on what the page asked to show,
+// not on Carbon's rendering of it — which NotificationProvider's own test already covers.
+const display = vi.hoisted(() => vi.fn());
+vi.mock('@/context/notification/useNotification', () => ({
+  useNotification: () => ({ display }),
+}));
+
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
 }));
@@ -91,6 +99,9 @@ beforeEach(() => {
   siteSearchApi.searchSites.mockResolvedValue(emptyPage());
   siteSearchApi.deleteSite.mockReset();
   siteSearchApi.deleteSite.mockResolvedValue(undefined);
+  // Shared across tests because vi.hoisted runs once — without this a "was a toast shown" assertion
+  // passes on a call the previous test made.
+  display.mockClear();
 });
 
 const search = () => fireEvent.click(screen.getByTestId('site-search-submit'));
@@ -836,18 +847,56 @@ describe('SiteSearchPage — deleting a site', () => {
 
     fireEvent.click(screen.getByText('Delete'));
 
-    expect(await screen.findByTestId('site-delete-error')).toBeInTheDocument();
-    expect(screen.getByText(/2 associated archived structure\(s\)/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'error',
+          title: 'The site was not deleted',
+          subtitle: 'Site SITE-1 has 2 associated archived structure(s) and cannot be deleted.',
+        }),
+      );
+    });
   });
 
-  it('falls back to its own wording when the failure carries no explanation', async () => {
+  it('reports a failed delete as a toast, not as a banner on the page', async () => {
+    // The action failed, so nothing on screen changed and there is no region to replace — the row
+    // is still in the table. nr-frep and nr-fspts both report an action failure this way and keep
+    // in-place notifications for a region that could not load.
     siteSearchApi.deleteSite.mockRejectedValue(new Error('network'));
     await openDeleteConfirmation();
 
     fireEvent.click(screen.getByText('Delete'));
 
-    expect(await screen.findByTestId('site-delete-error')).toBeInTheDocument();
-    expect(screen.getByText(/could not be deleted/i)).toBeInTheDocument();
+    await waitFor(() => expect(display).toHaveBeenCalled());
+    expect(screen.queryByTestId('site-delete-error')).toBeNull();
+  });
+
+  it('falls back to its own wording when the failure carries no explanation', async () => {
+    // An ApiError's own message is the bare status phrase — "Conflict" — which tells the user
+    // nothing. A sentence naming the site is worth more.
+    siteSearchApi.deleteSite.mockRejectedValue({ body: null });
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ subtitle: expect.stringMatching(/could not be deleted/i) }),
+      );
+    });
+  });
+
+  it('confirms a delete that worked, since the row simply vanishes otherwise', async () => {
+    siteSearchApi.deleteSite.mockResolvedValue(undefined);
+    await openDeleteConfirmation();
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Site SITE-1 deleted' }),
+      );
+    });
   });
 
   it('offers no delete at all to a user without the capability', async () => {

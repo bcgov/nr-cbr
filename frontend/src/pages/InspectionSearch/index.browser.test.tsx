@@ -14,9 +14,14 @@ const api = vi.hoisted(() => ({
   getStructureInspectionStatusCodes: vi.fn(),
   getSpecialAccessCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
+  getStructureTypeClassCodes: vi.fn(),
+  getInspectionTypeCodes: vi.fn(),
+  getInspectionReportStatusCodes: vi.fn(),
   getForestDistricts: vi.fn(),
+  getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
 }));
+const searchApi = vi.hoisted(() => ({ searchInspections: vi.fn() }));
 
 vi.mock('@/hooks/useAuthorization', () => ({
   useAuthorization: () => authorization,
@@ -29,7 +34,7 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 // Mocked at the service rather than at the hook, so the query keys, the fallback to an empty list
 // and the error branch are all exercised by these tests instead of being stubbed past.
 vi.mock('@/services/APIs', () => ({
-  default: { configuration: api },
+  default: { configuration: api, inspectionSearch: searchApi },
 }));
 
 const renderPage = (canDelete = false) => {
@@ -55,11 +60,38 @@ const areas: OrgUnitOption[] = [
   { orgUnitNo: '11', orgUnitCode: 'DVA', orgUnitName: 'Vanderhoof Forest District' },
 ];
 
+/** One page of results, shaped as the backend's PagedResponse. */
+const page = (content: unknown[], totalElements = content.length) => ({
+  content,
+  totalElements,
+  totalPages: Math.max(Math.ceil(totalElements / 20), 1),
+  pageNumber: 0,
+  pageSize: 20,
+});
+
+const inspectionRow = {
+  id: '42',
+  inspectionDate: '2026-06-15',
+  inspectionReportStatusCode: 'SUB',
+  inspectionReportStatusDescription: 'Submitted',
+  siteAtTimeOfInspection: 'SITE-1',
+  structureName: 'BR000001',
+  orgUnitCode: 'DPG',
+  orgUnitName: 'Prince George Natural Resource District',
+  forestServiceRoad: 'Deadman FSR',
+  pointOfCommencementDistance: '12.50',
+  crossingName: 'Deadman Creek',
+  forestFileId: 'R00123',
+  roadSectionId: '01',
+};
+
 beforeEach(() => {
   Object.values(api).forEach((fn) => {
     fn.mockReset();
     fn.mockResolvedValue([]);
   });
+  searchApi.searchInspections.mockReset();
+  searchApi.searchInspections.mockResolvedValue(page([]));
 });
 
 const search = () => fireEvent.click(screen.getByTestId('inspection-search-submit'));
@@ -158,35 +190,17 @@ describe('InspectionSearchPage — criteria form', () => {
 });
 
 describe('InspectionSearchPage — validation', () => {
-  it('refuses an empty search instead of returning every inspection', () => {
-    // Legacy's errors.search.select. The results block must stay away entirely — legacy renders it
-    // only once a search has run.
+  it('runs an unfiltered search rather than refusing it, as Site Search does', async () => {
+    // Legacy refuses this on all five of its search forms with errors.search.select, because its
+    // query was unpaginated and "no criteria" meant every inspection in the province at once. The
+    // search is paged server-side now, so "show me everything, twenty at a time" is an ordinary
+    // request — and the two search screens in this app must agree about it.
     renderPage();
 
     search();
 
-    expect(screen.getByTestId('inspection-search-empty-error')).toBeInTheDocument();
-    expect(screen.queryByTestId('inspection-search-results')).toBeNull();
-  });
-
-  it('clears the empty-form message as soon as a criterion is entered', () => {
-    renderPage();
-    search();
-
-    type('siteId', '12345');
-
-    expect(screen.queryByTestId('inspection-search-empty-error')).toBeNull();
-  });
-
-  it('does not accept "structures at previous sites" as the only criterion', () => {
-    // It is not a filter — it changes what Site # matches — so on its own it narrows nothing.
-    // Legacy lets it past this guard and then silently runs no query at all.
-    renderPage();
-
-    fireEvent.click(screen.getByTestId('inspection-search-findMovedStructures'));
-    search();
-
-    expect(screen.getByTestId('inspection-search-empty-error')).toBeInTheDocument();
+    expect(await screen.findByTestId('inspection-search-results')).toBeInTheDocument();
+    expect(searchApi.searchInspections).toHaveBeenCalled();
   });
 
   it('rejects a month that is not yyyy/mm, on the box that holds it', () => {
@@ -196,7 +210,7 @@ describe('InspectionSearchPage — validation', () => {
     search();
 
     expect(screen.getByText('Enter a month as yyyy/mm, e.g. 2026/01')).toBeInTheDocument();
-    expect(screen.queryByTestId('inspection-search-results')).toBeNull();
+    expect(searchApi.searchInspections).not.toHaveBeenCalled();
   });
 
   it('accepts a one-digit month, which the legacy SimpleDateFormat also accepts', () => {
@@ -206,7 +220,7 @@ describe('InspectionSearchPage — validation', () => {
     search();
 
     expect(screen.queryByText('Enter a month as yyyy/mm, e.g. 2026/01')).toBeNull();
-    expect(screen.getByTestId('inspection-search-results')).toBeInTheDocument();
+    expect(searchApi.searchInspections).toHaveBeenCalled();
   });
 
   it('fills the month from the calendar, discarding the day', async () => {
@@ -272,7 +286,12 @@ describe('InspectionSearchPage — validation', () => {
     search();
 
     expect(box('inspectionDateStart').value).toBe('');
-    expect(screen.getByTestId('inspection-search-empty-error')).toBeInTheDocument();
+    // The month never reaches the request: flatpickr erased it, and the criterion went with it.
+    expect(searchApi.searchInspections).toHaveBeenCalledWith(
+      expect.objectContaining({ inspectionDateStart: '' }),
+      0,
+      20,
+    );
   });
 
   it('rejects a range that ends before it starts', () => {
@@ -285,20 +304,86 @@ describe('InspectionSearchPage — validation', () => {
     search();
 
     expect(screen.getByText('The end month cannot be before the start month')).toBeInTheDocument();
-    expect(screen.queryByTestId('inspection-search-results')).toBeNull();
+    expect(searchApi.searchInspections).not.toHaveBeenCalled();
   });
 });
 
 describe('InspectionSearchPage — searching', () => {
-  it('shows the results block only once a search has run', () => {
+  it('shows the results block only once a search has run', async () => {
     renderPage();
 
     expect(screen.queryByTestId('inspection-search-results')).toBeNull();
+    expect(screen.queryByTestId('inspection-search-loading')).toBeNull();
 
     type('siteId', '12345');
     search();
 
-    expect(screen.getByTestId('inspection-search-results')).toBeInTheDocument();
+    // The table is preceded by its own loading state now that a request is really made, so this
+    // waits rather than asserting straight through it.
+    expect(await screen.findByTestId('inspection-search-results')).toBeInTheDocument();
+  });
+
+  it('sends the submitted criteria to the endpoint, not the live form state', async () => {
+    renderPage();
+
+    type('siteId', '12345');
+    search();
+    await screen.findByTestId('inspection-search-results');
+    // Editing after the search must not re-run it: the results on screen belong to what was
+    // submitted, and a keystroke changing them under the user would be worse than stale.
+    type('siteId', '99999');
+
+    expect(searchApi.searchInspections).toHaveBeenCalledTimes(1);
+    expect(searchApi.searchInspections).toHaveBeenCalledWith(
+      expect.objectContaining({ siteId: '12345' }),
+      0,
+      20,
+    );
+  });
+
+  it('renders the rows the endpoint returned', async () => {
+    searchApi.searchInspections.mockResolvedValue(page([inspectionRow]));
+    renderPage();
+
+    type('siteId', '12345');
+    search();
+
+    await screen.findByTestId('inspection-search-results');
+    expect(screen.getByText('BR000001')).toBeInTheDocument();
+    // The date column is printed yyyy/MM/dd, as legacy's <fmt:formatDate> does.
+    expect(screen.getByText('2026/06/15')).toBeInTheDocument();
+    expect(screen.getByText('Submitted')).toBeInTheDocument();
+  });
+
+  it('asks for a zero-based page, because Carbon counts from one and the backend does not', async () => {
+    searchApi.searchInspections.mockResolvedValue(page([inspectionRow], 100));
+    renderPage();
+    type('siteId', '12345');
+    search();
+    await screen.findByTestId('inspection-search-results');
+
+    fireEvent.click(screen.getByLabelText('Next page'));
+
+    await waitFor(() => {
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(
+        expect.objectContaining({ siteId: '12345' }),
+        1,
+        20,
+      );
+    });
+  });
+
+  it('says the search failed rather than showing an empty table', async () => {
+    // An empty table and a failed request look identical to a user, and one of them means "try
+    // again". The results component is not rendered at all in this branch.
+    searchApi.searchInspections.mockRejectedValue(new Error('boom'));
+    renderPage();
+
+    type('siteId', '12345');
+    search();
+
+    expect(await screen.findByTestId('inspection-search-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('inspection-search-results')).toBeNull();
   });
 
   it('puts the results away again when the form is cleared', () => {
@@ -310,14 +395,6 @@ describe('InspectionSearchPage — searching', () => {
 
     expect(screen.queryByTestId('inspection-search-results')).toBeNull();
     expect(screen.getByTestId('inspection-search-siteId')).toHaveValue('');
-  });
-
-  it('says plainly that nothing is wired up yet', () => {
-    // The screen ships ahead of its endpoint, so it has to say so. This test is expected to be
-    // deleted along with the notice when the search is wired.
-    renderPage();
-
-    expect(screen.getByTestId('inspection-search-placeholder')).toBeInTheDocument();
   });
 });
 
@@ -331,6 +408,54 @@ describe('InspectionSearchPage — reference data', () => {
         screen.getByRole('option', { name: 'DPG - Prince George Natural Resource District' }),
       ).toBeInTheDocument();
     });
+  });
+
+  it('fills every code-table filter from its own endpoint', async () => {
+    // Four lists of the same shape, read through four hooks, assembled into one object. Crossing
+    // two of them over compiles and renders a perfectly plausible form, so each stub carries a
+    // value that says where it came from.
+    api.getStructureTypeClassCodes.mockResolvedValue([
+      { code: 'BRIDGE', description: 'Forest service bridge' },
+    ]);
+    api.getInspectionTypeCodes.mockResolvedValue([{ code: 'ROUT', description: 'Routine' }]);
+    api.getInspectionReportStatusCodes.mockResolvedValue([
+      { code: 'SUB', description: 'Submitted' },
+    ]);
+    api.getBusinessAreas.mockResolvedValue([
+      { orgUnitNo: '1833', orgUnitCode: 'TBA', orgUnitName: 'Babine Business Area' },
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('inspection-search-structureTypeClassCode')).toHaveTextContent(
+        'BRIDGE - Forest service bridge',
+      );
+    });
+    expect(screen.getByTestId('inspection-search-inspectionTypeCode')).toHaveTextContent(
+      'ROUT - Routine',
+    );
+    expect(screen.getByTestId('inspection-search-inspectionReportStatusCode')).toHaveTextContent(
+      'SUB - Submitted',
+    );
+    expect(screen.getByTestId('inspection-search-businessAreaOrgUnitNo')).toHaveTextContent(
+      'TBA - Babine Business Area',
+    );
+  });
+
+  it('offers the offline and accepted statuses a data-entry form would hide', async () => {
+    // OFL is machine-set by the offline checkout and ACC is an expired status that saving rewrites
+    // to RVD — so both are unsettable, and both sit on rows this screen exists to find. The backend
+    // returns them for that reason; the form must not filter them back out.
+    api.getInspectionReportStatusCodes.mockResolvedValue([
+      { code: 'ACC', description: 'Accepted' },
+      { code: 'OFL', description: 'Offline' },
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'OFL - Offline' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('option', { name: 'ACC - Accepted' })).toBeInTheDocument();
   });
 
   it('loads management areas for the chosen district, and not before', async () => {
@@ -399,6 +524,6 @@ describe('InspectionSearchPage — reference data', () => {
     type('siteId', '12345');
     search();
 
-    expect(screen.getByTestId('inspection-search-results')).toBeInTheDocument();
+    expect(await screen.findByTestId('inspection-search-results')).toBeInTheDocument();
   });
 });

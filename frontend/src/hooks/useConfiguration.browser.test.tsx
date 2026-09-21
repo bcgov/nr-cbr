@@ -7,7 +7,11 @@ const api = vi.hoisted(() => ({
   getStructureInspectionStatusCodes: vi.fn(),
   getSpecialAccessCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
+  getStructureTypeClassCodes: vi.fn(),
+  getInspectionTypeCodes: vi.fn(),
+  getInspectionReportStatusCodes: vi.fn(),
   getForestDistricts: vi.fn(),
+  getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
 }));
 
@@ -47,13 +51,24 @@ const AreaReader: FC<{ district: string }> = ({ district }) => {
   );
 };
 
-/** Every parameterless lookup, in the order usePrefetchConfiguration warms them. */
+/**
+ * Every parameterless lookup, in the order usePrefetchConfiguration warms them.
+ *
+ * <p>Kept exhaustive on purpose. A lookup added to the hook but not to this list is warmed with no
+ * test watching, and one added to neither fails nothing — the prefetch swallows its own errors by
+ * design, so calling a method the service does not have looks exactly like a lookup that was never
+ * wired.
+ */
 const PARAMETERLESS = [
   api.getSiteStatusCodes,
   api.getStructureInspectionStatusCodes,
   api.getSpecialAccessCodes,
   api.getSiteTypeCodes,
   api.getForestDistricts,
+  api.getStructureTypeClassCodes,
+  api.getInspectionTypeCodes,
+  api.getInspectionReportStatusCodes,
+  api.getBusinessAreas,
 ];
 
 beforeEach(() => {

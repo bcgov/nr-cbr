@@ -137,18 +137,44 @@ public final class SiteSearchSpecifications {
       // candidate for the other filters; the predicate itself then excludes it, which is what an
       // inner join would have done anyway — but only for these criteria, rather than for the whole
       // query.
+      //
+      // <p><b>The road section join is created once and shared with the projection.</b> A results
+      // row always shows the road name, so when this query returns entities the join is a fetch and
+      // the filter reuses it. It used to be created twice — a plain join here and a fetch below —
+      // because {@code root.fetch(X)} is a new join every time and never reuses {@code
+      // root.join(X)}. That put two left joins to {@code CBR_ROAD_SECTION_VW}, a materialized view
+      // reached over a database link, in every search that filtered on Forest Service Road. The
+      // same mistake in Inspection Search cost far more, because the join it duplicated carried a
+      // correlated subquery.
+      boolean projecting = returnsEntities(query);
+      From<?, ?> roadSection =
+          projecting || StringUtils.hasText(criteria.forestServiceRoad())
+              ? joinOrFetch(root, ROAD_SECTION, projecting)
+              : null;
       if (StringUtils.hasText(criteria.forestServiceRoad())) {
-        From<?, ?> roadSection = root.join(ROAD_SECTION, JoinType.LEFT);
         contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
             .ifPresent(predicates::add);
       }
+      // <p><b>The client is fetched even though no results column shows it.</b> That looks
+      // wasteful and is the opposite: {@code CrossingSiteEntity.client} carries
+      // {@code @NotFound(IGNORE)}, and Hibernate cannot honour {@code FetchType.LAZY} alongside it —
+      // it has to go and look whether the row exists before it can decide between an entity and a
+      // null, so the association loads whatever the fetch type says. Left to itself that is one
+      // extra select per site on the page: twenty round trips for a full page of results, and a
+      // textbook N+1 that hides on any page where the sites happen to share a maintainer. Joining
+      // it costs one left join to a view and removes all of them.
+      From<?, ?> client =
+          projecting || StringUtils.hasText(criteria.primaryUserName())
+              ? joinOrFetch(root, CLIENT, projecting)
+              : null;
       if (StringUtils.hasText(criteria.primaryUserName())) {
-        From<?, ?> client = root.join(CLIENT, JoinType.LEFT);
         contains(builder, client.get(CLIENT_NAME), criteria.primaryUserName())
             .ifPresent(predicates::add);
       }
 
-      fetchAndOrder(root, query, builder);
+      if (projecting) {
+        fetchAndOrder(root, roadSection, query, builder);
+      }
 
       return predicates.isEmpty() ? builder.conjunction() : builder.and(predicates.toArray(new Predicate[0]));
     };
@@ -207,16 +233,17 @@ public final class SiteSearchSpecifications {
    * <h3>Why both are skipped for the count query</h3>
    * A count has no ordering, and a fetch join in one is invalid — Hibernate rejects it, because
    * there is no entity to fetch into. Spring Data runs the count from this same specification, so
-   * the guard is what lets one specification serve both.
+   * the guard is what lets one specification serve both. The guard itself is now on the caller,
+   * which needs the same answer to decide whether the road section is a fetch or a plain join.
+   *
+   * @param roadSection the join {@code matching} already made, reused here rather than made again
    */
   private static void fetchAndOrder(
-      Root<CrossingSiteEntity> root, CriteriaQuery<?> query, CriteriaBuilder builder) {
-    if (query == null || Long.class.equals(query.getResultType())
-        || long.class.equals(query.getResultType())) {
-      return;
-    }
+      Root<CrossingSiteEntity> root,
+      From<?, ?> roadSection,
+      CriteriaQuery<?> query,
+      CriteriaBuilder builder) {
     From<?, ?> orgUnit = (From<?, ?>) root.fetch(ORG_UNIT, JoinType.LEFT);
-    From<?, ?> roadSection = (From<?, ?>) root.fetch(ROAD_SECTION, JoinType.LEFT);
     root.fetch(STATUS, JoinType.LEFT);
 
     query.orderBy(
@@ -224,6 +251,32 @@ public final class SiteSearchSpecifications {
         builder.asc(roadSection.get(ROAD_SECTION_NAME)),
         builder.asc(root.get(ROAD_SECTION_ID)),
         builder.asc(root.get(KILOMETRES)));
+  }
+
+  /**
+   * Whether this execution of the specification returns entities rather than a count.
+   *
+   * <p>Spring Data runs the page and the count from the same specification. A fetch join in a count
+   * is invalid — Hibernate rejects it — and a count has no ordering, so both are guarded on this.
+   */
+  private static boolean returnsEntities(CriteriaQuery<?> query) {
+    return query != null
+        && !Long.class.equals(query.getResultType())
+        && !long.class.equals(query.getResultType());
+  }
+
+  /**
+   * One left join, fetched when the query returns entities.
+   *
+   * <p>The cast is safe and is the standard way to use a fetch as a join: Hibernate's {@code Fetch}
+   * implementations are {@code Join}s. It is what lets one join serve both the predicate and the
+   * projection instead of creating a second one.
+   */
+  private static From<?, ?> joinOrFetch(
+      Root<CrossingSiteEntity> root, String attribute, boolean projecting) {
+    return projecting
+        ? (From<?, ?>) root.fetch(attribute, JoinType.LEFT)
+        : root.join(attribute, JoinType.LEFT);
   }
 
   private static Optional<Predicate> contains(

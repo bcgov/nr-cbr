@@ -2,7 +2,10 @@ package ca.bc.gov.nrs.cbr.model.v1;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,15 +17,17 @@ import lombok.ToString;
 /**
  * {@code THE.CROSSING_STRUCTURE} — a bridge or culvert standing on a crossing site.
  *
- * <p><b>Only enough of it to answer "does this site have any structures?"</b> The real table is wide
- * and is the root of the inspection, repair and monitoring trees; none of that is mapped, because
- * the one thing that reads this today is the guard on deleting a site. The rest arrives with the
- * structure screens.
+ * <p><b>Only the columns its two readers need.</b> The real table is wide and is the root of the
+ * inspection, repair and monitoring trees; most of it is unmapped, and arrives with the structure
+ * screens. What is here serves the guard on deleting a site, and Inspection Search — which reaches
+ * the site through this table, filters on the structure's name and type, and reads
+ * {@code CLOSE_PROXIMITY_IND} for one of its four toggles.
  *
- * <p>{@code crossingSiteId} is deliberately a plain column rather than an association back to
- * {@link CrossingSiteEntity}. The real foreign key ({@code CRS_CS_FK}) exists in Oracle either way;
- * mapping it as an association here would make the delete guard load a site in order to count its
- * children, which is the wrong way round.
+ * <p>{@code crossingSiteId} stays a plain column <em>as well as</em> an association. The column is
+ * what the delete guard counts by — loading a site in order to count its children is the wrong way
+ * round — while {@link #site} is what a search traverses to reach the site's road, district and
+ * project file. Both map {@code CRS_CS_FK}; the association is read-only
+ * ({@code insertable = false}) so only one of them can ever write it.
  */
 @Entity
 @Table(name = "CROSSING_STRUCTURE", schema = "THE")
@@ -41,6 +46,27 @@ public class CrossingStructureEntity {
   @Column(name = "CROSSING_SITE_ID", length = 14)
   private String crossingSiteId;
 
+  /** "The display name of the structure entity." Labelled "Structure #" on both search screens. */
+  @Column(name = "CROSSING_STRUCTURE_NAME", length = 14)
+  private String crossingStructureName;
+
+  /**
+   * The discriminator: bridge → {@code FOREST_SERVICE_BRIDGE}, culvert →
+   * {@code FOREST_SERVICE_CULVERT}. It also decides which inspection subsections and repair types
+   * apply (cbr-data-model.local.md §2).
+   */
+  @Column(name = "STRUCTURE_TYPE_CLASS_CODE", length = 10)
+  private String structureTypeClassCode;
+
+  /**
+   * {@code 'Y'} or {@code 'N'} — whether a close-proximity inspection is required.
+   *
+   * <p>On the structure, not on the inspection, which is why Inspection Search has to traverse to
+   * get at it.
+   */
+  @Column(name = "CLOSE_PROXIMITY_IND", length = 1)
+  private String closeProximityInd;
+
   /**
    * {@code 'Y'} or {@code 'N'} — "Determines if the current structure is active or not."
    *
@@ -50,4 +76,9 @@ public class CrossingStructureEntity {
    */
   @Column(name = "ACTIVE_IND", length = 1)
   private String activeInd;
+
+  /** The site the structure stands on <em>now</em> — see the note on {@code crossingSiteId} above. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "CROSSING_SITE_ID", insertable = false, updatable = false)
+  private CrossingSiteEntity site;
 }

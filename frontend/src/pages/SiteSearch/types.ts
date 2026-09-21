@@ -88,15 +88,7 @@ export const EMPTY_CRITERIA: SiteSearchCriteria = {
 };
 
 /**
- * One page of results plus the true total. Mirrors the backend's `PagedResponse`.
- *
- * <p>`pageNumber` is zero-based, as Spring Data's is. Carbon's `Pagination` is one-based, so the
- * page component converts at its own edge rather than either side pretending otherwise.
+ * Re-exported so this file stays the one place the Site Search screen's shapes are named. The
+ * definition lives in `@/types/api` because Inspection Search speaks the same envelope.
  */
-export type PagedResponse<T> = {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  pageNumber: number;
-  pageSize: number;
-};
+export type { PagedResponse } from '@/types/api';

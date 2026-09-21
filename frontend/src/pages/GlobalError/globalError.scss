@@ -1,0 +1,20 @@
+@use '@carbon/react/scss/spacing' as *;
+
+.global-error__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-04;
+}
+
+// Development-only detail. `pre` does not wrap, and a stack trace is wider than any screen, so it
+// scrolls in its own box rather than stretching the page.
+.global-error__detail {
+  margin: 0;
+  padding: $spacing-05;
+  overflow-x: auto;
+  background: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle-01);
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}

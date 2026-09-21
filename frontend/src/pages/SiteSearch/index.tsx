@@ -10,20 +10,21 @@ import { EMPTY_CRITERIA, type SiteSearchCriteria, type SiteSearchResult } from '
 
 import './siteSearch.scss';
 
-import type { ApiError } from '@/config/api/types';
 import type { FC } from 'react';
 
+import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
 import {
   useForestDistricts,
   useManagementAreas,
-  useReferenceDataState,
+  useSiteReferenceDataState,
   useSiteStatusCodes,
   useSiteTypeCodes,
   useSpecialAccessCodes,
   useStructureInspectionStatusCodes,
 } from '@/hooks/useConfiguration';
 import { useDeleteSite, useSiteSearch } from '@/hooks/useSiteSearch';
+import { apiErrorMessage } from '@/utils/apiError';
 
 /**
  * Site Search — the first screen of the Inventory section.
@@ -38,26 +39,9 @@ import { useDeleteSite, useSiteSearch } from '@/hooks/useSiteSearch';
  * <p>Deleting a site is a hard delete and cannot be undone — see `SiteService.delete`. It is
  * reachable only to a role holding the destructive capability, and only behind a confirmation.
  */
-/**
- * The server's explanation for a failed delete, or a fallback.
- *
- * <p>A 409 body is an RFC 7807 problem detail whose `detail` says what still references the site.
- * That sentence is the whole value of the response — it is the only place the user learns that an
- * archived structure or a close-proximity inspection is in the way, neither of which the results
- * table shows.
- */
-const messageFor = (error: unknown, siteId: string): string => {
-  const body = (error as ApiError | undefined)?.body;
-  const detail =
-    body !== null && typeof body === 'object' && 'detail' in body ? body.detail : undefined;
-
-  return typeof detail === 'string' && detail.trim() !== ''
-    ? detail
-    : `Site ${siteId} could not be deleted. Try again, or contact support if this continues.`;
-};
-
 const SiteSearchPage: FC = () => {
   const { canDelete } = useAuthorization();
+  const { display } = useNotification();
 
   const [criteria, setCriteria] = useState<SiteSearchCriteria>(EMPTY_CRITERIA);
   /**
@@ -80,7 +64,6 @@ const SiteSearchPage: FC = () => {
    * what still references the site, and archived structures and close-proximity inspections are
    * both invisible from this table.
    */
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Carbon's Pagination is one-based; the backend, like Spring Data, is zero-based.
   const results = useSiteSearch(submitted, page - 1, pageSize);
@@ -96,7 +79,7 @@ const SiteSearchPage: FC = () => {
   // picked. Legacy does the same by posting the form back on change.
   const managementAreas = useManagementAreas(criteria.orgUnit);
 
-  const referenceData = useReferenceDataState();
+  const referenceData = useSiteReferenceDataState();
 
   /**
    * A failed lookup falls back to an empty list rather than blocking the form: every criterion is
@@ -197,19 +180,6 @@ const SiteSearchPage: FC = () => {
 
       {/* Legacy renders the results block only after a search (`<c:if test="${search}">`), so an
           untouched page is the form alone rather than an empty table implying zero matches. */}
-      {deleteError !== null && (
-        <Column sm={4} md={8} lg={16}>
-          <InlineNotification
-            kind="error"
-            lowContrast
-            title="The site was not deleted"
-            subtitle={deleteError}
-            data-testid="site-delete-error"
-            onCloseButtonClick={() => setDeleteError(null)}
-          />
-        </Column>
-      )}
-
       {submitted !== null && (
         <Column sm={4} md={8} lg={16}>
           {results.isError ? (
@@ -256,12 +226,30 @@ const SiteSearchPage: FC = () => {
           if (site === null) {
             return;
           }
-          setDeleteError(null);
           deleteSite.mutate(site.id, {
-            onSuccess: () => setPendingDelete(null),
+            onSuccess: () => {
+              setPendingDelete(null);
+              display({ kind: 'success', title: `Site ${site.id} deleted`, timeout: 4000 });
+            },
             onError: (error) => {
               setPendingDelete(null);
-              setDeleteError(messageFor(error, site.id));
+              // A toast rather than a banner on the page: the delete failed, so nothing on screen
+              // changed and there is no region to replace — the row is still in the table where the
+              // user left it. This is the split nr-frep and nr-fspts both use, and the one CBR had
+              // only half of: a region that failed to load explains itself in place, an action that
+              // failed reports back over the screen that is still working.
+              //
+              // `timeout` is ignored for an error kind — NotificationProvider pins it to 0, so the
+              // user dismisses this rather than watching the only explanation slide away.
+              display({
+                kind: 'error',
+                title: 'The site was not deleted',
+                subtitle: apiErrorMessage(
+                  error,
+                  `Site ${site.id} could not be deleted. Try again, or contact support if this continues.`,
+                ),
+                timeout: 0,
+              });
             },
           });
         }}

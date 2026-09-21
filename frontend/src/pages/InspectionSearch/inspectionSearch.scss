@@ -194,10 +194,3 @@
 .inspection-search__numeric {
   text-align: end;
 }
-
-// The "enter at least one criterion" notice, on its own full-width row directly above the buttons —
-// next to the Search button that triggered it, rather than at the top of a form the user has
-// scrolled past.
-.inspection-search__notice {
-  grid-column: 1 / -1;
-}
