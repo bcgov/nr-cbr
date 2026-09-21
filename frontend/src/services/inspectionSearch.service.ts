@@ -43,6 +43,29 @@ export class InspectionSearchService extends HttpClient {
       query: { ...populated(criteria), pageNumber, pageSize },
     });
   }
+  /**
+   * Deletes an offline inspection.
+   *
+   * <p>204 on success. 404 if it is already gone, 409 if it exists but is no longer offline — the
+   * body carries a sentence naming the status it holds instead, which the caller should show rather
+   * than replace with wording of its own.
+   *
+   * <p><b>Irreversible, and it takes more with it than the row.</b> The backend removes the
+   * inspection's attachments, repairs, monitor items, filled-in form, load rating and its entire
+   * status history, then re-derives the structure's load rating from whatever is left. Nothing
+   * records that the inspection existed.
+   *
+   * <p>Only an offline inspection can be deleted. The results table offers the control on an `OFL`
+   * row only, and the server refuses anything else — legacy enforces that rule in its JSP alone, so
+   * a hand-typed URL could delete a reviewed inspection there.
+   */
+  deleteInspection(inspectionId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/inspections/{inspectionId}',
+      path: { inspectionId },
+    });
+  }
 }
 
 /**

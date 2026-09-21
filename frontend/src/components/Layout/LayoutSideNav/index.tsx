@@ -40,13 +40,22 @@ export const LayoutSideNav: FC = () => {
   const menuEntries =
     online && isLoggedIn ? getMenuEntries(user?.roles || []) : getOfflineMenuEntries();
 
-  const renderMenuLink = (route: MenuItem) => (
+  /**
+   * An entry as a link.
+   *
+   * <p>`isActive` is an exact match for a leaf and a prefix match for a section, because a
+   * section's own path is never the address the user is on — `/inventory` redirects straight to
+   * `/inventory/site-search` — so an exact test would leave the rail with nothing lit.
+   */
+  const renderMenuLink = (route: MenuItem, isSection = false) => (
     <SideNavLink
       data-testid={`side-nav-link-${route.id}`}
       key={route.id}
       as={Link}
       to={route.path}
-      isActive={route.path === location.pathname}
+      isActive={
+        isSection ? location.pathname.startsWith(route.path) : route.path === location.pathname
+      }
       renderIcon={route.icon}
     >
       {route.id}
@@ -92,8 +101,16 @@ export const LayoutSideNav: FC = () => {
       className={`side-nav-drawer${isSideNavExpanded ? ' side-nav-drawer--open' : ''}`}
     >
       <SideNavItems>
+        {/* A section is a disclosure in the panel and a plain link in the rail.
+            `SideNavMenu` is a <button> that toggles a nested list, and at 48px wide there is
+            nowhere for that list to go — the rail stylesheet hides both the list and its chevron —
+            so pressing the icon would expand something that can never appear and the user would
+            get no navigation at all. As a link it goes to the section's own path, which redirects
+            to its first child (see routePaths), so the icon lands where it looks like it should. */}
         {menuEntries.map((route) =>
-          route.children ? renderMenuItem(route) : renderMenuLink(route),
+          route.children && isSideNavExpanded
+            ? renderMenuItem(route)
+            : renderMenuLink(route, Boolean(route.children)),
         )}
         {/* Support — pinned to the bottom of the nav regardless of how many role-dependent entries
             render above it (see the flex rules in index.scss). A plain mailto: rather than a route:

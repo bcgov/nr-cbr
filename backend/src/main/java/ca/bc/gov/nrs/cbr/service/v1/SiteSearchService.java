@@ -124,8 +124,9 @@ public class SiteSearchService {
    * A NUMBER as text, keeping the column's own scale.
    *
    * <p>{@code toPlainString} rather than {@code toString} so 11.00 stays "11.00" instead of becoming
-   * "1.1E+1" — the same reasoning as {@code AbstractCbrRepository.numberString}, which exists
-   * because a single unreadable value once failed a whole read.
+   * "1.1E+1". A NUMBER read as text through Oracle's own conversion can also throw outright on
+   * bytes that are not canonical, which is why nothing here goes near {@code rs.getString} on a
+   * numeric column.
    */
   private static String text(BigDecimal value) {
     return value == null ? null : value.toPlainString();

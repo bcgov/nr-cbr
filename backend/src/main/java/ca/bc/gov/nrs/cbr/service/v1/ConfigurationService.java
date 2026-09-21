@@ -20,12 +20,13 @@ import org.springframework.stereotype.Service;
 /**
  * Reference lookups that populate the UI's dropdowns. All ten are live.
  *
- * <h3>Two ways into the data, and when each applies</h3>
- * These are read with Spring Data JPA — an entity, a repository, a query — because each legacy
- * procedure is a bare {@code SELECT} with an {@code ORDER BY} and there is no business logic to
- * preserve. Anything that <em>does</em> have logic behind it stays on the stored procedure through
- * {@link ca.bc.gov.nrs.cbr.repository.AbstractCbrRepository}; that is the line between the two, not
- * "new code versus old".
+ * <h3>How the data is read</h3>
+ * With Spring Data JPA — an entity, a repository, a query — because each legacy procedure is a bare
+ * {@code SELECT} with an {@code ORDER BY} and there is nothing to preserve but the predicate and the
+ * order. That is now true of the whole application: CBR does not call the PL/SQL packages. Where a
+ * procedure carries real logic, it is ported with the rule made explicit — see
+ * {@link LoadRatingService}, which is {@code CBR.FIND_CRNT_LD_RATING_ID} written out — rather than
+ * invoked.
  *
  * <h3>The predicates are not obvious, and they are not this layer's business</h3>
  * Several of the legacy queries do something that reads as a defect and is not: site statuses and

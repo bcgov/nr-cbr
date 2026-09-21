@@ -1,11 +1,11 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
   InspectionSearchCriteria,
   InspectionSearchResult,
   PagedResponse,
 } from '@/pages/InspectionSearch/types';
-import type { UseQueryResult } from '@tanstack/react-query';
+import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
 
@@ -45,3 +45,25 @@ export const useInspectionSearch = (
     // which reads as a search that found nothing rather than one still loading.
     placeholderData: keepPreviousData,
   });
+
+/**
+ * Deletes an offline inspection, then makes every search result reflect it.
+ *
+ * <p>Invalidating the whole `inspection-search` key rather than removing the row locally: the
+ * deleted inspection changes the total and therefore the paging, and a page that drops a row
+ * without re-counting shows "20 matches" over nineteen rows. Refetching is one request and cannot
+ * disagree with the server.
+ *
+ * <p>The error is deliberately not translated here. A 409 arrives with a sentence naming the status
+ * the inspection actually holds — it stopped being offline while the results were on screen — and
+ * the user cannot see that from a table they may not have refreshed, so replacing it with "could
+ * not delete" would leave them with no next step.
+ */
+export const useDeleteInspection = (): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (inspectionId: string) => API.inspectionSearch.deleteInspection(inspectionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [INSPECTION_SEARCH_QUERY_KEY] }),
+  });
+};

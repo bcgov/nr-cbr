@@ -16,6 +16,7 @@ import './inspectionSearch.scss';
 
 import type { FC } from 'react';
 
+import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
 import {
   useBusinessAreas,
@@ -26,7 +27,8 @@ import {
   useManagementAreas,
   useStructureTypeClassCodes,
 } from '@/hooks/useConfiguration';
-import { useInspectionSearch } from '@/hooks/useInspectionSearch';
+import { useDeleteInspection, useInspectionSearch } from '@/hooks/useInspectionSearch';
+import { apiErrorMessage } from '@/utils/apiError';
 
 /**
  * Inspection Search — the first screen of the Inspection section.
@@ -46,10 +48,10 @@ import { useInspectionSearch } from '@/hooks/useInspectionSearch';
  * `UserLookupClient` rather than from `STRUCTURE_INSPECTION_REVIEWER` (decision D4). Building it
  * against the table first would be building it twice.
  *
- * <p><b>Delete is still a stub.</b> The control is gated correctly and the confirmation modal is
- * real, but there is no delete endpoint yet, so confirming closes the dialog and changes nothing.
- * Now that the rest of the screen queries for real, that gap is worth closing before a user with
- * `CBR_LEVEL_2` finds it — the wiring point is marked on the modal below.
+ * <p><b>Delete is real and irreversible.</b> It is offered on an `OFL` row only and to a role
+ * holding the destructive capability, and it removes the inspection's attachments, repairs, monitor
+ * items, form answers, load rating and status history along with it. The server enforces both the
+ * capability and the offline rule — legacy enforces the second in a JSP conditional alone.
  */
 const InspectionSearchPage: FC = () => {
   /**
@@ -57,6 +59,7 @@ const InspectionSearchPage: FC = () => {
    * destructive capability covers — `CBR_LEVEL_2` and above.
    */
   const { canDelete } = useAuthorization();
+  const { display } = useNotification();
 
   const [criteria, setCriteria] = useState<InspectionSearchCriteria>(EMPTY_CRITERIA);
   /**
@@ -84,6 +87,7 @@ const InspectionSearchPage: FC = () => {
   // `page` is 1-based because Carbon's Pagination is; the backend is 0-based, so the conversion
   // happens here rather than either side pretending otherwise.
   const results = useInspectionSearch(submitted, page - 1, pageSize);
+  const deleteInspection = useDeleteInspection();
 
   /**
    * A failed lookup falls back to an empty list rather than blocking the form: every criterion is
@@ -146,10 +150,14 @@ const InspectionSearchPage: FC = () => {
     // PageTitle renders its own <Column>, so the page owns the <Grid>. Everything else sits in one
     // full-width column and lays itself out with CSS grid — the nr-frep pattern.
     <Grid fullWidth className="default-grid">
+      {/* No `experimental` tag. The screen searches, pages, sorts and deletes against real
+          endpoints, so an "Under construction" badge would now be telling users not to trust
+          results that are correct. The one filter that is still unfinished says so on itself —
+          Reviewed By is disabled with a reason — which is a claim about that control rather than
+          about the page. */}
       <PageTitle
         title="Inspection Search"
         subtitle="Find inspections by structure, location, date, inspector or status."
-        experimental
         breadCrumbs={[{ name: 'Inspection', path: '/inspection' }]}
       />
 
@@ -219,11 +227,50 @@ const InspectionSearchPage: FC = () => {
       <DestructiveModal
         open={pendingDelete !== null}
         title="Delete offline inspection"
-        message={`Are you sure you would like to delete offline inspection ${pendingDelete?.id ?? ''}?`}
+        message={
+          `Are you sure you would like to delete offline inspection ${pendingDelete?.id ?? ''}? ` +
+          'Its attachments, repairs, monitor items and history are deleted with it. ' +
+          'This cannot be undone.'
+        }
         confirmButtonText="Delete"
+        loading={deleteInspection.isPending}
         onCancel={() => setPendingDelete(null)}
-        // No endpoint to call yet, so confirming just closes. The wiring point is here.
-        onConfirm={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const inspection = pendingDelete;
+          if (inspection === null) {
+            return;
+          }
+          deleteInspection.mutate(inspection.id, {
+            onSuccess: () => {
+              setPendingDelete(null);
+              display({
+                kind: 'success',
+                title: `Inspection ${inspection.id} deleted`,
+                timeout: 4000,
+              });
+            },
+            onError: (error) => {
+              setPendingDelete(null);
+              // A toast rather than a banner: the delete failed, so nothing on screen changed and
+              // there is no region to replace — the row is still in the table where the user left
+              // it. Same split as Site Search, and as nr-frep and nr-fspts.
+              //
+              // The server's sentence matters more here than on a site. A 409 means the inspection
+              // stopped being offline while the results were on screen — someone else took it — and
+              // the status it names is the only way the user learns that.
+              display({
+                kind: 'error',
+                title: 'The inspection was not deleted',
+                subtitle: apiErrorMessage(
+                  error,
+                  `Inspection ${inspection.id} could not be deleted. Try again, or contact support ` +
+                    'if this continues.',
+                ),
+                timeout: 0,
+              });
+            },
+          });
+        }}
       />
     </Grid>
   );

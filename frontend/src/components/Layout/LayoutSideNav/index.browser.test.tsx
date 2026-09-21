@@ -127,15 +127,42 @@ describe('LayoutSideNav', () => {
     expect(profileLink).toHaveClass('cds--side-nav__link--current');
   });
 
-  it('marks the SECTION active too, which is all the collapsed rail can show', async () => {
-    // With the nav collapsed the children are hidden, so the section itself has to carry the state
-    // or the user loses every trace of where they are. Carbon puts `--active` on the <li> when
-    // `isActive` is passed, which LayoutSideNav derives from the path prefix; the rail stylesheet
-    // paints that. Asserted on the class rather than the paint because the styling is CSS-only.
+  it('marks the SECTION active too, not just the child inside it', async () => {
+    // Carbon puts `--active` on the <li> when `isActive` is passed, which LayoutSideNav derives
+    // from the path prefix. Asserted on the class rather than the paint because the styling is
+    // CSS-only.
     await renderWithProviders('/settings/profile');
 
     const section = screen.getByText('Settings').closest('li');
     expect(section).toHaveClass('cds--side-nav__item--active');
+  });
+
+  /**
+   * The rail is 48px wide and hides both the submenu and its chevron, so a section rendered as
+   * Carbon's `SideNavMenu` would be a button toggling a list that can never appear — the user
+   * presses the icon and nothing happens, which is exactly what was reported. In the rail the
+   * section is a link instead, to its own path, which redirects to its first child.
+   */
+  it('makes a collapsed section navigate rather than toggle a submenu that cannot open', async () => {
+    layoutMock.isSideNavExpanded = false;
+    await renderWithProviders('/dashboard');
+
+    const section = screen.getByTestId('side-nav-link-Settings');
+    expect(section.tagName).toBe('A');
+    expect(section).toHaveAttribute('href', '/settings');
+    // The disclosure button is gone, so there is nothing left that swallows the click.
+    expect(document.querySelector('.cds--side-nav__submenu')).toBeNull();
+  });
+
+  it('lights the collapsed section for a child route, whose path it never exactly matches', async () => {
+    // `/settings` is never the address bar's value — it redirects to `/settings/profile` — so the
+    // rail link has to match on the prefix or the user loses every trace of where they are.
+    layoutMock.isSideNavExpanded = false;
+    await renderWithProviders('/settings/profile');
+
+    expect(screen.getByTestId('side-nav-link-Settings')).toHaveClass(
+      'cds--side-nav__link--current',
+    );
   });
 
   it('gives the section a title element for the rail tooltip to reuse', async () => {

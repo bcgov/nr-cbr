@@ -413,11 +413,23 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
         )}
         {text('inspectorName', 'Inspector Name', 255)}
 
+        {/* Disabled, not hidden.
+            The reviewer list is the one filter on this form with nothing behind it, and it will stay
+            that way until decision D4 settles where reviewers come from — the
+            `STRUCTURE_INSPECTION_REVIEWER` table, or FAM through `UserLookupClient`
+            (cbr-inspection-reviewer.local.md §7).
+
+            Left enabled it offers a filter that silently does nothing: the only option is "Anyone",
+            which is the same as not filtering, so a user could believe they had narrowed a search
+            when they had not. Removed entirely, the form would quietly lose a criterion the legacy
+            screen has, and the gap would be invisible to anyone comparing the two. Greyed out with a
+            reason says what is true — the filter exists and is not available yet. */}
         <Select
           id="inspection-search-inspectionReviewerId"
           data-testid="inspection-search-inspectionReviewerId"
           labelText="Reviewed By"
-          disabled={codeTablesLoading}
+          disabled
+          helperText="Not available yet"
           value={criteria.inspectionReviewerId}
           onChange={(event) => onChange('inspectionReviewerId', event.target.value)}
         >
