@@ -7,11 +7,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 /**
@@ -76,6 +78,28 @@ public class CrossingStructureEntity {
    */
   @Column(name = "ACTIVE_IND", length = 1)
   private String activeInd;
+
+  /**
+   * The structure's current capacity in tons, denormalized from {@code STRUCTURE_LOAD_RATING}.
+   *
+   * <p>Not a value anything sets directly: it is a copy of whichever rating
+   * {@code LoadRatingService.currentLoadRatingId} resolves for this structure, and it is rewritten
+   * whenever the set of ratings changes — including when an inspection that supplied one is deleted.
+   * {@code null} when the structure has no rating at all.
+   */
+  @Setter
+  @Column(name = "CURRENT_LOAD_RATING")
+  private BigDecimal currentLoadRating;
+
+  /**
+   * {@code 'Y'} or {@code 'N'} — whether the structure's capacity is unknown.
+   *
+   * <p>Set to {@code 'Y'} when the rating that was current is removed, which is the first of the two
+   * corrections an inspection delete makes to its parent structure.
+   */
+  @Setter
+  @Column(name = "LOAD_RATING_UNKNOWN_INDICATOR", length = 1)
+  private String loadRatingUnknownIndicator;
 
   /** The site the structure stands on <em>now</em> — see the note on {@code crossingSiteId} above. */
   @ManyToOne(fetch = FetchType.LAZY)

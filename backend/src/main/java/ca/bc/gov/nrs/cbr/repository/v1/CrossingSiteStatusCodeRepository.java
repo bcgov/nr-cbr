@@ -9,12 +9,13 @@ import org.springframework.stereotype.Repository;
 /**
  * {@code THE.CROSSING_SITE_STATUS_CODE}.
  *
- * <p>The first Spring Data repository in CBR. It sits alongside
- * {@link ca.bc.gov.nrs.cbr.repository.AbstractCbrRepository}, not in place of it: the stored
- * procedures stay the route for anything with business logic behind it, and the two live in
- * different packages so which one a class uses is visible from its imports. A code table has no
- * logic behind it — {@code CBR.FIND_SITE_STATUSES} is a bare {@code SELECT} — so it is a plain
- * read, and Hibernate does it with less ceremony than a REF CURSOR.
+ * <p>The first Spring Data repository in CBR, and at the time it was written it sat alongside a
+ * stored-procedure base class rather than replacing it. That is no longer the arrangement: CBR reads
+ * and writes through Hibernate, and the legacy PL/SQL is a reference for what the rules are rather
+ * than the route to them. {@code CBR.FIND_SITE_STATUSES} is a bare {@code SELECT} and this is the
+ * same query with less ceremony than a REF CURSOR; where a procedure does carry logic — the
+ * inspection delete's load-rating correction, for instance — that logic is ported rather than
+ * called (see {@code LoadRatingService}).
  */
 @Repository
 public interface CrossingSiteStatusCodeRepository

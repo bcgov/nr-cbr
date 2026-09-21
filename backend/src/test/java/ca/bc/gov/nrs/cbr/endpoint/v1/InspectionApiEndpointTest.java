@@ -10,22 +10,35 @@ import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
  * Pins the search contract and its gate.
  *
- * <p>Thinner than {@link SiteApiEndpointTest}, because there is one operation and it is a read. The
- * tests worth having are the ones that would otherwise fail silently: an unguarded endpoint keeps
- * working, and criteria bound without {@code @Valid} turn a misformatted month into a filter that is
- * quietly dropped rather than a 400 — which widens the search instead of refusing it.
+ * <p>The tests worth having are the ones that would otherwise fail silently: an unguarded endpoint
+ * keeps working; criteria bound without {@code @Valid} turn a misformatted month into a filter that
+ * is quietly dropped rather than a 400, widening the search instead of refusing it; and a delete
+ * whose {@code @PreAuthorize} slipped to {@link CbrAuthorities#READ} would leave every reader able
+ * to destroy inspections, with nothing failing and nothing to notice.
+ *
+ * <p>The contrast between the two gates is the point of testing them together — the same reasoning
+ * {@link SiteApiEndpointTest} gives for its pair.
  */
 class InspectionApiEndpointTest {
 
   private static Method searchInspections() {
+    return method("searchInspections");
+  }
+
+  private static Method deleteInspection() {
+    return method("deleteInspection");
+  }
+
+  private static Method method(String name) {
     return Arrays.stream(InspectionApiEndpoint.class.getDeclaredMethods())
-        .filter(candidate -> candidate.getName().equals("searchInspections"))
+        .filter(candidate -> candidate.getName().equals(name))
         .findFirst()
         .orElseThrow();
   }
@@ -59,5 +72,35 @@ class InspectionApiEndpointTest {
     assertThat(method.getParameters()[0].getAnnotation(Valid.class))
         .as("criteria are bound without @Valid")
         .isNotNull();
+  }
+
+  @Test
+  @DisplayName("delete is DELETE /api/v1/inspections/{inspectionId}")
+  void deleteIsMapped() {
+    assertThat(deleteInspection().getAnnotation(DeleteMapping.class).value())
+        .containsExactly("/{inspectionId}");
+  }
+
+  @Test
+  @DisplayName("delete is gated on DESTRUCTIVE, not on READ")
+  void deleteRequiresDestructive() {
+    // The one operation on this endpoint that destroys data, and it takes an inspection's whole
+    // audit trail with it. A @PreAuthorize widened to READ here would leave every role that can
+    // search able to delete, and nothing would fail.
+    PreAuthorize preAuthorize = deleteInspection().getAnnotation(PreAuthorize.class);
+
+    assertThat(preAuthorize).isNotNull();
+    assertThat(preAuthorize.value()).isEqualTo(CbrAuthorities.DESTRUCTIVE);
+    assertThat(preAuthorize.value()).isNotEqualTo(CbrAuthorities.READ);
+  }
+
+  @Test
+  @DisplayName("searching and deleting do not share a gate")
+  void theTwoOperationsAreGatedDifferently() {
+    // Legacy gates them on different privileges — /showInspectionSearch, which every reader holds,
+    // and /deleteInspection, which two roles hold. Collapsing them to one gate in either direction
+    // is a security change disguised as a tidy-up.
+    assertThat(searchInspections().getAnnotation(PreAuthorize.class).value())
+        .isNotEqualTo(deleteInspection().getAnnotation(PreAuthorize.class).value());
   }
 }
