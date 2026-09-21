@@ -1,3 +1,4 @@
+import { ClientService } from './client.service';
 import { ConfigurationService } from './configuration.service';
 import { InspectionSearchService } from './inspectionSearch.service';
 import { SiteSearchService } from './siteSearch.service';
@@ -51,6 +52,7 @@ BackendApiConfig.TOKEN = async () => {
  * controller as the screens land.
  */
 const API = {
+  client: new ClientService(BackendApiConfig),
   configuration: new ConfigurationService(BackendApiConfig),
   siteSearch: new SiteSearchService(BackendApiConfig),
   inspectionSearch: new InspectionSearchService(BackendApiConfig),

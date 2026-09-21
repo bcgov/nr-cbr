@@ -1,10 +1,15 @@
 import { Search as SearchIcon } from '@carbon/icons-react';
 import { Button, Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
+import ClientCombo from '@/components/core/ClientCombo';
+
 import { criteriaErrors } from './validation';
 
 import type { CodeOption, OrgUnitOption, SiteSearchCriteria as Criteria } from './types';
+import type { ClientSuggestion } from '@/types/client';
 import type { FC, SubmitEventHandler } from 'react';
+
+import { clientLabel } from '@/utils/clientSearch';
 
 export type CodeTables = {
   siteStatusCodes: CodeOption[];
@@ -29,13 +34,23 @@ type Props = {
   onChange: <K extends keyof Criteria>(field: K, value: Criteria[K]) => void;
   onSearch: () => void;
   onReset: () => void;
+  /**
+   * Bumped by the page each time Reset is pressed.
+   *
+   * <p>Only the Designated Maintainer lookup needs it. Carbon's ComboBox keeps its
+   * `allowCustomValue` text in its own state, where emptying the criteria cannot reach it, so the
+   * control is remounted to clear it — and this is what says when. Deriving the same signal from
+   * the criteria going blank does not work: the criteria are also blank before the user's first
+   * keystroke, so the field would remount as they began typing and swallow the character.
+   */
+  resetToken: number;
 };
 
 /**
  * The Site Search criteria form.
  *
- * <p>All 17 fields from the legacy `site_search.jsp`, in the legacy order and with the legacy
- * labels. The labels are the vocabulary the business already uses and appear in their
+ * <p>Every field from the legacy `site_search.jsp`, in the legacy order and with the legacy
+ * labels — except that its three maintainer boxes are one lookup here; see `selectMaintainer`. The labels are the vocabulary the business already uses and appear in their
  * documentation, so they are kept verbatim rather than modernised — "Project File ID#",
  * "Designated Maintainer Client Number", "Incomplete Data?" and the rest.
  *
@@ -63,6 +78,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
   onChange,
   onSearch,
   onReset,
+  resetToken,
 }) => {
   // Typed as the handler rather than the event: React 19 deprecated `FormEvent` ("FormEvent
   // doesn't actually exist"), and naming the prop's own type — `onSubmit?: SubmitEventHandler<T>` —
@@ -99,6 +115,36 @@ const SiteSearchCriteriaForm: FC<Props> = ({
       {...extra}
     />
   );
+
+  /**
+   * A maintainer was picked from the lookup.
+   *
+   * <p>A pick is the precise form of this filter — it names one client at one location — so it
+   * replaces any name still in `primaryUserName` rather than adding to it. Both would otherwise
+   * apply, and a user who typed "canfor" and then picked a Canfor office would be searching for
+   * sites that matched both conditions without being told.
+   */
+  const selectMaintainer = (client: ClientSuggestion | null) => {
+    onChange('clientNumber', client?.clientNumber ?? '');
+    onChange('clientLocationCode', client?.clientLocnCode ?? '');
+    onChange('maintainerLabel', client ? clientLabel(client) : '');
+    onChange('primaryUserName', '');
+  };
+
+  /**
+   * The user typed something that is not a pick.
+   *
+   * <p>It still searches, on the client name — which is what this field did before the lookup
+   * existed, and what a term like "canfor" needs: several distinct clients carry that name, and no
+   * single pick covers them. nr-frep's equivalent refuses the search and marks the field instead;
+   * CBR does not have to, because the backend has accepted a name here all along.
+   */
+  const typeMaintainer = (term: string) => {
+    onChange('primaryUserName', term);
+    onChange('clientNumber', '');
+    onChange('clientLocationCode', '');
+    onChange('maintainerLabel', '');
+  };
 
   /**
    * A code-table dropdown.
@@ -219,9 +265,23 @@ const SiteSearchCriteriaForm: FC<Props> = ({
           codeTables.structureInspectionStatusCodes,
         )}
         {text('forestServiceRoad', 'Forest Service Road', 20)}
-        {text('clientNumber', 'Designated Maintainer Client Number', 8)}
+        {/* One field where legacy had three — "Designated Maintainer Client Number", "Client
+            Location Code" and "Designated Maintainer" — because a maintainer is one thing and the
+            first two are halves of its key. Picking a suggestion fills both; typing a name that
+            matches nothing still searches on the name.
+
+            Remounted on Reset — see `resetToken`. Carbon keeps `allowCustomValue` text in its own
+            internal state, so clearing the criteria alone would leave the typed name sitting in a
+            field that no longer filters on it. */}
+        <ClientCombo
+          key={resetToken}
+          id="site-search-maintainer"
+          titleText="Designated Maintainer"
+          selectedLabel={criteria.maintainerLabel}
+          onSelect={selectMaintainer}
+          onTermChange={typeMaintainer}
+        />
         {text('crossingName', 'Crossing Name', 20)}
-        {text('clientLocationCode', 'Client Location Code', 2)}
 
         {orgUnitSelect('orgUnit', 'Forest District', 'Any district', codeTables.forestDistricts)}
         {orgUnitSelect(
@@ -243,7 +303,6 @@ const SiteSearchCriteriaForm: FC<Props> = ({
           codeTables.specialAccessCodes,
         )}
         {codeSelect('siteTypeCode', 'Site Type', 'Any site type', codeTables.siteTypeCodes)}
-        {text('primaryUserName', 'Designated Maintainer', 35)}
 
         {/* Toggles rather than checkboxes. Both are filters that are either applied or not, and a
             toggle states its current position in words ("Off"/"On") instead of leaving the user to

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { userEvent } from '@vitest/browser/context';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -36,9 +37,10 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 // Mocked at the service rather than at the hook, so the query key, the fallback to an empty list
 // and the error branch are all exercised by these tests instead of being stubbed past.
 const siteSearchApi = vi.hoisted(() => ({ searchSites: vi.fn(), deleteSite: vi.fn() }));
+const clientApi = vi.hoisted(() => ({ searchClients: vi.fn() }));
 
 vi.mock('@/services/APIs', () => ({
-  default: { configuration: api, siteSearch: siteSearchApi },
+  default: { configuration: api, siteSearch: siteSearchApi, client: clientApi },
 }));
 
 const renderPage = (canDelete = false) => {
@@ -99,6 +101,8 @@ beforeEach(() => {
   siteSearchApi.searchSites.mockResolvedValue(emptyPage());
   siteSearchApi.deleteSite.mockReset();
   siteSearchApi.deleteSite.mockResolvedValue(undefined);
+  clientApi.searchClients.mockReset();
+  clientApi.searchClients.mockResolvedValue([]);
   // Shared across tests because vi.hoisted runs once — without this a "was a toast shown" assertion
   // passes on a call the previous test made.
   display.mockClear();
@@ -119,9 +123,11 @@ describe('SiteSearchPage — criteria form', () => {
       'roadSectionId',
       'structureInspectionStatusCode',
       'forestServiceRoad',
-      'clientNumber',
+      // One control where legacy had three boxes: "Designated Maintainer Client Number", "Client
+      // Location Code" and "Designated Maintainer". The criteria behind it are unchanged — a pick
+      // sets the number and the location code, typed text searches the name.
+      'maintainer',
       'crossingName',
-      'clientLocationCode',
       'orgUnit',
       'kiloStart',
       'kiloEnd',
@@ -130,7 +136,6 @@ describe('SiteSearchPage — criteria form', () => {
       'userKmEnd',
       'specialAccessCode',
       'siteTypeCode',
-      'primaryUserName',
       'incomplete',
       'capitalRoad',
     ]) {
@@ -143,7 +148,11 @@ describe('SiteSearchPage — criteria form', () => {
 
     expect(screen.getByLabelText('Site #')).toBeInTheDocument();
     expect(screen.getByLabelText('Project File ID#')).toBeInTheDocument();
-    expect(screen.getByLabelText('Designated Maintainer Client Number')).toBeInTheDocument();
+    // "Designated Maintainer", not "...Client Number": the lookup asks for the maintainer, and the
+    // client number is now something it returns rather than something the user is made to know.
+    // By role, because Carbon's ComboBox labels both the input and its toggle button — and because
+    // asserting the role is what pins this as a lookup rather than the text box it replaced.
+    expect(screen.getByRole('combobox', { name: 'Designated Maintainer' })).toBeInTheDocument();
     // The two filters are Carbon Toggles, which label a `switch` by aria-labelledby rather than a
     // <label for>. Asserting the role as well as the name keeps this honest about the control type.
     expect(screen.getByRole('switch', { name: /Incomplete Data\?/ })).toBeInTheDocument();
@@ -208,8 +217,8 @@ describe('SiteSearchPage — criteria form', () => {
     renderPage();
 
     expect(screen.getByTestId('site-search-siteId')).toHaveAttribute('maxlength', '14');
-    expect(screen.getByTestId('site-search-clientLocationCode')).toHaveAttribute('maxlength', '2');
-    expect(screen.getByTestId('site-search-primaryUserName')).toHaveAttribute('maxlength', '35');
+    expect(screen.getByTestId('site-search-forestFileId')).toHaveAttribute('maxlength', '10');
+    expect(screen.getByTestId('site-search-crossingName')).toHaveAttribute('maxlength', '20');
   });
 
   it('records what the user types', () => {
@@ -907,5 +916,92 @@ describe('SiteSearchPage — deleting a site', () => {
     await searchAndWait();
 
     expect(screen.queryByTestId('site-delete-SITE-1')).not.toBeInTheDocument();
+  });
+});
+
+describe('SiteSearchPage — Designated Maintainer', () => {
+  const canfor = {
+    clientNumber: '00001012',
+    clientLocnCode: '00',
+    clientName: 'CANFOR CORPORATION',
+    clientLocnName: null,
+    city: 'Vancouver',
+  };
+
+  const maintainerField = () => screen.getByRole('combobox', { name: 'Designated Maintainer' });
+
+  /** The criteria the page sent on the most recent search. */
+  const sentCriteria = () => siteSearchApi.searchSites.mock.calls.at(-1)?.[0];
+
+  it('does not look anything up until the term could narrow something', async () => {
+    // Two letters match a large share of the client table, so the request is pure cost. The
+    // backend applies the same floor; this stops the round trip happening at all.
+    renderPage();
+
+    await userEvent.fill(maintainerField(), 'ca');
+
+    await waitFor(() => {
+      expect(clientApi.searchClients).not.toHaveBeenCalled();
+    });
+  });
+
+  it('looks up a term once the user stops typing, not once per keystroke', async () => {
+    renderPage();
+
+    await userEvent.fill(maintainerField(), 'canfor');
+
+    await waitFor(() => {
+      expect(clientApi.searchClients).toHaveBeenCalledWith('canfor');
+    });
+    expect(clientApi.searchClients).toHaveBeenCalledTimes(1);
+  });
+
+  it('searches on the client number and location code once a suggestion is picked', async () => {
+    // The pair is what CROSSING_SITE records and what CRS_CL_FK1 constrains, so a pick filters on
+    // both halves — which is exactly what the legacy lookup popup wrote back into the form.
+    clientApi.searchClients.mockResolvedValue([canfor]);
+    renderPage();
+
+    await userEvent.fill(maintainerField(), 'canfor');
+    await userEvent.click(await screen.findByText(/CANFOR CORPORATION/));
+    await searchAndWait();
+
+    expect(sentCriteria()).toMatchObject({
+      clientNumber: '00001012',
+      clientLocationCode: '00',
+      // A pick is the precise form of the filter, so the name it replaces must not still apply.
+      primaryUserName: '',
+    });
+  });
+
+  it('still searches on the name when the term matches no suggestion', async () => {
+    // What the field did before the lookup existed, and what a term like "canfor" needs — several
+    // distinct clients carry that name and no single pick covers them. nr-frep refuses the search
+    // here instead; CBR does not have to, because the backend has accepted a name all along.
+    clientApi.searchClients.mockResolvedValue([]);
+    renderPage();
+
+    await userEvent.fill(maintainerField(), 'canfor');
+    await searchAndWait();
+
+    expect(sentCriteria()).toMatchObject({
+      primaryUserName: 'canfor',
+      clientNumber: '',
+      clientLocationCode: '',
+    });
+  });
+
+  it('clears the field on Reset, text and all', async () => {
+    // Carbon holds `allowCustomValue` text in its own state, so clearing the criteria is not
+    // enough on its own — the component is remounted. Without that the name stays on screen
+    // looking like a filter that is no longer applied.
+    renderPage();
+
+    await userEvent.fill(maintainerField(), 'canfor');
+    fireEvent.click(screen.getByTestId('site-search-reset'));
+
+    await waitFor(() => {
+      expect(maintainerField()).toHaveValue('');
+    });
   });
 });

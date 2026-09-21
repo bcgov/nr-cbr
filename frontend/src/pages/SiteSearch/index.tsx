@@ -57,6 +57,11 @@ const SiteSearchPage: FC = () => {
   const [pageSize, setPageSize] = useState(20);
   const [pendingDelete, setPendingDelete] = useState<SiteSearchResult | null>(null);
   /**
+   * Incremented by {@link reset}, to remount the one control that cannot be cleared by emptying the
+   * criteria — see the `resetToken` prop on the criteria form.
+   */
+  const [resetToken, setResetToken] = useState(0);
+  /**
    * Why the last delete was refused, if it was.
    *
    * <p>Held on the page rather than read from the mutation, because the modal closes on failure and
@@ -130,6 +135,7 @@ const SiteSearchPage: FC = () => {
     setCriteria(EMPTY_CRITERIA);
     setSubmitted(null);
     setPage(1);
+    setResetToken((token) => token + 1);
   }, []);
 
   return (
@@ -173,6 +179,7 @@ const SiteSearchPage: FC = () => {
           codeTablesLoading={referenceData.isLoading}
           managementAreasLoading={managementAreas.isFetching}
           onChange={updateCriteria}
+          resetToken={resetToken}
           onSearch={search}
           onReset={reset}
         />

@@ -17,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
@@ -77,7 +78,6 @@ public final class InspectionSearchSpecifications {
 
   private InspectionSearchSpecifications() {}
 
-  /** Legacy's {@code Search.LIKE} is an unanchored contains. */
   private static final String WILDCARD = "%";
 
   /** Legacy parses both date bounds with {@code SimpleDateFormat("yyyy/MM")}. */
@@ -508,12 +508,34 @@ public final class InspectionSearchSpecifications {
         : parent.join(attribute, type);
   }
 
+  /**
+   * Legacy's {@code Search.LIKE}: an unanchored, case-insensitive contains.
+   *
+   * <p><b>The case folding is legacy's, and it was missing here.</b>
+   * {@code AbstractOracleDMLDAO.generateWhere} emits
+   * {@code UPPER(col) LIKE UPPER('%'||?||'%')} for every criterion not declared case-sensitive,
+   * and nothing on either search form declares one — {@code SearchCriteriaDTO.caseSensitive} is a
+   * primitive that defaults to {@code false}, and the only two calls that set it true are
+   * {@code EQUALS} predicates in an internal count, which never reach this branch at all.
+   *
+   * <p>Without it these matched only the stored casing. That is invisible on a code column, which
+   * is upper-case either way, and wrong on every name: typing {@code Deadman Creek} found nothing,
+   * because {@code CROSSING_NAME} holds {@code DEADMAN CREEK}.
+   *
+   * <p><b>No index is given up by wrapping the column.</b> The leading wildcard already rules out a
+   * range scan, so these were full scans before {@code UPPER} was applied and are full scans after.
+   *
+   * <p>The value is folded in Java rather than by a second {@code UPPER} in SQL. It is the same
+   * comparison, one function call cheaper per row, and {@link Locale#ROOT} keeps it so — a
+   * default-locale fold turns a Turkish {@code i} into {@code İ} and stops matching.
+   */
   private static Optional<Predicate> contains(
       CriteriaBuilder builder, Expression<String> path, String value) {
     if (!StringUtils.hasText(value)) {
       return Optional.empty();
     }
-    return Optional.of(builder.like(path, WILDCARD + value.trim() + WILDCARD));
+    return Optional.of(builder.like(
+        builder.upper(path), WILDCARD + value.trim().toUpperCase(Locale.ROOT) + WILDCARD));
   }
 
   private static Optional<Predicate> equals(

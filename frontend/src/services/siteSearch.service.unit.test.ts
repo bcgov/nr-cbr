@@ -40,6 +40,29 @@ const criteria = (overrides: Partial<SiteSearchCriteria> = {}): SiteSearchCriter
 });
 
 describe('SiteSearchService', () => {
+  it('never puts the maintainer label on the wire', async () => {
+    // It exists so the combo box has something to display. What the server filters on is the pair
+    // beside it, which travels on its own — sending the label would put a client's name in every
+    // search URL to no effect.
+    const { service, request } = withMockedRequest();
+
+    await service.searchSites(
+      criteria({
+        maintainerLabel: 'CANFOR CORPORATION · Vancouver · 00001012-00',
+        clientNumber: '00001012',
+        clientLocationCode: '00',
+      }),
+      0,
+      20,
+    );
+
+    const url = urlOf(request);
+    expect(url).not.toContain('maintainerLabel');
+    expect(url).not.toContain('CANFOR');
+    expect(url).toContain('clientNumber=00001012');
+    expect(url).toContain('clientLocationCode=00');
+  });
+
   it('calls the search endpoint with paging', async () => {
     const { service, request } = withMockedRequest();
 

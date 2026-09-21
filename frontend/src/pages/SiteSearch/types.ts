@@ -44,6 +44,16 @@ export type SiteSearchCriteria = {
   capitalRoad: boolean;
   /** Designated Maintainer, by name rather than client number. */
   primaryUserName: string;
+  /**
+   * The label of the maintainer picked from the lookup, e.g.
+   * `CANFOR CORPORATION · Vancouver · 00001012-00`.
+   *
+   * <p><b>Display state, not a criterion.</b> It is held here rather than inside the combo box so
+   * that Reset clears it with everything else, and it is the one field `populated()` in
+   * `siteSearch.service` refuses to send — the server filters on the number and the location code,
+   * which are carried separately.
+   */
+  maintainerLabel: string;
 };
 
 /** A row of the results table. */
@@ -85,6 +95,7 @@ export const EMPTY_CRITERIA: SiteSearchCriteria = {
   siteTypeCode: '',
   capitalRoad: false,
   primaryUserName: '',
+  maintainerLabel: '',
 };
 
 /**
