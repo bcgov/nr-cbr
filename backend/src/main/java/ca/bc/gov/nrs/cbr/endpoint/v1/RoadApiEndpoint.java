@@ -24,20 +24,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface RoadApiEndpoint {
 
   /**
-   * The road section named by a Project File ID# and a Br.
-   *
-   * <p>Gated on {@link CbrAuthorities#READ}: it fills in a field on screens that are themselves
-   * READ-gated, so a token holder with no CBR role has nothing to do with it.
-   *
-   * <p><b>Query parameters, not a path.</b> {@code ROAD_SECTION_ID} is thirty characters of free
-   * text — a path segment would have to be encoded and decoded correctly by every caller for a
-   * value that may contain a slash.
-   *
-   * <p>404 when the view holds no such section, which is the ordinary answer while the user is
-   * still typing either half — and the only answer in an environment provisioned from nr-mof-db,
-   * where the materialized view is stubbed. The caller shows nothing rather than reporting it.
-   */
-  /**
    * Roads matching the lookup dialog's criteria.
    *
    * <p>Gated on {@link CbrAuthorities#READ} — legacy's {@code /showRoadSearch}, which sits at the
@@ -53,6 +39,20 @@ public interface RoadApiEndpoint {
   @GetMapping("/search")
   ResponseEntity<List<RoadSearchResult>> searchRoads(@ModelAttribute RoadSearchCriteria criteria);
 
+  /**
+   * The road section named by a Project File ID# and a Br.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}: it fills in a field on screens that are themselves
+   * READ-gated, so a token holder with no CBR role has nothing to do with it.
+   *
+   * <p><b>Query parameters, not a path.</b> {@code ROAD_SECTION_ID} is thirty characters of free
+   * text — a path segment would have to be encoded and decoded correctly by every caller for a
+   * value that may contain a slash.
+   *
+   * <p>404 when the view holds no such section, which is the ordinary answer while the user is
+   * still typing either half — and the only answer in an environment provisioned from nr-mof-db,
+   * where the materialized view is stubbed. The caller shows nothing rather than reporting it.
+   */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping
   ResponseEntity<RoadSectionResponse> getRoadSection(

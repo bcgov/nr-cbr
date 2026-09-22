@@ -76,13 +76,6 @@ public interface ConfigurationApiEndpoint {
   ResponseEntity<List<OrgUnitResponse>> getBusinessAreas();
 
   /**
-   * Management areas within one forest district — the Management Area select, which is repopulated
-   * whenever Forest District changes and is empty until a district is chosen.
-   *
-   * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}; required, because
-   *                                the screen never asks for every management area at once
-   */
-  /**
    * The recreation districts a project file belongs to — the Recreation District list.
    *
    * <p>A recreation site is administered by one of these rather than by a forest district, and the
@@ -100,6 +93,13 @@ public interface ConfigurationApiEndpoint {
   ResponseEntity<List<OrgUnitResponse>> getRecreationDistricts(
       @RequestParam(name = "forestFileId", defaultValue = "") String forestFileId);
 
+  /**
+   * Management areas within one forest district — the Management Area select, which is repopulated
+   * whenever Forest District changes and is empty until a district is chosen.
+   *
+   * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}; required, because
+   *                                the screen never asks for every management area at once
+   */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/management-areas")
   ResponseEntity<List<OrgUnitResponse>> getManagementAreas(
