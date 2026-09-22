@@ -71,12 +71,12 @@ const renderPage = async () => {
     </QueryClientProvider>,
   );
   await waitFor(() => {
-    expect(screen.getByTestId('add-site-crossingSiteTypeCode')).not.toBeDisabled();
+    expect(screen.getByTestId('site-form-crossingSiteTypeCode')).not.toBeDisabled();
   });
   return result;
 };
 
-const field = (name: string) => screen.getByTestId(`add-site-${name}`);
+const field = (name: string) => screen.getByTestId(`site-form-${name}`);
 const type = (name: string, value: string) => fireEvent.change(field(name), { target: { value } });
 const save = () => fireEvent.click(screen.getByTestId('add-site-save'));
 
@@ -184,15 +184,15 @@ describe('AddSitePage — the form', () => {
 
     expect(screen.queryByText('Coordinates')).not.toBeInTheDocument();
 
-    const order = ['add-site-longitudeDegrees', 'add-site-latitudeDegrees', 'add-site-utmZone'];
+    const order = ['site-form-longitudeDegrees', 'site-form-latitudeDegrees', 'site-form-utmZone'];
     const positions = order.map((id) =>
       Array.from(document.querySelectorAll('[data-testid]')).indexOf(screen.getByTestId(id)),
     );
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
 
-    const details = screen.getByTestId('add-site-pointOfAccessDescription');
+    const details = screen.getByTestId('site-form-pointOfAccessDescription');
     expect(
-      screen.getByTestId('add-site-utmNorthing').compareDocumentPosition(details) &
+      screen.getByTestId('site-form-utmNorthing').compareDocumentPosition(details) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
@@ -204,13 +204,13 @@ describe('AddSitePage — the form', () => {
     await renderPage();
 
     expect(
-      screen.getByLabelText('Degrees', { selector: '#add-site-longitudeDegrees' }),
+      screen.getByLabelText('Degrees', { selector: '#site-form-longitudeDegrees' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText('Seconds', { selector: '#add-site-latitudeSeconds' }),
+      screen.getByLabelText('Seconds', { selector: '#site-form-latitudeSeconds' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText('Northing', { selector: '#add-site-utmNorthing' }),
+      screen.getByLabelText('Northing', { selector: '#site-form-utmNorthing' }),
     ).toBeInTheDocument();
   });
 
@@ -219,7 +219,7 @@ describe('AddSitePage — the form', () => {
     // different way rather than completing them, so it does not belong in the pair.
     await renderPage();
 
-    const pair = document.querySelector('.add-site__coordinate-pair');
+    const pair = document.querySelector('.site-form__coordinate-pair');
     expect(pair).toContainElement(field('longitudeDegrees'));
     expect(pair).toContainElement(field('latitudeDegrees'));
     expect(pair).not.toContainElement(field('utmZone'));
@@ -523,7 +523,7 @@ describe('AddSitePage — the rest of the screen', () => {
 
     expect(button.closest('form')).toBeNull();
     expect(button).toHaveAttribute('type', 'submit');
-    expect(button).toHaveAttribute('form', 'add-site-form');
+    expect(button).toHaveAttribute('form', 'site-form');
   });
 
   const cancel = () => fireEvent.click(screen.getByTestId('add-site-cancel'));

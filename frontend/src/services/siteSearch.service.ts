@@ -1,4 +1,5 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
+import type { SiteDetailResponse } from '@/pages/SiteDetail/siteResponse';
 import type { PagedResponse, SiteSearchCriteria, SiteSearchResult } from '@/pages/SiteSearch/types';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
@@ -31,6 +32,22 @@ export class SiteSearchService extends HttpClient {
       method: 'GET',
       url: '/v1/sites/search',
       query: { ...populated(criteria), pageNumber, pageSize },
+    });
+  }
+
+  /**
+   * One site, for the detail screen.
+   *
+   * <p>Answers with the stored values — codes as codes, org units as numbers — plus the two things
+   * the screen could not resolve on its own: the road's name and the maintainer. 404 when the site
+   * is gone, which is ordinary: the link here comes from a results table that may have been on
+   * screen for some time.
+   */
+  getSite(siteId: string): CancelablePromise<SiteDetailResponse> {
+    return this.doRequest<SiteDetailResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/sites/{siteId}',
+      path: { siteId },
     });
   }
 
