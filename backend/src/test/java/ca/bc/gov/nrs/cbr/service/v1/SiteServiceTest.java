@@ -7,13 +7,22 @@ import ca.bc.gov.nrs.cbr.exception.SiteInUseException;
 import ca.bc.gov.nrs.cbr.exception.SiteNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CloseProximityInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
+import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
+import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
+import ca.bc.gov.nrs.cbr.model.v1.ClientLocationEntity;
+import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
+import ca.bc.gov.nrs.cbr.repository.v1.ClientLocationRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CloseProximityInspectionRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
 import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -45,6 +54,9 @@ class SiteServiceTest {
   private CloseProximityInspectionRepository inspections;
 
   @Autowired
+  private ClientLocationRepository clientLocations;
+
+  @Autowired
   private EntityManager entityManager;
 
   @BeforeEach
@@ -52,6 +64,10 @@ class SiteServiceTest {
     entityManager.createQuery("DELETE FROM CloseProximityInspectionEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CrossingStructureEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CrossingSiteEntity").executeUpdate();
+    entityManager.createQuery("DELETE FROM ClientLocationEntity").executeUpdate();
+    entityManager.createQuery("DELETE FROM ClientPublicEntity").executeUpdate();
+    entityManager.createQuery("DELETE FROM OrgUnitEntity").executeUpdate();
+    entityManager.createQuery("DELETE FROM CrossingSiteStatusCodeEntity").executeUpdate();
   }
 
   private void givenSite(String siteId) {
@@ -67,6 +83,62 @@ class SiteServiceTest {
   private void givenCloseProximityInspection(long id, String siteId) {
     entityManager.persist(CloseProximityInspectionEntity.builder()
         .closeProximityInspectionId(id).crossingSiteId(siteId).build());
+  }
+
+  /**
+   * The rows a complete site points at. CROSSING_SITE has real foreign keys to ORG_UNIT and
+   * CROSSING_SITE_STATUS_CODE, so a fixture inventing either is a fixture testing what cannot
+   * happen.
+   */
+  private void givenSupportingRows() {
+    entityManager.persist(CrossingSiteStatusCodeEntity.builder()
+        .crossingSiteStatusCode("ACT").description("Active")
+        .effectiveDate(LocalDateTime.now().minusYears(10))
+        .expiryDate(LocalDateTime.now().plusYears(10))
+        .updateTimestamp(LocalDateTime.now()).build());
+    for (long orgUnitNo : new long[] {18L, 26L, 31L}) {
+      entityManager.persist(OrgUnitEntity.builder()
+          .orgUnitNo(orgUnitNo).orgUnitCode("U" + orgUnitNo).orgUnitName("Unit " + orgUnitNo)
+          .build());
+    }
+  }
+
+  /** A site with the detail screen's fields filled in. */
+  private void givenCompleteSite(String siteId) {
+    givenSupportingRows();
+    entityManager.persist(CrossingSiteEntity.builder()
+        .crossingSiteId(siteId)
+        .crossingName("Deadman Creek")
+        .pointOfCommencementDistance(new BigDecimal("12.50"))
+        .userKm(new BigDecimal("13.00"))
+        .crossingSiteStatusCode("ACT")
+        .structureInspectionStatusCode("INS")
+        .crossingSiteTypeCode("CRS")
+        .specialAccessRqmtCode("HEL")
+        .orgUnitNo(18L)
+        .managementOrgUnitNo(26L)
+        .businessAreaOrgUnitNo(31L)
+        .forestFileId("R00123")
+        .roadSectionId("01")
+        .clientNumber("00001012")
+        .clientLocnCode("01")
+        .capitalRoadInd("Y")
+        .longitude(new BigDecimal("-122.504306"))
+        .latitude(new BigDecimal("53.916667"))
+        .utmZone(10)
+        .utmEasting(532000L)
+        .utmNorthing(5975000L)
+        .pointOfAccessDesc("Helicopter required to reach the cove.")
+        .ntsMapSheetNumber("92P/10")
+        .trimMapSheetNumber("093G025")
+        .build());
+  }
+
+  private void givenMaintainer(String number, String code, String name, String city) {
+    entityManager.persist(
+        ClientPublicEntity.builder().clientNumber(number).clientName(name).build());
+    entityManager.persist(ClientLocationEntity.builder()
+        .clientNumber(number).clientLocnCode(code).city(city).build());
   }
 
   @Test
@@ -180,5 +252,105 @@ class SiteServiceTest {
     service.delete("SITE-1");
 
     assertThat(structures.findById(1L)).isPresent();
+  }
+
+  @Nested
+  @DisplayName("reading one site")
+  class FindById {
+
+    @Test
+    @DisplayName("returns the stored values, codes and org units included")
+    void returnsTheRow() {
+      // Codes as codes and org units as numbers: the screen holds every code table it needs and is
+      // the only thing that knows how they should read.
+      givenCompleteSite("SITE-1");
+      entityManager.flush();
+      entityManager.clear();
+
+      SiteDetailResponse site = service.findById("SITE-1");
+
+      assertThat(site.siteId()).isEqualTo("SITE-1");
+      assertThat(site.crossingName()).isEqualTo("Deadman Creek");
+      assertThat(site.crossingSiteStatusCode()).isEqualTo("ACT");
+      assertThat(site.orgUnitNo()).isEqualTo(18L);
+      assertThat(site.businessAreaOrgUnitNo()).isEqualTo(31L);
+      assertThat(site.ntsMapSheetNumber()).isEqualTo("92P/10");
+      assertThat(site.pointOfAccessDescription()).isEqualTo("Helicopter required to reach the cove.");
+    }
+
+    @Test
+    @DisplayName("keeps the coordinates as the columns hold them, longitude negative")
+    void returnsDecimalDegrees() {
+      // The form enters degrees/minutes/seconds unsigned and converts at that edge, which is the
+      // split legacy makes too. Signing it here would be a second opinion on the same value.
+      givenCompleteSite("SITE-1");
+      entityManager.flush();
+      entityManager.clear();
+
+      SiteDetailResponse site = service.findById("SITE-1");
+
+      assertThat(site.longitude()).isEqualByComparingTo("-122.504306");
+      assertThat(site.latitude()).isEqualByComparingTo("53.916667");
+      assertThat(site.utmZone()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("turns the capital road indicator into a boolean")
+    void decodesCapitalRoad() {
+      // 'Y'/'N' is how Oracle stores a flag, not something a screen should be asked to interpret.
+      givenCompleteSite("SITE-1");
+      givenSite("SITE-2");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.findById("SITE-1").capitalRoad()).isTrue();
+      assertThat(service.findById("SITE-2").capitalRoad()).isFalse();
+    }
+
+    @Test
+    @DisplayName("names the maintainer, which is a second table the screen would not otherwise read")
+    void resolvesTheMaintainer() {
+      // Legacy fetches the same thing with its own getClientDetails() call on page load.
+      givenCompleteSite("SITE-1");
+      givenMaintainer("00001012", "01", "CANFOR CORPORATION", "Prince George");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.findById("SITE-1").maintainerLabel())
+          .isEqualTo("CANFOR CORPORATION \u00b7 Prince George \u00b7 00001012-01");
+    }
+
+    @Test
+    @DisplayName("says nothing rather than an empty label when the pair resolves to no client")
+    void toleratesAMissingClient() {
+      // A site may name a client location that has since been removed. Nothing constrains it —
+      // CROSSING_SITE's foreign key is to CLIENT_LOCATION, which the view does not police.
+      givenCompleteSite("SITE-1");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.findById("SITE-1").maintainerLabel()).isNull();
+    }
+
+    @Test
+    @DisplayName("says nothing when the site names no maintainer at all")
+    void toleratesNoMaintainer() {
+      givenSite("SITE-2");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.findById("SITE-2").maintainerLabel()).isNull();
+    }
+
+    @Test
+    @DisplayName("refuses a site that is not there")
+    void refusesAMissingSite() {
+      // The link here comes from a results table that may have been open for some time, so a site
+      // deleted in the meantime is an ordinary case rather than a broken link.
+      assertThatThrownBy(() -> service.findById("NOPE"))
+          .isInstanceOf(SiteNotFoundException.class)
+          .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
   }
 }

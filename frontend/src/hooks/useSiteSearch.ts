@@ -7,6 +7,23 @@ import API from '@/services/APIs';
 
 export const SITE_SEARCH_QUERY_KEY = 'site-search';
 
+/** Query key for one site read by id — distinct from the search, which is keyed on criteria. */
+export const SITE_QUERY_KEY = 'site';
+
+/**
+ * One site, for the detail screen.
+ *
+ * <p>No `staleTime`: a site's data changes while people work, and someone returning to a record
+ * expects to see it as it is now. The app-wide default — stale immediately, refetch on mount and
+ * on window focus — is the right behaviour for a record someone may be editing elsewhere.
+ */
+export const useSite = (siteId: string | undefined) =>
+  useQuery({
+    queryKey: [SITE_QUERY_KEY, siteId],
+    queryFn: () => API.siteSearch.getSite(siteId as string),
+    enabled: Boolean(siteId),
+  });
+
 /**
  * Runs a site search, or nothing at all until one has been submitted.
  *

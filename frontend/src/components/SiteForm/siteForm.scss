@@ -1,0 +1,117 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '../../styles/variables' as vars;
+
+.site-form__form {
+  margin-block-end: 0;
+}
+
+// The same four-column grid the search screens use, and for the same reasons: fixed columns rather
+// than auto-fit, so the field count per row does not change with the window, stepping to two and
+// then one at the Carbon lg and md breakpoints.
+.site-form__fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: $spacing-05;
+  // Top-aligned so the inputs line up when a long label ("Special Access Requirements") wraps.
+  align-items: start;
+
+  @media (max-width: 1055px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// "Project File ID#" and "Br." — two halves of one identifier, in one column, as on Site Search.
+.site-form__paired {
+  display: flex;
+  gap: $spacing-03;
+
+  > :first-child {
+    flex: 1 1 auto;
+  }
+
+  > :last-child {
+    flex: 0 0 6rem;
+  }
+
+  // Read-only, the pair is two short strings rather than two inputs, and the widths above are the
+  // widths of boxes that are no longer there — they pushed "Br." to the far side of the column
+  // with a hand's width of nothing between it and the number it belongs to. Sized to the text, so
+  // "S25867" and "01" read as the one identifier they are.
+  > .read-only-field:first-child,
+  > .read-only-field:last-child {
+    flex: 0 1 auto;
+  }
+
+  &:has(> .read-only-field) {
+    gap: $spacing-05;
+  }
+}
+
+// Site Details is prose, so it gets the width of the form rather than a field's column.
+.site-form__wide {
+  grid-column: 1 / -1;
+}
+
+.site-form__checkbox {
+  align-self: start;
+}
+
+// One triple: degrees / minutes / seconds, or zone / easting / northing. The fieldset carries the
+// group label so a screen reader says "Longitude, Degrees" rather than a bare "Degrees" that could
+// belong to either coordinate.
+//
+.site-form__group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+// A triple sitting directly in the form takes a row of its own — which today is UTM, the one that
+// is not half of a pair. Scoped to direct children so the two inside the pair below keep the two
+// columns that wrapper gives them instead of stacking.
+.site-form__fields > .site-form__group {
+  grid-column: 1 / -1;
+}
+
+// Longitude and Latitude share a row: they are one point, and a reader checks them against each
+// other. A flex row rather than two equal grid halves — the halves pushed the two triples to
+// opposite ends of the form with a gap between them wider than either one, which stopped them
+// reading as a pair at all. Side by side at their own width, with a gap that separates without
+// dividing, and wrapping to two rows when there is no longer room for both.
+.site-form__coordinate-pair {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-05 $spacing-07;
+}
+
+// Sized to what goes in them rather than to the space available. These hold two to ten digits, and
+// stretched to fill a half-row each box came out wider than Crossing Name — which reads as though a
+// long value is expected and leaves the two triples marooned at opposite ends of the form.
+.site-form__parts {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-03;
+}
+
+// A fixed basis, not `flex: 1`. Ten digits is the widest value any of these holds, and 7rem fits it
+// with room to spare; `min-inline-size: 0` lets the box shrink below Carbon's intrinsic input width
+// on a narrow screen rather than overflowing the row.
+.site-form__parts .#{vars.$bcgov-prefix}--form-item {
+  flex: 0 1 7rem;
+  min-inline-size: 0;
+}
+
+// Save / Cancel, beside the page heading.
+//
+// PageTitle lays its title row out as a flex row whose `h1` is `width: 100%`, so anything passed as
+// a child is pushed to the right edge without this needing to say so — what it does need is to stop
+// the pair being stretched to the heading's height, which is what `align-items: stretch` would
+// otherwise do to them.
+//
+
+

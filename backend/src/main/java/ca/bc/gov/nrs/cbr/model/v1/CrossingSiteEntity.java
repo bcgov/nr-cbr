@@ -131,6 +131,47 @@ public class CrossingSiteEntity {
   private String capitalRoadInd;
 
   /*
+   * The columns the detail screen shows and the search does not. Mapped here rather than on a
+   * second entity over the same table: they are the same row, so reading them costs the search
+   * nothing it was not already paying, and two entities over one table is a standing invitation
+   * for the two to disagree about what a site is.
+   */
+
+  /**
+   * Decimal degrees, <b>negative</b> — every site in the province is west of Greenwich.
+   *
+   * <p>The form enters degrees, minutes and seconds unsigned and negates on the way in; legacy's
+   * {@code SiteForm} does the same. The conversion belongs at the edge that shows it, so this is
+   * the stored value untouched.
+   */
+  @Column(name = "LONGITUDE", precision = 9, scale = 6)
+  private BigDecimal longitude;
+
+  /** Decimal degrees, positive. */
+  @Column(name = "LATITUDE", precision = 8, scale = 6)
+  private BigDecimal latitude;
+
+  @Column(name = "UTM_ZONE")
+  private Integer utmZone;
+
+  @Column(name = "UTM_EASTING")
+  private Long utmEasting;
+
+  @Column(name = "UTM_NORTHING")
+  private Long utmNorthing;
+
+  /** "Site Details" on the form — how to reach the site, and what to expect on arrival. */
+  @Column(name = "POINT_OF_ACCESS_DESC", length = 255)
+  private String pointOfAccessDesc;
+
+  /** "1:50,000 Map Sheet #" on the form, e.g. {@code 92P/10}. */
+  @Column(name = "NTS_MAP_SHEET_NUMBER", length = 10)
+  private String ntsMapSheetNumber;
+
+  @Column(name = "TRIM_MAP_SHEET_NUMBER", length = 10)
+  private String trimMapSheetNumber;
+
+  /*
    * The four joins. Each maps a column already mapped above as a scalar, so the association is
    * read-only (`insertable`/`updatable` false) and the scalar stays the thing a write would set.
    * Filters use the scalars where they can — `orgUnitNo` rather than `orgUnit.orgUnitNo` — which

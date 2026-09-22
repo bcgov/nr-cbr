@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
 import jakarta.validation.Valid;
@@ -64,6 +65,27 @@ public interface SiteApiEndpoint {
    *
    * @param siteId the {@code CROSSING_SITE_ID}, a 14-character natural key
    */
+  /**
+   * One site, for the detail screen.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ} — legacy's {@code /showSite}, which sits at the
+   * GENERAL floor alongside the search that leads here. A user who can find a site can open it.
+   *
+   * <p>Answers with the stored values: codes as codes, org units as numbers. The screen holds the
+   * code tables it needs to decode them, and is the only thing that knows how they should read.
+   * The road name and the maintainer are the exceptions — both sit on tables the screen has no
+   * other reason to fetch, and legacy goes after both itself.
+   *
+   * <p>404 when there is no such site. The link that leads here comes from a results table that
+   * may have been on screen for some time, so a site deleted in the meantime is an ordinary case
+   * rather than a broken link.
+   *
+   * @param siteId the {@code CROSSING_SITE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{siteId}")
+  ResponseEntity<SiteDetailResponse> getSite(@PathVariable("siteId") String siteId);
+
   @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
   @DeleteMapping("/{siteId}")
   ResponseEntity<Void> deleteSite(@PathVariable("siteId") String siteId);
