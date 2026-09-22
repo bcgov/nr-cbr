@@ -1,0 +1,18 @@
+@use '@carbon/react/scss/spacing' as *;
+
+// Edit, or Cancel and Save, beside the page heading. PageTitle's title row is a flex row whose h1
+// is `width: 100%`, so these are pushed right without saying so; what they need is to not be
+// stretched to the heading's height, and to keep their own width when the title is long.
+.site-detail__header-actions {
+  display: flex;
+  align-self: center;
+  flex-shrink: 0;
+  gap: $spacing-03;
+}
+
+.site-detail__notice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-03;
+}

@@ -2,12 +2,18 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.exception.SiteInUseException;
 import ca.bc.gov.nrs.cbr.exception.SiteNotFoundException;
+import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
+import ca.bc.gov.nrs.cbr.repository.v1.ClientLocationRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CloseProximityInspectionRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -26,14 +32,93 @@ public class SiteService {
   private final CrossingSiteRepository crossingSiteRepository;
   private final CrossingStructureRepository crossingStructureRepository;
   private final CloseProximityInspectionRepository closeProximityInspectionRepository;
+  private final ClientLocationRepository clientLocations;
 
   public SiteService(
       CrossingSiteRepository crossingSiteRepository,
       CrossingStructureRepository crossingStructureRepository,
-      CloseProximityInspectionRepository closeProximityInspectionRepository) {
+      CloseProximityInspectionRepository closeProximityInspectionRepository,
+      ClientLocationRepository clientLocations) {
     this.crossingSiteRepository = crossingSiteRepository;
     this.crossingStructureRepository = crossingStructureRepository;
     this.closeProximityInspectionRepository = closeProximityInspectionRepository;
+    this.clientLocations = clientLocations;
+  }
+
+  /**
+   * One site, for the detail screen.
+   *
+   * <p>Legacy assembles the same page from three requests: {@code showSite.do} for the row, a road
+   * lookup for the Forest Service Road, and a {@code getClientDetails()} AJAX call on load for the
+   * maintainer's name. This answers all three at once — the screen cannot usefully render without
+   * any of them, so three round trips only stagger the moment it becomes readable.
+   *
+   * @param siteId the {@code CROSSING_SITE_ID}
+   * @throws SiteNotFoundException if no such site exists
+   */
+  @Transactional(readOnly = true)
+  public SiteDetailResponse findById(String siteId) {
+    CrossingSiteEntity site = crossingSiteRepository.findById(siteId)
+        .orElseThrow(() -> new SiteNotFoundException(siteId));
+
+    return new SiteDetailResponse(
+        site.getCrossingSiteId(),
+        site.getCrossingName(),
+        site.getPointOfCommencementDistance(),
+        site.getUserKm(),
+        site.getCrossingSiteStatusCode(),
+        site.getStructureInspectionStatusCode(),
+        site.getCrossingSiteTypeCode(),
+        site.getSpecialAccessRqmtCode(),
+        site.getOrgUnitNo(),
+        site.getManagementOrgUnitNo(),
+        site.getBusinessAreaOrgUnitNo(),
+        site.getForestFileId(),
+        site.getRoadSectionId(),
+        // Null whenever the road-section snapshot does not carry this pair — a stale mview, not an
+        // error. The mapping reads a dangling reference as "no road section"; so does legacy.
+        site.getRoadSection() == null ? null : site.getRoadSection().getRoadSectName(),
+        site.getClientNumber(),
+        site.getClientLocnCode(),
+        maintainerLabel(site),
+        ACTIVE.equals(site.getCapitalRoadInd()),
+        site.getLongitude(),
+        site.getLatitude(),
+        site.getUtmZone(),
+        site.getUtmEasting(),
+        site.getUtmNorthing(),
+        site.getPointOfAccessDesc(),
+        site.getNtsMapSheetNumber(),
+        site.getTrimMapSheetNumber());
+  }
+
+  /**
+   * The Designated Maintainer as one line, or null when the site names none.
+   *
+   * <p>Composed here rather than on the screen only because this is the one place that has the
+   * client row; the search's own lookup composes its label in the browser for the same reason in
+   * reverse. Null rather than an empty string when the pair resolves to nothing — a site may name
+   * a client location that has since been removed, and an empty label is not the same answer as
+   * "no maintainer recorded".
+   */
+  private String maintainerLabel(CrossingSiteEntity site) {
+    if (site.getClientNumber() == null || site.getClientLocnCode() == null) {
+      return null;
+    }
+    return clientLocations
+        .findMaintainer(site.getClientNumber(), site.getClientLocnCode())
+        .stream()
+        .findFirst()
+        .map(SiteService::describe)
+        .orElse(null);
+  }
+
+  /** "CANFOR CORPORATION · Northern Division · Prince George · 00001012-01". */
+  private static String describe(ClientLookupResult client) {
+    String pair = client.clientNumber() + "-" + client.clientLocnCode();
+    return Stream.of(client.clientName(), client.clientLocnName(), client.city(), pair)
+        .filter(part -> part != null && !part.isBlank())
+        .collect(Collectors.joining(" \u00b7 "));
   }
 
   /**

@@ -5,13 +5,12 @@ import { useNavigate } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
 import UnderConstructionTag from '@/components/core/Tags/UnderConstructionTag';
-
-import AddSiteForm, { FORM_ID, type SiteCodeTables } from './AddSiteForm';
-import { EMPTY_SITE, type SiteFormValues } from './types';
-import { crossFieldErrors, fieldErrors, type SiteErrors } from './validation';
+import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
 
 import type { FC } from 'react';
 
+import { EMPTY_SITE, type SiteFormValues } from '@/components/SiteForm/types';
+import { crossFieldErrors, fieldErrors, type SiteErrors } from '@/components/SiteForm/validation';
 import {
   useBusinessAreas,
   useForestDistricts,
@@ -246,7 +245,7 @@ const AddSitePage: FC = () => {
       </Column>
 
       <Column sm={4} md={8} lg={16}>
-        <AddSiteForm
+        <SiteForm
           values={site}
           errors={errors}
           codeTables={codeTables}

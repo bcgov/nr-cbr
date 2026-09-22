@@ -1,48 +1,336 @@
-import { Column, Grid, InlineNotification } from '@carbon/react';
+import { Add, Edit, ListChecked, Save } from '@carbon/icons-react';
+import { Button, Column, Grid, InlineNotification, SkeletonText } from '@carbon/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
+import UnderConstructionTag from '@/components/core/Tags/UnderConstructionTag';
+import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
+
+import { toFormValues } from './siteResponse';
 
 import type { FC } from 'react';
 
+import { EMPTY_SITE, type SiteFormValues } from '@/components/SiteForm/types';
+import { crossFieldErrors, fieldErrors, type SiteErrors } from '@/components/SiteForm/validation';
+import { useAuthorization } from '@/hooks/useAuthorization';
+import {
+  useBusinessAreas,
+  useForestDistricts,
+  useManagementAreas,
+  useSiteReferenceDataState,
+  useSiteStatusCodes,
+  useSiteTypeCodes,
+  useSpecialAccessCodes,
+  useStructureInspectionStatusCodes,
+} from '@/hooks/useConfiguration';
+import { useSettledFields } from '@/hooks/useSettledFields';
+import { useSite } from '@/hooks/useSiteSearch';
+import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt';
+import { apiErrorMessage } from '@/utils/apiError';
+import { errorsForSettledFields } from '@/utils/validation';
+
+import './siteDetail.scss';
+
 /**
- * Site detail — the screen a site number in the search results leads to.
+ * Fields no role may change on this screen, in legacy or here.
  *
- * <p><b>A placeholder.</b> It exists so the results table's links go somewhere that names what will
- * be there, rather than nowhere: a link to a route that does not exist renders the "page not found"
- * screen, which reads as a defect in the search rather than as work not yet done.
+ * <p>Each is disabled in <em>every</em> branch of `site.jsp` — including the Level 2 one — because
+ * each is set somewhere other than this form: the site number is the key, the maintainer comes
+ * from the client lookup, and Capital Road comes from the road record. Two of them still carry
+ * `onchange` handlers in the JSP, so they read as fields that were editable once and were locked
+ * later.
  *
- * <p>Legacy equivalent: `showSite.do` → `SiteAction` → the site screens, which carry the site's
- * location and tenure, its structures, and the inspections hanging off those
- * (cbr-overview.local.md §5).
+ * <p><b>User Kilometres is the one worth questioning.</b> It is the posted distance on the sign,
+ * which differs from the measured one and is exactly the sort of correction a district would want
+ * to make. Reproduced as legacy has it, but flagged rather than assumed correct.
+ */
+const NEVER_EDITABLE = new Set<keyof SiteFormValues>([
+  'siteId',
+  'clientNumber',
+  'clientLocationCode',
+  'maintainerLabel',
+  'userKm',
+  'capitalRoad',
+]);
+
+/**
+ * Site detail — what the Site # in the search results opens.
+ *
+ * <p>Legacy serves this and Add Site from one JSP: `showSite.do` with a site id renders the same
+ * form with the number locked and the structure buttons shown. The two screens share a form here
+ * for the same reason, and differ in what may be changed rather than in what is on them.
+ *
+ * <p><b>Read first, edit on request.</b> Legacy opens straight into an editable form for anyone
+ * holding Level 1, which means the commonest thing a user does here — look something up — is done
+ * on a page that is one stray keystroke from changing the record. This opens read-only and offers
+ * Edit, and even then only the fields the user's role actually allows become editable; the rest
+ * stay as they read.
  */
 const SiteDetailPage: FC = () => {
   const { siteId } = useParams<{ siteId: string }>();
+  const { canEdit, canDelete } = useAuthorization();
+
+  const [site, setSite] = useState<SiteFormValues>({ ...EMPTY_SITE, siteId: siteId ?? '' });
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const loaded = useSite(siteId);
+
+  /**
+   * Copies the server's answer into the form once it lands, and again whenever it is refetched.
+   *
+   * <p>Held in state rather than read straight from the query because the form is editable: a
+   * background refetch must not overwrite what the user is part-way through typing. Guarded on
+   * view mode for exactly that reason — entering Edit takes a copy of what is on screen, and the
+   * copy is theirs until they leave.
+   */
+  useEffect(() => {
+    if (loaded.data && mode === 'view') {
+      setSite(toFormValues(loaded.data));
+    }
+  }, [loaded.data, mode]);
+  const [submitted, setSubmitted] = useState(false);
+  const { settled, markSettled } = useSettledFields();
+
+  const siteStatusCodes = useSiteStatusCodes();
+  const siteTypeCodes = useSiteTypeCodes();
+  const structureInspectionStatusCodes = useStructureInspectionStatusCodes();
+  const specialAccessCodes = useSpecialAccessCodes();
+  const forestDistricts = useForestDistricts();
+  const businessAreas = useBusinessAreas();
+  const managementAreas = useManagementAreas(site.orgUnitNo);
+  const referenceData = useSiteReferenceDataState();
+
+  const codeTables = useMemo<SiteCodeTables>(
+    () => ({
+      siteStatusCodes: siteStatusCodes.data ?? [],
+      siteTypeCodes: siteTypeCodes.data ?? [],
+      structureInspectionStatusCodes: structureInspectionStatusCodes.data ?? [],
+      specialAccessCodes: specialAccessCodes.data ?? [],
+      forestDistricts: forestDistricts.data ?? [],
+      managementAreas: managementAreas.data ?? [],
+      businessAreas: businessAreas.data ?? [],
+    }),
+    [
+      siteStatusCodes.data,
+      siteTypeCodes.data,
+      structureInspectionStatusCodes.data,
+      specialAccessCodes.data,
+      forestDistricts.data,
+      managementAreas.data,
+      businessAreas.data,
+    ],
+  );
+
+  /**
+   * Who may change what, from the role matrix `site.jsp` spells out branch by branch.
+   *
+   * <p>Level 2 edits the record; Level 1 edits only Site Details; everyone else reads. Inspection
+   * Status is gated separately on `/modifyStructureInspectionStatus`, which is a Level 2
+   * privilege of its own rather than part of the general edit surface.
+   */
+  const isEditable = useCallback(
+    (field: keyof SiteFormValues) => {
+      if (mode !== 'edit' || NEVER_EDITABLE.has(field)) {
+        return false;
+      }
+      if (field === 'pointOfAccessDescription') {
+        return canEdit;
+      }
+      return canDelete;
+    },
+    [mode, canEdit, canDelete],
+  );
+
+  /** Whether this user may change anything at all — what decides if Edit is offered. */
+  const canEditSomething = canEdit || canDelete;
+
+  const update = useCallback(
+    <K extends keyof SiteFormValues>(field: K, value: SiteFormValues[K]) => {
+      setSite((current) => ({
+        ...current,
+        [field]: value,
+        ...(field === 'orgUnitNo' ? { managementOrgUnitNo: '' } : {}),
+      }));
+    },
+    [],
+  );
+
+  /** The same three layers Add Site uses — see its own note on when each speaks. */
+  const settledErrors = fieldErrors(site, 'settled');
+  const errors: SiteErrors = {
+    ...fieldErrors(site, 'typing'),
+    ...errorsForSettledFields(settledErrors, settled, (key) => String(site[key] ?? '')),
+    ...(submitted ? settledErrors : {}),
+  };
+  const conflicts = submitted ? crossFieldErrors(site) : [];
+
+  // Only while editing: a read-only page holds nothing to lose, and prompting on the way out of
+  // one the user merely looked at would be nonsense.
+  useUnsavedChangesPrompt(mode === 'edit');
+
+  const save = useCallback(() => {
+    setSubmitted(true);
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    setMode('view');
+    setSubmitted(false);
+  }, []);
 
   return (
     <Grid fullWidth className="default-grid">
       <PageTitle
         title={`Site ${siteId ?? ''}`.trim()}
-        subtitle="Location, tenure, structures and inspections for this crossing site."
-        experimental
+        subtitle="Location, tenure and access for this crossing site."
         breadCrumbs={[
           { name: 'Inventory', path: '/inventory' },
           { name: 'Site Search', path: '/inventory/site-search' },
         ]}
-      />
+      >
+        <div className="site-detail__header-actions">
+          {/* Shown only once the site is on screen, as legacy's `structuresButton` div is
+              `display:none` until `actionType` is UPDATE. Both are disabled because neither screen
+              exists yet — the structure inventory is the next thing to be ported. Disabled rather
+              than hidden on purpose: withholding them would say this site has no structures, which
+              is a different and possibly untrue statement. */}
+          {mode === 'view' && loaded.data && (
+            <>
+              {canEdit && (
+                <Button
+                  kind="ghost"
+                  size="md"
+                  renderIcon={Add}
+                  disabled
+                  data-testid="site-detail-add-structure"
+                  title="The structure screens have not been built yet"
+                >
+                  Add Structure
+                </Button>
+              )}
+              <Button
+                kind="ghost"
+                size="md"
+                renderIcon={ListChecked}
+                disabled
+                data-testid="site-detail-structures"
+                title="The structure screens have not been built yet"
+              >
+                Display Structures
+              </Button>
+            </>
+          )}
+          {mode === 'view'
+            ? canEditSomething && (
+                <Button
+                  kind="primary"
+                  size="md"
+                  renderIcon={Edit}
+                  data-testid="site-detail-edit"
+                  onClick={() => setMode('edit')}
+                >
+                  Edit
+                </Button>
+              )
+            : [
+                <Button
+                  key="cancel"
+                  kind="secondary"
+                  size="md"
+                  data-testid="site-detail-cancel"
+                  onClick={cancelEdit}
+                >
+                  Cancel
+                </Button>,
+                <Button
+                  key="save"
+                  kind="primary"
+                  size="md"
+                  type="submit"
+                  form={FORM_ID}
+                  renderIcon={Save}
+                  data-testid="site-detail-save"
+                >
+                  Save
+                </Button>,
+              ]}
+        </div>
+      </PageTitle>
+
+      {referenceData.isError && (
+        <Column sm={4} md={8} lg={16}>
+          <InlineNotification
+            kind="warning"
+            lowContrast
+            hideCloseButton
+            title="Some lists could not be loaded"
+            subtitle="Codes may show as their stored value rather than their description."
+            data-testid="site-detail-reference-error"
+          />
+        </Column>
+      )}
+
+      {conflicts.length > 0 && (
+        <Column sm={4} md={8} lg={16}>
+          <InlineNotification
+            kind="error"
+            lowContrast
+            hideCloseButton
+            title="This site cannot be saved"
+            subtitle={conflicts.join(' ')}
+            data-testid="site-detail-conflicts"
+          />
+        </Column>
+      )}
+
+      {loaded.isError && (
+        <Column sm={4} md={8} lg={16}>
+          <InlineNotification
+            kind="error"
+            lowContrast
+            hideCloseButton
+            title="This site could not be loaded"
+            subtitle={apiErrorMessage(loaded.error, 'Try again, or go back to Site Search.')}
+            data-testid="site-detail-error"
+          />
+        </Column>
+      )}
+
+      {/* Saving is still unbuilt, so the page says so while it is — but only to someone who could
+          otherwise have pressed Save. A reader has nothing to be warned about. */}
+      {canEditSomething && (
+        <Column sm={4} md={8} lg={16}>
+          <div className="site-detail__notice">
+            <UnderConstructionTag type="page" />
+            <InlineNotification
+              kind="info"
+              lowContrast
+              hideCloseButton
+              title="Changes cannot be saved yet"
+              subtitle="The site reads from the server, but the endpoint behind Save has not been built."
+              data-testid="site-detail-placeholder"
+            />
+          </div>
+        </Column>
+      )}
 
       <Column sm={4} md={8} lg={16}>
-        <InlineNotification
-          kind="info"
-          lowContrast
-          hideCloseButton
-          title="Not built yet"
-          subtitle={
-            'This screen will show the site’s location and tenure, the structures on it, and the ' +
-            'inspections recorded against them.'
-          }
-          data-testid="site-detail-placeholder"
-        />
+        {loaded.isPending ? (
+          // A skeleton, not an empty form. A form full of em dashes says the site has no values,
+          // which is a different answer from "not read yet".
+          <SkeletonText paragraph lineCount={10} data-testid="site-detail-loading" />
+        ) : (
+          <SiteForm
+            values={site}
+            errors={errors}
+            codeTables={codeTables}
+            codeTablesLoading={referenceData.isLoading}
+            managementAreasLoading={managementAreas.isFetching}
+            isEditable={isEditable}
+            onChange={update}
+            onSettle={markSettled}
+            onSave={save}
+          />
+        )}
       </Column>
     </Grid>
   );
