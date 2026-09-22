@@ -18,6 +18,13 @@ import java.math.BigDecimal;
  * @param maintainerLabel the Designated Maintainer as one line, or null when the site names none
  * @param forestServiceRoad the road's name from {@code CBR_ROAD_SECTION_VW}; null when the
  *                          snapshot does not carry that section yet
+ * @param activeStructureCount how many structures stand on the site. Two of the form's rules turn
+ *                          on whether this is zero: a Proposed site may not carry any, and
+ *                          Deactivated is worth a second look when it does. Legacy asks the same
+ *                          question as {@code Site.hasStructures()}, which is
+ *                          {@code FIND_STRUCTURES_BY_SITE_ID} — and that procedure ends
+ *                          {@code AND S.ACTIVE_IND = 'Y'}, so an archived structure does not
+ *                          count here either
  */
 public record SiteDetailResponse(
     String siteId,
@@ -34,6 +41,7 @@ public record SiteDetailResponse(
     String forestFileId,
     String roadSectionId,
     String forestServiceRoad,
+    long activeStructureCount,
     String clientNumber,
     String clientLocnCode,
     String maintainerLabel,

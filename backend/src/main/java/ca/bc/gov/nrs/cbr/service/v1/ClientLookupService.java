@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.repository.v1.ClientLocationRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
+import ca.bc.gov.nrs.cbr.struct.v1.ClientScope;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -73,11 +74,16 @@ public class ClientLookupService {
    * two letters, or more than eight digits all return nothing: this is called on a keystroke, and a
    * 400 arriving mid-word would surface as a failure the user has not made yet.
    *
-   * @param term what the user has typed so far
+   * <p><b>The scope decides which set is searched, not how.</b> The term is read the same way
+   * either side of it — all digits is a client number, anything else is a name — so a user moving
+   * between the two screens does not have to learn two rules.
+   *
+   * @param term  what the user has typed so far
+   * @param scope which clients this screen can usefully offer
    * @return at most {@value #SUGGESTION_LIMIT} suggestions, ordered by client name then location
    */
   @Transactional(readOnly = true)
-  public List<ClientLookupResult> suggest(String term) {
+  public List<ClientLookupResult> suggest(String term, ClientScope scope) {
     if (!StringUtils.hasText(term)) {
       return List.of();
     }
@@ -91,13 +97,17 @@ public class ClientLookupService {
         return List.of();
       }
       String padded = "0".repeat(CLIENT_NUMBER_LENGTH - trimmed.length()) + trimmed;
-      return clientLocations.findMaintainersByClientNumber(padded, limit);
+      return scope == ClientScope.ROAD_FILE_HOLDERS
+          ? clientLocations.findRoadFileHolders(null, padded, limit)
+          : clientLocations.findMaintainersByClientNumber(padded, limit);
     }
 
     if (trimmed.length() < MINIMUM_TERM_LENGTH) {
       return List.of();
     }
-    return clientLocations.findMaintainersByText(
-        WILDCARD + trimmed.toUpperCase(Locale.ROOT) + WILDCARD, limit);
+    String wildcarded = WILDCARD + trimmed.toUpperCase(Locale.ROOT) + WILDCARD;
+    return scope == ClientScope.ROAD_FILE_HOLDERS
+        ? clientLocations.findRoadFileHolders(wildcarded, null, limit)
+        : clientLocations.findMaintainersByText(wildcarded, limit);
   }
 }

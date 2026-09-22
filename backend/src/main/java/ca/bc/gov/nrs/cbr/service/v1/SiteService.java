@@ -78,6 +78,8 @@ public class SiteService {
         // Null whenever the road-section snapshot does not carry this pair — a stale mview, not an
         // error. The mapping reads a dangling reference as "no road section"; so does legacy.
         site.getRoadSection() == null ? null : site.getRoadSection().getRoadSectName(),
+        crossingStructureRepository.countByCrossingSiteIdAndActiveInd(
+            site.getCrossingSiteId(), ACTIVE),
         site.getClientNumber(),
         site.getClientLocnCode(),
         maintainerLabel(site),

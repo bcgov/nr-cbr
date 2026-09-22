@@ -57,6 +57,25 @@ public class CbrRoadSectionEntity {
   private String roadSectName;
 
   /**
+   * "Tenure Type" on the road search — {@code B01} road permit, {@code B40} forest service road,
+   * {@code S01}/{@code S02} special use permit. The legacy dialog prints that key beside the box
+   * because the view carries the code and nothing decodes it.
+   */
+  @Column(name = "FILE_TYPE_CODE", length = 10)
+  private String fileTypeCode;
+
+  /**
+   * The road's forest region — and <b>what legacy puts in the site's Forest District</b>.
+   *
+   * <p>Not a mistranslation here: {@code OracleRoadSegmentDAO} reads it as
+   * {@code ORG_UNIT_NO = "FOREST_REGION"} and {@code SiteAction} assigns it to
+   * {@code SiteForm.orgUnitNo}. A region is a different kind of org unit from a district, so this
+   * is carried under the view's own name and the site form is left to decide what to do with it.
+   */
+  @Column(name = "FOREST_REGION")
+  private Long forestRegion;
+
+  /**
    * The composite key.
    *
    * <p>A plain class rather than a record, because JPA requires a no-arg constructor. Named

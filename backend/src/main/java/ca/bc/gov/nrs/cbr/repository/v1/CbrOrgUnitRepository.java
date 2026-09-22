@@ -3,6 +3,8 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -59,7 +61,39 @@ public interface CbrOrgUnitRepository extends JpaRepository<CbrOrgUnitEntity, Lo
    */
   String BUSINESS_AREA = "T";
 
+  /**
+   * A recreation district.
+   *
+   * <p>Its own branch of the view, and a different kind of org unit from the districts above — a
+   * recreation site is administered by one of these rather than by a forest district.
+   */
+  String RECREATION_DISTRICT = "RD";
+
   List<CbrOrgUnitEntity> findAllByOrgUnitTypeOrderByOrgUnitNameAsc(String orgUnitType);
+
+  /**
+   * The recreation districts a project file belongs to — the Recreation District list on a
+   * recreation site.
+   *
+   * <p>Replaces {@code CBR.FIND_RECREATION_DISTRICTS}, predicate for predicate: the {@code RD}
+   * branch of the view, in effect today, cross-referenced to the file.
+   *
+   * <p><b>An inner join, as legacy's is not.</b> The procedure writes {@code LEFT JOIN} and then
+   * puts {@code RDX.FOREST_FILE_ID = :forestFileId} in the {@code WHERE}, which discards every
+   * unmatched row anyway — an outer join that cannot produce an outer row. Saying inner is the
+   * same query with the contradiction removed.
+   */
+  @Query("""
+      SELECT unit
+        FROM CbrOrgUnitEntity unit
+        JOIN RecreationDistrictXrefEntity xref
+          ON xref.recreationDistrictCode = unit.orgUnitCode
+       WHERE unit.orgUnitType = 'RD'
+         AND xref.forestFileId = :forestFileId
+         AND CURRENT_TIMESTAMP BETWEEN unit.effectiveDate AND unit.expiryDate
+       ORDER BY unit.orgUnitName
+      """)
+  List<CbrOrgUnitEntity> findRecreationDistricts(@Param("forestFileId") String forestFileId);
 
   List<CbrOrgUnitEntity> findAllByOrgUnitTypeAndRollupDistNoOrderByOrgUnitNameAsc(
       String orgUnitType, Long rollupDistNo);

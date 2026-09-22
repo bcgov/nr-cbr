@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 /**
  * Reference lookups that populate the UI's dropdowns. All ten are live.
@@ -236,6 +237,22 @@ public class ConfigurationService {
    * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}, as submitted
    */
   @Cacheable("managementAreas")
+  /**
+   * The recreation districts cross-referenced to a project file.
+   *
+   * <p>Blank in, empty out — the same contract the management areas keep. The list is meaningless
+   * without a file, and answering with every recreation district would offer choices the site
+   * cannot legitimately take.
+   */
+  public List<OrgUnitResponse> getRecreationDistricts(String forestFileId) {
+    if (!StringUtils.hasText(forestFileId)) {
+      return List.of();
+    }
+    return cbrOrgUnitRepository.findRecreationDistricts(forestFileId.trim()).stream()
+        .map(ConfigurationService::toOrgUnit)
+        .toList();
+  }
+
   public List<OrgUnitResponse> getManagementAreas(String forestDistrictOrgUnitNo) {
     Long orgUnitNo = parseOrgUnitNo(forestDistrictOrgUnitNo);
     if (orgUnitNo == null) {

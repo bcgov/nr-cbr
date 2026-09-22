@@ -68,6 +68,11 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   }
 
   @Override
+  public ResponseEntity<List<OrgUnitResponse>> getRecreationDistricts(String forestFileId) {
+    return ResponseEntity.ok(configurationService.getRecreationDistricts(forestFileId));
+  }
+
+  @Override
   public ResponseEntity<List<OrgUnitResponse>> getManagementAreas(String forestDistrictOrgUnitNo) {
     return ResponseEntity.ok(configurationService.getManagementAreas(forestDistrictOrgUnitNo));
   }

@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 import ca.bc.gov.nrs.cbr.endpoint.v1.ClientApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.ClientLookupService;
 import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
+import ca.bc.gov.nrs.cbr.struct.v1.ClientScope;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,7 +22,7 @@ public class ClientApiController implements ClientApiEndpoint {
   }
 
   @Override
-  public ResponseEntity<List<ClientLookupResult>> searchClients(String term) {
-    return ResponseEntity.ok(clientLookupService.suggest(term));
+  public ResponseEntity<List<ClientLookupResult>> searchClients(String term, ClientScope scope) {
+    return ResponseEntity.ok(clientLookupService.suggest(term, scope));
   }
 }

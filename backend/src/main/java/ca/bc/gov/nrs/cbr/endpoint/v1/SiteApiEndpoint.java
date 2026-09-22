@@ -52,20 +52,6 @@ public interface SiteApiEndpoint {
       @RequestParam(name = "pageSize", defaultValue = "20") int pageSize);
 
   /**
-   * Deletes a site.
-   *
-   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — legacy's {@code /deleteSite} privilege, held by
-   * {@code CBR_LEVEL_2} and {@code CBR_PENG} and by nobody else. Notably <b>not</b> by
-   * {@code CBR_ADMIN}: administrators can read everything and write nothing
-   * (cbr-auth-and-roles.local.md §3.2).
-   *
-   * <p>204 on success, because there is nothing left to return. 404 if the site is already gone,
-   * 409 if something still references it — see
-   * {@link ca.bc.gov.nrs.cbr.service.v1.SiteService#delete(String)}, where those are decided.
-   *
-   * @param siteId the {@code CROSSING_SITE_ID}, a 14-character natural key
-   */
-  /**
    * One site, for the detail screen.
    *
    * <p>Gated on {@link CbrAuthorities#READ} — legacy's {@code /showSite}, which sits at the
@@ -86,6 +72,20 @@ public interface SiteApiEndpoint {
   @GetMapping("/{siteId}")
   ResponseEntity<SiteDetailResponse> getSite(@PathVariable("siteId") String siteId);
 
+  /**
+   * Deletes a site.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — legacy's {@code /deleteSite} privilege, held by
+   * {@code CBR_LEVEL_2} and {@code CBR_PENG} and by nobody else. Notably <b>not</b> by
+   * {@code CBR_ADMIN}: administrators can read everything and write nothing
+   * (cbr-auth-and-roles.local.md §3.2).
+   *
+   * <p>204 on success, because there is nothing left to return. 404 if the site is already gone,
+   * 409 if something still references it — see
+   * {@link ca.bc.gov.nrs.cbr.service.v1.SiteService#delete(String)}, where those are decided.
+   *
+   * @param siteId the {@code CROSSING_SITE_ID}, a 14-character natural key
+   */
   @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
   @DeleteMapping("/{siteId}")
   ResponseEntity<Void> deleteSite(@PathVariable("siteId") String siteId);

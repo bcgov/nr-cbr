@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.ClientScope;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 class ClientApiEndpointTest {
 
   private static Method searchClients() throws NoSuchMethodException {
-    return ClientApiEndpoint.class.getMethod("searchClients", String.class);
+    return ClientApiEndpoint.class.getMethod("searchClients", String.class, ClientScope.class);
   }
 
   @Test
@@ -55,6 +56,18 @@ class ClientApiEndpointTest {
     assertThat(term).isNotNull();
     assertThat(term.name()).isEqualTo("term");
     assertThat(term.defaultValue()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("defaults the scope, so only the screen wanting the other set has to name it")
+  void scopeDefaultsToMaintainers() throws NoSuchMethodException {
+    // Without a default, every existing caller would have to start naming a scope to keep the
+    // behaviour it already had.
+    RequestParam scope = searchClients().getParameters()[1].getAnnotation(RequestParam.class);
+
+    assertThat(scope).isNotNull();
+    assertThat(scope.name()).isEqualTo("scope");
+    assertThat(scope.defaultValue()).isEqualTo(ClientScope.MAINTAINERS.name());
   }
 
   @Test

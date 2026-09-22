@@ -89,17 +89,24 @@ class SiteServiceTest {
    * The rows a complete site points at. CROSSING_SITE has real foreign keys to ORG_UNIT and
    * CROSSING_SITE_STATUS_CODE, so a fixture inventing either is a fixture testing what cannot
    * happen.
+   *
+   * <p>Idempotent: two sites in one test share these rows, and persisting them twice fails on the
+   * identifier rather than on anything the test is about.
    */
   private void givenSupportingRows() {
-    entityManager.persist(CrossingSiteStatusCodeEntity.builder()
-        .crossingSiteStatusCode("ACT").description("Active")
-        .effectiveDate(LocalDateTime.now().minusYears(10))
-        .expiryDate(LocalDateTime.now().plusYears(10))
-        .updateTimestamp(LocalDateTime.now()).build());
+    if (entityManager.find(CrossingSiteStatusCodeEntity.class, "ACT") == null) {
+      entityManager.persist(CrossingSiteStatusCodeEntity.builder()
+          .crossingSiteStatusCode("ACT").description("Active")
+          .effectiveDate(LocalDateTime.now().minusYears(10))
+          .expiryDate(LocalDateTime.now().plusYears(10))
+          .updateTimestamp(LocalDateTime.now()).build());
+    }
     for (long orgUnitNo : new long[] {18L, 26L, 31L}) {
-      entityManager.persist(OrgUnitEntity.builder()
-          .orgUnitNo(orgUnitNo).orgUnitCode("U" + orgUnitNo).orgUnitName("Unit " + orgUnitNo)
-          .build());
+      if (entityManager.find(OrgUnitEntity.class, orgUnitNo) == null) {
+        entityManager.persist(OrgUnitEntity.builder()
+            .orgUnitNo(orgUnitNo).orgUnitCode("U" + orgUnitNo).orgUnitName("Unit " + orgUnitNo)
+            .build());
+      }
     }
   }
 
@@ -276,6 +283,45 @@ class SiteServiceTest {
       assertThat(site.businessAreaOrgUnitNo()).isEqualTo(31L);
       assertThat(site.ntsMapSheetNumber()).isEqualTo("92P/10");
       assertThat(site.pointOfAccessDescription()).isEqualTo("Helicopter required to reach the cove.");
+    }
+
+    @Test
+    @DisplayName("counts the structures standing on the site")
+    void countsActiveStructures() {
+      // Two of the form's status rules turn on it: a Proposed site may carry none, and Deactivated
+      // is worth a second look when it does. Neither can be decided from the form alone.
+      givenCompleteSite("SITE-1");
+      givenStructure(1L, "SITE-1", "Y");
+      givenStructure(2L, "SITE-1", "Y");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.findById("SITE-1").activeStructureCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("leaves archived structures out of that count, as FIND_STRUCTURES_BY_SITE_ID does")
+    void ignoresArchivedStructures() {
+      // The procedure behind legacy's Site.hasStructures() ends AND S.ACTIVE_IND = 'Y'. An
+      // archived structure is a record of something removed, so a Proposed site may hold one.
+      givenCompleteSite("SITE-1");
+      givenStructure(1L, "SITE-1", "N");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.findById("SITE-1").activeStructureCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("counts only this site's structures")
+    void ignoresOtherSitesStructures() {
+      givenCompleteSite("SITE-1");
+      givenCompleteSite("SITE-2");
+      givenStructure(1L, "SITE-2", "Y");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.findById("SITE-1").activeStructureCount()).isZero();
     }
 
     @Test
