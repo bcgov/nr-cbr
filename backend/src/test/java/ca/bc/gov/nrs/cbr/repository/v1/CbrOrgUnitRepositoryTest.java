@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RecreationDistrictXrefEntity;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -176,5 +177,81 @@ class CbrOrgUnitRepositoryTest {
   @DisplayName("a district with no former districts is an empty list")
   void toleratesNoManagementAreas() {
     assertThat(repository.findManagementAreas(1809L)).isEmpty();
+  }
+
+  /** A recreation district: the view's {@code RD} branch, in effect today. */
+  private void givenRecreationDistrict(long orgUnitNo, String code, String name) {
+    entityManager.persist(CbrOrgUnitEntity.builder()
+        .orgUnitNo(orgUnitNo)
+        .orgUnitCode(code)
+        .orgUnitName(name)
+        .orgLevelCode("D")
+        .orgUnitType(CbrOrgUnitRepository.RECREATION_DISTRICT)
+        .effectiveDate(LONG_AGO)
+        .expiryDate(FUTURE)
+        .build());
+  }
+
+  private void givenFileInDistrict(String forestFileId, String districtCode) {
+    entityManager.persist(RecreationDistrictXrefEntity.builder()
+        .forestFileId(forestFileId).recreationDistrictCode(districtCode).build());
+  }
+
+  @Test
+  @DisplayName("offers only the recreation districts the project file belongs to")
+  void recreationDistrictsAreScopedToTheFile() {
+    // Where a crossing takes its district from the road, a recreation site takes its *choices*
+    // from the file and the user picks among them.
+    givenRecreationDistrict(1L, "RDA", "Cariboo Recreation");
+    givenRecreationDistrict(2L, "RDB", "Kootenay Recreation");
+    givenFileInDistrict("R00123", "RDA");
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(repository.findRecreationDistricts("R00123"))
+        .extracting(CbrOrgUnitEntity::getOrgUnitName)
+        .containsExactly("Cariboo Recreation");
+  }
+
+  @Test
+  @DisplayName("offers nothing for a file that is cross-referenced to none")
+  void answersNothingForAnUnknownFile() {
+    givenRecreationDistrict(1L, "RDA", "Cariboo Recreation");
+    givenFileInDistrict("R00123", "RDA");
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(repository.findRecreationDistricts("R99999")).isEmpty();
+  }
+
+  @Test
+  @DisplayName("leaves out a recreation district that has expired")
+  void excludesExpiredDistricts() {
+    givenRecreationDistrict(1L, "RDA", "Cariboo Recreation");
+    entityManager.persist(CbrOrgUnitEntity.builder()
+        .orgUnitNo(2L).orgUnitCode("RDB").orgUnitName("Retired Recreation")
+        .orgLevelCode("D").orgUnitType(CbrOrgUnitRepository.RECREATION_DISTRICT)
+        .effectiveDate(LONG_AGO).expiryDate(PAST).build());
+    givenFileInDistrict("R00123", "RDA");
+    givenFileInDistrict("R00123", "RDB");
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(repository.findRecreationDistricts("R00123"))
+        .extracting(CbrOrgUnitEntity::getOrgUnitCode)
+        .containsExactly("RDA");
+  }
+
+  @Test
+  @DisplayName("does not mistake a forest district for a recreation one")
+  void excludesOtherBranches() {
+    // They are different kinds of org unit, and the cross-reference joins on a code that a forest
+    // district could coincidentally share.
+    givenDistrict(3L, "RDA", "Prince George");
+    givenFileInDistrict("R00123", "RDA");
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(repository.findRecreationDistricts("R00123")).isEmpty();
   }
 }

@@ -99,6 +99,40 @@ public interface ClientLocationRepository
       @Param("clientNumber") String clientNumber, @Param("clientLocnCode") String clientLocnCode);
 
   /**
+   * Clients holding a road file, by name or number.
+   *
+   * <p>Driven from {@code FOREST_FILE_CLIENT}, which is what connects a client to a road file and
+   * the same table the road search joins to show the holder beside each road. A client who holds
+   * no file is never suggested, for the reason {@link ca.bc.gov.nrs.cbr.struct.v1.ClientScope}
+   * gives: it would offer a filter guaranteed to match nothing.
+   *
+   * <p><b>One row per client, not per location.</b> The file-client row carries a location code,
+   * but the road search matches on name and number and shows no address — so a second row for the
+   * same company would be two identical suggestions.
+   *
+   * @param term already trimmed, upper-cased and wrapped in wildcards by the caller, or the exact
+   *             zero-padded client number
+   */
+  @Query("""
+      SELECT DISTINCT new ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult(
+               client.clientNumber,
+               NULL,
+               client.clientName,
+               NULL,
+               NULL)
+        FROM ForestFileClientEntity fileClient
+        JOIN ClientPublicEntity client
+          ON client.clientNumber = fileClient.clientNumber
+       WHERE (:term IS NOT NULL AND UPPER(client.clientName) LIKE :term)
+          OR (:clientNumber IS NOT NULL AND client.clientNumber = :clientNumber)
+       ORDER BY client.clientName
+      """)
+  List<ClientLookupResult> findRoadFileHolders(
+      @Param("term") String term,
+      @Param("clientNumber") String clientNumber,
+      Pageable limit);
+
+  /**
    * By name, division or city — a case-insensitive contains match on each.
    *
    * <p><b>{@code UPPER} on both sides, which is legacy's behaviour and not this application's

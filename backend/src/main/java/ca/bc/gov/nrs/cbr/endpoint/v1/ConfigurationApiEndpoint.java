@@ -82,6 +82,24 @@ public interface ConfigurationApiEndpoint {
    * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}; required, because
    *                                the screen never asks for every management area at once
    */
+  /**
+   * The recreation districts a project file belongs to — the Recreation District list.
+   *
+   * <p>A recreation site is administered by one of these rather than by a forest district, and the
+   * file decides which are on offer. That makes this the one org-unit list keyed on something
+   * other than another org unit.
+   *
+   * <p>Empty until a Project File ID# is given, as the management areas are empty until a district
+   * is: an unfiltered list would be every recreation district in the province, none of which the
+   * file may belong to.
+   *
+   * @param forestFileId "Project File ID#" on the site form
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/recreation-districts")
+  ResponseEntity<List<OrgUnitResponse>> getRecreationDistricts(
+      @RequestParam(name = "forestFileId", defaultValue = "") String forestFileId);
+
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/management-areas")
   ResponseEntity<List<OrgUnitResponse>> getManagementAreas(

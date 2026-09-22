@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
+import ca.bc.gov.nrs.cbr.struct.v1.ClientScope;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -41,10 +42,16 @@ public interface ClientApiEndpoint {
    * — returns an empty list rather than a 400, because this is called while the user is still
    * typing and a rejection mid-word describes a mistake they have not finished making.
    *
-   * @param term the text typed into the Designated Maintainer field
+   * <p><b>{@code scope} says which clients the calling screen can act on</b>, and there is no
+   * unscoped option — see {@link ClientScope}. It defaults to the maintainers the site searches
+   * want, so the parameter is only named by the screen that wants the other set.
+   *
+   * @param term  the text typed into the client field
+   * @param scope which clients to offer
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping
   ResponseEntity<List<ClientLookupResult>> searchClients(
-      @RequestParam(name = "term", defaultValue = "") String term);
+      @RequestParam(name = "term", defaultValue = "") String term,
+      @RequestParam(name = "scope", defaultValue = "MAINTAINERS") ClientScope scope);
 }

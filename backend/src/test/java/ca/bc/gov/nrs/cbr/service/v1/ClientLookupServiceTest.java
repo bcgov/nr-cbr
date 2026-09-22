@@ -3,6 +3,8 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -10,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.repository.v1.ClientLocationRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
+import ca.bc.gov.nrs.cbr.struct.v1.ClientScope;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -61,13 +64,13 @@ class ClientLookupServiceTest {
     @Test
     @DisplayName("is answered with an empty list, without going to the database")
     void returnsEmptyWithoutQuerying() {
-      assertThat(service.suggest(null)).isEmpty();
-      assertThat(service.suggest("")).isEmpty();
-      assertThat(service.suggest("   ")).isEmpty();
-      assertThat(service.suggest("ca")).isEmpty();
+      assertThat(service.suggest(null, ClientScope.MAINTAINERS)).isEmpty();
+      assertThat(service.suggest("", ClientScope.MAINTAINERS)).isEmpty();
+      assertThat(service.suggest("   ", ClientScope.MAINTAINERS)).isEmpty();
+      assertThat(service.suggest("ca", ClientScope.MAINTAINERS)).isEmpty();
       // Longer than CLIENT_NUMBER's stored width, so it is not a client number, and it has no
       // letters to be a name.
-      assertThat(service.suggest("123456789")).isEmpty();
+      assertThat(service.suggest("123456789", ClientScope.MAINTAINERS)).isEmpty();
 
       verifyNoInteractions(clientLocations);
     }
@@ -75,7 +78,7 @@ class ClientLookupServiceTest {
     @Test
     @DisplayName("counts characters after trimming, not before")
     void trimsBeforeMeasuring() {
-      assertThat(service.suggest("  ca  ")).isEmpty();
+      assertThat(service.suggest("  ca  ", ClientScope.MAINTAINERS)).isEmpty();
 
       verify(clientLocations, never()).findMaintainersByText(anyString(), any(Pageable.class));
     }
@@ -91,7 +94,7 @@ class ClientLookupServiceTest {
       when(clientLocations.findMaintainersByClientNumber(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
-      service.suggest("66838");
+      service.suggest("66838", ClientScope.MAINTAINERS);
 
       assertThat(capturedNumber()).isEqualTo("00066838");
     }
@@ -107,7 +110,7 @@ class ClientLookupServiceTest {
       when(clientLocations.findMaintainersByClientNumber(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
-      service.suggest("5");
+      service.suggest("5", ClientScope.MAINTAINERS);
 
       assertThat(capturedNumber()).isEqualTo("00000005");
     }
@@ -118,7 +121,7 @@ class ClientLookupServiceTest {
       when(clientLocations.findMaintainersByClientNumber(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
-      service.suggest("00066838");
+      service.suggest("00066838", ClientScope.MAINTAINERS);
 
       assertThat(capturedNumber()).isEqualTo("00066838");
     }
@@ -134,7 +137,7 @@ class ClientLookupServiceTest {
       when(clientLocations.findMaintainersByText(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
-      service.suggest("Canfor");
+      service.suggest("Canfor", ClientScope.MAINTAINERS);
 
       assertThat(capturedText()).isEqualTo("%CANFOR%");
     }
@@ -145,7 +148,7 @@ class ClientLookupServiceTest {
       when(clientLocations.findMaintainersByText(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
-      service.suggest("  canfor  ");
+      service.suggest("  canfor  ", ClientScope.MAINTAINERS);
 
       assertThat(capturedText()).isEqualTo("%CANFOR%");
     }
@@ -158,7 +161,7 @@ class ClientLookupServiceTest {
       when(clientLocations.findMaintainersByText(anyString(), any(Pageable.class)))
           .thenReturn(List.of(canfor));
 
-      assertThat(service.suggest("canfor")).containsExactly(canfor);
+      assertThat(service.suggest("canfor", ClientScope.MAINTAINERS)).containsExactly(canfor);
     }
 
     @Test
@@ -167,9 +170,51 @@ class ClientLookupServiceTest {
       when(clientLocations.findMaintainersByText(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
-      service.suggest("123A");
+      service.suggest("123A", ClientScope.MAINTAINERS);
 
       assertThat(capturedText()).isEqualTo("%123A%");
+    }
+  }
+
+  @Nested
+  @DisplayName("scoped to road-file holders")
+  class RoadFileHolders {
+
+    @Test
+    @DisplayName("asks the road-file query instead, and never the maintainer one")
+    void usesTheOtherSet() {
+      // The two populations overlap without either containing the other — a company may hold a
+      // road file and maintain no site — and they are reached through different tables, so one
+      // query cannot stand in for the other.
+      when(clientLocations.findRoadFileHolders(anyString(), isNull(), any(Pageable.class)))
+          .thenReturn(List.of());
+
+      service.suggest("canfor", ClientScope.ROAD_FILE_HOLDERS);
+
+      verify(clientLocations).findRoadFileHolders(eq("%CANFOR%"), isNull(), any(Pageable.class));
+      verify(clientLocations, never()).findMaintainersByText(anyString(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("reads a term the same way either side of the scope")
+    void readsTheTermTheSameWay() {
+      // All digits is a client number and anything else is a name, in both sets — a user moving
+      // between the two screens should not have to learn two rules.
+      when(clientLocations.findRoadFileHolders(isNull(), anyString(), any(Pageable.class)))
+          .thenReturn(List.of());
+
+      service.suggest("66838", ClientScope.ROAD_FILE_HOLDERS);
+
+      verify(clientLocations)
+          .findRoadFileHolders(isNull(), eq("00066838"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("applies the same floor to a term too short to narrow anything")
+    void keepsTheMinimumLength() {
+      service.suggest("ca", ClientScope.ROAD_FILE_HOLDERS);
+
+      verifyNoInteractions(clientLocations);
     }
   }
 }
