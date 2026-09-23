@@ -2,6 +2,8 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
+import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
+import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
@@ -11,6 +13,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +76,7 @@ public class ConfigurationService {
   private final StrctreInspectionTypeCodeRepository strctreInspectionTypeCodeRepository;
   private final InspectionReportStatusCodeRepository inspectionReportStatusCodeRepository;
   private final CbrOrgUnitRepository cbrOrgUnitRepository;
+  private final RecreationProjectRepository recreationProjectRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -82,7 +86,8 @@ public class ConfigurationService {
       StructureTypeClassCodeRepository structureTypeClassCodeRepository,
       StrctreInspectionTypeCodeRepository strctreInspectionTypeCodeRepository,
       InspectionReportStatusCodeRepository inspectionReportStatusCodeRepository,
-      CbrOrgUnitRepository cbrOrgUnitRepository) {
+      CbrOrgUnitRepository cbrOrgUnitRepository,
+      RecreationProjectRepository recreationProjectRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -91,6 +96,7 @@ public class ConfigurationService {
     this.strctreInspectionTypeCodeRepository = strctreInspectionTypeCodeRepository;
     this.inspectionReportStatusCodeRepository = inspectionReportStatusCodeRepository;
     this.cbrOrgUnitRepository = cbrOrgUnitRepository;
+    this.recreationProjectRepository = recreationProjectRepository;
   }
 
   /**
@@ -222,6 +228,52 @@ public class ConfigurationService {
   }
 
   /**
+   * The name of the recreation project a file id names, or null when it names none.
+   *
+   * <p>Replaces {@code CBR_GENERAL.FIND_PROJECT_NAME_BY_ID}, a single-column select on the primary
+   * key. <b>It is what a recreation site shows where a crossing shows its Forest Service Road</b> —
+   * `site.jsp:814-824`, the other half of the {@code <c:if>} that picks between the two — so the
+   * two are alternatives rather than a pair, and only one is ever on screen.
+   *
+   * <p>Null rather than an exception when the file is unknown, which is legacy's answer too: its
+   * DAO returns {@code ""} from an empty result set. A recreation file id is typed by hand and a
+   * half-typed one is the ordinary case, not a failure.
+   *
+   * <p>Cached like the lists beside it. A project is renamed about as often as a code table
+   * changes, and the form asks again on every keystroke of the file id.
+   */
+  @Cacheable("recreationProjectNames")
+  public RecreationProjectResponse getRecreationProjectName(String forestFileId) {
+    String fileId = StringUtils.hasText(forestFileId) ? forestFileId.trim() : "";
+    if (fileId.isEmpty()) {
+      return new RecreationProjectResponse("", null);
+    }
+    return new RecreationProjectResponse(
+        fileId,
+        recreationProjectRepository
+            .findById(fileId)
+            .map(RecreationProjectEntity::getProjectName)
+            .orElse(null));
+  }
+
+  /**
+   * The recreation districts cross-referenced to a project file.
+   *
+   * <p>Blank in, empty out — the same contract the management areas keep. The list is meaningless
+   * without a file, and answering with every recreation district would offer choices the site
+   * cannot legitimately take.
+   */
+  @Cacheable("recreationDistricts")
+  public List<OrgUnitResponse> getRecreationDistricts(String forestFileId) {
+    if (!StringUtils.hasText(forestFileId)) {
+      return List.of();
+    }
+    return cbrOrgUnitRepository.findRecreationDistricts(forestFileId.trim()).stream()
+        .map(ConfigurationService::toOrgUnit)
+        .toList();
+  }
+
+  /**
    * Management areas within one forest district, by name.
    *
    * <p>Replaces {@code CBR_GENERAL.FIND_MANAGEMENT_AREAS_BY_SLCTN}. A CBR management area is a
@@ -237,22 +289,6 @@ public class ConfigurationService {
    * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}, as submitted
    */
   @Cacheable("managementAreas")
-  /**
-   * The recreation districts cross-referenced to a project file.
-   *
-   * <p>Blank in, empty out — the same contract the management areas keep. The list is meaningless
-   * without a file, and answering with every recreation district would offer choices the site
-   * cannot legitimately take.
-   */
-  public List<OrgUnitResponse> getRecreationDistricts(String forestFileId) {
-    if (!StringUtils.hasText(forestFileId)) {
-      return List.of();
-    }
-    return cbrOrgUnitRepository.findRecreationDistricts(forestFileId.trim()).stream()
-        .map(ConfigurationService::toOrgUnit)
-        .toList();
-  }
-
   public List<OrgUnitResponse> getManagementAreas(String forestDistrictOrgUnitNo) {
     Long orgUnitNo = parseOrgUnitNo(forestDistrictOrgUnitNo);
     if (orgUnitNo == null) {

@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,7 +17,9 @@ import ca.bc.gov.nrs.cbr.model.v1.SpecialAccessRequirementCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StrctreInspectionTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
@@ -26,6 +29,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
+import java.util.Optional;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,6 +59,8 @@ class ConfigurationServiceTest {
   private final InspectionReportStatusCodeRepository inspectionReportStatusCodes =
       mock(InspectionReportStatusCodeRepository.class);
   private final CbrOrgUnitRepository orgUnits = mock(CbrOrgUnitRepository.class);
+  private final RecreationProjectRepository recreationProjects =
+      mock(RecreationProjectRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes,
@@ -64,7 +70,8 @@ class ConfigurationServiceTest {
       structureTypeClassCodes,
       inspectionTypeCodes,
       inspectionReportStatusCodes,
-      orgUnits);
+      orgUnits,
+      recreationProjects);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -209,5 +216,56 @@ class ConfigurationServiceTest {
     when(siteTypeCodes.findAllByOrderByDescriptionAsc()).thenReturn(List.of());
 
     assertThat(service.getSiteTypeCodes()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("answers the recreation project's name for a file that has one")
+  void findsARecreationProjectName() {
+    // What a recreation site shows where a crossing shows its Forest Service Road.
+    when(recreationProjects.findById("R00123"))
+        .thenReturn(Optional.of(RecreationProjectEntity.builder()
+            .forestFileId("R00123").projectName("Bowron Lake").build()));
+
+    assertThat(service.getRecreationProjectName("R00123").projectName()).isEqualTo("Bowron Lake");
+  }
+
+  @Test
+  @DisplayName("answers a null name for a file that names no project, rather than failing")
+  void toleratesAnUnknownRecreationProject() {
+    // A recreation file id is typed by hand, so a half-typed one is the ordinary state of the
+    // field. Legacy's DAO returns "" from an empty result set for the same reason.
+    when(recreationProjects.findById("NOPE")).thenReturn(Optional.empty());
+
+    assertThat(service.getRecreationProjectName("NOPE").projectName()).isNull();
+  }
+
+  @Test
+  @DisplayName("asks nothing of the database for a blank file id")
+  void doesNotLookUpABlankFileId() {
+    assertThat(service.getRecreationProjectName("   ").projectName()).isNull();
+
+    verify(recreationProjects, never()).findById(any());
+  }
+
+  @Test
+  @DisplayName("caches each org-unit list under its own name")
+  void cachesUnderDistinctNames() throws Exception {
+    // Guards a slip that is invisible at runtime: `getRecreationDistricts` was inserted above
+    // `getManagementAreas` and took its `@Cacheable("managementAreas")` with it, leaving the
+    // management areas uncached and the recreation districts filed under the wrong name. Both
+    // methods take one String, so nothing failed — the cache was just wrong.
+    assertThat(cacheNameOf("getManagementAreas")).isEqualTo("managementAreas");
+    assertThat(cacheNameOf("getRecreationDistricts")).isEqualTo("recreationDistricts");
+    assertThat(cacheNameOf("getRecreationProjectName")).isEqualTo("recreationProjectNames");
+  }
+
+  private static String cacheNameOf(String method) {
+    return java.util.Arrays.stream(ConfigurationService.class.getDeclaredMethods())
+        .filter(m -> m.getName().equals(method))
+        .map(m -> m.getAnnotation(org.springframework.cache.annotation.Cacheable.class))
+        .filter(java.util.Objects::nonNull)
+        .findFirst()
+        .map(c -> c.value()[0])
+        .orElse(null);
   }
 }

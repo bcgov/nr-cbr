@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { SiteCreateRequest } from '@/components/SiteForm/request';
 import type { SiteErrors } from '@/components/SiteForm/validation';
-import type { SiteDetailResponse } from '@/pages/SiteDetail/siteResponse';
+import type { SiteCreatedResponse } from '@/services/siteSearch.service';
 import type { UseMutationResult } from '@tanstack/react-query';
 
 import { toFieldErrors } from '@/components/SiteForm/request';
@@ -31,7 +31,11 @@ const fieldErrorsFrom = (error: unknown): SiteErrors => {
   return toFieldErrors(messages);
 };
 
-export type CreateSiteResult = UseMutationResult<SiteDetailResponse, unknown, SiteCreateRequest> & {
+export type CreateSiteResult = UseMutationResult<
+  SiteCreatedResponse,
+  unknown,
+  SiteCreateRequest
+> & {
   /** What the server refused, ready to merge into the form's own error map. */
   fieldErrors: SiteErrors;
 };
@@ -50,7 +54,7 @@ export type CreateSiteResult = UseMutationResult<SiteDetailResponse, unknown, Si
 export const useCreateSite = (): CreateSiteResult => {
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<SiteDetailResponse, unknown, SiteCreateRequest>({
+  const mutation = useMutation<SiteCreatedResponse, unknown, SiteCreateRequest>({
     mutationFn: (site) => API.siteSearch.createSite(site),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [SITE_SEARCH_QUERY_KEY] });

@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -164,12 +165,40 @@ public class CrossingSiteEntity {
   @Column(name = "POINT_OF_ACCESS_DESC", length = 255)
   private String pointOfAccessDesc;
 
-  /** "1:50,000 Map Sheet #" on the form, e.g. {@code 92P/10}. */
+  /*
+   * The two map sheet columns. <b>Nothing reads or writes them, and no screen shows them</b> —
+   * legacy removed both fields from `site.jsp` under CBR-455, where the whole table row survives
+   * commented out. The columns still hold whatever was entered before that, so they stay mapped:
+   * the data is real even though the fields are gone, and a future report or extract would want
+   * them. They are deliberately absent from SiteCreateRequest and SiteDetailResponse.
+   */
+
   @Column(name = "NTS_MAP_SHEET_NUMBER", length = 10)
   private String ntsMapSheetNumber;
 
   @Column(name = "TRIM_MAP_SHEET_NUMBER", length = 10)
   private String trimMapSheetNumber;
+
+  /*
+   * The audit columns, all four NOT NULL. Set on the way in rather than by a trigger — nothing on
+   * CROSSING_SITE populates them, and legacy passes all four to INSERT_SITE from `Site.save`.
+   * An insert that leaves them out fails at the constraint, so they are part of writing a site
+   * rather than bookkeeping alongside it.
+   */
+
+  /** Who created the row. Never changed afterwards — an update carries the original forward. */
+  @Column(name = "ENTRY_USERID", length = 30)
+  private String entryUserid;
+
+  @Column(name = "ENTRY_TIMESTAMP")
+  private LocalDateTime entryTimestamp;
+
+  /** Who last changed the row. Equal to the entry user until someone else edits it. */
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 
   /*
    * The four joins. Each maps a column already mapped above as a scalar, so the association is

@@ -2,7 +2,9 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.exception.SiteInUseException;
 import ca.bc.gov.nrs.cbr.exception.SiteNotFoundException;
+import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSegmentEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
+import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSegmentRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.ClientLocationRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CloseProximityInspectionRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteRepository;
@@ -10,8 +12,13 @@ import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
+import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Operations on a crossing site itself, as opposed to searching for one.
  *
- * <p>Deleting is all there is so far; creating and editing arrive with the site screens.
+ * <p>Creating, reading and deleting. Editing arrives with the Site Detail save.
  */
 @Service
 public class SiteService {
@@ -27,22 +34,140 @@ public class SiteService {
   private static final Logger log = LoggerFactory.getLogger(SiteService.class);
 
   private static final String ACTIVE = "Y";
+
+  /** The one site type with no road, so no segment to derive. */
+  private static final String RECREATION_SITE = "REC";
   private static final String ARCHIVED = "N";
 
   private final CrossingSiteRepository crossingSiteRepository;
   private final CrossingStructureRepository crossingStructureRepository;
   private final CloseProximityInspectionRepository closeProximityInspectionRepository;
   private final ClientLocationRepository clientLocations;
+  private final CbrRoadSegmentRepository roadSegments;
+  private final SiteValidator validator;
+  private final LoggedUserHelper loggedUser;
 
   public SiteService(
       CrossingSiteRepository crossingSiteRepository,
       CrossingStructureRepository crossingStructureRepository,
       CloseProximityInspectionRepository closeProximityInspectionRepository,
-      ClientLocationRepository clientLocations) {
+      ClientLocationRepository clientLocations,
+      CbrRoadSegmentRepository roadSegments,
+      SiteValidator validator,
+      LoggedUserHelper loggedUser) {
     this.crossingSiteRepository = crossingSiteRepository;
     this.crossingStructureRepository = crossingStructureRepository;
     this.closeProximityInspectionRepository = closeProximityInspectionRepository;
     this.clientLocations = clientLocations;
+    this.roadSegments = roadSegments;
+    this.validator = validator;
+    this.loggedUser = loggedUser;
+  }
+
+  /**
+   * Creates a site, or refuses with a message for every field at fault.
+   *
+   * <p>Replaces {@code addSite.do?actionMapping=save} and the {@code CBR_REGIONAL_ENGINEER
+   * .INSERT_SITE} procedure behind it, which is a bare {@code INSERT} with no logic of its own — the
+   * rules all live in {@code SiteForm.validate}, which is what {@link SiteValidator} ports.
+   *
+   * <p><b>The number is upper-cased here, not only in the browser.</b> {@code INSERT_SITE} writes
+   * {@code UPPER(P_SITE_ID)}, so legacy's key is upper-case however it was typed and whatever
+   * client sent it. A row stored in mixed case would be a site the search could not find and the
+   * uniqueness check would not catch.
+   *
+   * <p><b>The four audit columns are set here too.</b> All four are {@code NOT NULL} and nothing on
+   * the table populates them; legacy passes all four from {@code Site.save}. Entry and update are
+   * the same user and the same instant on a create, which is what legacy writes.
+   *
+   * @return the number the site was stored under — upper-cased, whatever case was sent. Nothing
+   *         else: the caller holds what it sent, and the screen it opens next reads the site
+   *         for itself
+   * @throws ca.bc.gov.nrs.cbr.exception.SiteValidationException if anything is wrong with it
+   */
+  @Transactional
+  public SiteCreatedResponse create(SiteCreateRequest request) {
+    String siteId = request.siteId() == null ? "" : request.siteId().trim().toUpperCase(Locale.ROOT);
+    Long roadSegmentId = resolveRoadSegment(request);
+    validator.validate(request, crossingSiteRepository.existsById(siteId), roadSegmentId);
+
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now();
+
+    CrossingSiteEntity site = CrossingSiteEntity.builder()
+        .crossingSiteId(siteId)
+        .crossingName(blankToNull(request.crossingName()))
+        .pointOfCommencementDistance(request.pointOfCommencementDistance())
+        .userKm(request.userKm())
+        .crossingSiteStatusCode(blankToNull(request.crossingSiteStatusCode()))
+        .structureInspectionStatusCode(blankToNull(request.structureInspectionStatusCode()))
+        .crossingSiteTypeCode(blankToNull(request.crossingSiteTypeCode()))
+        .specialAccessRqmtCode(blankToNull(request.specialAccessRqmtCode()))
+        .orgUnitNo(request.orgUnitNo())
+        .managementOrgUnitNo(request.managementOrgUnitNo())
+        .businessAreaOrgUnitNo(request.businessAreaOrgUnitNo())
+        .forestFileId(blankToNull(request.forestFileId()))
+        .roadSectionId(blankToNull(request.roadSectionId()))
+        .roadSegmentId(roadSegmentId)
+        .clientNumber(blankToNull(request.clientNumber()))
+        .clientLocnCode(blankToNull(request.clientLocnCode()))
+        .capitalRoadInd(request.capitalRoad() ? ACTIVE : ARCHIVED)
+        .longitude(request.longitude())
+        .latitude(request.latitude())
+        .utmZone(request.utmZone())
+        .utmEasting(request.utmEasting())
+        .utmNorthing(request.utmNorthing())
+        .pointOfAccessDesc(blankToNull(request.pointOfAccessDescription()))
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build();
+
+    crossingSiteRepository.saveAndFlush(site);
+    log.info("Created site {}", siteId);
+
+    return new SiteCreatedResponse(siteId);
+  }
+
+  /**
+   * The road segment a site on this section belongs to — derived, never sent.
+   *
+   * <p><b>Legacy does not ask the user either.</b> Its Road Segment control is a {@code <select>}
+   * inside two {@code visibility:hidden} cells; the server fills it with the section's segments and
+   * the browser posts back whichever the ordering put first. Deriving it here reaches the same
+   * stored value without a field nobody can see travelling to the browser and back — and without a
+   * client being able to name a segment that belongs to a different road.
+   *
+   * <p>Null for a recreation site, whose Project File ID# names a recreation project rather than a
+   * road file, and null when either half of the pair is missing. {@link SiteValidator} turns the
+   * remaining case — a road named but not found — into a message on Project File ID#.
+   */
+  private Long resolveRoadSegment(SiteCreateRequest request) {
+    if (RECREATION_SITE.equals(blankToNull(request.crossingSiteTypeCode()))) {
+      return null;
+    }
+    String forestFileId = blankToNull(request.forestFileId());
+    String roadSectionId = blankToNull(request.roadSectionId());
+    if (forestFileId == null || roadSectionId == null) {
+      return null;
+    }
+    return roadSegments
+        .findFirstByForestFileIdAndRoadSectionIdOrderByRoadSegmentIdAsc(forestFileId, roadSectionId)
+        .map(CbrRoadSegmentEntity::getRoadSegmentId)
+        .orElse(null);
+  }
+
+  /**
+   * An empty box as {@code NULL}, not as the empty string.
+   *
+   * <p>Oracle treats the two as the same thing for a {@code VARCHAR2}, but the distinction matters
+   * on the way in: a column left empty reads as "not recorded" everywhere else in this application,
+   * and storing {@code ''} would make a blank Crossing Name a different value from an absent one to
+   * every non-Oracle reader of the row.
+   */
+  private static String blankToNull(String value) {
+    return value == null || value.isBlank() ? null : value.trim();
   }
 
   /**
@@ -89,9 +214,7 @@ public class SiteService {
         site.getUtmZone(),
         site.getUtmEasting(),
         site.getUtmNorthing(),
-        site.getPointOfAccessDesc(),
-        site.getNtsMapSheetNumber(),
-        site.getTrimMapSheetNumber());
+        site.getPointOfAccessDesc());
   }
 
   /**

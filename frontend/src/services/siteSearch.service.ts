@@ -5,6 +5,9 @@ import type { PagedResponse, SiteSearchCriteria, SiteSearchResult } from '@/page
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
 
+/** What `POST /v1/sites` answers with: the number the site was stored under, upper-cased. */
+export type SiteCreatedResponse = { siteId: string };
+
 /**
  * Site Search, backed by `/api/v1/sites/search`.
  */
@@ -55,16 +58,16 @@ export class SiteSearchService extends HttpClient {
   /**
    * Creates a site.
    *
-   * <p>201 with the stored site, whose number comes back upper-cased and whose road name and
-   * maintainer label are filled in — so the caller should navigate to what came back rather than
-   * to what it sent.
+   * <p>200 with the new site's number and nothing else. That number is the one thing the caller
+   * does not already hold — the server upper-cases it — so it is what to navigate to; the detail
+   * page reads the site for itself.
    *
    * <p><b>400 carries a message per field.</b> The problem detail has a `fieldErrors` property
    * keyed by the same names this request uses, which are the form's names too, so the screen can
-   * mark the boxes instead of printing a paragraph. See `siteFieldErrors`.
+   * mark the boxes instead of printing a paragraph. See `toFieldErrors`.
    */
-  createSite(site: SiteCreateRequest): CancelablePromise<SiteDetailResponse> {
-    return this.doRequest<SiteDetailResponse>(this.config, {
+  createSite(site: SiteCreateRequest): CancelablePromise<SiteCreatedResponse> {
+    return this.doRequest<SiteCreatedResponse>(this.config, {
       method: 'POST',
       url: '/v1/sites',
       body: site,

@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -74,6 +75,23 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/business-areas")
   ResponseEntity<List<OrgUnitResponse>> getBusinessAreas();
+
+  /**
+   * The name of the recreation project a file id names — "Project Name" on the site form.
+   *
+   * <p>What a recreation site shows where a crossing shows its Forest Service Road, and the reason
+   * the two are never on screen together.
+   *
+   * <p>200 with a null name when the file is unknown, not a 404: a recreation file id is typed by
+   * hand, so a half-typed one is the ordinary state of this field rather than a failure. Legacy's
+   * DAO answers the same way, returning {@code ""} from an empty result set.
+   *
+   * @param forestFileId "Project File ID#" on the site form
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/recreation-project-name")
+  ResponseEntity<RecreationProjectResponse> getRecreationProjectName(
+      @RequestParam(name = "forestFileId", defaultValue = "") String forestFileId);
 
   /**
    * The recreation districts a project file belongs to — the Recreation District list.

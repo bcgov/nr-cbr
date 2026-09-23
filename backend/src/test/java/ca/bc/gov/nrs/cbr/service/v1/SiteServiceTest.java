@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -37,12 +38,19 @@ import org.springframework.web.server.ResponseStatusException;
  * feature, so what matters is that the row is actually gone when it should be and actually still
  * there when it should not be — which a mocked repository cannot tell you.
  */
+// SiteValidator comes along because SiteService now needs it and it is a plain component over the
+// same repositories — mocking it would leave the create path untested end to end, which is the one
+// place a rule and a column can disagree. LoggedUserHelper reads the security context and has no
+// database of its own, so it is mocked.
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import(SiteService.class)
+@Import({SiteService.class, SiteValidator.class})
 class SiteServiceTest {
 
   @Autowired
   private SiteService service;
+
+  @MockBean
+  private ca.bc.gov.nrs.cbr.security.LoggedUserHelper loggedUser;
 
   @Autowired
   private CrossingSiteRepository sites;
@@ -281,7 +289,6 @@ class SiteServiceTest {
       assertThat(site.crossingSiteStatusCode()).isEqualTo("ACT");
       assertThat(site.orgUnitNo()).isEqualTo(18L);
       assertThat(site.businessAreaOrgUnitNo()).isEqualTo(31L);
-      assertThat(site.ntsMapSheetNumber()).isEqualTo("92P/10");
       assertThat(site.pointOfAccessDescription()).isEqualTo("Helicopter required to reach the cove.");
     }
 
