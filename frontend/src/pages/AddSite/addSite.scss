@@ -1,14 +1,5 @@
 @use '@carbon/react/scss/spacing' as *;
 
-// The temporary block: the Under construction tag above the notice that explains it. Grouped so the
-// two read as one statement about the page's state, and so both leave together.
-.add-site__notice {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: $spacing-03;
-}
-
 // `flex-shrink: 0` so a long title squeezes itself rather than the buttons: a half-width "Cancel"
 // is unusable, where a wrapped heading is merely a wrapped heading.
 .add-site__header-actions {

@@ -1,5 +1,19 @@
 @use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as type;
 @use '../../styles/variables' as vars;
+
+// One line of Carbon's `label-01`, which measures exactly 1rem — so a label here reserves what a
+// label reserves anywhere else in the application, and a field on this form sits the same distance
+// below its label as one on Site Search. Named because two rules depend on it agreeing with itself:
+// every label reserves it, and the Capital Road checkbox, which has no label of its own, is offset
+// by an empty label that inherits it.
+//
+// <b>It was two lines</b>, so that a wrapping label could not push its own input below the row's.
+// Measuring every label at every breakpoint (1400 down to 700) found none that wraps, so it was
+// buying a blank line per row against a case that does not arise — and putting this form 16px out
+// of step with every other one. `layout.browser.test.tsx` asserts that stays true: add a label long
+// enough to wrap and it fails there rather than the alignment quietly going.
+$label-block-size: 1rem;
 
 .site-form__form {
   margin-block-end: 0;
@@ -8,6 +22,31 @@
 // The same four-column grid the search screens use, and for the same reasons: fixed columns rather
 // than auto-fit, so the field count per row does not change with the window, stepping to two and
 // then one at the Carbon lg and md breakpoints.
+// Every label reserves the same height, whether or not it needs it.
+//
+// A grid row only lines up if the blocks above its inputs are equal, and these labels are not:
+// "Project File ID#" wraps where "Br." does not, and "Special Access Requirements" wraps where
+// "Status" does not — so which fields sat low changed with the window width. Reserving two lines
+// for all of them makes the inputs start at the same height in every row, at every width.
+//
+// Applied to the label rather than to the grid, because `align-items` cannot do this: a cell's
+// height also depends on helper text and validation messages below the input, so aligning cell
+// edges would move the inputs around instead of holding them still.
+//
+// Deliberately NOT a flex container with the text pushed to the bottom, which is the other way to
+// spend the reserved space: the required marker is an inline span, and as a flex item it stops
+// sharing the text's baseline and drops below it.
+// A read-only cell's label is not a Carbon label, so it has to be told the same thing — otherwise
+// its value sits a line higher than the input beside it and the row stops reading as one line.
+.site-form__fields .read-only-field__label,
+.site-form__fields .#{vars.$bcgov-prefix}--label {
+  // `display: block` is load-bearing, not tidying. Carbon's label is `display: inline`, and
+  // `min-block-size` has no effect on an inline box — the reservation below was silently doing
+  // nothing until this was added.
+  display: block;
+  min-block-size: $label-block-size;
+}
+
 .site-form__fields {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -29,12 +68,43 @@
   display: flex;
   gap: $spacing-03;
 
+  // Positional, and the positions are named rather than implied: "Br." is the second child, not
+  // the last one. It was written as `:last-child` and quietly became the lookup button when that
+  // was added beside it — so "Br." grew to the width of a full field and the button took a
+  // six-rem box it had no use for.
   > :first-child {
     flex: 1 1 auto;
   }
 
-  > :last-child {
+  > :nth-child(2) {
     flex: 0 0 6rem;
+    // A flex item is `min-width: auto` by default, so it will not shrink below the intrinsic width
+    // of what is inside it — and Carbon's text input has a wide one. Without this the basis above
+    // is ignored and "Br." renders as wide as the field beside it.
+    min-inline-size: 0;
+  }
+
+  // Label above control, like the two fields beside it — see the empty label in the markup. No
+  // offset of its own: it lines up because it is built the same way, not because a number was
+  // chosen to match.
+  // The button has no label of its own, so it has to be told where the labelled boxes beside it
+  // put theirs. Aligned to the bottom of the row rather than offset from the top: the boxes are the
+  // tallest thing in it and the button is exactly an input tall, so their bottoms meeting puts
+  // their tops together too — and it stays true whatever a label does above.
+  //
+  // An empty label used to stand in for the offset. Carbon wraps an icon-only button in a tooltip
+  // element that sits three pixels below where the box model says it should, so that version was
+  // out by three pixels the whole time — invisible because the test measuring it ran without
+  // Carbon's stylesheet. Measured now: see layout.browser.test.tsx.
+  > .site-form__find-road {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-end;
+    align-self: stretch;
+    // The row's gap, plus the inset Carbon leaves inside a text input's wrapper, comes to twice
+    // the gap between the two fields — so the button reads as adrift of the pair it belongs to.
+    // Pulled back by one gap. Measured, not guessed: see layout.browser.test.tsx.
+    margin-inline-start: -$spacing-03;
   }
 
   // Read-only, the pair is two short strings rather than two inputs, and the widths above are the
@@ -56,8 +126,28 @@
   grid-column: 1 / -1;
 }
 
+// Capital Road. The empty label above the box does the vertical alignment — see the component —
+// and `align-self` stops the cell stretching the checkbox to the row's full height.
 .site-form__checkbox {
   align-self: start;
+
+}
+
+// Undoes the two pixels Carbon takes off a checkbox that follows a label.
+//
+// Its rule is `.cds--label + .cds--form-item.cds--checkbox-wrapper { margin-block-start: -0.125rem }`,
+// meant for a checkbox *group*, where the group label sits above and the first box is pulled onto
+// its text. The empty label this cell uses to reserve the label row is exactly what triggers it —
+// so the device that lines the checkbox up with its neighbours is also what knocks it 2px out.
+//
+// The selector mirrors Carbon's rather than being shorter, because it has to: a two- or
+// three-class selector ties on specificity and loses on source order, since Carbon's stylesheet
+// loads after this one. Measured, not guessed — see layout.browser.test.tsx.
+.site-form__fields
+  .site-form__checkbox
+  .#{vars.$bcgov-prefix}--label
+  + .#{vars.$bcgov-prefix}--form-item.#{vars.$bcgov-prefix}--checkbox-wrapper {
+  margin-block-start: 0;
 }
 
 // One triple: degrees / minutes / seconds, or zone / easting / northing. The fieldset carries the
@@ -98,6 +188,18 @@
   gap: $spacing-03;
 }
 
+// The minus in front of the longitude boxes. Sized like the inputs' own text and pushed down onto
+// their line — the parts row is `align-items: flex-start`, so without the field height it would sit
+// against the top of the row rather than beside the value it qualifies. `flex: 0 0 auto` keeps it
+// from being squeezed when the row wraps on a narrow screen.
+.site-form__sign {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+  @include type.type-style('body-01');
+}
+
 // A fixed basis, not `flex: 1`. Ten digits is the widest value any of these holds, and 7rem fits it
 // with room to spare; `min-inline-size: 0` lets the box shrink below Carbon's intrinsic input width
 // on a narrow screen rather than overflowing the row.
@@ -115,3 +217,36 @@
 //
 
 
+
+// Kilometres, User Kilometres and Capital Road, sharing one column between them. None is more than
+// a short number or a tick box, so a column each left most of three columns empty and pushed them a
+// third of the form apart.
+//
+// Wrapping, because Site Detail shows all three where Add Site shows two: the pair plus a checkbox
+// fits, the trio does not, and a second line inside the cell is better than a row that overflows.
+.site-form__narrow-group {
+  // Two columns, because Site Detail puts three members here and two columns is what three of them
+  // need. It costs nothing: the group is the last cell in its row — the coordinates below take a
+  // full-width row of their own — so the columns it spans were empty anyway. At the narrow
+  // breakpoints the grid has fewer columns than this asks for and the browser clamps it.
+  grid-column: span 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-03 $spacing-05;
+  align-items: flex-start;
+}
+
+// 9rem, which is what "999999.99" needs and no more. A basis rather than `1fr`, because the group
+// holds two members on Add Site and three on Site Detail — a `1fr` child stretches to whatever is
+// left, so the same box would be a different width on each screen.
+//
+// Prefixed with the grid, and it has to be: Carbon ships `.cds--form-item { flex: 1 1 auto }`,
+// which is one class — the same specificity as `> *` — and its stylesheet loads after this one, so
+// the shorter selector ties and loses. The field stayed the full width of its column and nothing
+// said why. Measured: layout.browser.test.tsx.
+.site-form__fields .site-form__narrow-group > .#{vars.$bcgov-prefix}--form-item {
+  flex: 0 1 9rem;
+  // A flex item will not shrink below the intrinsic width of what is inside it, and Carbon's text
+  // input has a wide one — without this the basis above is ignored.
+  min-inline-size: 0;
+}

@@ -1,6 +1,7 @@
 import { ComboBox, Loading } from '@carbon/react';
 import { useRef, useState, type FC } from 'react';
 
+import type { ClientScope } from '@/services/client.service';
 import type { ClientSuggestion } from '@/types/client';
 
 import { useClientSearch } from '@/hooks/useClientSearch';
@@ -29,6 +30,12 @@ type Props = {
    */
   onTermChange: (term: string) => void;
   disabled?: boolean;
+  /** Which clients this field may offer. Defaults to the site maintainers. */
+  scope?: ClientScope;
+  /** Overrides the default helper text where a screen means something narrower by "client". */
+  helperText?: string;
+  /** The same, for the placeholder — "maintainer" is wrong anywhere but the site form. */
+  placeholder?: string;
 };
 
 /**
@@ -48,6 +55,9 @@ const ClientCombo: FC<Props> = ({
   onSelect,
   onTermChange,
   disabled,
+  scope = 'MAINTAINERS',
+  helperText,
+  placeholder,
 }) => {
   const [term, setTerm] = useState(selectedLabel);
 
@@ -65,7 +75,7 @@ const ClientCombo: FC<Props> = ({
   // otherwise send the full "CANFOR CORPORATION · Vancouver · 00001012-00" back as a search term —
   // matching nothing, and replacing a good list with an empty one the moment the user chose from it.
   const searchTerm = term.trim() === selectedLabel.trim() ? '' : term;
-  const { data: items = [], isFetching } = useClientSearch(searchTerm);
+  const { data: items = [], isFetching } = useClientSearch(searchTerm, scope);
 
   return (
     <ComboBox
@@ -91,8 +101,10 @@ const ClientCombo: FC<Props> = ({
           )}
         </span>
       }
-      helperText={`Name, city or client number (min. ${MIN_CLIENT_TERM_LENGTH} characters)`}
-      placeholder="Search for a maintainer"
+      helperText={
+        helperText ?? `Name, city or client number (min. ${MIN_CLIENT_TERM_LENGTH} characters)`
+      }
+      placeholder={placeholder ?? 'Search for a maintainer'}
       items={items}
       itemToString={(item: ClientSuggestion | null) => (item ? clientLabel(item) : '')}
       // A stand-in carrying only what itemToString reads, because the picked suggestion is usually

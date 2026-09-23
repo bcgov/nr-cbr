@@ -139,7 +139,7 @@ describe('SiteDetailPage — reading', () => {
   it('shows the coordinates as one value each, not six boxes', async () => {
     await renderPage();
 
-    expect(isReadOnlyCell('Longitude (west)')).toBe(true);
+    expect(isReadOnlyCell('Longitude')).toBe(true);
     expect(isReadOnlyCell('Latitude')).toBe(true);
     expect(screen.queryByTestId('site-form-longitudeDegrees')).not.toBeInTheDocument();
   });
@@ -164,11 +164,11 @@ describe('SiteDetailPage — the values it shows', () => {
   });
 
   it('turns the stored decimal degrees back into degrees, minutes and seconds', async () => {
-    // -122.504306 is 122° 30′ 15.5″ west. Shown unsigned, because every site in the province is —
+    // -122.504306 is 122° 30′ 15.5″ west. Shown with the minus legacy prints beside the boxes —
     // the sign carries nothing a reader can use.
     await renderPage();
 
-    expect(screen.getByText('122° 30′ 15.5″')).toBeInTheDocument();
+    expect(screen.getByText('\u2212122° 30′ 15.5″')).toBeInTheDocument();
     expect(screen.getByText('53° 55′ 0″')).toBeInTheDocument();
   });
 

@@ -1,3 +1,4 @@
+import type { SiteCreateRequest } from '@/components/SiteForm/request';
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type { SiteDetailResponse } from '@/pages/SiteDetail/siteResponse';
 import type { PagedResponse, SiteSearchCriteria, SiteSearchResult } from '@/pages/SiteSearch/types';
@@ -48,6 +49,25 @@ export class SiteSearchService extends HttpClient {
       method: 'GET',
       url: '/v1/sites/{siteId}',
       path: { siteId },
+    });
+  }
+
+  /**
+   * Creates a site.
+   *
+   * <p>201 with the stored site, whose number comes back upper-cased and whose road name and
+   * maintainer label are filled in — so the caller should navigate to what came back rather than
+   * to what it sent.
+   *
+   * <p><b>400 carries a message per field.</b> The problem detail has a `fieldErrors` property
+   * keyed by the same names this request uses, which are the form's names too, so the screen can
+   * mark the boxes instead of printing a paragraph. See `siteFieldErrors`.
+   */
+  createSite(site: SiteCreateRequest): CancelablePromise<SiteDetailResponse> {
+    return this.doRequest<SiteDetailResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/sites',
+      body: site,
     });
   }
 

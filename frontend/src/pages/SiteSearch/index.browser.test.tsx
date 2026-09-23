@@ -37,7 +37,7 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 // Mocked at the service rather than at the hook, so the query key, the fallback to an empty list
 // and the error branch are all exercised by these tests instead of being stubbed past.
 const siteSearchApi = vi.hoisted(() => ({ searchSites: vi.fn(), deleteSite: vi.fn() }));
-const clientApi = vi.hoisted(() => ({ searchClients: vi.fn() }));
+const clientApi = vi.hoisted(() => ({ searchClients: vi.fn(), clientLocations: vi.fn() }));
 
 vi.mock('@/services/APIs', () => ({
   default: { configuration: api, siteSearch: siteSearchApi, client: clientApi },
@@ -102,6 +102,8 @@ beforeEach(() => {
   siteSearchApi.deleteSite.mockReset();
   siteSearchApi.deleteSite.mockResolvedValue(undefined);
   clientApi.searchClients.mockReset();
+  clientApi.clientLocations.mockReset();
+  clientApi.clientLocations.mockResolvedValue([]);
   clientApi.searchClients.mockResolvedValue([]);
   // Shared across tests because vi.hoisted runs once — without this a "was a toast shown" assertion
   // passes on a call the previous test made.
@@ -132,8 +134,6 @@ describe('SiteSearchPage — criteria form', () => {
       'kiloStart',
       'kiloEnd',
       'managementOrgUnit',
-      'userKmStart',
-      'userKmEnd',
       'specialAccessCode',
       'siteTypeCode',
       'incomplete',
@@ -171,18 +171,6 @@ describe('SiteSearchPage — criteria form', () => {
     expect(screen.getByTestId('site-search-kiloEnd')).not.toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('validates User Kilometres To with nothing else filled in', async () => {
-    // The legacy bug this replaces: createSearch() guards the User Km upper bound with a test on
-    // kiloEnd, so this box does nothing unless an unrelated one happens to be filled.
-    renderPage();
-
-    fireEvent.change(screen.getByTestId('site-search-userKmEnd'), { target: { value: 'abc' } });
-
-    expect(
-      await screen.findByText('User Kilometres must be a number, e.g. 12.5'),
-    ).toBeInTheDocument();
-  });
-
   it('still names the range boxes for a screen reader with the labels hidden', () => {
     // hideLabel keeps the <label> and hides it visually. The temptation when removing a visible
     // label is to drop it altogether, which leaves two identical unnamed boxes either side of a
@@ -192,7 +180,7 @@ describe('SiteSearchPage — criteria form', () => {
     expect(
       screen.getByLabelText('From', { selector: '#site-search-kiloStart' }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('To', { selector: '#site-search-userKmEnd' })).toBeInTheDocument();
+    expect(screen.getByLabelText('To', { selector: '#site-search-kiloEnd' })).toBeInTheDocument();
   });
 
   it('accepts a decimal bound', () => {
@@ -951,14 +939,16 @@ describe('SiteSearchPage — Designated Maintainer', () => {
     await userEvent.fill(maintainerField(), 'canfor');
 
     await waitFor(() => {
-      expect(clientApi.searchClients).toHaveBeenCalledWith('canfor');
+      // Scoped: this field offers the clients already maintaining a site, which is a different
+      // set from the road-file holders the road lookup offers.
+      expect(clientApi.searchClients).toHaveBeenCalledWith('canfor', 'MAINTAINERS');
     });
     expect(clientApi.searchClients).toHaveBeenCalledTimes(1);
   });
 
-  it('searches on the client number and location code once a suggestion is picked', async () => {
-    // The pair is what CROSSING_SITE records and what CRS_CL_FK1 constrains, so a pick filters on
-    // both halves — which is exactly what the legacy lookup popup wrote back into the form.
+  it('searches on the client number once a suggestion is picked', async () => {
+    // A pick names the client, not one of its offices — Location is a filter of its own beside it
+    // since 2026-09-23. The lookup now offers each client once rather than once per location.
     clientApi.searchClients.mockResolvedValue([canfor]);
     renderPage();
 
@@ -968,10 +958,78 @@ describe('SiteSearchPage — Designated Maintainer', () => {
 
     expect(sentCriteria()).toMatchObject({
       clientNumber: '00001012',
-      clientLocationCode: '00',
+      // Not taken from the pick: the location filter is the user's own second choice.
+      clientLocationCode: '',
       // A pick is the precise form of the filter, so the name it replaces must not still apply.
       primaryUserName: '',
     });
+  });
+
+  it("offers the chosen client's locations, and searches on the one picked", async () => {
+    clientApi.searchClients.mockResolvedValue([canfor]);
+    clientApi.clientLocations.mockResolvedValue([
+      {
+        clientNumber: '00001012',
+        clientLocnCode: '00',
+        clientName: 'CANFOR CORPORATION',
+        clientLocnName: 'HEAD OFFICE',
+        city: 'VANCOUVER',
+      },
+      {
+        clientNumber: '00001012',
+        clientLocnCode: '01',
+        clientName: 'CANFOR CORPORATION',
+        clientLocnName: 'PRINCE GEORGE',
+        city: 'PRINCE GEORGE',
+      },
+    ]);
+    renderPage();
+
+    await userEvent.fill(maintainerField(), 'canfor');
+    await userEvent.click(await screen.findByText(/CANFOR CORPORATION/));
+
+    const location = screen.getByTestId('site-search-clientLocationCode');
+    await waitFor(() => expect(location).not.toBeDisabled());
+    fireEvent.change(location, { target: { value: '01' } });
+    await searchAndWait();
+
+    expect(sentCriteria()).toMatchObject({ clientNumber: '00001012', clientLocationCode: '01' });
+  });
+
+  it('keeps the location filter shut until a maintainer is chosen', async () => {
+    // A location code on its own filters every client's office 01 at once, which is not a question
+    // anyone means to ask. The same rule Management Area follows under Forest District.
+    renderPage();
+
+    const location = screen.getByTestId('site-search-clientLocationCode');
+    expect(location).toBeDisabled();
+    expect(screen.getByText('Pick a maintainer first')).toBeInTheDocument();
+  });
+
+  it('drops the location when the maintainer is cleared', async () => {
+    clientApi.searchClients.mockResolvedValue([canfor]);
+    clientApi.clientLocations.mockResolvedValue([
+      {
+        clientNumber: '00001012',
+        clientLocnCode: '01',
+        clientName: 'CANFOR CORPORATION',
+        clientLocnName: 'PRINCE GEORGE',
+        city: 'PRINCE GEORGE',
+      },
+    ]);
+    renderPage();
+
+    await userEvent.fill(maintainerField(), 'canfor');
+    await userEvent.click(await screen.findByText(/CANFOR CORPORATION/));
+    const location = screen.getByTestId('site-search-clientLocationCode');
+    await waitFor(() => expect(location).not.toBeDisabled());
+    fireEvent.change(location, { target: { value: '01' } });
+
+    // Typing over the pick clears it, and the location goes with it.
+    await userEvent.fill(maintainerField(), 'other');
+    await searchAndWait();
+
+    expect(sentCriteria()).toMatchObject({ clientNumber: '', clientLocationCode: '' });
   });
 
   it('still searches on the name when the term matches no suggestion', async () => {
@@ -1003,5 +1061,17 @@ describe('SiteSearchPage — Designated Maintainer', () => {
     await waitFor(() => {
       expect(maintainerField()).toHaveValue('');
     });
+  });
+});
+
+describe('SiteSearchPage — User Kilometres', () => {
+  it('is not offered as a criterion', () => {
+    // Removed deliberately, 2026-09-23. Legacy has it as a live range on `site_search.jsp:147-149`
+    // — this is a divergence by decision, not a gap. The column and the backend filter both remain.
+    renderPage();
+
+    expect(screen.queryByTestId('site-search-userKmStart')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('site-search-userKmEnd')).not.toBeInTheDocument();
+    expect(screen.queryByText('User Kilometres')).not.toBeInTheDocument();
   });
 });

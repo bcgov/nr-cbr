@@ -3,6 +3,13 @@ import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
 
+/** One recreation project, as `/v1/configuration/recreation-project-name` answers. */
+export type RecreationProjectResponse = {
+  forestFileId: string;
+  /** Null when the file names no project — the ordinary state while one is being typed. */
+  projectName: string | null;
+};
+
 /**
  * Reference-data client for the dropdown lookups, backed by `/api/v1/configuration/*`.
  *
@@ -117,6 +124,35 @@ export class ConfigurationService extends HttpClient {
    * list is meaningless without a district and the parameter is required. Asking for a district with
    * no former districts is a normal, empty answer.
    */
+  /**
+   * The recreation districts a project file belongs to.
+   *
+   * <p>Empty until a file is given — an unfiltered list would be every recreation district in the
+   * province, none of which the file may belong to.
+   */
+  getRecreationDistricts(forestFileId: string): CancelablePromise<OrgUnitOption[]> {
+    return this.doRequest<OrgUnitOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/recreation-districts',
+      query: { forestFileId },
+    });
+  }
+
+  /**
+   * The name of the recreation project a file id names.
+   *
+   * <p>Always 200. A file that names no project answers with a null `projectName` rather than a
+   * 404: a recreation file id is typed by hand, so a half-typed one is the ordinary state of the
+   * field rather than a failure.
+   */
+  getRecreationProjectName(forestFileId: string): CancelablePromise<RecreationProjectResponse> {
+    return this.doRequest<RecreationProjectResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/recreation-project-name',
+      query: { forestFileId },
+    });
+  }
+
   getManagementAreas(forestDistrictOrgUnitNo: string): CancelablePromise<OrgUnitOption[]> {
     return this.doRequest<OrgUnitOption[]>(this.config, {
       method: 'GET',

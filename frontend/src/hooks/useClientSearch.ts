@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import useDebounce from '@/hooks/useDebounce';
 
+import type { ClientScope } from '@/services/client.service';
 import type { ClientSuggestion } from '@/types/client';
 import type { UseQueryResult } from '@tanstack/react-query';
 
@@ -34,12 +35,17 @@ export const CLIENT_SEARCH_DEBOUNCE_MS = 300;
  *
  * @param term the raw text in the field, debounced here rather than by the caller
  */
-export const useClientSearch = (term: string): UseQueryResult<ClientSuggestion[]> => {
+export const useClientSearch = (
+  term: string,
+  scope: ClientScope = 'MAINTAINERS',
+): UseQueryResult<ClientSuggestion[]> => {
   const debounced = useDebounce(term.trim(), CLIENT_SEARCH_DEBOUNCE_MS);
 
   return useQuery({
-    queryKey: [CLIENT_SEARCH_QUERY_KEY, debounced],
-    queryFn: () => API.client.searchClients(debounced),
+    // The scope is part of the key: the two sets answer different questions, and a term cached
+    // under one must never be served for the other.
+    queryKey: [CLIENT_SEARCH_QUERY_KEY, scope, debounced],
+    queryFn: () => API.client.searchClients(debounced, scope),
     enabled: isSearchableTerm(debounced),
     // The set of in-use maintainers moves only when sites are edited, so a minute of freshness
     // costs nothing and spares the repeated fetches a type-ahead would otherwise make.
@@ -49,3 +55,20 @@ export const useClientSearch = (term: string): UseQueryResult<ClientSuggestion[]
     placeholderData: keepPreviousData,
   });
 };
+
+/**
+ * The locations of one client, for the Location filter beside it on Site Search.
+ *
+ * <p>Asks nothing until a client is chosen, so it never runs while the user is still typing a name
+ * — unlike the suggestion lookup above, this one is answered once per selection.
+ *
+ * <p>Cached for the same minute and for the same reason: which locations maintain a site moves only
+ * when sites are edited.
+ */
+export const useClientLocations = (clientNumber: string): UseQueryResult<ClientSuggestion[]> =>
+  useQuery({
+    queryKey: [CLIENT_SEARCH_QUERY_KEY, 'locations', clientNumber.trim()],
+    queryFn: () => API.client.clientLocations(clientNumber.trim()),
+    enabled: clientNumber.trim() !== '',
+    staleTime: ONE_MINUTE,
+  });

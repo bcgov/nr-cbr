@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { EMPTY_SITE, type SiteFormValues } from './types';
-import { crossFieldErrors, fieldErrors } from './validation';
+import {
+  crossFieldErrors,
+  crossFieldWarnings,
+  fieldErrors,
+  fieldWarnings,
+  savedSiteConflicts,
+} from './validation';
 
 /** A site with every required field filled, so each case can break exactly one thing. */
 const valid = (overrides: Partial<SiteFormValues> = {}): SiteFormValues => ({
@@ -67,6 +73,34 @@ describe('fieldErrors', () => {
       // It is identified by its project rather than by a district's road network.
       expect(fieldErrors(valid({ crossingSiteTypeCode: 'REC', orgUnitNo: '' }))).toEqual({});
     });
+
+    it('needs no Br.', () => {
+      // A "Br." is a branch of a road and a recreation site has no road. Asterisked unconditionally
+      // in the JSP, but no rule enforces it and `site.jsp:661` hides its error div for REC — so
+      // legacy could not report it there even if one were raised.
+      expect(fieldErrors(valid({ crossingSiteTypeCode: 'REC', roadSectionId: '' }))).toEqual({});
+    });
+
+    it('still needs its project file, which narrows the district list', () => {
+      expect(
+        fieldErrors(valid({ crossingSiteTypeCode: 'REC', forestFileId: '' })).forestFileId,
+      ).toBe('Project File ID# is required.');
+    });
+  });
+
+  it('requires Br. for every other site type', () => {
+    expect(
+      fieldErrors(valid({ crossingSiteTypeCode: 'CRS', roadSectionId: '' })).roadSectionId,
+    ).toBe('Br. is required.');
+    expect(
+      fieldErrors(
+        valid({
+          crossingSiteTypeCode: 'STRG',
+          structureInspectionStatusCode: 'DNI',
+          roadSectionId: '',
+        }),
+      ).roadSectionId,
+    ).toBe('Br. is required.');
   });
 
   it('requires a crossing name and kilometres for every other site type', () => {
@@ -180,9 +214,18 @@ describe('fieldErrors', () => {
       ).toEqual({});
     });
 
-    it('reject minutes and seconds of 60 or more', () => {
-      expect(fieldErrors(valid({ latitudeMinutes: '60' }))).toHaveProperty('latitudeMinutes');
-      expect(fieldErrors(valid({ latitudeSeconds: '60' }))).toHaveProperty('latitudeSeconds');
+    it('lets minutes and seconds of 60 or more through, as legacy does', () => {
+      // Out of range for the notation, but `Site.validateLatitudeDMS` files it as a WARNING and
+      // `SiteForm.validate` — the only thing that can refuse the save — never looks at it. The
+      // amber message is asserted in the fieldWarnings block below.
+      expect(fieldErrors(valid({ latitudeMinutes: '60' })).latitudeMinutes).toBeUndefined();
+      expect(fieldErrors(valid({ latitudeSeconds: '60' })).latitudeSeconds).toBeUndefined();
+    });
+
+    it('still rejects a part that is not a number at all', () => {
+      // `errors.numeric` in `SiteForm.validate`, which does refuse the save.
+      expect(fieldErrors(valid({ latitudeMinutes: 'abc' }))).toHaveProperty('latitudeMinutes');
+      expect(fieldErrors(valid({ utmEasting: 'abc' }))).toHaveProperty('utmEasting');
     });
 
     it('accept an unsigned longitude, which is how it is entered', () => {
@@ -254,8 +297,9 @@ describe('crossFieldErrors', () => {
       }),
     );
 
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain('must have an Inspection Status of Inspect');
+    // On Inspection Status, which is legacy's field for all three rules.
+    expect(Object.keys(messages)).toEqual(['structureInspectionStatusCode']);
+    expect(messages.structureInspectionStatusCode).toContain('must be set to Inspect');
   });
 
   it.each(['TRN', 'DAC', 'UCON', 'PP', 'ARC', 'LRM'])(
@@ -269,8 +313,8 @@ describe('crossFieldErrors', () => {
         }),
       );
 
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toContain('Do Not Inspect');
+      expect(Object.keys(messages)).toEqual(['structureInspectionStatusCode']);
+      expect(messages.structureInspectionStatusCode).toContain('Do Not Inspect');
     },
   );
 
@@ -279,8 +323,8 @@ describe('crossFieldErrors', () => {
       valid({ crossingSiteTypeCode: 'STRG', structureInspectionStatusCode: 'INS' }),
     );
 
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain('Storage site');
+    expect(Object.keys(messages)).toEqual(['structureInspectionStatusCode']);
+    expect(messages.structureInspectionStatusCode).toContain('Storage site');
   });
 
   it('allows the combinations that agree', () => {
@@ -288,17 +332,17 @@ describe('crossFieldErrors', () => {
       crossFieldErrors(
         valid({ crossingSiteStatusCode: 'ACT', structureInspectionStatusCode: 'INS' }),
       ),
-    ).toEqual([]);
+    ).toEqual({});
     expect(
       crossFieldErrors(
         valid({ crossingSiteStatusCode: 'DAC', structureInspectionStatusCode: 'DNI' }),
       ),
-    ).toEqual([]);
+    ).toEqual({});
     expect(
       crossFieldErrors(
         valid({ crossingSiteTypeCode: 'STRG', structureInspectionStatusCode: 'DNI' }),
       ),
-    ).toEqual([]);
+    ).toEqual({});
   });
 
   it('says nothing about a recreation site, which legacy leaves to the user', () => {
@@ -308,6 +352,139 @@ describe('crossFieldErrors', () => {
       crossFieldErrors(
         valid({ crossingSiteTypeCode: 'REC', structureInspectionStatusCode: 'DNI' }),
       ),
-    ).toEqual([]);
+    ).toEqual({});
+  });
+});
+
+describe('fieldWarnings', () => {
+  it('says nothing about a site inside British Columbia', () => {
+    expect(fieldWarnings(valid())).toEqual({});
+  });
+
+  it.each([
+    ['latitudeMinutes', '60'],
+    ['longitudeMinutes', '75'],
+    ['latitudeSeconds', '60'],
+    ['longitudeSeconds', '61.5'],
+  ])('flags %s of %s as outside the notation', (field, value) => {
+    expect(fieldWarnings(valid({ [field]: value }))).toHaveProperty(field);
+  });
+
+  it.each([
+    ['longitudeDegrees', '95'],
+    ['longitudeDegrees', '150'],
+    ['latitudeDegrees', '40'],
+    ['latitudeDegrees', '70'],
+  ])('flags %s of %s as outside the province', (field, value) => {
+    expect(fieldWarnings(valid({ [field]: value }))).toHaveProperty(field);
+  });
+
+  it.each([
+    ['utmZone', '7'],
+    ['utmZone', '13'],
+    ['utmEasting', '100000'],
+    ['utmEasting', '900000'],
+    ['utmNorthing', '5000000'],
+    ['utmNorthing', '7000000'],
+  ])('flags a UTM %s of %s', (field, value) => {
+    expect(fieldWarnings(valid({ [field]: value }))).toHaveProperty(field);
+  });
+
+  it('accepts a UTM coordinate inside the province', () => {
+    expect(
+      fieldWarnings(valid({ utmZone: '10', utmEasting: '472954', utmNorthing: '5363981' })),
+    ).toEqual({});
+  });
+
+  it('never blocks the save — warnings and errors are disjoint here', () => {
+    // The point of the tier: every field this marks is a field `fieldErrors` leaves alone.
+    const outside = valid({ latitudeDegrees: '70', utmZone: '7', longitudeMinutes: '75' });
+    expect(fieldWarnings(outside)).not.toEqual({});
+    expect(fieldErrors(outside)).toEqual({});
+  });
+
+  it('leaves an empty box alone', () => {
+    // UTM is optional, and an untouched form must not open covered in amber.
+    expect(fieldWarnings(valid({ utmZone: '', utmEasting: '', utmNorthing: '' }))).toEqual({});
+  });
+});
+
+describe('crossFieldWarnings', () => {
+  it('asks about an active recreation site that is not inspected', () => {
+    expect(
+      crossFieldWarnings(
+        valid({
+          crossingSiteTypeCode: 'REC',
+          crossingSiteStatusCode: 'ACT',
+          structureInspectionStatusCode: 'DNI',
+        }),
+      ),
+    ).toHaveProperty('structureInspectionStatusCode');
+  });
+
+  it('says nothing when the recreation site is inspected', () => {
+    expect(
+      crossFieldWarnings(
+        valid({
+          crossingSiteTypeCode: 'REC',
+          crossingSiteStatusCode: 'ACT',
+          structureInspectionStatusCode: 'INS',
+        }),
+      ),
+    ).toEqual({});
+  });
+
+  it('does not stop the save, unlike the equivalent rule for a crossing', () => {
+    const site = valid({
+      crossingSiteTypeCode: 'REC',
+      crossingSiteStatusCode: 'ACT',
+      structureInspectionStatusCode: 'DNI',
+    });
+    expect(crossFieldErrors(site)).toEqual({});
+  });
+});
+
+describe('savedSiteConflicts', () => {
+  it('refuses a Proposed site that already has structures', () => {
+    const conflicts = savedSiteConflicts(valid({ crossingSiteStatusCode: 'PP' }), {
+      activeStructureCount: 2,
+    });
+
+    expect(conflicts.errors.crossingSiteStatusCode).toContain('2');
+    expect(conflicts.warnings).toEqual({});
+  });
+
+  it('only warns about a Deactivated site that still has them', () => {
+    // `SiteForm.validate` has no `errors.site.deactivated` at all — legacy paints this and saves.
+    // A closed crossing legitimately keeps its bridge until someone removes it.
+    const conflicts = savedSiteConflicts(valid({ crossingSiteStatusCode: 'DAC' }), {
+      activeStructureCount: 1,
+    });
+
+    expect(conflicts.errors).toEqual({});
+    expect(conflicts.warnings).toHaveProperty('crossingSiteStatusCode');
+  });
+
+  it('says nothing when the site carries no structures', () => {
+    expect(savedSiteConflicts(valid({ crossingSiteStatusCode: 'PP' }), {})).toEqual({
+      errors: {},
+      warnings: {},
+    });
+  });
+
+  it('says nothing for any other status', () => {
+    expect(
+      savedSiteConflicts(valid({ crossingSiteStatusCode: 'ACT' }), { activeStructureCount: 3 }),
+    ).toEqual({ errors: {}, warnings: {} });
+  });
+
+  it('is not reachable from the rules Add Site runs', () => {
+    // The whole point of keeping these separate. Add Site calls only crossFieldErrors and
+    // crossFieldWarnings, and neither takes a structure count — so a rule legacy nests inside
+    // `if (actionType.equals(UPDATE))` cannot fire on a create here either.
+    const proposed = valid({ crossingSiteStatusCode: 'PP', structureInspectionStatusCode: 'DNI' });
+
+    expect(crossFieldErrors(proposed)).toEqual({});
+    expect(crossFieldWarnings(proposed)).toEqual({});
   });
 });

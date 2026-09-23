@@ -1,6 +1,9 @@
 import { queryOptions, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import useDebounce from '@/hooks/useDebounce';
+
+import type { RecreationProjectResponse } from '@/services/configuration.service';
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 import type { UseQueryResult } from '@tanstack/react-query';
 
@@ -18,6 +21,9 @@ export const CONFIGURATION_QUERY_KEY = 'configuration';
  * be round trips to be told the same thing.
  */
 const REFERENCE_DATA_STALE_TIME = THREE_HOURS;
+
+/** The same wait the road lookup uses — see `ROAD_SECTION_DEBOUNCE_MS`, and for the same reason. */
+const RECREATION_PROJECT_DEBOUNCE_MS = 300;
 
 /**
  * The lookups that take no parameter.
@@ -154,6 +160,43 @@ export const useBusinessAreas = (): UseQueryResult<OrgUnitOption[]> => useQuery(
 
 export const useForestDistricts = (): UseQueryResult<OrgUnitOption[]> =>
   useQuery(forestDistrictsQuery);
+
+/**
+ * The recreation districts for a project file — the Recreation District list on a recreation site.
+ *
+ * <p>Keyed on the file rather than on another org unit, and not warmed with the rest: the list
+ * differs per file, so there is nothing to prefetch before one is chosen.
+ */
+export const useRecreationDistricts = (forestFileId: string): UseQueryResult<OrgUnitOption[]> =>
+  useQuery({
+    queryKey: [CONFIGURATION_QUERY_KEY, 'recreation-districts', forestFileId],
+    queryFn: () => API.configuration.getRecreationDistricts(forestFileId),
+    enabled: forestFileId.trim() !== '',
+    staleTime: REFERENCE_DATA_STALE_TIME,
+  });
+
+/**
+ * The project name for a recreation file — "Project Name" on the site form.
+ *
+ * <p>What a recreation site shows where a crossing shows its Forest Service Road, so the two are
+ * never fetched together: this asks nothing unless the site type is `REC`.
+ *
+ * <p>Debounced, because the file id is typed a character at a time and each one would otherwise be
+ * a request. The road lookup beside it is debounced for the same reason and by the same amount.
+ */
+export const useRecreationProjectName = (
+  forestFileId: string,
+  enabled: boolean,
+): UseQueryResult<RecreationProjectResponse> => {
+  const file = useDebounce(forestFileId.trim(), RECREATION_PROJECT_DEBOUNCE_MS);
+
+  return useQuery({
+    queryKey: [CONFIGURATION_QUERY_KEY, 'recreation-project-name', file],
+    queryFn: () => API.configuration.getRecreationProjectName(file),
+    enabled: enabled && file !== '',
+    staleTime: REFERENCE_DATA_STALE_TIME,
+  });
+};
 
 export const useManagementAreas = (
   forestDistrictOrgUnitNo: string,

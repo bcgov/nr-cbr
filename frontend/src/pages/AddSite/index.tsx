@@ -1,19 +1,29 @@
 import { Save } from '@carbon/icons-react';
 import { Button, Column, Grid, InlineNotification } from '@carbon/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
-import UnderConstructionTag from '@/components/core/Tags/UnderConstructionTag';
+import RoadSearchModal from '@/components/RoadSearchModal';
 import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
 
 import type { FC } from 'react';
 
-import { EMPTY_SITE, type SiteFormValues } from '@/components/SiteForm/types';
-import { crossFieldErrors, fieldErrors, type SiteErrors } from '@/components/SiteForm/validation';
+import { syncCoordinates } from '@/components/SiteForm/coordinateSync';
+import { toCreateRequest } from '@/components/SiteForm/request';
+import { EMPTY_SITE, SITE_TYPE, type SiteFormValues } from '@/components/SiteForm/types';
+import {
+  crossFieldErrors,
+  crossFieldWarnings,
+  fieldErrors,
+  fieldWarnings,
+  type SiteErrors,
+} from '@/components/SiteForm/validation';
 import {
   useBusinessAreas,
   useForestDistricts,
+  useRecreationDistricts,
+  useRecreationProjectName,
   useManagementAreas,
   useSiteReferenceDataState,
   useSiteStatusCodes,
@@ -21,8 +31,12 @@ import {
   useSpecialAccessCodes,
   useStructureInspectionStatusCodes,
 } from '@/hooks/useConfiguration';
+import { useCreateSite } from '@/hooks/useCreateSite';
+import { useRoadSection } from '@/hooks/useRoadSection';
 import { useSettledFields } from '@/hooks/useSettledFields';
+import { useSiteNumberTaken } from '@/hooks/useSiteNumberTaken';
 import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt';
+import { apiErrorMessage } from '@/utils/apiError';
 import { errorsForSettledFields } from '@/utils/validation';
 
 import './addSite.scss';
@@ -40,12 +54,41 @@ import './addSite.scss';
  * live — which is the point at which the feedback is about what they did rather than what they
  * have not done yet.
  */
+/**
+ * The three fields legacy locks on every branch of `site.jsp`, left off a form for a site that does
+ * not exist yet.
+ *
+ * <p>Designated Maintainer is `disabled` for Level 1 and above and `readonly` below it
+ * (`site.jsp:734-740`, `778-784`), and `showClientSearch()` — the lookup that would fill it — is
+ * defined at line 529 and called from nowhere. A disabled input is not submitted, so <b>legacy's
+ * Add Site always stores a site with no maintainer</b>. User Kilometres is the distance posted on
+ * the sign, `disabled` at line 863. BCTS BA Responsible is `disabled` at line 901 even in the
+ * Level 2 branch.
+ *
+ * <p>Hidden rather than shown read-only: on a create they could only ever be blank, and an empty
+ * cell with a label invites a user to look for the control that fills it. Site Detail shows all
+ * three, where the site is stored and they have values.
+ */
+const NOT_SET_ON_CREATE: ReadonlySet<keyof SiteFormValues> = new Set([
+  'clientNumber',
+  'userKm',
+  'businessAreaOrgUnitNo',
+]);
+
 const AddSitePage: FC = () => {
   const navigate = useNavigate();
 
   const [site, setSite] = useState<SiteFormValues>(EMPTY_SITE);
   /** Whether Save has been pressed — see the note above on when messages appear. */
   const [submitted, setSubmitted] = useState(false);
+  /**
+   * Whether the site has been stored.
+   *
+   * <p>Only used to stand the unsaved-changes guard down: the form is still full of values when the
+   * save succeeds, so without this the navigation to the new site's page would be intercepted and
+   * the user asked whether to discard work that is already safely in the database.
+   */
+  const [saved, setSaved] = useState(false);
   const { settled, markSettled } = useSettledFields();
 
   const siteStatusCodes = useSiteStatusCodes();
@@ -57,7 +100,38 @@ const AddSitePage: FC = () => {
   // Refetches under its own key whenever the district changes, and does not run until one is
   // picked — the same coupling Site Search has.
   const managementAreas = useManagementAreas(site.orgUnitNo);
+  // Only ever asked for once a project file is given — a recreation site's districts come from
+  // the file, not from the whole province.
+  const recreationDistricts = useRecreationDistricts(site.forestFileId);
+  // The other half of the same question the road lookup asks. A recreation site's Project File ID#
+  // names a recreation project rather than a road file, so only one of the two is ever asked.
+  const isRecreationSite = site.crossingSiteTypeCode === SITE_TYPE.RECREATION;
+  const recreationProject = useRecreationProjectName(site.forestFileId, isRecreationSite);
   const referenceData = useSiteReferenceDataState();
+  // Debounced inside the hook, and asked nothing until both halves are present — a road file alone
+  // names many sections, and they are different roads.
+  const road = useRoadSection(site.forestFileId, site.roadSectionId);
+  // Asked as the number is typed, so a clash is known before the other thirty fields are filled
+  // in. Legacy checks the same thing in the same two places — live, and again at the save.
+  const siteNumberTaken = useSiteNumberTaken(site.siteId);
+  const created = useCreateSite();
+
+  /**
+   * The road sets the Forest District, as `SiteAction` does on every redisplay.
+   *
+   * <p>Never for a recreation site, whose district is the user's choice from a list the file
+   * narrows — writing the road's org unit there would overwrite what they picked.
+   */
+  useEffect(() => {
+    const fromRoad = road.data?.orgUnitNo;
+    if (fromRoad === undefined || fromRoad === null) return;
+    if (site.crossingSiteTypeCode === SITE_TYPE.RECREATION) return;
+    setSite((current) =>
+      current.orgUnitNo === String(fromRoad)
+        ? current
+        : { ...current, orgUnitNo: String(fromRoad), managementOrgUnitNo: '' },
+    );
+  }, [road.data, site.crossingSiteTypeCode]);
 
   const codeTables = useMemo<SiteCodeTables>(
     () => ({
@@ -66,6 +140,7 @@ const AddSitePage: FC = () => {
       structureInspectionStatusCodes: structureInspectionStatusCodes.data ?? [],
       specialAccessCodes: specialAccessCodes.data ?? [],
       forestDistricts: forestDistricts.data ?? [],
+      recreationDistricts: recreationDistricts.data ?? [],
       managementAreas: managementAreas.data ?? [],
       businessAreas: businessAreas.data ?? [],
     }),
@@ -75,21 +150,51 @@ const AddSitePage: FC = () => {
       structureInspectionStatusCodes.data,
       specialAccessCodes.data,
       forestDistricts.data,
+      recreationDistricts.data,
       managementAreas.data,
       businessAreas.data,
     ],
   );
 
+  /** Whether the road lookup is open. */
+  const [findingRoad, setFindingRoad] = useState(false);
+
+  /**
+   * A road was picked. Both halves of the pair go in together — they identify one section between
+   * them, and setting either alone would leave the form describing a road that does not exist.
+   */
+  const chooseRoad = useCallback((road: { forestFileId: string; roadSectionId: string }) => {
+    setSite((current) => ({
+      ...current,
+      forestFileId: road.forestFileId,
+      roadSectionId: road.roadSectionId,
+    }));
+    setFindingRoad(false);
+  }, []);
+
   const update = useCallback(
     <K extends keyof SiteFormValues>(field: K, value: SiteFormValues[K]) => {
-      setSite((current) => ({
-        ...current,
-        [field]: value,
-        // Changing the district changes which management areas exist, so a selection made under
-        // the old one has to go — it would otherwise submit an area that is not in the list the
-        // user can now see. Site Search drops it for the same reason.
-        ...(field === 'orgUnitNo' ? { managementOrgUnitNo: '' } : {}),
-      }));
+      setSite((current) =>
+        syncCoordinates(
+          {
+            ...current,
+            [field]: value,
+            // Two ways a Management Area selection stops being valid. Changing the district
+            // changes which areas exist, so one picked under the old district would submit an
+            // area the user can no longer see. Switching to a recreation site takes the field off
+            // the form entirely, as it does on legacy's — and a hidden box must not submit a value
+            // at all. (Legacy's session-scoped form bean keeps it, which is a framework artefact
+            // rather than a rule: the row is simply not rendered.)
+            ...(field === 'orgUnitNo' ||
+            (field === 'crossingSiteTypeCode' && value === SITE_TYPE.RECREATION)
+              ? { managementOrgUnitNo: '' }
+              : {}),
+          },
+          // Which box was touched decides which notation is recomputed — legacy's `longLatUpdate`
+          // and `utmUpdate` flags, set the same way from the changed field's name.
+          field,
+        ),
+      );
     },
     [],
   );
@@ -107,24 +212,61 @@ const AddSitePage: FC = () => {
    * <p>Pressing Save shows everything, including what is still missing.
    */
   const settledErrors = fieldErrors(site, 'settled');
+  const conflicts = crossFieldErrors(site);
   const errors: SiteErrors = {
     ...fieldErrors(site, 'typing'),
     ...errorsForSettledFields(settledErrors, settled, (key) => String(site[key] ?? '')),
     ...(submitted ? settledErrors : {}),
+    // The two-field rules, live rather than held to Save — see `crossFieldErrors`. After the
+    // required set, so "this combination is wrong" wins over "this field is required" on the same
+    // box; the rule cannot fire unless all three fields are filled in, so the two rarely meet.
+    ...conflicts,
+    // Last, so it wins the Site # box: "already used" is a more specific and more actionable
+    // complaint than "required", and the two can never both be true anyway.
+    ...(siteNumberTaken ? { siteId: 'A site with this number already exists.' } : {}),
+    // What the server refused, over everything the form decided. It applies the same rules, so
+    // these arrive only where the two disagreed — and when they do, the server is the one that
+    // decides whether the site stores.
+    ...created.fieldErrors,
   };
 
-  // Above the form, and only once Save has been pressed: each of these is a disagreement between
-  // two fields, and neither is wrong until the user says they have finished choosing both.
-  const conflicts = submitted ? crossFieldErrors(site) : [];
+  /**
+   * The amber tier, which never waits for Save.
+   *
+   * <p>Legacy shows these the moment they become true — its live `validate` call returns warnings
+   * and errors in one list — and they read differently from an error for it: nothing here is
+   * wrong, so there is no correction to hold back until the user says they are done. A warning
+   * that appears only after Save has been refused would be advice arriving too late to take.
+   *
+   * <p>Every rule here depends on fields being filled in, so an untouched form is silent.
+   */
+  const warnings: SiteErrors = { ...fieldWarnings(site), ...crossFieldWarnings(site) };
 
+  /**
+   * Saves, once the form agrees the site is storable.
+   *
+   * <p>The local check first, so an obviously incomplete form is answered without a round trip —
+   * but it is not the gate. The server applies the same rules and is the only thing that can
+   * actually refuse; anything it sends back lands beside the boxes through `created.fieldErrors`.
+   */
   const save = useCallback(() => {
     setSubmitted(true);
-    if (Object.keys(settledErrors).length > 0 || crossFieldErrors(site).length > 0) {
+    if (
+      siteNumberTaken ||
+      Object.keys(settledErrors).length > 0 ||
+      Object.keys(crossFieldErrors(site)).length > 0
+    ) {
       return;
     }
-    // The endpoint is not built yet. Nothing is silently dropped: the notification below says so,
-    // rather than a Save that appears to work.
-  }, [settledErrors, site]);
+    created.mutate(toCreateRequest(site), {
+      // To the site that was stored, not the one that was sent: the server upper-cases the number
+      // and fills in the road name and maintainer, so the detail page should read the record.
+      onSuccess: (stored) => {
+        setSaved(true);
+        navigate(`/inventory/site/${stored.siteId}`);
+      },
+    });
+  }, [created, navigate, settledErrors, site, siteNumberTaken]);
 
   /**
    * Anything typed, picked or ticked.
@@ -155,7 +297,7 @@ const AddSitePage: FC = () => {
    * confirmation attached to Cancel catches one exit; the side nav, a breadcrumb and the browser's
    * back button would each still discard the form in silence.
    */
-  useUnsavedChangesPrompt(isDirty);
+  useUnsavedChangesPrompt(isDirty && !saved);
 
   /** Cancel simply leaves. If there is anything to lose, the guard intercepts and asks. */
   const cancel = useCallback(() => navigate('/inventory/site-search'), [navigate]);
@@ -184,9 +326,10 @@ const AddSitePage: FC = () => {
             type="submit"
             form={FORM_ID}
             renderIcon={Save}
+            disabled={created.isPending}
             data-testid="add-site-save"
           >
-            Save
+            {created.isPending ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </PageTitle>
@@ -206,56 +349,54 @@ const AddSitePage: FC = () => {
         </Column>
       )}
 
-      {conflicts.length > 0 && (
+      {/* A save the server refused for a reason no single box is at fault for — it was down, the
+          token had expired, the role was wrong. Anything it blamed on a field is already beside
+          that field; this is what is left over, and without it a refused save looks like a button
+          that does nothing. Not a validation message, which is why it is a notification. */}
+      {created.isError && Object.keys(created.fieldErrors).length === 0 && (
         <Column sm={4} md={8} lg={16}>
-          {/* Above the form rather than beside a box, because each of these is a disagreement
-              between two fields and either one could be the one to change. Marking one would be
-              choosing for the user. */}
           <InlineNotification
             kind="error"
             lowContrast
             hideCloseButton
-            title="This site cannot be saved"
-            subtitle={conflicts.join(' ')}
-            data-testid="add-site-conflicts"
+            title="This site could not be saved"
+            subtitle={apiErrorMessage(created.error, 'The site could not be saved. Try again.')}
+            data-testid="add-site-save-error"
           />
         </Column>
       )}
-
-      {/* Everything on this page that is true only until the create endpoint lands, in one block.
-          The tag used to sit in the heading, where it competed with Save and Cancel for the row and
-          read as part of the screen's identity rather than as a note about its state — and where
-          removing it later would mean editing the page header. Here the whole block deletes in one
-          edit, and the notification says specifically what the tag only gestures at. */}
-      <Column sm={4} md={8} lg={16}>
-        <div className="add-site__notice">
-          <UnderConstructionTag type="page" />
-          <InlineNotification
-            kind="info"
-            lowContrast
-            hideCloseButton
-            title="Saving is not available yet"
-            subtitle={
-              'The form is complete and validates as the legacy screen does, but the endpoint ' +
-              'behind Save has not been built — nothing entered here is stored.'
-            }
-            data-testid="add-site-placeholder"
-          />
-        </div>
-      </Column>
 
       <Column sm={4} md={8} lg={16}>
         <SiteForm
           values={site}
           errors={errors}
+          warnings={warnings}
           codeTables={codeTables}
           codeTablesLoading={referenceData.isLoading}
           managementAreasLoading={managementAreas.isFetching}
           onChange={update}
           onSettle={markSettled}
           onSave={save}
+          onFindRoad={() => setFindingRoad(true)}
+          forestServiceRoad={
+            isRecreationSite
+              ? (recreationProject.data?.projectName ?? '')
+              : (road.data?.forestServiceRoad ?? '')
+          }
+          forestServiceRoadLoading={
+            isRecreationSite ? recreationProject.isFetching : road.isFetching
+          }
+          roadResolved={Boolean(road.data)}
+          hiddenFields={NOT_SET_ON_CREATE}
         />
       </Column>
+
+      {/* Mounted only while open. Carbon keeps a closed modal's content in the document, and a
+          second "Project File ID#" label sitting invisibly beside the real one confuses a screen
+          reader exactly as much as it confuses a test. */}
+      {findingRoad && (
+        <RoadSearchModal onSelect={chooseRoad} onClose={() => setFindingRoad(false)} />
+      )}
     </Grid>
   );
 };

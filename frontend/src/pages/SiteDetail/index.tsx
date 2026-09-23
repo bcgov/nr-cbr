@@ -5,18 +5,28 @@ import { useParams } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
 import UnderConstructionTag from '@/components/core/Tags/UnderConstructionTag';
+import RoadSearchModal from '@/components/RoadSearchModal';
 import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
 
 import { toFormValues } from './siteResponse';
 
 import type { FC } from 'react';
 
-import { EMPTY_SITE, type SiteFormValues } from '@/components/SiteForm/types';
-import { crossFieldErrors, fieldErrors, type SiteErrors } from '@/components/SiteForm/validation';
+import { syncCoordinates } from '@/components/SiteForm/coordinateSync';
+import { EMPTY_SITE, SITE_TYPE, type SiteFormValues } from '@/components/SiteForm/types';
+import {
+  crossFieldErrors,
+  crossFieldWarnings,
+  fieldErrors,
+  fieldWarnings,
+  savedSiteConflicts,
+  type SiteErrors,
+} from '@/components/SiteForm/validation';
 import { useAuthorization } from '@/hooks/useAuthorization';
 import {
   useBusinessAreas,
   useForestDistricts,
+  useRecreationDistricts,
   useManagementAreas,
   useSiteReferenceDataState,
   useSiteStatusCodes,
@@ -98,6 +108,9 @@ const SiteDetailPage: FC = () => {
   const forestDistricts = useForestDistricts();
   const businessAreas = useBusinessAreas();
   const managementAreas = useManagementAreas(site.orgUnitNo);
+  // Only ever asked for once a project file is given — a recreation site's districts come from
+  // the file, not from the whole province.
+  const recreationDistricts = useRecreationDistricts(site.forestFileId);
   const referenceData = useSiteReferenceDataState();
 
   const codeTables = useMemo<SiteCodeTables>(
@@ -107,6 +120,7 @@ const SiteDetailPage: FC = () => {
       structureInspectionStatusCodes: structureInspectionStatusCodes.data ?? [],
       specialAccessCodes: specialAccessCodes.data ?? [],
       forestDistricts: forestDistricts.data ?? [],
+      recreationDistricts: recreationDistricts.data ?? [],
       managementAreas: managementAreas.data ?? [],
       businessAreas: businessAreas.data ?? [],
     }),
@@ -116,6 +130,7 @@ const SiteDetailPage: FC = () => {
       structureInspectionStatusCodes.data,
       specialAccessCodes.data,
       forestDistricts.data,
+      recreationDistricts.data,
       managementAreas.data,
       businessAreas.data,
     ],
@@ -144,25 +159,78 @@ const SiteDetailPage: FC = () => {
   /** Whether this user may change anything at all — what decides if Edit is offered. */
   const canEditSomething = canEdit || canDelete;
 
+  /** Whether the road lookup is open. */
+  const [findingRoad, setFindingRoad] = useState(false);
+
+  /**
+   * A road was picked. Both halves of the pair go in together — they identify one section between
+   * them, and setting either alone would leave the form describing a road that does not exist.
+   */
+  const chooseRoad = useCallback((road: { forestFileId: string; roadSectionId: string }) => {
+    setSite((current) => ({
+      ...current,
+      forestFileId: road.forestFileId,
+      roadSectionId: road.roadSectionId,
+    }));
+    setFindingRoad(false);
+  }, []);
+
   const update = useCallback(
     <K extends keyof SiteFormValues>(field: K, value: SiteFormValues[K]) => {
-      setSite((current) => ({
-        ...current,
-        [field]: value,
-        ...(field === 'orgUnitNo' ? { managementOrgUnitNo: '' } : {}),
-      }));
+      setSite((current) =>
+        syncCoordinates(
+          {
+            ...current,
+            [field]: value,
+            // Two ways a Management Area selection stops being valid. Changing the district
+            // changes which areas exist, so one picked under the old district would submit an
+            // area the user can no longer see. Switching to a recreation site takes the field off
+            // the form entirely, as it does on legacy's — and a hidden box must not submit a value
+            // at all. (Legacy's session-scoped form bean keeps it, which is a framework artefact
+            // rather than a rule: the row is simply not rendered.)
+            ...(field === 'orgUnitNo' ||
+            (field === 'crossingSiteTypeCode' && value === SITE_TYPE.RECREATION)
+              ? { managementOrgUnitNo: '' }
+              : {}),
+          },
+          // Which box was touched decides which notation is recomputed — legacy's `longLatUpdate`
+          // and `utmUpdate` flags, set the same way from the changed field's name.
+          field,
+        ),
+      );
     },
     [],
   );
 
   /** The same three layers Add Site uses — see its own note on when each speaks. */
+  /**
+   * The two rules that only a stored site can break — see `savedSiteConflicts`. Add Site does not
+   * call this at all, because a site being created owns no structures.
+   *
+   * <p>Zero until the site has loaded, which is the right answer while nothing is on screen:
+   * treating "not yet known" as "has some" would flash a message about structures that may not
+   * exist.
+   */
+  const stored = savedSiteConflicts(site, {
+    activeStructureCount: loaded.data?.activeStructureCount ?? 0,
+  });
+
   const settledErrors = fieldErrors(site, 'settled');
   const errors: SiteErrors = {
     ...fieldErrors(site, 'typing'),
     ...errorsForSettledFields(settledErrors, settled, (key) => String(site[key] ?? '')),
     ...(submitted ? settledErrors : {}),
+    // The two-field rules, live rather than held to Save — see `crossFieldErrors`.
+    ...(mode === 'edit' ? { ...crossFieldErrors(site), ...stored.errors } : {}),
   };
-  const conflicts = submitted ? crossFieldErrors(site) : [];
+
+  // The amber tier. Never gated on Save — see the note on the same pair in Add Site — and shown
+  // only while editing, because a read-only page is a record of what was decided rather than an
+  // invitation to reconsider it.
+  const warnings: SiteErrors =
+    mode === 'edit'
+      ? { ...fieldWarnings(site), ...crossFieldWarnings(site), ...stored.warnings }
+      : {};
 
   // Only while editing: a read-only page holds nothing to lose, and prompting on the way out of
   // one the user merely looked at would be nonsense.
@@ -269,19 +337,6 @@ const SiteDetailPage: FC = () => {
         </Column>
       )}
 
-      {conflicts.length > 0 && (
-        <Column sm={4} md={8} lg={16}>
-          <InlineNotification
-            kind="error"
-            lowContrast
-            hideCloseButton
-            title="This site cannot be saved"
-            subtitle={conflicts.join(' ')}
-            data-testid="site-detail-conflicts"
-          />
-        </Column>
-      )}
-
       {loaded.isError && (
         <Column sm={4} md={8} lg={16}>
           <InlineNotification
@@ -322,6 +377,7 @@ const SiteDetailPage: FC = () => {
           <SiteForm
             values={site}
             errors={errors}
+            warnings={warnings}
             codeTables={codeTables}
             codeTablesLoading={referenceData.isLoading}
             managementAreasLoading={managementAreas.isFetching}
@@ -329,9 +385,17 @@ const SiteDetailPage: FC = () => {
             onChange={update}
             onSettle={markSettled}
             onSave={save}
+            onFindRoad={() => setFindingRoad(true)}
           />
         )}
       </Column>
+
+      {/* Mounted only while open. Carbon keeps a closed modal's content in the document, and a
+          second "Project File ID#" label sitting invisibly beside the real one confuses a screen
+          reader exactly as much as it confuses a test. */}
+      {findingRoad && (
+        <RoadSearchModal onSelect={chooseRoad} onClose={() => setFindingRoad(false)} />
+      )}
     </Grid>
   );
 };

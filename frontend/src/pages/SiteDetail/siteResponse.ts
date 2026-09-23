@@ -1,3 +1,4 @@
+import { fillMissingCoordinates } from '@/components/SiteForm/coordinateSync';
 import { EMPTY_SITE, type SiteFormValues } from '@/components/SiteForm/types';
 
 /** One crossing site as `/api/v1/sites/{siteId}` returns it. Stored values, not display values. */
@@ -16,6 +17,8 @@ export type SiteDetailResponse = {
   forestFileId: string | null;
   roadSectionId: string | null;
   forestServiceRoad: string | null;
+  /** Structures standing on the site — what the Proposed and Deactivated rules turn on. */
+  activeStructureCount: number;
   clientNumber: string | null;
   clientLocnCode: string | null;
   maintainerLabel: string | null;
@@ -27,8 +30,6 @@ export type SiteDetailResponse = {
   utmEasting: number | null;
   utmNorthing: number | null;
   pointOfAccessDescription: string | null;
-  ntsMapSheetNumber: string | null;
-  trimMapSheetNumber: string | null;
 };
 
 const asText = (value: string | number | null | undefined): string =>
@@ -79,7 +80,12 @@ export const toFormValues = (site: SiteDetailResponse): SiteFormValues => {
   const longitude = toDms(site.longitude);
   const latitude = toDms(site.latitude);
 
-  return {
+  // Whichever notation the record is missing is derived here rather than after mounting, so it
+  // is part of the baseline the form compares against. Legacy fills the same gap on load — its
+  // `onInitialLoad` runs the live validate, which triggers the conversion — and then resets
+  // `contentChanged`, which is the same effect: opening a record and leaving does not count as an
+  // edit. A record carrying both notations keeps both, even where they disagree.
+  return fillMissingCoordinates({
     ...EMPTY_SITE,
     siteId: site.siteId,
     crossingSiteStatusCode: asText(site.crossingSiteStatusCode),
@@ -96,8 +102,6 @@ export const toFormValues = (site: SiteDetailResponse): SiteFormValues => {
     userKm: asText(site.userKm),
     crossingName: asText(site.crossingName),
     businessAreaOrgUnitNo: asText(site.businessAreaOrgUnitNo),
-    trimMapSheetNumber: asText(site.trimMapSheetNumber),
-    ntsMapSheetNumber: asText(site.ntsMapSheetNumber),
     specialAccessRqmtCode: asText(site.specialAccessRqmtCode),
     capitalRoad: site.capitalRoad,
     pointOfAccessDescription: asText(site.pointOfAccessDescription),
@@ -110,5 +114,5 @@ export const toFormValues = (site: SiteDetailResponse): SiteFormValues => {
     utmZone: asText(site.utmZone),
     utmEasting: asText(site.utmEasting),
     utmNorthing: asText(site.utmNorthing),
-  };
+  });
 };

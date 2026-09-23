@@ -4,6 +4,13 @@ import type { ClientSuggestion } from '@/types/client';
 import { HttpClient, type APIConfig } from '@/config/api/types';
 
 /**
+ * Which clients a lookup may suggest. There is no unscoped option: a suggestion the user cannot
+ * act on offers a filter guaranteed to match nothing, and they have no way to tell that from a
+ * filter that simply found nothing.
+ */
+export type ClientScope = 'MAINTAINERS' | 'ROAD_FILE_HOLDERS';
+
+/**
  * The Forest Client lookup behind the Designated Maintainer field, backed by `/api/v1/clients`.
  */
 export class ClientService extends HttpClient {
@@ -19,14 +26,33 @@ export class ClientService extends HttpClient {
    * term it cannot match with an empty list rather than an error, which is what lets this be called
    * on a keystroke.
    *
-   * <p>Only maintainers already recorded on a site come back, so every suggestion leads to at least
-   * one result.
+   * <p>The scope decides which set is searched, not how the term is read — all digits is a client
+   * number and anything else is a name, either side of it. Whichever set, every suggestion leads
+   * somewhere: a maintainer has sites, a road-file holder has roads.
    */
-  searchClients(term: string): CancelablePromise<ClientSuggestion[]> {
+  searchClients(
+    term: string,
+    scope: ClientScope = 'MAINTAINERS',
+  ): CancelablePromise<ClientSuggestion[]> {
     return this.doRequest<ClientSuggestion[]>(this.config, {
       method: 'GET',
       url: '/v1/clients',
-      query: { term },
+      query: { term, scope },
+    });
+  }
+
+  /**
+   * The locations of one client that actually maintain a site.
+   *
+   * <p>Fills the Location filter beside the client on Site Search. Narrowed to locations in use:
+   * offering one no site names would give a filter guaranteed to match nothing, which reads as a
+   * broken search rather than an empty one.
+   */
+  clientLocations(clientNumber: string): CancelablePromise<ClientSuggestion[]> {
+    return this.doRequest<ClientSuggestion[]>(this.config, {
+      method: 'GET',
+      url: '/v1/clients/locations',
+      query: { clientNumber },
     });
   }
 }

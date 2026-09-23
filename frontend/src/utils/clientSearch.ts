@@ -44,3 +44,18 @@ export const clientLabel = (client: ClientSuggestion): string => {
     .filter(Boolean)
     .join(' · ');
 };
+
+/**
+ * One of a client's locations, as the Location filter lists it.
+ *
+ * <p>`01 · PRINCE GEORGE · PRINCE GEORGE` — the code first, because that is what the column stores
+ * and what a user who knows it will look for. The name and city follow because a bare two-digit
+ * code identifies nothing to anyone who does not already know it.
+ *
+ * <p>Falls back to the code alone when the location carries neither, which the client table
+ * permits.
+ */
+export const locationLabel = (location: ClientSuggestion): string =>
+  [location.clientLocnCode?.trim(), location.clientLocnName?.trim(), location.city?.trim()]
+    .filter(Boolean)
+    .join(' · ');

@@ -27,8 +27,6 @@ export type SiteFormValues = {
   userKm: string;
   crossingName: string;
   businessAreaOrgUnitNo: string;
-  trimMapSheetNumber: string;
-  ntsMapSheetNumber: string;
   specialAccessRqmtCode: string;
   capitalRoad: boolean;
   /** "Site Details" on the form — `POINT_OF_ACCESS_DESC`. */
@@ -74,6 +72,10 @@ export const INSPECTION_STATUS = {
 export const SITE_STATUS = {
   ACTIVE: 'ACT',
   BARRICADED: 'BAR',
+  /** Not built yet — so it may carry no structures at all. */
+  PROPOSED: 'PP',
+  /** Closed, but its structures may still be standing. */
+  DEACTIVATED: 'DAC',
 } as const;
 
 /** The statuses a crossing may not be inspected under. */
@@ -105,8 +107,6 @@ export const EMPTY_SITE: SiteFormValues = {
   userKm: '',
   crossingName: '',
   businessAreaOrgUnitNo: '',
-  trimMapSheetNumber: '',
-  ntsMapSheetNumber: '',
   specialAccessRqmtCode: '',
   capitalRoad: false,
   pointOfAccessDescription: '',
