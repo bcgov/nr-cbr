@@ -122,7 +122,7 @@ jobs:
       DATABASE_PASSWORD: ${{ secrets.database_password }}
       KEYSTORE_SECRET: ${{ secrets.keystore_secret }}
     steps:
-      - uses: bcgov/action-deployer-openshift@f7bd61ec357fb1dfd1d43f1287bcd21382d06348 # v4.1.0
+      - uses: bcgov/action-deployer-openshift@27a85b7b157bfc9c3c9bf0aca53bcd288d4d2506 # latest
         id: deploy
         with:
           file: backend/openshift.deploy.yml
