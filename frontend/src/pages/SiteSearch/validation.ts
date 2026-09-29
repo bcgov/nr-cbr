@@ -16,12 +16,10 @@ export const KILOMETRE_PATTERN = /^\d{1,6}(\.\d{1,2})?$/;
 export const isKilometre = (value: string): boolean =>
   value === '' || KILOMETRE_PATTERN.test(value);
 
-/** The four numeric bounds, and the label each belongs to. */
+/** The two numeric bounds, and the label they belong to. */
 const KILOMETRE_FIELDS = {
   kiloStart: 'Kilometres',
   kiloEnd: 'Kilometres',
-  userKmStart: 'User Kilometres',
-  userKmEnd: 'User Kilometres',
 } as const satisfies Partial<Record<keyof SiteSearchCriteria, string>>;
 
 export type CriteriaErrors = Partial<Record<keyof SiteSearchCriteria, string>>;

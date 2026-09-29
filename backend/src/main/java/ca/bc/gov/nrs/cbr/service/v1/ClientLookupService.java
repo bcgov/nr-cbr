@@ -78,6 +78,10 @@ public class ClientLookupService {
    * either side of it — all digits is a client number, anything else is a name — so a user moving
    * between the two screens does not have to learn two rules.
    *
+   * <p><b>Three characters minimum, whether digits or letters.</b> The field says so, and until
+   * now it was true only of names — a lone digit searched, and answered with whatever the cap
+   * allowed. A number is matched as a fragment like a name is, so it needs the same floor.
+   *
    * @param term  what the user has typed so far
    * @param scope which clients this screen can usefully offer
    * @return at most {@value #SUGGESTION_LIMIT} suggestions, ordered by client name then location
@@ -90,24 +94,54 @@ public class ClientLookupService {
     String trimmed = term.trim();
     Pageable limit = PageRequest.ofSize(SUGGESTION_LIMIT);
 
-    if (DIGITS.matcher(trimmed).matches()) {
-      // Longer than the stored width is not a client number at all, so there is nothing to pad and
-      // nothing it could equal.
-      if (trimmed.length() > CLIENT_NUMBER_LENGTH) {
-        return List.of();
-      }
-      String padded = "0".repeat(CLIENT_NUMBER_LENGTH - trimmed.length()) + trimmed;
-      return scope == ClientScope.ROAD_FILE_HOLDERS
-          ? clientLocations.findRoadFileHolders(null, padded, limit)
-          : clientLocations.findMaintainersByClientNumber(padded, limit);
-    }
-
     if (trimmed.length() < MINIMUM_TERM_LENGTH) {
       return List.of();
     }
+
+    if (DIGITS.matcher(trimmed).matches()) {
+      // Longer than the stored width is not a client number at all — nothing eight characters wide
+      // can contain it.
+      if (trimmed.length() > CLIENT_NUMBER_LENGTH) {
+        return List.of();
+      }
+      // Wrapped, not zero-padded. The number is stored padded to eight and the user types the
+      // digits they know; padding a fragment invents the rest of it. For client 00001286 that made
+      // "1286" work — padding happened to rebuild the whole number — and "0128" fail, because it
+      // became 00000128. Both are fragments of the same number.
+      String digits = WILDCARD + trimmed + WILDCARD;
+      return scope == ClientScope.ROAD_FILE_HOLDERS
+          ? clientLocations.findRoadFileHolders(null, digits, limit)
+          : clientLocations.findMaintainerClientsByNumber(digits, limit);
+    }
+
     String wildcarded = WILDCARD + trimmed.toUpperCase(Locale.ROOT) + WILDCARD;
     return scope == ClientScope.ROAD_FILE_HOLDERS
         ? clientLocations.findRoadFileHolders(wildcarded, null, limit)
-        : clientLocations.findMaintainersByText(wildcarded, limit);
+        : clientLocations.findMaintainerClientsByText(wildcarded, limit);
+  }
+
+  /**
+   * The locations of one client that actually maintain a site — the Location filter beside the
+   * client on Site Search.
+   *
+   * <p>Narrowed to what is in use rather than every location the client has: a filter offering a
+   * location no site names would return nothing, which reads as a broken search rather than as an
+   * empty one.
+   *
+   * <p>Empty for a blank or over-long number rather than an error. The caller asks as soon as a
+   * client is picked, and a half-typed number is an ordinary state.
+   */
+  @Transactional(readOnly = true)
+  public List<ClientLookupResult> locationsOf(String clientNumber) {
+    if (!StringUtils.hasText(clientNumber)) {
+      return List.of();
+    }
+    String trimmed = clientNumber.trim();
+    if (trimmed.length() > CLIENT_NUMBER_LENGTH || !DIGITS.matcher(trimmed).matches()) {
+      return List.of();
+    }
+    String padded = "0".repeat(CLIENT_NUMBER_LENGTH - trimmed.length()) + trimmed;
+    return clientLocations.findMaintainersByClientNumber(
+        padded, PageRequest.ofSize(SUGGESTION_LIMIT));
   }
 }

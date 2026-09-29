@@ -1,8 +1,12 @@
+import type { SiteCreateRequest } from '@/components/SiteForm/request';
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type { SiteDetailResponse } from '@/pages/SiteDetail/siteResponse';
 import type { PagedResponse, SiteSearchCriteria, SiteSearchResult } from '@/pages/SiteSearch/types';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
+
+/** What `POST /v1/sites` answers with: the number the site was stored under, upper-cased. */
+export type SiteCreatedResponse = { siteId: string };
 
 /**
  * Site Search, backed by `/api/v1/sites/search`.
@@ -48,6 +52,25 @@ export class SiteSearchService extends HttpClient {
       method: 'GET',
       url: '/v1/sites/{siteId}',
       path: { siteId },
+    });
+  }
+
+  /**
+   * Creates a site.
+   *
+   * <p>200 with the new site's number and nothing else. That number is the one thing the caller
+   * does not already hold — the server upper-cases it — so it is what to navigate to; the detail
+   * page reads the site for itself.
+   *
+   * <p><b>400 carries a message per field.</b> The problem detail has a `fieldErrors` property
+   * keyed by the same names this request uses, which are the form's names too, so the screen can
+   * mark the boxes instead of printing a paragraph. See `toFieldErrors`.
+   */
+  createSite(site: SiteCreateRequest): CancelablePromise<SiteCreatedResponse> {
+    return this.doRequest<SiteCreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/sites',
+      body: site,
     });
   }
 

@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -92,7 +94,7 @@ class ClientLocationRepositoryTest {
   private List<ClientLookupResult> byText(String term) {
     entityManager.flush();
     entityManager.clear();
-    return repository.findMaintainersByText(term, LIMIT);
+    return repository.findMaintainerClientsByText(term, LIMIT);
   }
 
   private List<ClientLookupResult> byNumber(String clientNumber) {
@@ -120,30 +122,19 @@ class ClientLocationRepositoryTest {
   @Test
   @DisplayName("excludes a location of a used client that no site names")
   void excludesUnusedLocationOfUsedClient() {
-    // The discrimination is on the pair, not the client: CBR uses Canfor's Prince George office,
-    // so Canfor is "in use" — but its Vancouver office still leads to no sites.
+    // The discrimination is on the pair, not the client: CBR uses Canfor's Prince George office, so
+    // Canfor is "in use" — but its Vancouver office still leads to no sites, and the Location
+    // filter must not offer it. Asserted on the locations query, which is the only one that
+    // projects a location at all since the client lookup was split from it.
     givenClient("00001012", "CANFOR CORPORATION");
     givenLocation("00001012", "00", null, "Vancouver");
     givenLocation("00001012", "01", "Northern Division", "Prince George");
     givenSiteMaintainedBy("SITE-1", "00001012", "01");
+    entityManager.flush();
 
-    assertThat(byText("%CANFOR%"))
+    assertThat(repository.findMaintainersByClientNumber("00001012", LIMIT))
         .extracting(ClientLookupResult::clientLocnCode)
         .containsExactly("01");
-  }
-
-  @Test
-  @DisplayName("returns one suggestion per location, so a client can appear more than once")
-  void onePerLocation() {
-    givenClient("00001012", "CANFOR CORPORATION");
-    givenLocation("00001012", "00", null, "Vancouver");
-    givenLocation("00001012", "01", "Northern Division", "Prince George");
-    givenSiteMaintainedBy("SITE-1", "00001012", "00");
-    givenSiteMaintainedBy("SITE-2", "00001012", "01");
-
-    assertThat(byText("%CANFOR%"))
-        .extracting(ClientLookupResult::clientLocnCode)
-        .containsExactly("00", "01");
   }
 
   @Test
@@ -178,13 +169,15 @@ class ClientLocationRepositoryTest {
     givenLocation("00001012", "01", "Northern Division", "Prince George");
     givenSiteMaintainedBy("SITE-1", "00001012", "01");
 
+    // One row whichever column matched: a company with several matching offices is one choice.
     assertThat(byText("%NORTHERN%")).hasSize(1);
     assertThat(byText("%PRINCE GEORGE%")).hasSize(1);
+    assertThat(byText("%CANFOR%")).hasSize(1);
     assertThat(byText("%NANAIMO%")).isEmpty();
   }
 
   @Test
-  @DisplayName("matches a client number exactly, not as a prefix")
+  @DisplayName("matches a client number without dragging in numbers that merely contain it")
   void matchesClientNumberExactly() {
     givenClient("00001012", "CANFOR CORPORATION");
     givenLocation("00001012", "00", null, "Vancouver");
@@ -199,7 +192,7 @@ class ClientLocationRepositoryTest {
   }
 
   @Test
-  @DisplayName("orders by client name, then by location code within a client")
+  @DisplayName("orders by client name")
   void ordersByNameThenLocation() {
     // So that a truncated list loses the tail of the alphabet rather than an arbitrary slice.
     givenClient("00010120", "WEST FRASER MILLS LTD");
@@ -213,11 +206,8 @@ class ClientLocationRepositoryTest {
 
     // "R" is in both client names — the point is the order they come back in, not the match.
     assertThat(byText("%R%"))
-        .extracting(r -> r.clientName() + "-" + r.clientLocnCode())
-        .containsExactly(
-            "CANFOR CORPORATION-00",
-            "CANFOR CORPORATION-01",
-            "WEST FRASER MILLS LTD-00");
+        .extracting(ClientLookupResult::clientName)
+        .containsExactly("CANFOR CORPORATION", "WEST FRASER MILLS LTD");
   }
 
   @Test
@@ -231,6 +221,71 @@ class ClientLocationRepositoryTest {
 
     entityManager.flush();
     entityManager.clear();
-    assertThat(repository.findMaintainersByText("%CANFOR%", PageRequest.ofSize(1))).hasSize(1);
+    assertThat(repository.findMaintainerClientsByText("%CANFOR%", PageRequest.ofSize(1)))
+        .hasSize(1);
+  }
+
+  @Test
+  @DisplayName("lists a client once, however many of its locations maintain a site")
+  void listsAClientOncePerName() {
+    // The difference between the two families of query. The site form set both halves of the key
+    // at once and wanted client-locations; Site Search filters on the client and on the location
+    // separately, so a client maintaining sites at three locations is one choice there, not three.
+    givenClient("00001012", "CANFOR CORPORATION");
+    givenLocation("00001012", "00", "HEAD OFFICE", "VANCOUVER");
+    givenLocation("00001012", "01", "PRINCE GEORGE", "PRINCE GEORGE");
+    givenLocation("00001012", "02", "CHETWYND", "CHETWYND");
+    givenSiteMaintainedBy("SITE-1", "00001012", "00");
+    givenSiteMaintainedBy("SITE-2", "00001012", "01");
+    givenSiteMaintainedBy("SITE-3", "00001012", "02");
+    entityManager.flush();
+
+    List<ClientLookupResult> found =
+        repository.findMaintainerClientsByText("%CANFOR%", PageRequest.ofSize(10));
+
+    assertThat(found).hasSize(1);
+    assertThat(found.getFirst().clientNumber()).isEqualTo("00001012");
+    assertThat(found.getFirst().clientName()).isEqualTo("CANFOR CORPORATION");
+    // The location columns are absent by design — the browser's label guards for it.
+    assertThat(found.getFirst().clientLocnCode()).isNull();
+  }
+
+  @Test
+  @DisplayName("offers only clients that actually maintain something")
+  void ignoresAClientThatMaintainsNothing() {
+    givenClient("00009999", "CANFOR HOLDINGS");
+    givenLocation("00009999", "00", "HEAD OFFICE", "VANCOUVER");
+    entityManager.flush();
+
+    assertThat(repository.findMaintainerClientsByText("%CANFOR%", PageRequest.ofSize(10))).isEmpty();
+  }
+
+  @ParameterizedTest(name = "typing \"{0}\" finds client 00001012")
+  @ValueSource(strings = {"00001012", "1012", "0101", "000", "101"})
+  @DisplayName("finds a maintainer client from any run of digits in its number")
+  void findsAClientByAnyFragmentOfItsNumber(String typed) {
+    // The bug this replaces: the number was zero-padded and matched exactly, so "1012" found this
+    // client — the padding rebuilt the whole number — and "0101" did not, because it became
+    // 00000101. Both are runs of digits out of 00001012.
+    givenClient("00001012", "CANFOR CORPORATION");
+    givenLocation("00001012", "00", "HEAD OFFICE", "VANCOUVER");
+    givenSiteMaintainedBy("SITE-1", "00001012", "00");
+    entityManager.flush();
+
+    assertThat(repository.findMaintainerClientsByNumber("%" + typed + "%", PageRequest.ofSize(10)))
+        .singleElement()
+        .extracting(ClientLookupResult::clientName)
+        .isEqualTo("CANFOR CORPORATION");
+  }
+
+  @Test
+  @DisplayName("does not find a client whose number merely resembles the digits typed")
+  void doesNotMatchADifferentNumber() {
+    givenClient("00001012", "CANFOR CORPORATION");
+    givenLocation("00001012", "00", "HEAD OFFICE", "VANCOUVER");
+    givenSiteMaintainedBy("SITE-1", "00001012", "00");
+    entityManager.flush();
+
+    assertThat(repository.findMaintainerClientsByNumber("%9999%", PageRequest.ofSize(10))).isEmpty();
   }
 }

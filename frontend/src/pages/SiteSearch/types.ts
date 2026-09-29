@@ -36,8 +36,6 @@ export type SiteSearchCriteria = {
   kiloStart: string;
   kiloEnd: string;
   managementOrgUnit: string;
-  userKmStart: string;
-  userKmEnd: string;
   specialAccessCode: string;
   incomplete: boolean;
   siteTypeCode: string;
@@ -88,8 +86,6 @@ export const EMPTY_CRITERIA: SiteSearchCriteria = {
   kiloStart: '',
   kiloEnd: '',
   managementOrgUnit: '',
-  userKmStart: '',
-  userKmEnd: '',
   specialAccessCode: '',
   incomplete: false,
   siteTypeCode: '',

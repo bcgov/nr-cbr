@@ -341,14 +341,22 @@ $types: "error", "info", "success", "warning";
    requiredLabel() helper (src/utils/requiredLabel.tsx). */
 .required-asterisk {
   color: var(--#{variables.$bcgov-prefix}-text-error);
-  font-size: 1.1rem;
-  /* Zero, not 1. At 1.1rem the marker's own line box is taller than the 0.75rem label it sits in,
-     so it grew the label and pushed the input beneath it down — a required field's box sat a few
-     pixels lower than the optional one beside it, and a row of fields no longer lined up. With no
-     line height the glyph paints outside the line box rather than growing it, which is what
-     `vertical-align: middle` then centres it on. */
+  /* Two declarations, and each stops the other's failure mode.
+
+     `line-height: 0` keeps the marker out of the line box calculation entirely. Without it the
+     larger glyph claims more of the line than the label's own text does and pushes the input
+     beneath it down, so a required field's box sits a couple of pixels below the optional one
+     beside it and a row of fields stops lining up. Setting a line-height in absolute units does
+     not help: the glyph's descender still extends past the label's, and inheriting Carbon's
+     unitless 1.33333 is worse, because it is recomputed against this larger font size.
+
+     `vertical-align: baseline` is what keeps it readable. A zero-height box centred with
+     `vertical-align: middle` puts the glyph's middle on the text's midpoint, so it hangs visibly
+     below the baseline — the marker looked like a subscript. On the baseline it sits where an
+     asterisk belongs, and the zero line height means it still costs the line nothing. */
+  font-size: 1rem;
   line-height: 0;
-  vertical-align: middle;
+  vertical-align: baseline;
 }
 
 /* On a disabled field the marker fades with its label. A read-only checklist renders its inputs

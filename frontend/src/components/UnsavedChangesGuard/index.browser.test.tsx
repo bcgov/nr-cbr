@@ -1,11 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { Link, RouterProvider, createMemoryRouter } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, RouterProvider, createMemoryRouter, useNavigate } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import { UnsavedChangesProvider } from '@/context/unsavedChanges/UnsavedChangesProvider';
 
 import UnsavedChangesGuard from './index';
 
+import { WORK_SAVED } from '@/context/unsavedChanges/workSaved';
 import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt';
 
 /** A screen that declares unsaved work, as a real page does, and offers a way off itself. */
@@ -21,10 +23,35 @@ const Editor = ({ dirty }: { dirty: boolean }) => {
   );
 };
 
-const renderApp = async (dirty: boolean) => {
+/**
+ * A screen that saves and leaves in one step, as Add Site does: it marks itself clean and navigates
+ * in the same handler, before the guard has seen the clean flag.
+ */
+const SavingEditor = () => {
+  const [saved, setSaved] = useState(false);
+  const navigate = useNavigate();
+  useUnsavedChangesPrompt(!saved);
+  return (
+    <>
+      <UnsavedChangesGuard />
+      <p>Editor</p>
+      <button
+        type="button"
+        onClick={() => {
+          setSaved(true);
+          navigate('/elsewhere', { state: WORK_SAVED });
+        }}
+      >
+        Save
+      </button>
+    </>
+  );
+};
+
+const renderApp = async (dirty: boolean, editor = <Editor dirty={dirty} />) => {
   const router = createMemoryRouter(
     [
-      { path: '/', element: <Editor dirty={dirty} /> },
+      { path: '/', element: editor },
       { path: '/elsewhere', element: <p>Elsewhere</p> },
     ],
     { initialEntries: ['/'] },
@@ -57,6 +84,19 @@ const leavePage = async () => {
 };
 
 describe('UnsavedChangesGuard', () => {
+  it('lets a screen leave without asking once it has saved, even in the same step', async () => {
+    // Add Site's Save: success, then straight to the stored site. The screen's "clean" arrives a
+    // render later than the navigation, so the navigation says so itself.
+    await renderApp(true, <SavingEditor />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save'));
+    });
+
+    expect(screen.getByText('Elsewhere')).toBeInTheDocument();
+    expect(dialogIsOpen()).toBe(false);
+  });
+
   it('lets a screen with nothing to lose be left without a word', async () => {
     await renderApp(false);
 

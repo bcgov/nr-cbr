@@ -51,6 +51,4 @@ public record SiteDetailResponse(
     Integer utmZone,
     Long utmEasting,
     Long utmNorthing,
-    String pointOfAccessDescription,
-    String ntsMapSheetNumber,
-    String trimMapSheetNumber) {}
+    String pointOfAccessDescription) {}

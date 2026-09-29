@@ -16,6 +16,8 @@ import ca.bc.gov.nrs.cbr.struct.v1.ClientScope;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -43,13 +45,13 @@ class ClientLookupServiceTest {
 
   private String capturedText() {
     ArgumentCaptor<String> term = ArgumentCaptor.forClass(String.class);
-    verify(clientLocations).findMaintainersByText(term.capture(), any(Pageable.class));
+    verify(clientLocations).findMaintainerClientsByText(term.capture(), any(Pageable.class));
     return term.getValue();
   }
 
   private String capturedNumber() {
     ArgumentCaptor<String> number = ArgumentCaptor.forClass(String.class);
-    verify(clientLocations).findMaintainersByClientNumber(number.capture(), any(Pageable.class));
+    verify(clientLocations).findMaintainerClientsByNumber(number.capture(), any(Pageable.class));
     return number.getValue();
   }
 
@@ -80,7 +82,7 @@ class ClientLookupServiceTest {
     void trimsBeforeMeasuring() {
       assertThat(service.suggest("  ca  ", ClientScope.MAINTAINERS)).isEmpty();
 
-      verify(clientLocations, never()).findMaintainersByText(anyString(), any(Pageable.class));
+      verify(clientLocations, never()).findMaintainerClientsByText(anyString(), any(Pageable.class));
     }
   }
 
@@ -89,41 +91,27 @@ class ClientLookupServiceTest {
   class ClientNumber {
 
     @Test
-    @DisplayName("is zero-padded to the stored width and matched exactly")
-    void padsToStoredWidth() {
-      when(clientLocations.findMaintainersByClientNumber(anyString(), any(Pageable.class)))
+    @DisplayName("is wrapped in wildcards, so any run of its digits finds it")
+    void matchesAFragment() {
+      when(clientLocations.findMaintainerClientsByNumber(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
       service.suggest("66838", ClientScope.MAINTAINERS);
 
-      assertThat(capturedNumber()).isEqualTo("00066838");
-    }
-
-    /**
-     * No minimum length on this arm. A single digit is still an exact key — it asks for one client
-     * and can return only that client's locations — where a single letter would match most of the
-     * table.
-     */
-    @Test
-    @DisplayName("is matched at any length up to the full width")
-    void hasNoMinimumLength() {
-      when(clientLocations.findMaintainersByClientNumber(anyString(), any(Pageable.class)))
-          .thenReturn(List.of());
-
-      service.suggest("5", ClientScope.MAINTAINERS);
-
-      assertThat(capturedNumber()).isEqualTo("00000005");
+      assertThat(capturedNumber()).isEqualTo("%66838%");
     }
 
     @Test
-    @DisplayName("is not re-padded when already the full width")
-    void leavesAFullWidthNumberAlone() {
-      when(clientLocations.findMaintainersByClientNumber(anyString(), any(Pageable.class)))
+    @DisplayName("is still a fragment when it is already the full width")
+    void matchesAWholeNumber() {
+      // A whole number contains itself, so one rule covers both. Nothing needs to know whether the
+      // user typed all eight digits.
+      when(clientLocations.findMaintainerClientsByNumber(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
       service.suggest("00066838", ClientScope.MAINTAINERS);
 
-      assertThat(capturedNumber()).isEqualTo("00066838");
+      assertThat(capturedNumber()).isEqualTo("%00066838%");
     }
   }
 
@@ -134,7 +122,7 @@ class ClientLookupServiceTest {
     @Test
     @DisplayName("is upper-cased and wrapped in wildcards, so the match is case-insensitive")
     void foldsCaseAndWraps() {
-      when(clientLocations.findMaintainersByText(anyString(), any(Pageable.class)))
+      when(clientLocations.findMaintainerClientsByText(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
       service.suggest("Canfor", ClientScope.MAINTAINERS);
@@ -145,7 +133,7 @@ class ClientLookupServiceTest {
     @Test
     @DisplayName("is trimmed, so trailing space does not become part of the match")
     void trimsTheTerm() {
-      when(clientLocations.findMaintainersByText(anyString(), any(Pageable.class)))
+      when(clientLocations.findMaintainerClientsByText(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
       service.suggest("  canfor  ", ClientScope.MAINTAINERS);
@@ -158,7 +146,7 @@ class ClientLookupServiceTest {
     void returnsWhatTheRepositoryFound() {
       ClientLookupResult canfor =
           new ClientLookupResult("00001012", "00", "CANFOR CORPORATION", null, "Vancouver");
-      when(clientLocations.findMaintainersByText(anyString(), any(Pageable.class)))
+      when(clientLocations.findMaintainerClientsByText(anyString(), any(Pageable.class)))
           .thenReturn(List.of(canfor));
 
       assertThat(service.suggest("canfor", ClientScope.MAINTAINERS)).containsExactly(canfor);
@@ -167,7 +155,7 @@ class ClientLookupServiceTest {
     @Test
     @DisplayName("treats a term with any letter in it as a name, not a number")
     void aMixedTermIsAName() {
-      when(clientLocations.findMaintainersByText(anyString(), any(Pageable.class)))
+      when(clientLocations.findMaintainerClientsByText(anyString(), any(Pageable.class)))
           .thenReturn(List.of());
 
       service.suggest("123A", ClientScope.MAINTAINERS);
@@ -192,7 +180,7 @@ class ClientLookupServiceTest {
       service.suggest("canfor", ClientScope.ROAD_FILE_HOLDERS);
 
       verify(clientLocations).findRoadFileHolders(eq("%CANFOR%"), isNull(), any(Pageable.class));
-      verify(clientLocations, never()).findMaintainersByText(anyString(), any(Pageable.class));
+      verify(clientLocations, never()).findMaintainerClientsByText(anyString(), any(Pageable.class));
     }
 
     @Test
@@ -206,7 +194,7 @@ class ClientLookupServiceTest {
       service.suggest("66838", ClientScope.ROAD_FILE_HOLDERS);
 
       verify(clientLocations)
-          .findRoadFileHolders(isNull(), eq("00066838"), any(Pageable.class));
+          .findRoadFileHolders(isNull(), eq("%66838%"), any(Pageable.class));
     }
 
     @Test
@@ -216,5 +204,35 @@ class ClientLookupServiceTest {
 
       verifyNoInteractions(clientLocations);
     }
+  }
+
+  @ParameterizedTest(name = "\"{0}\" asks the database for \"{1}\"")
+  @CsvSource({
+      "1286,     '%1286%'",
+      "0128,     '%0128%'",
+      "01286,    '%01286%'",
+      "00001286, '%00001286%'",
+      "0000,     '%0000%'",
+  })
+  @DisplayName("matches a client number as a fragment, not as a padded whole")
+  void wrapsWhateverWasTyped(String typed, String expected) {
+    // From a bug report: for client 00001286, "1286" found it and "0128" did not. Padding had made
+    // the first into the whole number by luck and the second into 00000128, a different client.
+    // Every string here is a run of digits out of the same number, and a contains finds it from
+    // any of them.
+    service.suggest(typed, ClientScope.MAINTAINERS);
+
+    assertThat(capturedNumber()).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("holds a number to the same three characters a name needs")
+  void refusesATooShortNumber() {
+    // The field has always said "min. 3 characters" and it was true only of names: a lone digit
+    // used to pad into a whole client number and search for it. Matched as a fragment it would
+    // answer with whatever the cap allowed instead, which is not a suggestion.
+    assertThat(service.suggest("12", ClientScope.MAINTAINERS)).isEmpty();
+
+    verify(clientLocations, never()).findMaintainerClientsByNumber(anyString(), any(Pageable.class));
   }
 }

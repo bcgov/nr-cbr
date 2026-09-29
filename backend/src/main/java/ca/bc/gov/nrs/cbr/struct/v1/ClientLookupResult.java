@@ -26,4 +26,18 @@ public record ClientLookupResult(
     String clientLocnCode,
     String clientName,
     String clientLocnName,
-    String city) {}
+    String city) {
+
+  /**
+   * A whole client, with no location — what the maintainer lookup on Site Search offers.
+   *
+   * <p><b>Here so that a query need not select `NULL` three times.</b> A constructor expression
+   * projecting bare nulls compiles to `select distinct client_number, null, client_name, null,
+   * null`, which H2 accepts and Oracle need not: `DISTINCT` has to compare every projected column,
+   * and an untyped NULL is not something it can be asked to compare. Selecting only the columns
+   * that exist takes the question away.
+   */
+  public ClientLookupResult(String clientNumber, String clientName) {
+    this(clientNumber, null, clientName, null, null);
+  }
+}

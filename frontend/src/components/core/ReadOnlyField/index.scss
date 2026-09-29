@@ -6,7 +6,10 @@
 .read-only-field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  // The gap Carbon leaves between a label and its input, so a read-only cell and an input cell
+  // start their content at the same height. Measured rather than guessed — see
+  // SiteForm/layout.browser.test.tsx, which asserts the two sit on one line.
+  gap: 0.5rem;
   // Top-aligned with the input cells it shares a grid row with: a label/value pair is shorter than
   // a label/input pair, and centring would float it against nothing.
   align-self: start;
@@ -22,6 +25,13 @@
 // looks like it could be typed into.
 .read-only-field__value {
   @include type.type-style('body-02');
+
+  // A band the height of a Carbon `md` field, with the value centred in it — so a read-only cell
+  // puts its text where the input beside it puts its own, and a row of mixed cells reads as one
+  // line rather than as values floating above boxes.
+  display: flex;
+  align-items: center;
+  min-block-size: 2.5rem;
 
   // A long crossing name or a paragraph of site details wraps rather than stretching its column.
   overflow-wrap: anywhere;

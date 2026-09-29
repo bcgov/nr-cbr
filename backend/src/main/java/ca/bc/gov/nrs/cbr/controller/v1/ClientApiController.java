@@ -25,4 +25,9 @@ public class ClientApiController implements ClientApiEndpoint {
   public ResponseEntity<List<ClientLookupResult>> searchClients(String term, ClientScope scope) {
     return ResponseEntity.ok(clientLookupService.suggest(term, scope));
   }
+
+  @Override
+  public ResponseEntity<List<ClientLookupResult>> clientLocations(String clientNumber) {
+    return ResponseEntity.ok(clientLookupService.locationsOf(clientNumber));
+  }
 }

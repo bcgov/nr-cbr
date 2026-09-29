@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.endpoint.v1.ConfigurationApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.ConfigurationService;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -65,6 +66,11 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   @Override
   public ResponseEntity<List<OrgUnitResponse>> getForestDistricts() {
     return ResponseEntity.ok(configurationService.getForestDistricts());
+  }
+
+  @Override
+  public ResponseEntity<RecreationProjectResponse> getRecreationProjectName(String forestFileId) {
+    return ResponseEntity.ok(configurationService.getRecreationProjectName(forestFileId));
   }
 
   @Override

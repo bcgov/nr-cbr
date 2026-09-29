@@ -54,4 +54,21 @@ public interface ClientApiEndpoint {
   ResponseEntity<List<ClientLookupResult>> searchClients(
       @RequestParam(name = "term", defaultValue = "") String term,
       @RequestParam(name = "scope", defaultValue = "MAINTAINERS") ClientScope scope);
+
+  /**
+   * The locations of one client that actually maintain a site.
+   *
+   * <p>Fills the Location filter beside the client on Site Search, which is disabled until a client
+   * is chosen — so this is only ever asked with a number the user has already picked.
+   *
+   * <p>Always 200, empty for a number that is blank, over-long or not a number. Narrowed to
+   * locations in use: offering one that no site names would return nothing and read as a broken
+   * search rather than an empty one.
+   *
+   * @param clientNumber the client whose locations to list, zero-padded or not
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/locations")
+  ResponseEntity<List<ClientLookupResult>> clientLocations(
+      @RequestParam(name = "clientNumber", defaultValue = "") String clientNumber);
 }

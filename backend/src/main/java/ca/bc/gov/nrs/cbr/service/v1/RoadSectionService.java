@@ -3,15 +3,18 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import ca.bc.gov.nrs.cbr.exception.RoadSectionNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSectionRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSegmentRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionResponse;
-import java.util.List;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -29,12 +32,17 @@ import org.springframework.util.StringUtils;
 public class RoadSectionService {
 
   /**
-   * How many roads the dialog will show.
+   * Guards against a caller asking for the whole view in one page — the same bound Site Search
+   * puts on its pages.
    *
-   * <p>Legacy's own cap, and its dialog says "Search returned 200 or more records, 200 shown" when
-   * it fills — so the number is part of what the screen promises, not an implementation detail.
+   * <p>Legacy caps the dialog itself at two hundred roads ({@code ROWNUM <= 200}, and "Search
+   * returned 200 or more records, 200 shown" when it fills). CBR pages instead, so every match is
+   * reachable and the total is the true one; the bound here is on one page, not on the answer.
    */
-  private static final int SEARCH_LIMIT = 200;
+  private static final int MAX_PAGE_SIZE = 200;
+
+  /** The dialog's own page size, for a caller that does not say. */
+  private static final int DEFAULT_PAGE_SIZE = 15;
 
   private static final String WILDCARD = "%";
 
@@ -57,8 +65,12 @@ public class RoadSectionService {
 
   private final CbrRoadSectionRepository roadSections;
 
-  public RoadSectionService(CbrRoadSectionRepository roadSections) {
+  private final CbrRoadSegmentRepository roadSegments;
+
+  public RoadSectionService(
+      CbrRoadSectionRepository roadSections, CbrRoadSegmentRepository roadSegments) {
     this.roadSections = roadSections;
+    this.roadSegments = roadSegments;
   }
 
   /**
@@ -75,16 +87,20 @@ public class RoadSectionService {
    * {@code UnexpectedRollbackException} — a less legible error than the one being handled. Without
    * an outer transaction each repository call gets its own, the failed one rolls back alone, and
    * the fallback starts clean.
+   *
+   * @param pageNumber zero-based
+   * @param pageSize   rows per page, capped at {@value #MAX_PAGE_SIZE}
    */
-  public List<RoadSearchResult> search(RoadSearchCriteria criteria) {
-    PageRequest limit = PageRequest.ofSize(SEARCH_LIMIT);
+  public PagedResponse<RoadSearchResult> search(
+      RoadSearchCriteria criteria, int pageNumber, int pageSize) {
+    Pageable limit = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
 
     if (Boolean.FALSE.equals(tenureHolderReadable)) {
       return withoutTenureHolder(criteria, limit);
     }
 
     try {
-      List<RoadSearchResult> roads = roadSections.search(
+      Page<RoadSearchResult> roads = roadSections.search(
           contains(criteria.forestServiceRoad()),
           contains(criteria.forestFileId()),
           contains(criteria.roadSectionId()),
@@ -93,7 +109,7 @@ public class RoadSectionService {
           contains(criteria.clientNumber()),
           limit);
       tenureHolderReadable = true;
-      return roads;
+      return paged(roads);
     } catch (InvalidDataAccessResourceUsageException missingGrant) {
       // The only thing in that query this application is not granted. Caught here rather than
       // guarded by a probe on every search: once the grant lands this branch is never taken again,
@@ -113,8 +129,10 @@ public class RoadSectionService {
    * <p>Package-private rather than public: it is the same answer {@link #search} gives once it has
    * learned the table cannot be read, and no caller should be choosing it.
    */
-  List<RoadSearchResult> searchWithoutTenureHolder(RoadSearchCriteria criteria) {
-    return withoutTenureHolder(criteria, PageRequest.ofSize(SEARCH_LIMIT));
+  PagedResponse<RoadSearchResult> searchWithoutTenureHolder(
+      RoadSearchCriteria criteria, int pageNumber, int pageSize) {
+    return withoutTenureHolder(
+        criteria, PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize)));
   }
 
   /**
@@ -124,14 +142,30 @@ public class RoadSectionService {
    * be applied must not silently narrow nothing, so a user who typed a client name gets every road
    * rather than an empty list that reads as "no such road".
    */
-  private List<RoadSearchResult> withoutTenureHolder(
-      RoadSearchCriteria criteria, PageRequest limit) {
-    return roadSections.searchWithoutClient(
+  private PagedResponse<RoadSearchResult> withoutTenureHolder(
+      RoadSearchCriteria criteria, Pageable limit) {
+    return paged(roadSections.searchWithoutClient(
         contains(criteria.forestServiceRoad()),
         contains(criteria.forestFileId()),
         contains(criteria.roadSectionId()),
         contains(criteria.tenureType()),
-        limit);
+        limit));
+  }
+
+  private static PagedResponse<RoadSearchResult> paged(Page<RoadSearchResult> page) {
+    return new PagedResponse<>(
+        page.getContent(),
+        page.getTotalElements(),
+        page.getTotalPages(),
+        page.getNumber(),
+        page.getSize());
+  }
+
+  private static int boundedPageSize(int requested) {
+    if (requested < 1) {
+      return DEFAULT_PAGE_SIZE;
+    }
+    return Math.min(requested, MAX_PAGE_SIZE);
   }
 
   /**
@@ -148,10 +182,19 @@ public class RoadSectionService {
   }
 
   /**
-   * One road section, by the pair a site records.
+   * One road section, by the pair a site records — provided it has a road segment.
    *
-   * @throws RoadSectionNotFoundException if the view holds no such section — the ordinary answer
-   *                                      while the user is still typing either half
+   * <p><b>A section with no segment is no road here.</b> A site stores a segment, and the save
+   * refuses a pair that resolves to none (see {@code SiteValidator.checkRoadResolves}). Legacy
+   * behaves the same way before the save: it fills in the road name and the district only once
+   * its hidden segment list has an entry ({@code site.jsp:341}), and otherwise blanks the name and
+   * reports "Project File ID#/Br. is invalid." Answering with the section's name regardless showed a
+   * road and a district for a pair the save would then refuse. Asked through the same method the
+   * save uses, so the two cannot disagree about which pairs are roads.
+   *
+   * @throws RoadSectionNotFoundException if the view holds no such section, or the section has no
+   *                                      segment — the ordinary answer while the user is still
+   *                                      typing either half
    */
   @Transactional(readOnly = true)
   public RoadSectionResponse find(String forestFileId, String roadSectionId) {
@@ -162,6 +205,13 @@ public class RoadSectionService {
     CbrRoadSectionEntity section = roadSections
         .findById(new CbrRoadSectionEntity.Key(forestFileId.trim(), roadSectionId.trim()))
         .orElseThrow(() -> new RoadSectionNotFoundException(forestFileId, roadSectionId));
+
+    if (roadSegments
+        .findFirstByForestFileIdAndRoadSectionIdOrderByRoadSegmentIdAsc(
+            forestFileId.trim(), roadSectionId.trim())
+        .isEmpty()) {
+      throw new RoadSectionNotFoundException(forestFileId, roadSectionId);
+    }
 
     return new RoadSectionResponse(
         section.getForestFileId(),

@@ -4,6 +4,8 @@ import ca.bc.gov.nrs.cbr.endpoint.v1.SiteApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.SiteSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.SiteService;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
@@ -37,6 +39,11 @@ public class SiteApiController implements SiteApiEndpoint {
   @Override
   public ResponseEntity<SiteDetailResponse> getSite(String siteId) {
     return ResponseEntity.ok(siteService.findById(siteId));
+  }
+
+  @Override
+  public SiteCreatedResponse createSite(SiteCreateRequest request) {
+    return siteService.create(request);
   }
 
   @Override

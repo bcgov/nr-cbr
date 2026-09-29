@@ -9,7 +9,8 @@ import type { CodeOption, OrgUnitOption, SiteSearchCriteria as Criteria } from '
 import type { ClientSuggestion } from '@/types/client';
 import type { FC, SubmitEventHandler } from 'react';
 
-import { clientLabel } from '@/utils/clientSearch';
+import { useClientLocations } from '@/hooks/useClientSearch';
+import { clientLabel, locationLabel } from '@/utils/clientSearch';
 
 export type CodeTables = {
   siteStatusCodes: CodeOption[];
@@ -116,19 +117,26 @@ const SiteSearchCriteriaForm: FC<Props> = ({
     />
   );
 
+  // The locations of whichever client is chosen. Asks nothing until one is, so it never runs while
+  // a name is being typed.
+  const locations = useClientLocations(criteria.clientNumber);
+
   /**
    * A maintainer was picked from the lookup.
    *
-   * <p>A pick is the precise form of this filter — it names one client at one location — so it
-   * replaces any name still in `primaryUserName` rather than adding to it. Both would otherwise
-   * apply, and a user who typed "canfor" and then picked a Canfor office would be searching for
-   * sites that matched both conditions without being told.
+   * <p>A pick names one client, not one of its offices — Location is its own filter beside this
+   * one. It replaces any name still in `primaryUserName` rather than adding to it: both would
+   * otherwise apply, and a user who typed "canfor" and then picked Canfor would be searching for
+   * sites matching both conditions without being told.
+   *
+   * <p>Clearing the client clears the location with it. A location code on its own filters every
+   * client's office 01 at once, which is not a question anyone means to ask.
    */
   const selectMaintainer = (client: ClientSuggestion | null) => {
     onChange('clientNumber', client?.clientNumber ?? '');
-    onChange('clientLocationCode', client?.clientLocnCode ?? '');
     onChange('maintainerLabel', client ? clientLabel(client) : '');
     onChange('primaryUserName', '');
+    onChange('clientLocationCode', '');
   };
 
   /**
@@ -281,6 +289,33 @@ const SiteSearchCriteriaForm: FC<Props> = ({
           onSelect={selectMaintainer}
           onTermChange={typeMaintainer}
         />
+        {/* Its own filter, not part of the pick above. A client maintains sites from several
+            offices and the business asked to narrow by one — so the lookup now offers each client
+            once and this says which of its locations.
+
+            Disabled until a client is chosen, and listing only locations that actually maintain a
+            site: the same two rules Management Area follows under Forest District. A location code
+            alone would filter every client's office 01 at once. */}
+        <Select
+          id="site-search-clientLocationCode"
+          data-testid="site-search-clientLocationCode"
+          labelText="Maintainer Location"
+          disabled={criteria.clientNumber === '' || locations.isFetching}
+          value={criteria.clientLocationCode}
+          onChange={(event) => onChange('clientLocationCode', event.target.value)}
+        >
+          <SelectItem
+            value=""
+            text={criteria.clientNumber === '' ? 'Pick a maintainer first' : 'Any location'}
+          />
+          {(locations.data ?? []).map((location) => (
+            <SelectItem
+              key={location.clientLocnCode}
+              value={location.clientLocnCode ?? ''}
+              text={locationLabel(location)}
+            />
+          ))}
+        </Select>
         {text('crossingName', 'Crossing Name', 20)}
 
         {orgUnitSelect('orgUnit', 'Forest District', 'Any district', codeTables.forestDistricts)}
@@ -294,7 +329,6 @@ const SiteSearchCriteriaForm: FC<Props> = ({
           codeTablesLoading || managementAreasLoading,
         )}
         {range('kiloStart', 'kiloEnd', 'Kilometres')}
-        {range('userKmStart', 'userKmEnd', 'User Kilometres')}
 
         {codeSelect(
           'specialAccessCode',

@@ -1,0 +1,61 @@
+@use '@carbon/react/scss/spacing' as *;
+
+.road-search__form {
+  margin-block-end: $spacing-05;
+}
+
+// Three criteria per row, stepping to one on a phone. Narrower than the search screens' four,
+// because this sits inside a dialog rather than across the page.
+.road-search__criteria {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  // Tighter between rows than between columns. A grid row is as tall as its tallest cell, and
+  // Tenure Type's helper text makes the first one taller than the fields in it — so the short
+  // cells already carry slack underneath, and a full gap on top of that read as a break between
+  // two forms rather than two rows of one.
+  column-gap: $spacing-05;
+  row-gap: $spacing-03;
+  align-items: start;
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// "Project File ID#" and "Br." — two halves of one identifier, sharing a column as they do on the
+// site form.
+.road-search__paired {
+  display: flex;
+  gap: $spacing-03;
+
+  > :first-child {
+    flex: 1 1 auto;
+  }
+
+  > :last-child {
+    flex: 0 0 5rem;
+  }
+}
+
+// The buttons take the last row to themselves, right-aligned, so they never land in whichever
+// column happened to be left over.
+.road-search__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-03;
+}
+
+// Every row picks a road, so every row says so on hover. Carbon's zebra striping already gives the
+// table a hover colour; this adds the cursor, which is the part that says "clickable" before the
+// pointer has moved far enough to reveal the highlight.
+.road-search__row {
+  cursor: pointer;
+
+  // The row is focusable, so it has to show it. Carbon's own focus ring, inset so it is not
+  // clipped by the row's edges.
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus, #0f62fe);
+    outline-offset: -2px;
+  }
+}

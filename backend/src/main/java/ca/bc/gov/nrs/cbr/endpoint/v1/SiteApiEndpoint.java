@@ -2,6 +2,8 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
@@ -9,6 +11,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -71,6 +75,31 @@ public interface SiteApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{siteId}")
   ResponseEntity<SiteDetailResponse> getSite(@PathVariable("siteId") String siteId);
+
+  /**
+   * Creates a site.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — legacy's {@code /addSite} privilege, which is
+   * a {@code LEVEL_2} one. Adding a site is grouped with the destructive actions there rather than
+   * with ordinary editing, because a site is the root every structure and inspection hangs off and
+   * a wrong one cannot simply be tidied away.
+   *
+   * <p><b>200 with the new site's number, and nothing else.</b> The caller already holds what it
+   * sent; the one thing it does not know is the key, because the server upper-cases it. Returning
+   * the stored record meant reading the row straight back to answer with what had just been said.
+   *
+   * <p>The payload type rather than a {@code ResponseEntity}, which is how a create answers in
+   * EDUC-STUDENT-ASSESSMENT-API: Spring gives 200 on its own, and {@code ResponseEntity} is kept
+   * for the replies that carry no body — {@link #deleteSite} below.
+   *
+   * <p><b>400 with a message per field when a rule fails.</b> Every check {@link
+   * ca.bc.gov.nrs.cbr.service.v1.SiteValidator} makes is reported at once and keyed by the field it
+   * belongs to, so the form can mark the boxes rather than print a paragraph. See
+   * {@link SiteValidationAdvice} for the shape.
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PostMapping
+  SiteCreatedResponse createSite(@RequestBody SiteCreateRequest request);
 
   /**
    * Deletes a site.

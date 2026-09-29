@@ -139,7 +139,7 @@ describe('SiteDetailPage — reading', () => {
   it('shows the coordinates as one value each, not six boxes', async () => {
     await renderPage();
 
-    expect(isReadOnlyCell('Longitude (west)')).toBe(true);
+    expect(isReadOnlyCell('Longitude')).toBe(true);
     expect(isReadOnlyCell('Latitude')).toBe(true);
     expect(screen.queryByTestId('site-form-longitudeDegrees')).not.toBeInTheDocument();
   });
@@ -164,11 +164,11 @@ describe('SiteDetailPage — the values it shows', () => {
   });
 
   it('turns the stored decimal degrees back into degrees, minutes and seconds', async () => {
-    // -122.504306 is 122° 30′ 15.5″ west. Shown unsigned, because every site in the province is —
+    // -122.504306 is 122° 30′ 15.5″ west. Shown with the minus legacy prints beside the boxes —
     // the sign carries nothing a reader can use.
     await renderPage();
 
-    expect(screen.getByText('122° 30′ 15.5″')).toBeInTheDocument();
+    expect(screen.getByText('\u2212122° 30′ 15.5″')).toBeInTheDocument();
     expect(screen.getByText('53° 55′ 0″')).toBeInTheDocument();
   });
 
@@ -278,7 +278,7 @@ describe('SiteDetailPage — editing', () => {
 
   it('keeps the fields no role may change as values, even while editing', async () => {
     // Each is disabled in every branch of the legacy form, including the Level 2 one: the site
-    // number is the key, the maintainer comes from the lookup, Capital Road from the road record.
+    // number is the key, and the rest are written from LRMOPS by UPDATE_CROSSING_SITE_FROM_LRM.
     await renderPage({ canEdit: true, canDelete: true });
 
     edit();
@@ -286,6 +286,8 @@ describe('SiteDetailPage — editing', () => {
     expect(isReadOnlyCell('Site #')).toBe(true);
     expect(isReadOnlyCell('Designated Maintainer')).toBe(true);
     expect(isReadOnlyCell('User Kilometres')).toBe(true);
+    expect(isReadOnlyCell('BCTS BA Responsible')).toBe(true);
+    expect(screen.queryByTestId('site-form-businessAreaOrgUnitNo')).not.toBeInTheDocument();
     expect(isReadOnlyCell('Capital Road')).toBe(true);
   });
 

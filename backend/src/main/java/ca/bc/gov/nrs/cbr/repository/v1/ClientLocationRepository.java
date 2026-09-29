@@ -110,21 +110,22 @@ public interface ClientLocationRepository
    * but the road search matches on name and number and shows no address — so a second row for the
    * same company would be two identical suggestions.
    *
+   * <p>The two absent columns are left off the projection rather than selected as {@code NULL} —
+   * see the two-argument constructor on {@link ClientLookupResult}. This query has never run
+   * against Oracle: the road search cannot reach it without the {@code FOREST_FILE_CLIENT} grant,
+   * so the fault it shared with the maintainer lookup was invisible here.
+   *
    * @param term already trimmed, upper-cased and wrapped in wildcards by the caller, or the exact
    *             zero-padded client number
    */
   @Query("""
       SELECT DISTINCT new ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult(
-               client.clientNumber,
-               NULL,
-               client.clientName,
-               NULL,
-               NULL)
+               client.clientNumber, client.clientName)
         FROM ForestFileClientEntity fileClient
         JOIN ClientPublicEntity client
           ON client.clientNumber = fileClient.clientNumber
        WHERE (:term IS NOT NULL AND UPPER(client.clientName) LIKE :term)
-          OR (:clientNumber IS NOT NULL AND client.clientNumber = :clientNumber)
+          OR (:clientNumber IS NOT NULL AND client.clientNumber LIKE :clientNumber)
        ORDER BY client.clientName
       """)
   List<ClientLookupResult> findRoadFileHolders(
@@ -132,31 +133,39 @@ public interface ClientLocationRepository
       @Param("clientNumber") String clientNumber,
       Pageable limit);
 
+
   /**
-   * By name, division or city — a case-insensitive contains match on each.
+   * Maintainer <b>clients</b>, by name — one row per client rather than one per location.
    *
-   * <p><b>{@code UPPER} on both sides, which is legacy's behaviour and not this application's
-   * current behaviour.</b> {@code AbstractOracleDMLDAO.generateWhere} emits
-   * {@code UPPER(col) LIKE UPPER('%'||?||'%')} for any criterion not declared case-sensitive, and
-   * {@code SiteSearchForm} declares this one through the four-argument {@code addCriteria}, which
-   * defaults to insensitive. {@code SiteSearchSpecifications.maintainedBy} folds no case at all, so
-   * the free-text field beside this lookup still matches only the stored casing.
+   * <p>The two queries above answer "which client *locations* maintain a site", which is what the
+   * site form needed when it set both halves of the key at once. Site Search asks a different
+   * question: it filters on the client, and on the location separately. A client that maintains
+   * sites at five locations is one choice there, not five identical-looking ones.
    *
-   * <p><b>Three columns, where legacy searched one.</b> Legacy's lookup matched the client name and
-   * offered separate boxes for first name, org unit and status. Division name and city are matched
-   * here instead because they are what the suggestion already displays: a user reading
-   * "Prince George" in the list has no way to know it is not searchable, and someone after a
-   * specific division is likelier to type its name than its parent company's.
+   * <p>The location columns come back null, and {@code clientLabel} on the browser side already
+   * guards for that — a result with only a number and a name renders as "NAME · NUMBER". They are
+   * left off the projection rather than selected as {@code NULL}: see the two-argument constructor
+   * on {@link ClientLookupResult} for why that distinction matters to Oracle.
    *
-   * @param term already trimmed, upper-cased and wrapped in wildcards by the caller
+   * <p><b>Matched on three columns, projected as one client.</b> Division name and city are
+   * searched as well as the client name, because they are what the suggestion used to display and
+   * what a user looking for a particular office types — someone after "Prince George" has no way
+   * to know it is not searchable. Collapsing to one row per client is what {@code DISTINCT} does
+   * here: a company with three matching offices is still one choice.
+   *
+   * <p><b>{@code UPPER} on both sides, which is legacy's behaviour.</b>
+   * {@code AbstractOracleDMLDAO.generateWhere} emits {@code UPPER(col) LIKE UPPER('%'||?||'%')} for
+   * any criterion not declared case-sensitive, and {@code SiteSearchForm} declares this one through
+   * the four-argument {@code addCriteria}, which defaults to insensitive.
+   * {@code SiteSearchSpecifications.maintainedBy} folds no case at all, so the free-text criterion
+   * beside this lookup still matches only the stored casing.
+   *
+   * <p>Still driven from {@code CrossingSiteEntity}: the list offers clients that actually maintain
+   * something, not every client in the province.
    */
   @Query("""
       SELECT DISTINCT new ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult(
-               location.clientNumber,
-               location.clientLocnCode,
-               client.clientName,
-               location.clientLocnName,
-               location.city)
+               client.clientNumber, client.clientName)
         FROM CrossingSiteEntity site
         JOIN ClientLocationEntity location
           ON location.clientNumber = site.clientNumber
@@ -166,7 +175,33 @@ public interface ClientLocationRepository
        WHERE UPPER(client.clientName) LIKE :term
           OR UPPER(location.clientLocnName) LIKE :term
           OR UPPER(location.city) LIKE :term
-       ORDER BY client.clientName, location.clientLocnCode
+       ORDER BY client.clientName
       """)
-  List<ClientLookupResult> findMaintainersByText(@Param("term") String term, Pageable limit);
+  List<ClientLookupResult> findMaintainerClientsByText(
+      @Param("term") String term, Pageable limit);
+
+  /**
+   * The same list narrowed by a run of digits appearing anywhere in the client number.
+   *
+   * <p><b>A contains, not an equals.</b> The number is stored zero-padded to eight
+   * ({@code VARCHAR2(8)}), and a user types the digits they know rather than the padding. Matching
+   * exactly meant padding first, which made a partial number behave arbitrarily: for client
+   * {@code 00001286}, typing {@code 1286} found it — the padding happened to reproduce the whole
+   * number — while {@code 0128} became {@code 00000128} and found a different client that does not
+   * exist. Both are fragments of the same number and neither should be privileged.
+   *
+   * <p>The leading wildcard means no index is used, which is affordable here and nowhere else: the
+   * set is clients that maintain a site, the result is capped, and a type-ahead is not a report.
+   */
+  @Query("""
+      SELECT DISTINCT new ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult(
+               client.clientNumber, client.clientName)
+        FROM CrossingSiteEntity site
+        JOIN ClientPublicEntity client
+          ON client.clientNumber = site.clientNumber
+       WHERE client.clientNumber LIKE :digits
+       ORDER BY client.clientName
+      """)
+  List<ClientLookupResult> findMaintainerClientsByNumber(
+      @Param("digits") String digits, Pageable limit);
 }
