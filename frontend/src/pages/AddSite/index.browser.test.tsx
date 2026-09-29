@@ -7,6 +7,8 @@ import AddSitePage from './index';
 
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 
+import { WORK_SAVED } from '@/context/unsavedChanges/workSaved';
+
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
@@ -871,7 +873,7 @@ describe('AddSitePage — the rest of the screen', () => {
     save();
 
     await waitFor(() => expect(siteApi.createSite).toHaveBeenCalledTimes(1));
-    expect(navigate).toHaveBeenCalledWith('/inventory/site/BOWRON-001');
+    expect(navigate).toHaveBeenCalledWith('/inventory/site/BOWRON-001', { state: WORK_SAVED });
   });
 
   it('sends the coordinates as decimal degrees, longitude negated', async () => {

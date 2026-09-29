@@ -4,6 +4,7 @@ import { useBlocker } from 'react-router-dom';
 import DestructiveModal from '@/components/core/DestructiveModal';
 
 import { useUnsavedChanges } from '@/context/unsavedChanges/useUnsavedChanges';
+import { isWorkSaved } from '@/context/unsavedChanges/workSaved';
 
 /**
  * Stops a navigation that would throw away unsaved work, and asks first.
@@ -33,8 +34,11 @@ const UnsavedChangesGuard: FC = () => {
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       // Only a real change of screen. A search parameter or a hash moving on the page the user is
-      // already editing is not them leaving it, and blocking that would be unexplainable.
-      isDirty && currentLocation.pathname !== nextLocation.pathname,
+      // already editing is not them leaving it, and blocking that would be unexplainable. Nor a
+      // navigation made because the work was just saved — see `WORK_SAVED`.
+      isDirty &&
+      currentLocation.pathname !== nextLocation.pathname &&
+      !isWorkSaved(nextLocation.state),
   );
 
   useEffect(() => {

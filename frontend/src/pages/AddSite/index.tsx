@@ -24,6 +24,7 @@ import {
   fieldWarnings,
   type SiteErrors,
 } from '@/components/SiteForm/validation';
+import { WORK_SAVED } from '@/context/unsavedChanges/workSaved';
 import {
   useBusinessAreas,
   useForestDistricts,
@@ -346,9 +347,12 @@ const AddSitePage: FC = () => {
     created.mutate(toCreateRequest(site), {
       // To the site that was stored, not the one that was sent: the server upper-cases the number
       // and fills in the road name and maintainer, so the detail page should read the record.
+      // Marked as saved on the way out: the guard learns the form is clean only after the next
+      // render, and this navigation happens before it — so without the mark it asked "Leave
+      // without saving?" of a site it had just stored.
       onSuccess: (stored) => {
         setSaved(true);
-        navigate(`/inventory/site/${stored.siteId}`);
+        navigate(`/inventory/site/${stored.siteId}`, { state: WORK_SAVED });
       },
     });
   }, [created, navigate, noRoad, settledErrors, site, siteNumberTaken]);
