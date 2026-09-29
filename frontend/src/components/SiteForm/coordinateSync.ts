@@ -123,6 +123,13 @@ const isLatLonField = (field: keyof SiteFormValues) =>
 const isUtmField = (field: keyof SiteFormValues) =>
   (UTM_FIELDS as readonly string[]).includes(field);
 
+/** The other notation, recomputed from the one the changed box belongs to — or null. */
+const derivedFrom = (values: SiteFormValues, changed: keyof SiteFormValues) => {
+  if (isLatLonField(changed)) return utmFromLatLon(values);
+  if (isUtmField(changed)) return latLonFromUtm(values);
+  return null;
+};
+
 /**
  * The form after a coordinate box changed, with the other notation brought up to date.
  *
@@ -137,12 +144,7 @@ export const syncCoordinates = (
   values: SiteFormValues,
   changed: keyof SiteFormValues,
 ): SiteFormValues => {
-  const derived = isLatLonField(changed)
-    ? utmFromLatLon(values)
-    : isUtmField(changed)
-      ? latLonFromUtm(values)
-      : null;
-
+  const derived = derivedFrom(values, changed);
   return derived ? { ...values, ...derived } : values;
 };
 

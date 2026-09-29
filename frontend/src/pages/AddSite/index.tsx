@@ -303,16 +303,12 @@ const AddSitePage: FC = () => {
    */
   const districtIsDerived = isDistrictFromRoad(site.crossingSiteTypeCode, Boolean(road.data));
   const { orgUnitNo: districtError, ...rest } = merged;
+  const districtMessage = noRoad
+    ? 'No road matches this Project File ID# and Br.'
+    : 'This road has no Forest District on record.';
   const errors: SiteErrors =
     districtIsDerived && (noRoad || districtError !== undefined)
-      ? {
-          ...rest,
-          forestFileId:
-            merged.forestFileId ??
-            (noRoad
-              ? 'No road matches this Project File ID# and Br.'
-              : 'This road has no Forest District on record.'),
-        }
+      ? { ...rest, forestFileId: merged.forestFileId ?? districtMessage }
       : merged;
 
   /**
@@ -352,7 +348,7 @@ const AddSitePage: FC = () => {
       // without saving?" of a site it had just stored.
       onSuccess: (stored) => {
         setSaved(true);
-        navigate(`/inventory/site/${stored.siteId}`, { state: WORK_SAVED });
+        void navigate(`/inventory/site/${stored.siteId}`, { state: WORK_SAVED });
       },
     });
   }, [created, navigate, noRoad, settledErrors, site, siteNumberTaken]);
@@ -389,7 +385,9 @@ const AddSitePage: FC = () => {
   useUnsavedChangesPrompt(isDirty && !saved);
 
   /** Cancel simply leaves. If there is anything to lose, the guard intercepts and asks. */
-  const cancel = useCallback(() => navigate('/inventory/site-search'), [navigate]);
+  const cancel = useCallback(() => {
+    void navigate('/inventory/site-search');
+  }, [navigate]);
 
   return (
     <Grid fullWidth className="default-grid">

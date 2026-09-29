@@ -11,7 +11,7 @@ import './siteForm.scss';
 
 import type { SiteErrors } from './validation';
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
-import type { FC, SubmitEventHandler } from 'react';
+import type { FC, FocusEvent, SubmitEventHandler } from 'react';
 
 import { byteLength } from '@/utils/textLimits';
 
@@ -119,10 +119,11 @@ export const FORM_ID = 'site-form';
  * actually uses, and a screen reader is no worse off for it. Empty when no part is filled, so the
  * cell falls back to the em dash rather than printing three bare symbols.
  */
-const dms = (degrees: string, minutes: string, seconds: string, negative = false): string =>
-  [degrees, minutes, seconds].every((part) => part.trim() === '')
-    ? ''
-    : `${negative ? '\u2212' : ''}${degrees || '0'}\u00b0 ${minutes || '0'}\u2032 ${seconds || '0'}\u2033`;
+const dms = (degrees: string, minutes: string, seconds: string, negative = false): string => {
+  if ([degrees, minutes, seconds].every((part) => part.trim() === '')) return '';
+  const sign = negative ? '\u2212' : '';
+  return `${sign}${degrees || '0'}\u00b0 ${minutes || '0'}\u2032 ${seconds || '0'}\u2033`;
+};
 
 /**
  * `10 · 382875E · 7710784N`, for a UTM reference the user may read but not change.
@@ -143,6 +144,30 @@ const utm = (values: SiteFormValues): string => {
 /** "DCK - Chilliwack Natural Resource District", as everywhere else in the app. */
 const label = (code: string | null, description: string | null): string =>
   [code, description].filter(Boolean).join(' - ');
+
+/** The list's entry for a stored org unit number, if the list carries it. */
+const findUnit = (options: OrgUnitOption[], orgUnitNo: string): OrgUnitOption | undefined =>
+  options.find((option) => String(option.orgUnitNo) === orgUnitNo);
+
+/**
+ * The district as it should read when the road decides it.
+ *
+ * <p>Falls back to the bare org unit number when the list does not contain it, which is not
+ * hypothetical: legacy fills this field from the road's {@code FOREST_REGION}, and a region is
+ * not one of the districts the list holds. Showing the number is worse than showing a name and
+ * far better than showing nothing at all.
+ */
+const districtText = (districts: OrgUnitOption[], orgUnitNo: string): string => {
+  const unit = findUnit(districts, orgUnitNo);
+  if (unit) return label(unit.orgUnitCode, unit.orgUnitName);
+  return orgUnitNo === '' ? '' : `Org unit ${orgUnitNo}`;
+};
+
+/** A stored org unit as a read-only value: its name, or the raw number if the list lacks it. */
+const orgUnitText = (options: OrgUnitOption[], orgUnitNo: string): string => {
+  const unit = findUnit(options, orgUnitNo);
+  return unit ? label(unit.orgUnitCode, unit.orgUnitName) : orgUnitNo;
+};
 
 /**
  * The Add Site form, ported from the legacy `site.jsp`.
@@ -186,21 +211,52 @@ const SiteForm: FC<Props> = ({
   /** See `isDistrictFromRoad`. */
   const districtIsDerived = isDistrictFromRoad(values.crossingSiteTypeCode, roadResolved);
 
-  /**
-   * The district as it should read.
-   *
-   * <p>Falls back to the bare org unit number when the list does not contain it, which is not
-   * hypothetical: legacy fills this field from the road's {@code FOREST_REGION}, and a region is
-   * not one of the districts the list holds. Showing the number is worse than showing a name and
-   * far better than showing nothing at all.
+  /** See `districtText`. */
+  const derivedDistrict = districtText(codeTables.forestDistricts, values.orgUnitNo);
+  const capitalRoadText = values.capitalRoad ? 'Yes' : 'No';
+
+  /*
+   * The Forest District control when the user picks it. A recreation site picks from the districts
+   * its project file names, so the list waits for the file.
    */
-  const derivedDistrict = (() => {
-    const unit = codeTables.forestDistricts.find(
-      (option) => String(option.orgUnitNo) === values.orgUnitNo,
-    );
-    if (unit) return label(unit.orgUnitCode, unit.orgUnitName);
-    return values.orgUnitNo === '' ? '' : `Org unit ${values.orgUnitNo}`;
-  })();
+  const districtLabel = isRecreation ? 'Recreation District' : 'Forest District';
+  const districtOptions = isRecreation ? recreationDistricts : codeTables.forestDistricts;
+  const waitingForFile = isRecreation && values.forestFileId.trim() === '';
+  const districtBlank = waitingForFile ? 'Enter a Project File ID# first' : 'Select a district';
+
+  /**
+   * A field's error and warning, as Carbon's inputs take them.
+   *
+   * <p>The warning only when the field is not already in error: the rule that refuses the save
+   * outranks the one that merely asks. Carbon prefers `invalid` over `warn` by itself, so this is
+   * belt-and-braces — stated here because it is a decision rather than something to rediscover
+   * from a component's internals, and it is not covered by a test for the same reason: nothing it
+   * could be changed to would alter what appears.
+   */
+  const messages = (field: keyof SiteFormValues) => ({
+    invalid: field in errors,
+    invalidText: errors[field],
+    warn: !(field in errors) && field in warnings,
+    warnText: warnings[field],
+  });
+
+  /**
+   * Leaving a box is what earns its message. Until then only the rules no further typing can
+   * satisfy have anything to say — see utils/validation.
+   *
+   * <p>Upper-casing happens here, on exit rather than on every keystroke, which is where legacy
+   * puts it too (`onchange="setSiteNumberToUpperCase()"`). Rewriting the box as the user types
+   * fights the caret and makes a held shift key look broken.
+   */
+  const settle =
+    (field: keyof SiteFormValues, uppercase = false) =>
+    (event: FocusEvent<HTMLInputElement>) => {
+      const typed = event.target.value;
+      if (uppercase && typed !== typed.toUpperCase()) {
+        onChange(field, typed.toUpperCase() as never);
+      }
+      onSettle(field);
+    };
 
   const submit: SubmitEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
@@ -232,27 +288,9 @@ const SiteForm: FC<Props> = ({
         labelText={requiredLabel(labelText, required)}
         maxLength={maxLength}
         value={String(values[field])}
-        invalid={field in errors}
-        invalidText={errors[field]}
-        // Only when the field is not already in error: the rule that refuses the save outranks
-        // the one that merely asks. Carbon prefers `invalid` over `warn` by itself, so this is
-        // belt-and-braces — stated here because it is a decision rather than something to
-        // rediscover from a component's internals, and it is not covered by a test for the same
-        // reason: nothing it could be changed to would alter what appears.
-        warn={!(field in errors) && field in warnings}
-        warnText={warnings[field]}
+        {...messages(field)}
         onChange={(event) => onChange(field, event.target.value as never)}
-        // Leaving a box is what earns its message. Until then only the rules no further typing can
-        // satisfy have anything to say — see utils/validation.
-        onBlur={(event) => {
-          // On exit rather than on every keystroke, which is where legacy puts it too
-          // (`onchange="setSiteNumberToUpperCase()"`). Rewriting the box as the user types fights
-          // the caret and makes a held shift key look broken.
-          if (uppercase && event.target.value !== event.target.value.toUpperCase()) {
-            onChange(field, event.target.value.toUpperCase() as never);
-          }
-          onSettle(field);
-        }}
+        onBlur={settle(field, uppercase)}
         {...rest}
       />
     );
@@ -282,10 +320,7 @@ const SiteForm: FC<Props> = ({
         data-testid={`site-form-${field}`}
         labelText={requiredLabel(labelText, required)}
         disabled={codeTablesLoading}
-        invalid={field in errors}
-        invalidText={errors[field]}
-        warn={!(field in errors) && field in warnings}
-        warnText={warnings[field]}
+        {...messages(field)}
         value={String(values[field])}
         onChange={(event) => onChange(field, event.target.value as never)}
       >
@@ -309,23 +344,14 @@ const SiteForm: FC<Props> = ({
     required = false,
   ) =>
     !isEditable(field) ? (
-      <ReadOnlyField
-        label={labelText}
-        value={(() => {
-          const unit = options.find((option) => String(option.orgUnitNo) === values[field]);
-          return unit ? label(unit.orgUnitCode, unit.orgUnitName) : String(values[field] ?? '');
-        })()}
-      />
+      <ReadOnlyField label={labelText} value={orgUnitText(options, String(values[field] ?? ''))} />
     ) : (
       <Select
         id={`site-form-${field}`}
         data-testid={`site-form-${field}`}
         labelText={requiredLabel(labelText, required)}
         disabled={disabled}
-        invalid={field in errors}
-        invalidText={errors[field]}
-        warn={!(field in errors) && field in warnings}
-        warnText={warnings[field]}
+        {...messages(field)}
         value={String(values[field])}
         onChange={(event) => onChange(field, event.target.value as never)}
       >
@@ -475,11 +501,9 @@ const SiteForm: FC<Props> = ({
         ) : (
           orgUnitSelect(
             'orgUnitNo',
-            isRecreation ? 'Recreation District' : 'Forest District',
-            isRecreation && values.forestFileId.trim() === ''
-              ? 'Enter a Project File ID# first'
-              : 'Select a district',
-            isRecreation ? recreationDistricts : codeTables.forestDistricts,
+            districtLabel,
+            districtBlank,
+            districtOptions,
             codeTablesLoading,
             // A recreation site is identified by its project, not by a district's road network.
             !isRecreation,
@@ -562,7 +586,7 @@ const SiteForm: FC<Props> = ({
           {/* Never editable on this screen, in legacy or here — it is set from the road record. In a
               read-only page it reads as a word rather than as a permanently greyed-out tick box. */}
           {!isEditable('capitalRoad') ? (
-            <ReadOnlyField label="Capital Road" value={values.capitalRoad ? 'Yes' : 'No'} />
+            <ReadOnlyField label="Capital Road" value={capitalRoadText} />
           ) : (
             <div className="site-form__checkbox">
               {/* An empty label, not a margin — the same device the road lookup button uses. A

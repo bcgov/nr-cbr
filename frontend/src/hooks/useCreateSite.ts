@@ -57,7 +57,7 @@ export const useCreateSite = (): CreateSiteResult => {
   const mutation = useMutation<SiteCreatedResponse, unknown, SiteCreateRequest>({
     mutationFn: (site) => API.siteSearch.createSite(site),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [SITE_SEARCH_QUERY_KEY] });
+      void queryClient.invalidateQueries({ queryKey: [SITE_SEARCH_QUERY_KEY] });
     },
   });
 

@@ -60,7 +60,7 @@ const coordinate = (
   sign: 1 | -1,
 ): number | null => {
   const parts = [number(degrees), number(minutes), number(seconds)];
-  if (parts.some((part) => part === null)) return null;
+  if (parts.includes(null)) return null;
   return (
     sign *
     Math.abs(
