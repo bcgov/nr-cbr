@@ -249,7 +249,7 @@ class ConfigurationServiceTest {
 
   @Test
   @DisplayName("caches each org-unit list under its own name")
-  void cachesUnderDistinctNames() throws Exception {
+  void cachesUnderDistinctNames() {
     // Guards a slip that is invisible at runtime: `getRecreationDistricts` was inserted above
     // `getManagementAreas` and took its `@Cacheable("managementAreas")` with it, leaving the
     // management areas uncached and the recreation districts filed under the wrong name. Both

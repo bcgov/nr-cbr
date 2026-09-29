@@ -27,8 +27,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Creating a site: what the server stores, and everything it refuses.
@@ -50,7 +50,7 @@ class SiteCreateTest {
   @Autowired
   private EntityManager entityManager;
 
-  @MockBean
+  @MockitoBean
   private LoggedUserHelper loggedUser;
 
   @BeforeEach

@@ -166,7 +166,7 @@ public class CrossingSiteEntity {
   private String pointOfAccessDesc;
 
   /*
-   * The two map sheet columns. <b>Nothing reads or writes them, and no screen shows them</b> —
+   * The two map sheet columns. Nothing reads or writes them, and no screen shows them —
    * legacy removed both fields from `site.jsp` under CBR-455, where the whole table row survives
    * commented out. The columns still hold whatever was entered before that, so they stay mapped:
    * the data is real even though the fields are gone, and a future report or extract would want

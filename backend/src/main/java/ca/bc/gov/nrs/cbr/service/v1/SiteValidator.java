@@ -57,6 +57,16 @@ public class SiteValidator {
 
   private static final int KILOMETRE_SCALE = 2;
 
+  /*
+   * Field names, as the request, the form and every `fieldErrors` key spell them. Only those that
+   * carry more than one message; the rest appear once each.
+   */
+  private static final String SITE_ID = "siteId";
+  private static final String INSPECTION_STATUS = "structureInspectionStatusCode";
+  private static final String FOREST_FILE_ID = "forestFileId";
+  private static final String LONGITUDE = "longitude";
+  private static final String LATITUDE = "latitude";
+
   private static final String CROSSING = "CRS";
   private static final String RECREATION = "REC";
   private static final String STORAGE = "STRG";
@@ -134,15 +144,15 @@ public class SiteValidator {
       SiteCreateRequest request, boolean siteIdTaken, Map<String, String> errors) {
     String siteId = trimmed(request.siteId());
     if (siteId.isEmpty()) {
-      errors.put("siteId", "Site # is required.");
+      errors.put(SITE_ID, "Site # is required.");
       return;
     }
     if (siteId.length() > SITE_ID_MAX) {
-      errors.put("siteId", "Site # can be at most " + SITE_ID_MAX + " characters.");
+      errors.put(SITE_ID, "Site # can be at most " + SITE_ID_MAX + " characters.");
       return;
     }
     if (siteIdTaken) {
-      errors.put("siteId", "A site with this number already exists.");
+      errors.put(SITE_ID, "A site with this number already exists.");
     }
   }
 
@@ -153,10 +163,10 @@ public class SiteValidator {
     requireText(errors, "crossingSiteTypeCode", request.crossingSiteTypeCode(), "Site Type");
     requireText(
         errors,
-        "structureInspectionStatusCode",
+        INSPECTION_STATUS,
         request.structureInspectionStatusCode(),
         "Inspection Status");
-    requireText(errors, "forestFileId", request.forestFileId(), "Project File ID#");
+    requireText(errors, FOREST_FILE_ID, request.forestFileId(), "Project File ID#");
 
     // A storage site has no crossing to name and no point on a road to measure to.
     if (!STORAGE.equals(type)) {
@@ -178,10 +188,10 @@ public class SiteValidator {
     // mandatory" above the check in SiteForm.validate, and the same again for latitude. The columns
     // are nullable, so this is an application rule rather than a constraint.
     if (request.longitude() == null) {
-      errors.put("longitude", "Longitude is required.");
+      errors.put(LONGITUDE, "Longitude is required.");
     }
     if (request.latitude() == null) {
-      errors.put("latitude", "Latitude is required.");
+      errors.put(LATITUDE, "Latitude is required.");
     }
   }
 
@@ -194,7 +204,7 @@ public class SiteValidator {
         request.pointOfAccessDescription(),
         POINT_OF_ACCESS_MAX,
         "Site Details");
-    limit(errors, "forestFileId", request.forestFileId(), FOREST_FILE_ID_MAX, "Project File ID#");
+    limit(errors, FOREST_FILE_ID, request.forestFileId(), FOREST_FILE_ID_MAX, "Project File ID#");
     limit(errors, "roadSectionId", request.roadSectionId(), ROAD_SECTION_ID_MAX, "Br.");
   }
 
@@ -229,18 +239,18 @@ public class SiteValidator {
   private void checkCoordinates(SiteCreateRequest request, Map<String, String> errors) {
     BigDecimal longitude = request.longitude();
     if (longitude != null && degrees(longitude) > 180) {
-      errors.put("longitude", "Longitude degrees must be between 0 and 180.");
+      errors.put(LONGITUDE, "Longitude degrees must be between 0 and 180.");
     } else if (longitude != null && longitude.signum() > 0) {
       // Not a silent negation: a positive longitude is a real place, and guessing that the caller
       // meant its mirror image would store a site on the wrong side of the world without saying so.
       errors.put(
-          "longitude", "Longitude must be negative — every site in British Columbia is west of "
+          LONGITUDE, "Longitude must be negative — every site in British Columbia is west of "
               + "Greenwich.");
     }
 
     BigDecimal latitude = request.latitude();
     if (latitude != null && degrees(latitude) > 90) {
-      errors.put("latitude", "Latitude degrees must be between 0 and 90.");
+      errors.put(LATITUDE, "Latitude degrees must be between 0 and 90.");
     }
   }
 
@@ -258,7 +268,7 @@ public class SiteValidator {
         errors, "crossingSiteTypeCode", request.crossingSiteTypeCode(),
         siteTypeCodes::existsById, "Site Type");
     codeExists(
-        errors, "structureInspectionStatusCode", request.structureInspectionStatusCode(),
+        errors, INSPECTION_STATUS, request.structureInspectionStatusCode(),
         inspectionStatusCodes::existsById, "Inspection Status");
     codeExists(
         errors, "specialAccessRqmtCode", request.specialAccessRqmtCode(),
@@ -296,18 +306,18 @@ public class SiteValidator {
 
     if (CROSSING.equals(type) && STANDING.contains(status) && DO_NOT_INSPECT.equals(inspection)) {
       errors.put(
-          "structureInspectionStatusCode",
+          INSPECTION_STATUS,
           "An Active or Barricaded/Closed Crossing site must be set to Inspect.");
     } else if (CROSSING.equals(type)
         && NOT_STANDING.contains(status)
         && INSPECT.equals(inspection)) {
       errors.put(
-          "structureInspectionStatusCode",
+          INSPECTION_STATUS,
           "A Crossing site that is Transferred, Deactivated, Under Construction, Proposed, "
               + "Archived or LRMOPS must be set to Do Not Inspect.");
     } else if (STORAGE.equals(type) && INSPECT.equals(inspection)) {
       errors.put(
-          "structureInspectionStatusCode", "A Storage site must be set to Do Not Inspect.");
+          INSPECTION_STATUS, "A Storage site must be set to Do Not Inspect.");
     }
   }
 
@@ -333,7 +343,7 @@ public class SiteValidator {
     if (StringUtils.hasText(request.forestFileId())
         && StringUtils.hasText(request.roadSectionId())) {
       errors.putIfAbsent(
-          "forestFileId", "No road matches this Project File ID# and Br.");
+          FOREST_FILE_ID, "No road matches this Project File ID# and Br.");
     }
   }
 
