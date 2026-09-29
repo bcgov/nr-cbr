@@ -46,8 +46,9 @@ import './siteDetail.scss';
  * Fields no role may change on this screen, in legacy or here.
  *
  * <p>Each is disabled in <em>every</em> branch of `site.jsp` — including the Level 2 one — because
- * each is set somewhere other than this form: the site number is the key, the maintainer comes
- * from the client lookup, and Capital Road comes from the road record. Two of them still carry
+ * each is set somewhere other than this form: the site number is the key, and the maintainer, User
+ * Kilometres, BCTS BA Responsible and Capital Road are written from LRMOPS by
+ * `UPDATE_CROSSING_SITE_FROM_LRM` (`cbr-road-search.local.md` §8). Two of them still carry
  * `onchange` handlers in the JSP, so they read as fields that were editable once and were locked
  * later.
  *
@@ -61,6 +62,7 @@ const NEVER_EDITABLE = new Set<keyof SiteFormValues>([
   'clientLocationCode',
   'maintainerLabel',
   'userKm',
+  'businessAreaOrgUnitNo',
   'capitalRoad',
 ]);
 

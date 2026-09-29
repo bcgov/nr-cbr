@@ -1,4 +1,5 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
+import type { PagedResponse } from '@/types/api';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
 
@@ -62,16 +63,21 @@ export class RoadService extends HttpClient {
    * typed. Callers treat that as "no road yet" and show nothing.
    */
   /**
-   * Roads matching the dialog's criteria, at most two hundred — legacy's own cap.
+   * One page of the roads matching the dialog's criteria, with the true total.
    *
-   * <p>Blank criteria are dropped rather than sent: the server treats a blank as unset either way,
-   * and a URL carrying all six is unreadable in the place this gets debugged.
+   * <p>`pageNumber` is zero-based, matching the backend. Blank criteria are dropped rather than
+   * sent: the server treats a blank as unset either way, and a URL carrying all six is unreadable
+   * in the place this gets debugged.
    */
-  searchRoads(criteria: RoadSearchCriteria): CancelablePromise<RoadSearchResult[]> {
-    return this.doRequest<RoadSearchResult[]>(this.config, {
+  searchRoads(
+    criteria: RoadSearchCriteria,
+    pageNumber: number,
+    pageSize: number,
+  ): CancelablePromise<PagedResponse<RoadSearchResult>> {
+    return this.doRequest<PagedResponse<RoadSearchResult>>(this.config, {
       method: 'GET',
       url: '/v1/roads/search',
-      query: populated(criteria),
+      query: { ...populated(criteria), pageNumber, pageSize },
     });
   }
 

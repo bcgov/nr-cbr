@@ -1,4 +1,4 @@
-import { TextInput } from '@carbon/react';
+import { TextInput, Theme } from '@carbon/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { page } from '@vitest/browser/context';
@@ -93,12 +93,47 @@ describe('SiteForm — Capital Road', () => {
     await page.viewport(1400, 900);
     renderForm();
 
-    // The wrapper, not the input: Carbon's native checkbox is a 1px-tall hidden box and the tick
-    // the user sees is drawn by the label's ::before.
+    // The label, not the input: Carbon's native checkbox is a 1px-tall hidden box and the tick
+    // the user sees is drawn by the label's ::before, on the label's line. Centre to centre — a
+    // 16px box level with the top of a 40px input read as a line above the row.
     const checkbox = (
-      document.querySelector('.site-form__checkbox .cds--checkbox-wrapper') as HTMLElement
+      document.querySelector('.site-form__checkbox .cds--checkbox-label') as HTMLElement
     ).getBoundingClientRect();
-    expect(checkbox.top).toBeCloseTo(box('site-form-userKm').top, 0);
+    const input = box('site-form-userKm');
+    expect(checkbox.top + checkbox.height / 2).toBeCloseTo(input.top + input.height / 2, 0);
+  });
+
+  it('carries no hint under the box', () => {
+    renderForm();
+
+    expect(screen.queryByText('Set from the road record')).not.toBeInTheDocument();
+  });
+});
+
+describe('SiteForm — read-only labels', () => {
+  it('are the colour of the input labels beside them', () => {
+    // The component's own label is nr-frep's secondary grey, meant for a page of values. On a form
+    // mixing values and inputs in one row, it read as the label of something disabled. Inside the
+    // app's Theme, which is what defines the colour tokens — without it both resolve to inherit.
+    render(
+      <Theme theme="white">
+        <QueryClientProvider client={new QueryClient()}>
+          <SiteForm
+            values={EMPTY_SITE}
+            errors={{}}
+            codeTables={codeTables}
+            onChange={() => {}}
+            onSettle={() => {}}
+            onSave={() => {}}
+            onFindRoad={() => {}}
+          />
+        </QueryClientProvider>
+      </Theme>,
+    );
+
+    const readOnly = document.querySelector('.read-only-field__label') as HTMLElement;
+    const input = document.querySelector('label.cds--label') as HTMLElement;
+    expect(getComputedStyle(readOnly).color).toBe(getComputedStyle(input).color);
   });
 });
 
@@ -147,22 +182,45 @@ describe('SiteForm — the road lookup button', () => {
 
     expect(box('site-form-find-road').top).toBeCloseTo(box('site-form-roadSectionId').top, 0);
   });
-});
 
-describe('SiteForm — the narrow group on Add Site', () => {
-  it('keeps Kilometres narrow and Capital Road beside it with User Kilometres gone', async () => {
-    // Add Site leaves User Kilometres off — legacy will not let anyone set it — and a lone flex
-    // child stretches to the whole column unless its basis wins. Carbon's own
-    // `.cds--form-item { flex: 1 1 auto }` is one class, so a `> *` selector ties it and loses on
-    // source order; the rule is prefixed with the grid to outrank it.
+  it('stays level with the boxes when they carry an error message', async () => {
+    // Bottom-aligned, it followed the row's bottom edge — which an error message under the boxes
+    // pushes down a line, taking the button with it.
     await page.viewport(1400, 900);
     render(
       <QueryClientProvider client={new QueryClient()}>
         <SiteForm
           values={EMPTY_SITE}
+          errors={{
+            forestFileId: 'Project File ID# is required.',
+            roadSectionId: 'Br. is required.',
+          }}
+          codeTables={codeTables}
+          onChange={() => {}}
+          onSettle={() => {}}
+          onSave={() => {}}
+          onFindRoad={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(box('site-form-find-road').top).toBeCloseTo(box('site-form-roadSectionId').top, 0);
+  });
+});
+
+describe('SiteForm — the narrow group on Add Site', () => {
+  it('keeps Kilometres narrow with a read-only User Kilometres level beside it', async () => {
+    // Add Site shows User Kilometres as a value, not a box — LRMOPS fills it in. A read-only cell
+    // is label-above-value where an input is label-above-box, so it must still sit on the
+    // Kilometres line, and a lone input must not stretch to fill the group.
+    await page.viewport(1400, 900);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SiteForm
+          values={{ ...EMPTY_SITE, userKm: '12.50' }}
           errors={{}}
           codeTables={codeTables}
-          hiddenFields={new Set(['userKm'])}
+          isEditable={(field) => field !== 'userKm'}
           onChange={() => {}}
           onSettle={() => {}}
           onSave={() => {}}
@@ -174,14 +232,11 @@ describe('SiteForm — the narrow group on Add Site', () => {
     expect(screen.queryByTestId('site-form-userKm')).not.toBeInTheDocument();
 
     const kilometres = box('site-form-pointOfCommencementDistance');
-    const checkbox = (
-      document.querySelector('.site-form__checkbox .cds--checkbox-wrapper') as HTMLElement
-    ).getBoundingClientRect();
+    const userKm = screen.getByText('12.50').getBoundingClientRect();
 
     expect(kilometres.width).toBeLessThan(box('site-form-crossingName').width / 2);
-    // Capital Road closes up beside it rather than staying where the second box would have been.
-    expect(checkbox.left - kilometres.right).toBeLessThanOrEqual(16);
-    expect(checkbox.top).toBeCloseTo(kilometres.top, 0);
+    expect(userKm.top + userKm.height / 2).toBeCloseTo(kilometres.top + kilometres.height / 2, 0);
+    expect(userKm.left - kilometres.right).toBeLessThanOrEqual(24);
   });
 });
 

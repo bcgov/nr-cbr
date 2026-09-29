@@ -303,6 +303,35 @@ class SiteCreateTest {
   }
 
   @Nested
+  @DisplayName("coordinates legacy stores")
+  class LegacyCoordinates {
+
+    @Test
+    @DisplayName("stores 90 degrees plus minutes, which legacy never adds up")
+    void storesMinutesPastNinety() {
+      // 90° 25′ 42.2″. Legacy errors only on degrees above 90; minutes and seconds out of range are
+      // warnings, and nothing checks the three together. So it stores 90.428389 — and so does CBR.
+      service.create(site(draft -> draft.latitude = new BigDecimal("90.428389")));
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(sites.findById("BOWRON-001").orElseThrow().getLatitude())
+          .isEqualByComparingTo("90.428389");
+    }
+
+    @Test
+    @DisplayName("stores 180 degrees plus minutes of longitude, likewise")
+    void storesMinutesPastOneEighty() {
+      service.create(site(draft -> draft.longitude = new BigDecimal("-180.5")));
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(sites.findById("BOWRON-001").orElseThrow().getLongitude())
+          .isEqualByComparingTo("-180.5");
+    }
+  }
+
+  @Nested
   @DisplayName("a site that is refused")
   class Refused {
 
@@ -369,7 +398,7 @@ class SiteCreateTest {
     }
 
     @Test
-    @DisplayName("refuses coordinates outside the notation")
+    @DisplayName("refuses degrees outside the notation, as legacy does")
     void refusesImpossibleCoordinates() {
       assertThat(refusedWith(draft -> draft.longitude = new BigDecimal("-181")))
           .containsKey("longitude");

@@ -1,6 +1,6 @@
 import { Save } from '@carbon/icons-react';
 import { Button, Column, Grid, InlineNotification } from '@carbon/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
@@ -11,7 +11,12 @@ import type { FC } from 'react';
 
 import { syncCoordinates } from '@/components/SiteForm/coordinateSync';
 import { toCreateRequest } from '@/components/SiteForm/request';
-import { EMPTY_SITE, SITE_TYPE, type SiteFormValues } from '@/components/SiteForm/types';
+import {
+  EMPTY_SITE,
+  isDistrictFromRoad,
+  SITE_TYPE,
+  type SiteFormValues,
+} from '@/components/SiteForm/types';
 import {
   crossFieldErrors,
   crossFieldWarnings,
@@ -55,25 +60,27 @@ import './addSite.scss';
  * have not done yet.
  */
 /**
- * The three fields legacy locks on every branch of `site.jsp`, left off a form for a site that does
- * not exist yet.
+ * Fields shown but never typed into: they are filled in for the user, never by them.
  *
- * <p>Designated Maintainer is `disabled` for Level 1 and above and `readonly` below it
- * (`site.jsp:734-740`, `778-784`), and `showClientSearch()` — the lookup that would fill it — is
- * defined at line 529 and called from nowhere. A disabled input is not submitted, so <b>legacy's
- * Add Site always stores a site with no maintainer</b>. User Kilometres is the distance posted on
- * the sign, `disabled` at line 863. BCTS BA Responsible is `disabled` at line 901 even in the
- * Level 2 branch.
+ * <p>Designated Maintainer, User Kilometres and BCTS BA Responsible are locked on every branch of
+ * `site.jsp` (`734-740`, `778-784`, `863`, `901`), and nothing on legacy's screen fills them. What
+ * does is `THE.UPDATE_CROSSING_SITE_FROM_LRM`, which copies them from LRMOPS's `V_LRM_CBR_EXPORT`
+ * onto sites LRMOPS has placed on a road — along with the road, Kilometres, Management Area and
+ * Capital Road. See `cbr-road-search.local.md` §8.
  *
- * <p>Hidden rather than shown read-only: on a create they could only ever be blank, and an empty
- * cell with a label invites a user to look for the control that fills it. Site Detail shows all
- * three, where the site is stored and they have values.
+ * <p>Shown on Add Site, read-only, because what they will hold is worth knowing while the site is
+ * being created. Until CBR can read LRMOPS itself they show as empty; they are the slots that data
+ * lands in, not controls waiting to be found.
  */
-const NOT_SET_ON_CREATE: ReadonlySet<keyof SiteFormValues> = new Set([
+const AUTO_POPULATED: ReadonlySet<keyof SiteFormValues> = new Set([
   'clientNumber',
+  'clientLocationCode',
+  'maintainerLabel',
   'userKm',
   'businessAreaOrgUnitNo',
 ]);
+
+const isEditableOnCreate = (field: keyof SiteFormValues) => !AUTO_POPULATED.has(field);
 
 const AddSitePage: FC = () => {
   const navigate = useNavigate();
@@ -117,21 +124,53 @@ const AddSitePage: FC = () => {
   const created = useCreateSite();
 
   /**
-   * The road sets the Forest District, as `SiteAction` does on every redisplay.
+   * The district the road last wrote into the form, or `null` if the one there was not the road's.
+   *
+   * <p>What lets the road take back only what it gave: a storage site with no road picks its own
+   * district, and losing the road must not wipe a choice the user made.
+   */
+  const districtFromRoad = useRef<string | null>(null);
+
+  /**
+   * The road sets the Forest District, as `SiteAction` does on every redisplay — and, unlike
+   * legacy, takes it away again when there is no longer a road.
+   *
+   * <p>Legacy only ever writes the district: clear Project File ID#, or change the pair to one that
+   * names no road, and the old road's district stays in a field the user cannot edit. Here it
+   * follows the road both ways, once the lookup has settled — not while it is still in flight, or
+   * the district would blink out and back on every keystroke. A road with no region gives no
+   * district rather than leaving the previous road's.
    *
    * <p>Never for a recreation site, whose district is the user's choice from a list the file
    * narrows — writing the road's org unit there would overwrite what they picked.
    */
   useEffect(() => {
-    const fromRoad = road.data?.orgUnitNo;
-    if (fromRoad === undefined || fromRoad === null) return;
     if (site.crossingSiteTypeCode === SITE_TYPE.RECREATION) return;
-    setSite((current) =>
-      current.orgUnitNo === String(fromRoad)
+    if (road.isFetching) return;
+
+    let next: string;
+    if (road.data) {
+      next =
+        road.data.orgUnitNo === null || road.data.orgUnitNo === undefined
+          ? ''
+          : String(road.data.orgUnitNo);
+    } else if (districtFromRoad.current !== null) {
+      next = '';
+    } else {
+      return;
+    }
+    const hadFromRoad = districtFromRoad.current;
+    const hasRoad = Boolean(road.data);
+
+    setSite((current) => {
+      // No road any more, and the user has since picked a district of their own: keep theirs.
+      if (!hasRoad && current.orgUnitNo !== hadFromRoad) return current;
+      return current.orgUnitNo === next
         ? current
-        : { ...current, orgUnitNo: String(fromRoad), managementOrgUnitNo: '' },
-    );
-  }, [road.data, site.crossingSiteTypeCode]);
+        : { ...current, orgUnitNo: next, managementOrgUnitNo: '' };
+    });
+    districtFromRoad.current = hasRoad ? next : null;
+  }, [road.data, road.isFetching, site.crossingSiteTypeCode]);
 
   const codeTables = useMemo<SiteCodeTables>(
     () => ({
@@ -189,6 +228,14 @@ const AddSitePage: FC = () => {
             (field === 'crossingSiteTypeCode' && value === SITE_TYPE.RECREATION)
               ? { managementOrgUnitNo: '' }
               : {}),
+            // A recreation district is chosen from the ones the project file names. With the file
+            // gone the list is empty, and a choice kept from it would show as a bare org unit
+            // number the user can neither see in the list nor change.
+            ...(field === 'forestFileId' &&
+            String(value).trim() === '' &&
+            current.crossingSiteTypeCode === SITE_TYPE.RECREATION
+              ? { orgUnitNo: '' }
+              : {}),
           },
           // Which box was touched decides which notation is recomputed — legacy's `longLatUpdate`
           // and `utmUpdate` flags, set the same way from the changed field's name.
@@ -213,7 +260,21 @@ const AddSitePage: FC = () => {
    */
   const settledErrors = fieldErrors(site, 'settled');
   const conflicts = crossFieldErrors(site);
-  const errors: SiteErrors = {
+
+  /**
+   * The pair was looked up and names no road — the server's own refusal, known before Save.
+   *
+   * <p>Live, like the Site # clash: it is the answer to a question already asked, not a gap the
+   * user has yet to fill. Not for a recreation site, whose file names a project rather than a road.
+   */
+  const noRoad =
+    site.crossingSiteTypeCode !== SITE_TYPE.RECREATION &&
+    site.forestFileId.trim() !== '' &&
+    site.roadSectionId.trim() !== '' &&
+    road.isError &&
+    !road.isFetching;
+
+  const merged: SiteErrors = {
     ...fieldErrors(site, 'typing'),
     ...errorsForSettledFields(settledErrors, settled, (key) => String(site[key] ?? '')),
     ...(submitted ? settledErrors : {}),
@@ -229,6 +290,29 @@ const AddSitePage: FC = () => {
     // decides whether the site stores.
     ...created.fieldErrors,
   };
+
+  /**
+   * Where the road decides the district, a complaint about the district is shown on Project File
+   * ID# — the box the user can change to fix it.
+   *
+   * <p>Forest District is then a read-only value with nowhere to put a message, and a Save refused
+   * over an error nobody can see is a button that does nothing. Two causes, and the more useful
+   * sentence wins: no road at all, or a road with no district (a null `FOREST_REGION`). Neither
+   * overrides a complaint Project File ID# already has of its own, such as being blank.
+   */
+  const districtIsDerived = isDistrictFromRoad(site.crossingSiteTypeCode, Boolean(road.data));
+  const { orgUnitNo: districtError, ...rest } = merged;
+  const errors: SiteErrors =
+    districtIsDerived && (noRoad || districtError !== undefined)
+      ? {
+          ...rest,
+          forestFileId:
+            merged.forestFileId ??
+            (noRoad
+              ? 'No road matches this Project File ID# and Br.'
+              : 'This road has no Forest District on record.'),
+        }
+      : merged;
 
   /**
    * The amber tier, which never waits for Save.
@@ -253,6 +337,7 @@ const AddSitePage: FC = () => {
     setSubmitted(true);
     if (
       siteNumberTaken ||
+      noRoad ||
       Object.keys(settledErrors).length > 0 ||
       Object.keys(crossFieldErrors(site)).length > 0
     ) {
@@ -266,7 +351,7 @@ const AddSitePage: FC = () => {
         navigate(`/inventory/site/${stored.siteId}`);
       },
     });
-  }, [created, navigate, settledErrors, site, siteNumberTaken]);
+  }, [created, navigate, noRoad, settledErrors, site, siteNumberTaken]);
 
   /**
    * Anything typed, picked or ticked.
@@ -387,7 +472,7 @@ const AddSitePage: FC = () => {
             isRecreationSite ? recreationProject.isFetching : road.isFetching
           }
           roadResolved={Boolean(road.data)}
-          hiddenFields={NOT_SET_ON_CREATE}
+          isEditable={isEditableOnCreate}
         />
       </Column>
 

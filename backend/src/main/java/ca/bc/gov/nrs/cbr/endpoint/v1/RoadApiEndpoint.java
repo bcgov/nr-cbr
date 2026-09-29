@@ -1,10 +1,10 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionResponse;
-import java.util.List;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,15 +29,19 @@ public interface RoadApiEndpoint {
    * <p>Gated on {@link CbrAuthorities#READ} — legacy's {@code /showRoadSearch}, which sits at the
    * GENERAL floor with the rest of the {@code /show*} privileges.
    *
-   * <p>Always 200, with however many roads matched and at most two hundred of them. An empty list
-   * is an answer: legacy's dialog prints "No roads found." rather than treating it as a failure.
+   * <p>Always 200, with one page of the roads that matched and the true total. An empty page is an
+   * answer: legacy's dialog prints "No roads found." rather than treating it as a failure.
    *
-   * <p><b>No paging.</b> This fills a dialog the user picks one row from and closes, not a table
-   * they work through — legacy caps at the same two hundred and says so on screen when it fills.
+   * <p><b>Server-side paging, as Site Search and Inspection Search have.</b> Legacy caps the dialog
+   * at two hundred roads and says so on screen when it fills; paging instead puts every match in
+   * reach and lets the dialog say how many there are.
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/search")
-  ResponseEntity<List<RoadSearchResult>> searchRoads(@ModelAttribute RoadSearchCriteria criteria);
+  ResponseEntity<PagedResponse<RoadSearchResult>> searchRoads(
+      @ModelAttribute RoadSearchCriteria criteria,
+      @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
+      @RequestParam(name = "pageSize", defaultValue = "15") int pageSize);
 
   /**
    * The road section named by a Project File ID# and a Br.
@@ -49,9 +53,11 @@ public interface RoadApiEndpoint {
    * text — a path segment would have to be encoded and decoded correctly by every caller for a
    * value that may contain a slash.
    *
-   * <p>404 when the view holds no such section, which is the ordinary answer while the user is
+   * <p>404 when the view holds no such section, or the section has no road segment — legacy calls
+   * that pair invalid, and the save refuses it. Either is the ordinary answer while the user is
    * still typing either half — and the only answer in an environment provisioned from nr-mof-db,
-   * where the materialized view is stubbed. The caller shows nothing rather than reporting it.
+   * where the materialized view is stubbed. Add Site reports it on Project File ID# once both
+   * halves are in, as legacy does, rather than as an error of the request.
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping

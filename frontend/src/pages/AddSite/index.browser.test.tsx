@@ -136,7 +136,13 @@ beforeEach(() => {
   clientApi.searchClients.mockReset();
   clientApi.searchClients.mockResolvedValue([]);
   roadApi.searchRoads.mockReset();
-  roadApi.searchRoads.mockResolvedValue([]);
+  roadApi.searchRoads.mockResolvedValue({
+    content: [],
+    totalElements: 0,
+    totalPages: 0,
+    pageNumber: 0,
+    pageSize: 15,
+  });
   siteApi.getSite.mockReset();
   // No site with this number yet, which is what the uniqueness check asks. A 404 is the "free"
   // answer, so the hook reads a rejection rather than a value.
@@ -190,19 +196,17 @@ describe('AddSitePage — the form', () => {
     expect(isReadOnlyCell('Forest District')).toBe(true);
   });
 
-  it('leaves out the three fields legacy will not let anyone set here', async () => {
-    // Designated Maintainer is disabled for Level 1 and above and readonly below it, and the
-    // lookup that would fill it — `showClientSearch()` at site.jsp:529 — is called from nowhere.
-    // User Kilometres is disabled at 863, BCTS BA Responsible at 901 even for Level 2. On a site
-    // that does not exist yet they could only ever be blank.
+  it('shows the fields LRMOPS fills in, read-only, and offers no way to set them', async () => {
+    // Designated Maintainer, User Kilometres and BCTS BA Responsible are locked on every branch of
+    // site.jsp and filled in from LRMOPS by UPDATE_CROSSING_SITE_FROM_LRM. Worth seeing while the
+    // site is created, never typed into.
     await renderPage();
 
-    expect(screen.queryByTestId('site-form-maintainer')).not.toBeInTheDocument();
+    expect(isReadOnlyCell('Designated Maintainer')).toBe(true);
+    expect(isReadOnlyCell('User Kilometres')).toBe(true);
+    expect(isReadOnlyCell('BCTS BA Responsible')).toBe(true);
     expect(screen.queryByTestId('site-form-userKm')).not.toBeInTheDocument();
     expect(screen.queryByTestId('site-form-businessAreaOrgUnitNo')).not.toBeInTheDocument();
-    // Nor as read-only cells: an empty labelled cell invites a hunt for the control that fills it.
-    expect(isReadOnlyCell('User Kilometres')).toBe(false);
-    expect(isReadOnlyCell('BCTS BA Responsible')).toBe(false);
   });
 
   it('keeps the legacy labels, which is the vocabulary the business uses', async () => {
@@ -543,6 +547,83 @@ describe('AddSitePage — the site type', () => {
     expect(screen.queryByTestId('site-form-orgUnitNo')).not.toBeInTheDocument();
   });
 
+  it('takes the district away again when Project File ID# is cleared', async () => {
+    // Legacy only ever writes the district, so clearing the file left the old road's district in a
+    // field nobody can edit. Here it follows the road both ways — the road name goes with it.
+    await renderPage();
+    type('crossingSiteTypeCode', 'CRS');
+    type('forestFileId', 'R00123');
+    type('roadSectionId', '01');
+    expect(await screen.findByText('DPG - Prince George')).toBeInTheDocument();
+    expect(screen.getByText('Bowron FSR')).toBeInTheDocument();
+
+    type('forestFileId', '');
+
+    await waitFor(() => {
+      expect(screen.queryByText('DPG - Prince George')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText('Bowron FSR')).not.toBeInTheDocument();
+  });
+
+  it('takes the district away when the pair is changed to one that names no road', async () => {
+    roadApi.getRoadSection.mockImplementation((file: string, section: string) =>
+      file === 'R00123' && section === '01'
+        ? Promise.resolve({
+            forestFileId: 'R00123',
+            roadSectionId: '01',
+            forestServiceRoad: 'Bowron FSR',
+            orgUnitNo: 18,
+          })
+        : Promise.reject(new Error('No road section was found.')),
+    );
+    await renderPage();
+    type('crossingSiteTypeCode', 'CRS');
+    type('forestFileId', 'R00123');
+    type('roadSectionId', '01');
+    expect(await screen.findByText('DPG - Prince George')).toBeInTheDocument();
+
+    type('roadSectionId', '99');
+
+    await waitFor(() => {
+      expect(screen.queryByText('DPG - Prince George')).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not keep the previous road's district for a road with no region", async () => {
+    roadApi.getRoadSection.mockImplementation((file: string) =>
+      Promise.resolve({
+        forestFileId: file,
+        roadSectionId: '01',
+        forestServiceRoad: file === 'R00123' ? 'Bowron FSR' : 'Deadman Spur',
+        orgUnitNo: file === 'R00123' ? 18 : null,
+      }),
+    );
+    await renderPage();
+    type('crossingSiteTypeCode', 'CRS');
+    type('forestFileId', 'R00123');
+    type('roadSectionId', '01');
+    expect(await screen.findByText('DPG - Prince George')).toBeInTheDocument();
+
+    type('forestFileId', 'R00999');
+
+    expect(await screen.findByText('Deadman Spur')).toBeInTheDocument();
+    expect(screen.queryByText('DPG - Prince George')).not.toBeInTheDocument();
+  });
+
+  it("keeps a storage site's own district when it never had a road", async () => {
+    // The road takes back only what it gave.
+    roadApi.getRoadSection.mockRejectedValue(new Error('No road section was found.'));
+    await renderPage();
+    type('crossingSiteTypeCode', 'STRG');
+    type('orgUnitNo', '18');
+    type('forestFileId', 'R00123');
+    type('forestFileId', '');
+
+    await waitFor(() => {
+      expect(field('orgUnitNo')).toHaveValue('18');
+    });
+  });
+
   it('lets a storage site choose its own district while it has no road', async () => {
     // A storage site may never have a road, so legacy gives the choice back rather than leaving
     // the field permanently empty.
@@ -566,6 +647,28 @@ describe('AddSitePage — the site type', () => {
     await waitFor(() => {
       expect(api.getRecreationDistricts).toHaveBeenCalledWith('R00123');
     });
+  });
+
+  it("drops a recreation site's district when its project file is cleared", async () => {
+    // The list comes from the file. With the file gone the choice cannot be seen or changed, and it
+    // would still be saved — so the saved request is what this reads, not the select, which shows
+    // blank for a value it has no option for either way.
+    api.getRecreationDistricts.mockResolvedValue([
+      { orgUnitNo: '77', orgUnitCode: 'RDCK', orgUnitName: 'Cariboo Recreation' },
+    ]);
+    await renderPage();
+    await fillRequired();
+    type('crossingSiteTypeCode', 'REC');
+    type('forestFileId', 'REC123');
+    await screen.findByText(/Cariboo Recreation/);
+    type('orgUnitNo', '77');
+
+    type('forestFileId', '');
+    type('forestFileId', 'REC999');
+    save();
+
+    await waitFor(() => expect(siteApi.createSite).toHaveBeenCalledTimes(1));
+    expect(siteApi.createSite.mock.calls[0][0].orgUnitNo).toBeNull();
   });
 
   it('calls it a Recreation District for a recreation site, on the same column', async () => {
@@ -599,16 +702,22 @@ describe('AddSitePage — the site type', () => {
   });
 
   it('takes both halves of the pair from the road that was picked', async () => {
-    roadApi.searchRoads.mockResolvedValue([
-      {
-        forestServiceRoad: 'Bowron FSR',
-        forestFileId: 'R00123',
-        roadSectionId: '01',
-        tenureType: 'B40',
-        clientName: null,
-        clientNumber: null,
-      },
-    ]);
+    roadApi.searchRoads.mockResolvedValue({
+      content: [
+        {
+          forestServiceRoad: 'Bowron FSR',
+          forestFileId: 'R00123',
+          roadSectionId: '01',
+          tenureType: 'B40',
+          clientName: null,
+          clientNumber: null,
+        },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+      pageNumber: 0,
+      pageSize: 15,
+    });
     await renderPage();
     fireEvent.click(screen.getByTestId('site-form-find-road'));
     fireEvent.click(await screen.findByTestId('road-search-submit'));
@@ -672,6 +781,82 @@ describe('AddSitePage — the site type', () => {
     save();
 
     expect(screen.queryByText('Forest District is required.')).not.toBeInTheDocument();
+  });
+
+  it('says on Project File ID# when the pair names no road, and does not save', async () => {
+    // Case 3.14. Forest District is a read-only value for a crossing, so its "required" had nowhere
+    // to show and Save appeared to do nothing. The box that can fix it carries the message.
+    roadApi.getRoadSection.mockImplementation((file: string, section: string) =>
+      file === 'R00123' && section === '01'
+        ? Promise.resolve({
+            forestFileId: 'R00123',
+            roadSectionId: '01',
+            forestServiceRoad: 'Bowron FSR',
+            orgUnitNo: 18,
+          })
+        : Promise.reject(new Error('No road section was found.')),
+    );
+    await renderPage();
+    await fillRequired();
+
+    type('forestFileId', 'tess');
+    type('roadSectionId', '0');
+
+    expect(
+      await screen.findByText('No road matches this Project File ID# and Br.'),
+    ).toBeInTheDocument();
+    save();
+    expect(siteApi.createSite).not.toHaveBeenCalled();
+    expect(screen.queryByText('Forest District is required.')).not.toBeInTheDocument();
+  });
+
+  it('drops the message once the pair names a road again', async () => {
+    roadApi.getRoadSection.mockImplementation((file: string) =>
+      file === 'R00123'
+        ? Promise.resolve({
+            forestFileId: 'R00123',
+            roadSectionId: '01',
+            forestServiceRoad: 'Bowron FSR',
+            orgUnitNo: 18,
+          })
+        : Promise.reject(new Error('No road section was found.')),
+    );
+    await renderPage();
+    type('crossingSiteTypeCode', 'CRS');
+    type('forestFileId', 'tess');
+    type('roadSectionId', '01');
+    await screen.findByText('No road matches this Project File ID# and Br.');
+
+    type('forestFileId', 'R00123');
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('No road matches this Project File ID# and Br.'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('says on Project File ID# when the road it names has no district', async () => {
+    // A null FOREST_REGION: the road exists, so there is no "no road" to report, but the district
+    // it would supply is empty and the save needs one.
+    roadApi.getRoadSection.mockResolvedValue({
+      forestFileId: 'R00123',
+      roadSectionId: '01',
+      forestServiceRoad: 'Bowron FSR',
+      orgUnitNo: null,
+    });
+    await renderPage();
+    type('crossingSiteTypeCode', 'CRS');
+    type('forestFileId', 'R00123');
+    type('roadSectionId', '01');
+    await screen.findByText('Bowron FSR');
+
+    save();
+
+    expect(
+      await screen.findByText('This road has no Forest District on record.'),
+    ).toBeInTheDocument();
+    expect(siteApi.createSite).not.toHaveBeenCalled();
   });
 });
 

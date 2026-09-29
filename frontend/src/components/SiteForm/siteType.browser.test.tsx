@@ -51,3 +51,19 @@ describe('SiteForm — Management Area', () => {
     expect(screen.queryByText('Management Area')).not.toBeInTheDocument();
   });
 });
+
+describe('SiteForm — road search button', () => {
+  it('is on the form for a crossing', () => {
+    renderForm(SITE_TYPE.CROSSING);
+
+    expect(screen.getByTestId('site-form-find-road')).toBeInTheDocument();
+  });
+
+  it('is absent on a recreation site, as it is on the legacy form', () => {
+    // `site.jsp:657` wraps the icon in `<c:if test="${... != 'REC'}">`: a recreation site's file
+    // id names a recreation project, not a road, so there is no road to look up.
+    renderForm(SITE_TYPE.RECREATION);
+
+    expect(screen.queryByTestId('site-form-find-road')).not.toBeInTheDocument();
+  });
+});

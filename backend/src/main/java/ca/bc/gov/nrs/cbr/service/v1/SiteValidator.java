@@ -8,6 +8,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteCreateRequest;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -212,16 +213,23 @@ public class SiteValidator {
   }
 
   /**
-   * The coordinates, as the notation bounds them.
+   * The coordinates, as legacy bounds them — on the <b>degrees</b>, not on the whole value.
    *
-   * <p>Only the bounds legacy treats as errors. Its provincial-range checks — longitude 114 to 140,
-   * latitude 48 to 60, and the three UTM ranges — are warnings in {@code Site.validate} and do not
-   * refuse the save, so a crossing a kilometre over the Alberta border stores here as it does there.
+   * <p>Only the bounds legacy treats as errors, and only as it states them: latitude degrees 0 to
+   * 90 and longitude degrees 0 to 180 ({@code SiteForm.validate}, {@code Site.validateLatitudeDMS}
+   * and {@code validateLongitudeDMS}). Minutes and seconds out of range are warnings there, and
+   * nothing adds the three parts up — so 90° 25′ 42.2″ passes as 90 degrees and is stored as
+   * 90.428389. Checking the combined value refused sites legacy stores; the degrees are the whole
+   * part of the decimal, so this is legacy's rule read back off what the form sends.
+   *
+   * <p>Its provincial-range checks — longitude 114 to 140, latitude 48 to 60, and the three UTM
+   * ranges — are warnings in {@code Site.validate} and do not refuse the save, so a crossing a
+   * kilometre over the Alberta border stores here as it does there.
    */
   private void checkCoordinates(SiteCreateRequest request, Map<String, String> errors) {
     BigDecimal longitude = request.longitude();
-    if (longitude != null && longitude.abs().compareTo(BigDecimal.valueOf(180)) > 0) {
-      errors.put("longitude", "Longitude must be between -180 and 180 degrees.");
+    if (longitude != null && degrees(longitude) > 180) {
+      errors.put("longitude", "Longitude degrees must be between 0 and 180.");
     } else if (longitude != null && longitude.signum() > 0) {
       // Not a silent negation: a positive longitude is a real place, and guessing that the caller
       // meant its mirror image would store a site on the wrong side of the world without saying so.
@@ -231,9 +239,14 @@ public class SiteValidator {
     }
 
     BigDecimal latitude = request.latitude();
-    if (latitude != null && latitude.abs().compareTo(BigDecimal.valueOf(90)) > 0) {
-      errors.put("latitude", "Latitude must be between -90 and 90 degrees.");
+    if (latitude != null && degrees(latitude) > 90) {
+      errors.put("latitude", "Latitude degrees must be between 0 and 90.");
     }
+  }
+
+  /** The degrees box a decimal coordinate came from: its whole part, without the sign. */
+  private static long degrees(BigDecimal coordinate) {
+    return coordinate.abs().setScale(0, RoundingMode.DOWN).longValueExact();
   }
 
   /** Every code must be one the matching table still carries. */

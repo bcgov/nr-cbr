@@ -13,7 +13,6 @@ import {
   TableRow,
   TextInput,
 } from '@carbon/react';
-import { useMutation } from '@tanstack/react-query';
 import { useCallback, useState, type FC, type KeyboardEvent } from 'react';
 
 import ClientCombo from '@/components/core/ClientCombo';
@@ -22,7 +21,7 @@ import { Modal } from '@/components/Modal';
 import type { RoadSearchCriteria, RoadSearchResult } from '@/services/road.service';
 import type { ClientSuggestion } from '@/types/client';
 
-import API from '@/services/APIs';
+import { useRoadSearch } from '@/hooks/useRoadSearch';
 import { EMPTY_ROAD_CRITERIA } from '@/services/road.service';
 import { apiErrorMessage } from '@/utils/apiError';
 import { clientLabel } from '@/utils/clientSearch';
@@ -38,7 +37,7 @@ import './index.scss';
  */
 const ROADS_PER_PAGE = 15;
 
-/** The server caps at two hundred, so nothing above that is worth offering. */
+/** The server bounds a page at two hundred rows, so nothing above that is worth offering. */
 const ROAD_PAGE_SIZES = [15, 50, 100];
 
 type Props = {
@@ -62,6 +61,10 @@ type Props = {
  * <p><b>Searched on demand, not as the user types.</b> The criteria are six partial matches over a
  * view of every road section in the province; a keystroke-driven search would run the widest
  * possible query most often. Legacy has a Search button for the same reason, and this keeps it.
+ *
+ * <p><b>Paged on the server</b>, as Site Search and Inspection Search are. Legacy stops at two
+ * hundred roads and says "Search returned 200 or more records, 200 shown"; asking for one page at a
+ * time puts every match within reach and lets the dialog give the true count.
  */
 const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
   const [criteria, setCriteria] = useState<RoadSearchCriteria>(EMPTY_ROAD_CRITERIA);
@@ -70,13 +73,13 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
   /** One-based, as Carbon's Pagination counts. */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(ROADS_PER_PAGE);
+  /**
+   * The criteria as last submitted, kept apart from the form's live state so that typing does not
+   * search — see `useRoadSearch`. `null` until the first press of Search.
+   */
+  const [submitted, setSubmitted] = useState<RoadSearchCriteria | null>(null);
 
-  // A mutation rather than a query: this runs when the user presses Search, not when a key
-  // changes. A query keyed on the criteria would re-run on every keystroke, which is the
-  // behaviour the Search button exists to avoid.
-  const results = useMutation({
-    mutationFn: (asked: RoadSearchCriteria) => API.road.searchRoads(asked),
-  });
+  const results = useRoadSearch(submitted, page - 1, pageSize);
 
   const update = useCallback(
     (field: keyof RoadSearchCriteria, value: string) =>
@@ -119,10 +122,8 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
     />
   );
 
-  const rows = results.data ?? [];
-  // Sliced here rather than asked for a page at a time: the server already capped the answer at
-  // two hundred, so every row is in hand and a round trip per page would be fetching what we have.
-  const visible = rows.slice((page - 1) * pageSize, page * pageSize);
+  const rows = results.data?.content ?? [];
+  const total = results.data?.totalElements ?? 0;
 
   return (
     <Modal
@@ -140,7 +141,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
           event.preventDefault();
           // Back to the first page: page 7 of the previous answer is an empty table in this one.
           setPage(1);
-          results.mutate(criteria);
+          setSubmitted(criteria);
         }}
       >
         <div className="road-search__criteria">
@@ -186,7 +187,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
               type="submit"
               renderIcon={SearchIcon}
               data-testid="road-search-submit"
-              disabled={results.isPending}
+              disabled={results.isFetching}
             >
               Search
             </Button>
@@ -205,7 +206,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
         />
       )}
 
-      {results.isPending && results.isIdle === false && (
+      {submitted !== null && results.isPending && (
         <DataTableSkeleton
           role="progressbar"
           aria-label="Searching"
@@ -219,14 +220,9 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
 
       {results.isSuccess && (
         <TableContainer
-          // Legacy says "Search returned 200 or more records, 200 shown" when the cap fills. The
-          // cap is the server's, so a full page is indistinguishable from exactly two hundred
-          // matches — which is what that wording admits.
-          title={
-            rows.length === 200
-              ? '200 or more roads found — showing the first 200'
-              : `${rows.length} road${rows.length === 1 ? '' : 's'} found`
-          }
+          // The true total, which the server counts for every search. Legacy could only say
+          // "200 or more records" here, because its cap stopped it counting.
+          title={`${total} road${total === 1 ? '' : 's'} found`}
           className="bordered-table"
           data-testid="road-search-results"
         >
@@ -247,7 +243,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
                   <TableCell colSpan={6}>No roads found.</TableCell>
                 </TableRow>
               ) : (
-                visible.map((road) => (
+                rows.map((road) => (
                   /* The whole row picks the road, because the whole row is what the user is
                      reading — scanning the tenure type or the client and then having to travel
                      back to the first cell to act on it is work the dialog can spare them.
@@ -296,7 +292,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
             page={page}
             pageSize={pageSize}
             pageSizes={ROAD_PAGE_SIZES}
-            totalItems={rows.length}
+            totalItems={total}
             onChange={({ page: nextPage, pageSize: nextPageSize }) => {
               setPage(nextPage);
               setPageSize(nextPageSize);

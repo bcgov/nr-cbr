@@ -9,6 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSectionRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSegmentRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
 import java.util.List;
@@ -20,6 +22,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,8 +39,14 @@ class RoadSectionServiceFallbackTest {
   private static final RoadSearchResult BOWRON =
       new RoadSearchResult("Bowron FSR", "R00123", "01", "B40", null, null);
 
+  private static final PageImpl<RoadSearchResult> ONE_ROAD =
+      new PageImpl<>(List.of(BOWRON), PageRequest.of(0, 15), 1);
+
   @Mock
   private CbrRoadSectionRepository roadSections;
+
+  @Mock
+  private CbrRoadSegmentRepository roadSegments;
 
   @InjectMocks
   private RoadSectionService service;
@@ -53,7 +63,7 @@ class RoadSectionServiceFallbackTest {
     when(roadSections.searchWithoutClient(
             nullable(String.class), nullable(String.class), nullable(String.class),
             nullable(String.class), any(Pageable.class)))
-        .thenReturn(List.of(BOWRON));
+        .thenReturn(ONE_ROAD);
   }
 
   @Test
@@ -62,7 +72,11 @@ class RoadSectionServiceFallbackTest {
     givenTheGrantIsMissing();
     givenTheFallbackAnswers();
 
-    assertThat(service.search(RoadSearchCriteria.builder().build())).containsExactly(BOWRON);
+    PagedResponse<RoadSearchResult> answer =
+        service.search(RoadSearchCriteria.builder().build(), 0, 15);
+
+    assertThat(answer.content()).containsExactly(BOWRON);
+    assertThat(answer.totalElements()).isEqualTo(1);
   }
 
   @Test
@@ -71,8 +85,8 @@ class RoadSectionServiceFallbackTest {
     givenTheGrantIsMissing();
     givenTheFallbackAnswers();
 
-    service.search(RoadSearchCriteria.builder().build());
-    service.search(RoadSearchCriteria.builder().forestFileId("R00123").build());
+    service.search(RoadSearchCriteria.builder().build(), 0, 15);
+    service.search(RoadSearchCriteria.builder().forestFileId("R00123").build(), 0, 15);
 
     verify(roadSections, times(1)).search(
         nullable(String.class), nullable(String.class), nullable(String.class),
@@ -90,10 +104,10 @@ class RoadSectionServiceFallbackTest {
             nullable(String.class), nullable(String.class), nullable(String.class),
             nullable(String.class), nullable(String.class), nullable(String.class),
             any(Pageable.class)))
-        .thenReturn(List.of(BOWRON));
+        .thenReturn(ONE_ROAD);
 
-    service.search(RoadSearchCriteria.builder().build());
-    service.search(RoadSearchCriteria.builder().build());
+    service.search(RoadSearchCriteria.builder().build(), 0, 15);
+    service.search(RoadSearchCriteria.builder().build(), 0, 15);
 
     verify(roadSections, never()).searchWithoutClient(
         nullable(String.class), nullable(String.class), nullable(String.class),
@@ -109,7 +123,7 @@ class RoadSectionServiceFallbackTest {
     // this package and would be entirely reasonable to add back.
     assertThat(
             AnnotatedElementUtils.findMergedAnnotation(
-                RoadSectionService.class.getMethod("search", RoadSearchCriteria.class),
+                RoadSectionService.class.getMethod("search", RoadSearchCriteria.class, int.class, int.class),
                 Transactional.class))
         .isNull();
   }

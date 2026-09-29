@@ -47,6 +47,14 @@ $label-block-size: 1rem;
   min-block-size: $label-block-size;
 }
 
+// A read-only cell's label in the colour of the input labels beside it. The component's own is the
+// secondary grey nr-frep uses for a page of values; on a form that mixes values and inputs in one
+// row, that grey reads as a label for something disabled. Two classes, so it outranks the
+// component's one whatever order the stylesheets load in.
+.site-form__fields .read-only-field__label {
+  color: var(--#{vars.$bcgov-prefix}-text-primary);
+}
+
 .site-form__fields {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -88,23 +96,32 @@ $label-block-size: 1rem;
   // offset of its own: it lines up because it is built the same way, not because a number was
   // chosen to match.
   // The button has no label of its own, so it has to be told where the labelled boxes beside it
-  // put theirs. Aligned to the bottom of the row rather than offset from the top: the boxes are the
-  // tallest thing in it and the button is exactly an input tall, so their bottoms meeting puts
-  // their tops together too — and it stays true whatever a label does above.
+  // put theirs: pushed down by one label's height, from the top of the row.
   //
-  // An empty label used to stand in for the offset. Carbon wraps an icon-only button in a tooltip
-  // element that sits three pixels below where the box model says it should, so that version was
-  // out by three pixels the whole time — invisible because the test measuring it ran without
-  // Carbon's stylesheet. Measured now: see layout.browser.test.tsx.
+  // It was aligned to the bottom of the row instead — the boxes being the tallest thing in it and
+  // the button exactly an input tall. That held until a box carried an error: the message under it
+  // makes the row a line taller, and the button followed the bottom edge down past the boxes.
+  //
+  // The label-height offset had been tried before and was three pixels out: Carbon wraps an
+  // icon-only button in an inline tooltip element that sits on the text baseline. Making that
+  // wrapper a flex box removes the baseline. Measured, with and without errors: see
+  // layout.browser.test.tsx.
   > .site-form__find-road {
     display: flex;
     flex: 0 0 auto;
-    align-items: flex-end;
-    align-self: stretch;
+    align-items: flex-start;
+    align-self: flex-start;
+    // A label's height above the boxes: Carbon's `label-01` line plus the margin under it.
+    padding-block-start: calc(#{$spacing-03} + 1rem);
     // The row's gap, plus the inset Carbon leaves inside a text input's wrapper, comes to twice
     // the gap between the two fields — so the button reads as adrift of the pair it belongs to.
     // Pulled back by one gap. Measured, not guessed: see layout.browser.test.tsx.
     margin-inline-start: -$spacing-03;
+
+    // Carbon's tooltip wrapper is inline, and sits on the text baseline three pixels low.
+    > * {
+      display: flex;
+    }
   }
 
   // Read-only, the pair is two short strings rather than two inputs, and the widths above are the
@@ -130,7 +147,15 @@ $label-block-size: 1rem;
 // and `align-self` stops the cell stretching the checkbox to the row's full height.
 .site-form__checkbox {
   align-self: start;
+}
 
+// The box centred in a band the height of an input, as a read-only value is. Top-aligned, a 16px
+// box beside a 40px input sat level with the input's top edge and read as a line above the row.
+// Prefixed with the grid to outrank Carbon's `.cds--form-item`, which loads after this stylesheet.
+.site-form__fields .site-form__checkbox .#{vars.$bcgov-prefix}--checkbox-wrapper {
+  flex-direction: row;
+  align-items: center;
+  min-block-size: 2.5rem;
 }
 
 // Undoes the two pixels Carbon takes off a checkbox that follows a label.

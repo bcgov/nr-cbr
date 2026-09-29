@@ -57,6 +57,17 @@ export const SITE_TYPE = {
   STORAGE: 'STRG',
 } as const;
 
+/**
+ * True when the road settles the district and the user may not change it.
+ *
+ * <p>Never for a recreation site, which chooses from a list the file narrows. Otherwise whenever
+ * the road resolves — and for everything except a storage site, even when it does not: legacy
+ * leaves a crossing's district disabled and blank until a road is given, because a crossing
+ * without a road has no district to record.
+ */
+export const isDistrictFromRoad = (siteTypeCode: string, roadResolved: boolean): boolean =>
+  siteTypeCode !== SITE_TYPE.RECREATION && (roadResolved || siteTypeCode !== SITE_TYPE.STORAGE);
+
 /** Inspection statuses. Only two exist, and every cross-field rule is about which one applies. */
 export const INSPECTION_STATUS = {
   INSPECT: 'INS',

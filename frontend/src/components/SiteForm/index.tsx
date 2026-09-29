@@ -5,7 +5,7 @@ import FieldWithCounter from '@/components/core/FieldWithCounter';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
 import { requiredLabel } from '@/utils/requiredLabel';
 
-import { SITE_TEXT_LIMITS, SITE_TYPE, type SiteFormValues } from './types';
+import { isDistrictFromRoad, SITE_TEXT_LIMITS, SITE_TYPE, type SiteFormValues } from './types';
 
 import './siteForm.scss';
 
@@ -98,16 +98,6 @@ type Props = {
    */
   roadResolved?: boolean;
   /**
-   * Fields to leave off the form entirely.
-   *
-   * <p>For the three legacy locks on every branch of `site.jsp` — Designated Maintainer, User
-   * Kilometres and BCTS BA Responsible. None of them can be set from this screen in legacy either,
-   * so on a site that does not exist yet they can only ever be blank, and a read-only cell showing
-   * nothing is a question the user cannot answer. Site Detail keeps them: there the site is stored
-   * and the values are worth reading.
-   */
-  hiddenFields?: ReadonlySet<keyof SiteFormValues>;
-  /**
    * Opens the road lookup. Omitted where there is nothing to look up — a read-only page — so the
    * control is absent rather than present and inert.
    */
@@ -121,9 +111,6 @@ type Props = {
  * leaves a button that silently does nothing.
  */
 export const FORM_ID = 'site-form';
-
-/** Shared so the default prop is one object rather than a new Set on every render. */
-const EMPTY_HIDDEN: ReadonlySet<keyof SiteFormValues> = new Set();
 
 /**
  * `122° 30′ 15.5″`, for a coordinate the user may read but not change.
@@ -184,7 +171,6 @@ const SiteForm: FC<Props> = ({
   forestServiceRoad = '',
   forestServiceRoadLoading = false,
   roadResolved = false,
-  hiddenFields = EMPTY_HIDDEN,
   onFindRoad,
 }) => {
   const isRecreation = values.crossingSiteTypeCode === SITE_TYPE.RECREATION;
@@ -197,16 +183,8 @@ const SiteForm: FC<Props> = ({
   /** All nine coordinate boxes move together, so one of them settles the layout for all of them. */
   const coordinatesAreValues = !isEditable('longitudeDegrees');
 
-  /**
-   * True when the road has settled the district and the user may not change it.
-   *
-   * <p>Never for a recreation site, which chooses from a list the file narrows. Otherwise whenever
-   * the road resolves — and for everything except a storage site, even when it does not: legacy
-   * leaves a crossing's district disabled and blank until a road is given, because a crossing
-   * without a road has no district to record.
-   */
-  const districtIsDerived =
-    !isRecreation && (roadResolved || values.crossingSiteTypeCode !== SITE_TYPE.STORAGE);
+  /** See `isDistrictFromRoad`. */
+  const districtIsDerived = isDistrictFromRoad(values.crossingSiteTypeCode, roadResolved);
 
   /**
    * The district as it should read.
@@ -460,8 +438,10 @@ const SiteForm: FC<Props> = ({
           {text('roadSectionId', 'Br.', 30, { required: !isRecreation })}
           {/* The magnifying glass legacy puts beside these two boxes, opening its road search.
               Offered only while they can be changed — on a read-only page there is nothing for a
-              chosen road to be written into. */}
-          {onFindRoad && isEditable('forestFileId') && (
+              chosen road to be written into. Not for a recreation site either: `site.jsp:657`
+              wraps the icon in `crossingSiteTypeCode != 'REC'`, since its file id names a
+              recreation project rather than a road. */}
+          {onFindRoad && !isRecreation && isEditable('forestFileId') && (
             <div className="site-form__find-road">
               <Button
                 kind="ghost"
@@ -508,12 +488,9 @@ const SiteForm: FC<Props> = ({
 
         {/* Read, never chosen. Legacy disables the client number and location code for every role
             and never calls the lookup that would fill them (`site.jsp:734-740`, `778-784`;
-            `showClientSearch()` at 529 is dead), so no screen sets a maintainer. Add Site leaves
-            the field out altogether — a site being created has none — and Site Detail shows what is
-            stored. There is no third state, which is why there is no editable branch here. */}
-        {hiddenFields.has('clientNumber') ? null : (
-          <ReadOnlyField label="Designated Maintainer" value={values.maintainerLabel} />
-        )}
+            `showClientSearch()` at 529 is dead). The value arrives from LRMOPS, through
+            `UPDATE_CROSSING_SITE_FROM_LRM`, so there is no editable branch here. */}
+        <ReadOnlyField label="Designated Maintainer" value={values.maintainerLabel} />
 
         {/* Absent on a recreation site, as it is on legacy's form — the whole row sits inside
             `<c:if test="${SiteForm.crossingSiteTypeCode != 'REC'}">`. A management area is a former
@@ -551,14 +528,12 @@ const SiteForm: FC<Props> = ({
           emptyText={forestServiceRoadLoading ? 'Looking up\u2026' : '\u2014'}
         />
 
-        {hiddenFields.has('businessAreaOrgUnitNo')
-          ? null
-          : orgUnitSelect(
-              'businessAreaOrgUnitNo',
-              'BCTS BA Responsible',
-              'No business area',
-              codeTables.businessAreas,
-            )}
+        {orgUnitSelect(
+          'businessAreaOrgUnitNo',
+          'BCTS BA Responsible',
+          'No business area',
+          codeTables.businessAreas,
+        )}
 
         {codeSelect(
           'specialAccessRqmtCode',
@@ -581,7 +556,7 @@ const SiteForm: FC<Props> = ({
             would refuse, which is why `KILOMETRE` in validation.ts is the narrower rule. */}
         <div className="site-form__narrow-group">
           {text('pointOfCommencementDistance', 'Kilometres', 10, { required: !isStorage })}
-          {hiddenFields.has('userKm') ? null : text('userKm', 'User Kilometres', 10)}
+          {text('userKm', 'User Kilometres', 10)}
           {/* Disabled, as it is in every branch of the legacy form — including for a Level 2 user.
               Capital Road is set by the road data, not on this screen. */}
           {/* Never editable on this screen, in legacy or here — it is set from the road record. In a
@@ -602,7 +577,6 @@ const SiteForm: FC<Props> = ({
                 labelText="Capital Road"
                 checked={values.capitalRoad}
                 disabled
-                helperText="Set from the road record"
                 onChange={(_event, { checked }) => onChange('capitalRoad', checked)}
               />
             </div>

@@ -278,7 +278,7 @@ describe('SiteDetailPage — editing', () => {
 
   it('keeps the fields no role may change as values, even while editing', async () => {
     // Each is disabled in every branch of the legacy form, including the Level 2 one: the site
-    // number is the key, the maintainer comes from the lookup, Capital Road from the road record.
+    // number is the key, and the rest are written from LRMOPS by UPDATE_CROSSING_SITE_FROM_LRM.
     await renderPage({ canEdit: true, canDelete: true });
 
     edit();
@@ -286,6 +286,8 @@ describe('SiteDetailPage — editing', () => {
     expect(isReadOnlyCell('Site #')).toBe(true);
     expect(isReadOnlyCell('Designated Maintainer')).toBe(true);
     expect(isReadOnlyCell('User Kilometres')).toBe(true);
+    expect(isReadOnlyCell('BCTS BA Responsible')).toBe(true);
+    expect(screen.queryByTestId('site-form-businessAreaOrgUnitNo')).not.toBeInTheDocument();
     expect(isReadOnlyCell('Capital Road')).toBe(true);
   });
 

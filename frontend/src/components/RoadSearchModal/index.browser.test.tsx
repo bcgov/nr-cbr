@@ -17,12 +17,21 @@ const bowron = {
   clientNumber: '00001012',
 };
 
-/** A page and a half of roads, so paging has something to page. */
-const manyRoads = (count: number) =>
+/** One page as the server answers it: these rows, out of `total` matches. */
+const paged = <T,>(content: T[], total = content.length, pageNumber = 0, pageSize = 15) => ({
+  content,
+  totalElements: total,
+  totalPages: Math.ceil(total / pageSize),
+  pageNumber,
+  pageSize,
+});
+
+/** Roads numbered from `from`, as one page of a larger answer would hold them. */
+const roadsFrom = (from: number, count: number) =>
   Array.from({ length: count }, (_, index) => ({
     ...bowron,
-    forestFileId: `R${String(index).padStart(5, '0')}`,
-    forestServiceRoad: `Road ${index}`,
+    forestFileId: `R${String(from + index).padStart(5, '0')}`,
+    forestServiceRoad: `Road ${from + index}`,
   }));
 
 const onSelect = vi.fn();
@@ -45,7 +54,7 @@ beforeEach(() => {
   onSelect.mockReset();
   onClose.mockReset();
   roadApi.searchRoads.mockReset();
-  roadApi.searchRoads.mockResolvedValue([bowron]);
+  roadApi.searchRoads.mockResolvedValue(paged([bowron]));
   clientApi.searchClients.mockReset();
   clientApi.searchClients.mockResolvedValue([]);
 });
@@ -97,6 +106,8 @@ describe('RoadSearchModal', () => {
     await waitFor(() => {
       expect(roadApi.searchRoads).toHaveBeenCalledWith(
         expect.objectContaining({ clientNumber: '00001012', clientName: '' }),
+        0,
+        15,
       );
     });
   });
@@ -114,6 +125,8 @@ describe('RoadSearchModal', () => {
     await waitFor(() => {
       expect(roadApi.searchRoads).toHaveBeenCalledWith(
         expect.objectContaining({ clientName: 'canfor', clientNumber: '' }),
+        0,
+        15,
       );
     });
   });
@@ -146,6 +159,8 @@ describe('RoadSearchModal', () => {
     await waitFor(() => {
       expect(roadApi.searchRoads).toHaveBeenCalledWith(
         expect.objectContaining({ forestServiceRoad: 'bowron', tenureType: 'B40' }),
+        0,
+        15,
       );
     });
   });
@@ -207,7 +222,7 @@ describe('RoadSearchModal', () => {
   });
 
   it('falls back to the pair when a road has no name to click on', async () => {
-    roadApi.searchRoads.mockResolvedValue([{ ...bowron, forestServiceRoad: null }]);
+    roadApi.searchRoads.mockResolvedValue(paged([{ ...bowron, forestServiceRoad: null }]));
     renderModal();
 
     search();
@@ -216,7 +231,7 @@ describe('RoadSearchModal', () => {
   });
 
   it('says so plainly when nothing matched', async () => {
-    roadApi.searchRoads.mockResolvedValue([]);
+    roadApi.searchRoads.mockResolvedValue(paged([]));
     renderModal();
 
     search();
@@ -224,22 +239,22 @@ describe('RoadSearchModal', () => {
     expect(await screen.findByText('No roads found.')).toBeInTheDocument();
   });
 
-  it('shows fifteen roads at a time', async () => {
+  it('asks the server for fifteen roads at a time', async () => {
     // A list the user has to scroll past the Search button to read is harder to scan than a short
     // one they can step through — and scanning for one road is the whole task here.
-    roadApi.searchRoads.mockResolvedValue(manyRoads(40));
+    roadApi.searchRoads.mockResolvedValue(paged(roadsFrom(0, 15), 40));
     renderModal();
 
     search();
 
     expect(await screen.findByTestId('road-search-results')).toBeInTheDocument();
+    expect(roadApi.searchRoads).toHaveBeenCalledWith(expect.anything(), 0, 15);
     expect(screen.getByText('Road 0')).toBeInTheDocument();
     expect(screen.getByText('Road 14')).toBeInTheDocument();
-    expect(screen.queryByText('Road 15')).not.toBeInTheDocument();
   });
 
   it('counts every match, not the page on screen', async () => {
-    roadApi.searchRoads.mockResolvedValue(manyRoads(40));
+    roadApi.searchRoads.mockResolvedValue(paged(roadsFrom(0, 15), 40));
     renderModal();
 
     search();
@@ -247,36 +262,53 @@ describe('RoadSearchModal', () => {
     expect(await screen.findByText('40 roads found')).toBeInTheDocument();
   });
 
-  it('goes back to the first page when a new search is run', async () => {
-    // Page three of the previous answer is an empty table in this one.
-    roadApi.searchRoads.mockResolvedValue(manyRoads(40));
+  it('asks the server for the next page rather than slicing one it already has', async () => {
+    roadApi.searchRoads.mockImplementation((_criteria, pageNumber: number) =>
+      Promise.resolve(paged(roadsFrom(pageNumber * 15, 15), 40, pageNumber)),
+    );
     renderModal();
     search();
-    await screen.findByTestId('road-search-results');
-    fireEvent.click(screen.getByLabelText('Next page'));
-    expect(screen.getByText('Road 15')).toBeInTheDocument();
+    await screen.findByText('Road 0');
 
+    fireEvent.click(screen.getByLabelText('Next page'));
+
+    expect(await screen.findByText('Road 15')).toBeInTheDocument();
+    expect(roadApi.searchRoads).toHaveBeenLastCalledWith(expect.anything(), 1, 15);
+  });
+
+  it('goes back to the first page when a new search is run', async () => {
+    // Page three of the previous answer is an empty table in this one.
+    roadApi.searchRoads.mockImplementation((_criteria, pageNumber: number) =>
+      Promise.resolve(paged(roadsFrom(pageNumber * 15, 15), 40, pageNumber)),
+    );
+    renderModal();
+    search();
+    await screen.findByText('Road 0');
+    fireEvent.click(screen.getByLabelText('Next page'));
+    await screen.findByText('Road 15');
+
+    criterion('forestServiceRoad', 'road');
     search();
 
     await waitFor(() => {
-      expect(screen.getByText('Road 0')).toBeInTheDocument();
+      expect(roadApi.searchRoads).toHaveBeenLastCalledWith(
+        expect.objectContaining({ forestServiceRoad: 'road' }),
+        0,
+        15,
+      );
     });
+    expect(await screen.findByText('Road 0')).toBeInTheDocument();
   });
 
-  it('admits that a full page may be more than it shows', async () => {
-    // The cap is the server's, so two hundred rows is indistinguishable from exactly two hundred
-    // matches — which is what legacy's own wording admits.
-    roadApi.searchRoads.mockResolvedValue(
-      Array.from({ length: 200 }, (_, index) => ({
-        ...bowron,
-        forestFileId: `R${String(index).padStart(5, '0')}`,
-      })),
-    );
+  it('reaches past the two hundred roads legacy stopped at', async () => {
+    // Legacy caps at 200 and can only say "200 or more". Paged on the server, the count is the
+    // true one and the last page is as reachable as the first.
+    roadApi.searchRoads.mockResolvedValue(paged(roadsFrom(0, 15), 205));
     renderModal();
 
     search();
 
-    expect(await screen.findByText(/200 or more roads found/)).toBeInTheDocument();
+    expect(await screen.findByText('205 roads found')).toBeInTheDocument();
   });
 
   it('reports a failed search rather than showing an empty table', async () => {

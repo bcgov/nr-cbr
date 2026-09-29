@@ -2,7 +2,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
-import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -37,13 +37,18 @@ public interface CbrRoadSectionRepository
    * <h2>One query with null-guarded parameters, unlike the client lookup</h2>
    * Six optional criteria is sixty-four shapes, and a method for each is not a plan. Legacy builds
    * the predicate as a string for the same reason. The cost is one plan that knows none of them
-   * specifically; the cap below is what keeps that affordable, and the dialog is a lookup rather
-   * than a report — nobody waits on it with a page of results open.
+   * specifically; paging is what keeps that affordable.
    *
-   * @param limit legacy's is {@code ROWNUM <= 200}, and its dialog says "200 or more records"
-   *              when it fills
+   * <h2>Paged, with a count of its own</h2>
+   * Legacy caps the dialog at {@code ROWNUM <= 200}; CBR pages it instead, as Site Search and
+   * Inspection Search do, so nothing past the two-hundredth road is out of reach and the total is
+   * the true one. The count cannot be derived: the select is a {@code DISTINCT} over six columns,
+   * and Oracle has no multi-column {@code COUNT(DISTINCT …)}. It counts the same distinct rows from
+   * a derived table instead — the only way to be sure it agrees with the rows it pages over.
+   *
+   * @param page the page asked for; its size is bounded by the service
    */
-  @Query("""
+  @Query(value = """
       SELECT DISTINCT new ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult(
                road.roadSectName,
                road.forestFileId,
@@ -63,16 +68,36 @@ public interface CbrRoadSectionRepository
          AND (:clientName IS NULL OR UPPER(client.clientName) LIKE :clientName)
          AND (:clientNumber IS NULL OR UPPER(client.clientNumber) LIKE :clientNumber)
        ORDER BY road.roadSectName, road.forestFileId, road.roadSectionId
+      """,
+      countQuery = """
+      SELECT COUNT(*)
+        FROM (SELECT DISTINCT road.roadSectName AS roadSectName,
+                     road.forestFileId AS forestFileId,
+                     road.roadSectionId AS roadSectionId,
+                     road.fileTypeCode AS fileTypeCode,
+                     client.clientName AS clientName,
+                     client.clientNumber AS clientNumber
+                FROM CbrRoadSectionEntity road
+                LEFT JOIN ForestFileClientEntity fileClient
+                  ON fileClient.forestFileId = road.forestFileId
+                LEFT JOIN ClientPublicEntity client
+                  ON client.clientNumber = fileClient.clientNumber
+               WHERE (:forestServiceRoad IS NULL OR UPPER(road.roadSectName) LIKE :forestServiceRoad)
+                 AND (:forestFileId IS NULL OR UPPER(road.forestFileId) LIKE :forestFileId)
+                 AND (:roadSectionId IS NULL OR UPPER(road.roadSectionId) LIKE :roadSectionId)
+                 AND (:tenureType IS NULL OR UPPER(road.fileTypeCode) LIKE :tenureType)
+                 AND (:clientName IS NULL OR UPPER(client.clientName) LIKE :clientName)
+                 AND (:clientNumber IS NULL OR UPPER(client.clientNumber) LIKE :clientNumber)
+             ) matched
       """)
-
-  List<RoadSearchResult> search(
+  Page<RoadSearchResult> search(
       @Param("forestServiceRoad") String forestServiceRoad,
       @Param("forestFileId") String forestFileId,
       @Param("roadSectionId") String roadSectionId,
       @Param("tenureType") String tenureType,
       @Param("clientName") String clientName,
       @Param("clientNumber") String clientNumber,
-      Pageable limit);
+      Pageable page);
 
   /**
    * The same search with the tenure holder left out.
@@ -82,7 +107,7 @@ public interface CbrRoadSectionRepository
    * the two columns they supply, so a road still finds itself by name, file, section or tenure
    * type; only the client is unknown.
    */
-  @Query("""
+  @Query(value = """
       SELECT new ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult(
                road.roadSectName,
                road.forestFileId,
@@ -96,11 +121,19 @@ public interface CbrRoadSectionRepository
          AND (:roadSectionId IS NULL OR UPPER(road.roadSectionId) LIKE :roadSectionId)
          AND (:tenureType IS NULL OR UPPER(road.fileTypeCode) LIKE :tenureType)
        ORDER BY road.roadSectName, road.forestFileId, road.roadSectionId
+      """,
+      countQuery = """
+      SELECT COUNT(road)
+        FROM CbrRoadSectionEntity road
+       WHERE (:forestServiceRoad IS NULL OR UPPER(road.roadSectName) LIKE :forestServiceRoad)
+         AND (:forestFileId IS NULL OR UPPER(road.forestFileId) LIKE :forestFileId)
+         AND (:roadSectionId IS NULL OR UPPER(road.roadSectionId) LIKE :roadSectionId)
+         AND (:tenureType IS NULL OR UPPER(road.fileTypeCode) LIKE :tenureType)
       """)
-  List<RoadSearchResult> searchWithoutClient(
+  Page<RoadSearchResult> searchWithoutClient(
       @Param("forestServiceRoad") String forestServiceRoad,
       @Param("forestFileId") String forestFileId,
       @Param("roadSectionId") String roadSectionId,
       @Param("tenureType") String tenureType,
-      Pageable limit);
+      Pageable page);
 }

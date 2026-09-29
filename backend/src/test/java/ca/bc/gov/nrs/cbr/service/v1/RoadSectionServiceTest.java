@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ca.bc.gov.nrs.cbr.exception.RoadSectionNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSegmentEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestFileClientEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
 import jakarta.persistence.EntityManager;
@@ -40,6 +42,7 @@ class RoadSectionServiceTest {
 
   @BeforeEach
   void clear() {
+    entityManager.createQuery("DELETE FROM CbrRoadSegmentEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CbrRoadSectionEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM ForestFileClientEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM ClientPublicEntity").executeUpdate();
@@ -49,7 +52,17 @@ class RoadSectionServiceTest {
     givenRoadSection(forestFileId, roadSectionId, name, "B40");
   }
 
+  /** A section with one segment — a road a site can be put on. */
   private void givenRoadSection(
+      String forestFileId, String roadSectionId, String name, String tenureType) {
+    givenSectionWithoutSegment(forestFileId, roadSectionId, name, tenureType);
+    entityManager.persist(CbrRoadSegmentEntity.builder()
+        .forestFileId(forestFileId).roadSectionId(roadSectionId).roadSegmentId(1L).build());
+    entityManager.flush();
+    entityManager.clear();
+  }
+
+  private void givenSectionWithoutSegment(
       String forestFileId, String roadSectionId, String name, String tenureType) {
     entityManager.persist(CbrRoadSectionEntity.builder()
         .forestFileId(forestFileId).roadSectionId(roadSectionId).roadSectName(name)
@@ -68,9 +81,14 @@ class RoadSectionServiceTest {
   }
 
   private List<RoadSearchResult> search(RoadSearchCriteria criteria) {
+    return page(criteria, 0, 200).content();
+  }
+
+  private PagedResponse<RoadSearchResult> page(
+      RoadSearchCriteria criteria, int pageNumber, int pageSize) {
     entityManager.flush();
     entityManager.clear();
-    return service.search(criteria);
+    return service.search(criteria, pageNumber, pageSize);
   }
 
   @Test
@@ -114,6 +132,20 @@ class RoadSectionServiceTest {
     // The ordinary case: the form asks on every keystroke, so most of what it asks about is a pair
     // half typed. It is also the only answer where the materialized view is stubbed.
     assertThatThrownBy(() -> service.find("R00123", "01"))
+        .isInstanceOf(RoadSectionNotFoundException.class)
+        .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("refuses a section with no road segment, as legacy and the save both do")
+  void refusesASectionWithNoSegment() {
+    // R08317 / I in TEST: the section view names it, the segment view has nothing for it. Legacy
+    // shows no road name and calls the pair invalid; the save refuses it for want of a segment.
+    // Answering with the name here showed a road the save would then turn down.
+    givenSectionWithoutSegment("R08317", "I", "AM 4", "B40");
+
+    assertThatThrownBy(() -> service.find("R08317", "I"))
         .isInstanceOf(RoadSectionNotFoundException.class)
         .extracting(error -> ((ResponseStatusException) error).getStatusCode())
         .isEqualTo(HttpStatus.NOT_FOUND);
@@ -221,6 +253,72 @@ class RoadSectionServiceTest {
   }
 
   @Nested
+  @DisplayName("paging")
+  class Paging {
+
+    @Test
+    @DisplayName("answers one page, in order, with the true total")
+    void answersOnePage() {
+      for (int i = 1; i <= 7; i++) {
+        givenRoadSection("R0010" + i, "01", "Road " + i);
+      }
+
+      PagedResponse<RoadSearchResult> second = page(RoadSearchCriteria.builder().build(), 1, 3);
+
+      assertThat(second.content())
+          .extracting(RoadSearchResult::forestServiceRoad)
+          .containsExactly("Road 4", "Road 5", "Road 6");
+      assertThat(second.totalElements()).isEqualTo(7);
+      assertThat(second.totalPages()).isEqualTo(3);
+      assertThat(second.pageNumber()).isEqualTo(1);
+      assertThat(second.pageSize()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("reaches past the two hundred legacy stopped at")
+    void hasNoCap() {
+      for (int i = 0; i < 205; i++) {
+        givenRoadSection(String.format("R%05d", i), "01", String.format("Road %03d", i));
+      }
+
+      PagedResponse<RoadSearchResult> last = page(RoadSearchCriteria.builder().build(), 13, 15);
+
+      assertThat(last.totalElements()).isEqualTo(205);
+      assertThat(last.content())
+          .extracting(RoadSearchResult::forestServiceRoad)
+          .containsExactly("Road 195", "Road 196", "Road 197", "Road 198", "Road 199",
+              "Road 200", "Road 201", "Road 202", "Road 203", "Road 204");
+    }
+
+    @Test
+    @DisplayName("counts the rows it shows, not the rows the joins produced")
+    void countsDistinctRows() {
+      // One client holding the same file twice — a second FOREST_FILE_CLIENT row, say under
+      // another client type — is one row after DISTINCT. A count taken before it would promise a
+      // row the pages never show.
+      givenRoadSection("R00123", "01", "Bowron FSR");
+      givenFileHeldBy(1L, "R00123", "00001012", "CANFOR CORPORATION");
+      entityManager.persist(ForestFileClientEntity.builder()
+          .forestFileClientSkey(2L).forestFileId("R00123").clientNumber("00001012").build());
+
+      PagedResponse<RoadSearchResult> answer = page(RoadSearchCriteria.builder().build(), 0, 15);
+
+      assertThat(answer.content()).hasSize(1);
+      assertThat(answer.totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("bounds a page at two hundred rows, and falls back to fifteen when none is asked")
+    void boundsThePageSize() {
+      givenRoadSection("R00123", "01", "Bowron FSR");
+
+      assertThat(page(RoadSearchCriteria.builder().build(), 0, 5000).pageSize()).isEqualTo(200);
+      assertThat(page(RoadSearchCriteria.builder().build(), 0, 0).pageSize()).isEqualTo(15);
+      assertThat(page(RoadSearchCriteria.builder().build(), -1, 15).pageNumber()).isZero();
+    }
+  }
+
+  @Nested
   @DisplayName("when the tenure holder cannot be read")
   class WithoutTheGrant {
 
@@ -235,8 +333,9 @@ class RoadSectionServiceTest {
       givenRoadSection("R00123", "01", "Bowron FSR", "B40");
       givenRoadSection("R00999", "02", "Deadman Spur", "B01");
 
-      List<RoadSearchResult> roads =
-          service.searchWithoutTenureHolder(RoadSearchCriteria.builder().tenureType("B40").build());
+      List<RoadSearchResult> roads = service
+          .searchWithoutTenureHolder(RoadSearchCriteria.builder().tenureType("B40").build(), 0, 15)
+          .content();
 
       assertThat(roads)
           .singleElement()
@@ -255,10 +354,26 @@ class RoadSectionServiceTest {
       // as "no such road" rather than "cannot search on that here".
       givenRoadSection("R00123", "01", "Bowron FSR");
 
-      List<RoadSearchResult> roads = service.searchWithoutTenureHolder(
-          RoadSearchCriteria.builder().clientName("canfor").build());
+      List<RoadSearchResult> roads = service
+          .searchWithoutTenureHolder(
+              RoadSearchCriteria.builder().clientName("canfor").build(), 0, 15)
+          .content();
 
       assertThat(roads).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("pages and counts the same way")
+    void pagesToo() {
+      for (int i = 1; i <= 4; i++) {
+        givenRoadSection("R0010" + i, "01", "Road " + i);
+      }
+
+      PagedResponse<RoadSearchResult> first =
+          service.searchWithoutTenureHolder(RoadSearchCriteria.builder().build(), 0, 3);
+
+      assertThat(first.content()).hasSize(3);
+      assertThat(first.totalElements()).isEqualTo(4);
     }
   }
 }
