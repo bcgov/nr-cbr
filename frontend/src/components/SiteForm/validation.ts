@@ -1,5 +1,6 @@
 import {
   INSPECTION_STATUS,
+  isDistrictFromRoad,
   SITE_STATUS,
   SITE_TEXT_LIMITS,
   SITE_TYPE,
@@ -415,4 +416,30 @@ export const savedSiteConflicts = (
   }
 
   return { errors: {}, warnings: {} };
+};
+
+/**
+ * Where the road decides the district, a complaint about the district is shown on Project File
+ * ID# — the box the user can change to fix it.
+ *
+ * <p>Forest District is then a read-only value with nowhere to put a message, and a Save refused
+ * over an error nobody can see is a button that does nothing. Two causes, and the more useful
+ * sentence wins: no road at all, or a road with no district (a null `FOREST_REGION`). Neither
+ * overrides a complaint Project File ID# already has of its own, such as being blank.
+ *
+ * @param road what `useSiteRoad` knows about the pair
+ */
+export const withRoadErrors = (
+  errors: SiteErrors,
+  siteTypeCode: string,
+  road: { roadResolved: boolean; noRoad: boolean },
+): SiteErrors => {
+  const { orgUnitNo: districtError, ...rest } = errors;
+  const fromRoad = isDistrictFromRoad(siteTypeCode, road.roadResolved);
+  if (!fromRoad || (!road.noRoad && districtError === undefined)) return errors;
+
+  const message = road.noRoad
+    ? 'No road matches this Project File ID# and Br.'
+    : 'This road has no Forest District on record.';
+  return { ...rest, forestFileId: errors.forestFileId ?? message };
 };

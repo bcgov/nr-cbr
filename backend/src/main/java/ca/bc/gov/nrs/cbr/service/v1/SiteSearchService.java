@@ -9,6 +9,7 @@ import ca.bc.gov.nrs.cbr.specification.v1.SiteSearchSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.function.Function;
@@ -17,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,14 +69,17 @@ public class SiteSearchService {
    * @param criteria   the caller's filters; every field optional
    * @param pageNumber zero-based
    * @param pageSize   rows per page, capped at {@value #MAX_PAGE_SIZE}
+   * @param sortBy     the results column the user sorted by, or null for legacy's order
+   * @param direction  which way, when {@code sortBy} is set
    */
   @Transactional(readOnly = true)
   public PagedResponse<SiteSearchResult> search(
-      SiteSearchCriteria criteria, int pageNumber, int pageSize) {
+      SiteSearchCriteria criteria, int pageNumber, int pageSize,
+      SiteSortColumn sortBy, Sort.Direction direction) {
     Pageable pageable = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
 
-    Page<CrossingSiteEntity> page =
-        crossingSiteRepository.findAll(SiteSearchSpecifications.matching(criteria), pageable);
+    Page<CrossingSiteEntity> page = crossingSiteRepository.findAll(
+        SiteSearchSpecifications.matching(criteria, sortBy, direction), pageable);
 
     log.debug("Site search matched {} site(s) (page {} of {}, criteriaEmpty={})",
         page.getTotalElements(), pageable.getPageNumber(), page.getTotalPages(), criteria.isEmpty());

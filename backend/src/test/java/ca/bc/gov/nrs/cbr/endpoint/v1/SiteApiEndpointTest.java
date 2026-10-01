@@ -4,13 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
@@ -30,6 +33,10 @@ class SiteApiEndpointTest {
 
   private static Method deleteSite() {
     return method("deleteSite");
+  }
+
+  private static Method updateSite() {
+    return method("updateSite");
   }
 
   private static Method method(String name) {
@@ -73,6 +80,26 @@ class SiteApiEndpointTest {
   }
 
   @Test
+  @DisplayName("an edit is PUT /api/v1/sites/{siteId}")
+  void updateIsMappedAsAPut() {
+    assertThat(updateSite().getAnnotation(PutMapping.class).value()).containsExactly("/{siteId}");
+  }
+
+  @Test
+  @DisplayName("an edit is gated on CONTENT_EDIT — legacy's /saveSite, Level 1 and up")
+  void updateRequiresContentEdit() {
+    // Level 1 may save; what it may change is narrowed in the service, not at the door.
+    assertThat(updateSite().getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.CONTENT_EDIT);
+  }
+
+  @Test
+  @DisplayName("an administrator cannot edit a site")
+  void administratorsCannotEdit() {
+    assertThat(updateSite().getAnnotation(PreAuthorize.class).value()).doesNotContain("CBR_ADMIN");
+  }
+
+  @Test
   @DisplayName("search is GET /api/v1/sites/search")
   void searchIsMappedUnderApiV1() {
     assertThat(searchSites().getAnnotation(GetMapping.class).value()).containsExactly("/search");
@@ -93,8 +120,12 @@ class SiteApiEndpointTest {
     // 17 criteria as positional parameters would have to be repeated identically in the interface,
     // the controller override and the service call, where transposing two same-typed neighbours
     // compiles and returns the wrong rows.
+    // The sort pair is not criteria — it orders the answer rather than narrowing it — so it travels
+    // beside the paging, as two typed parameters a bad value cannot slip through.
     assertThat(searchSites().getParameterTypes())
-        .containsExactly(SiteSearchCriteria.class, int.class, int.class);
+        .containsExactly(
+            SiteSearchCriteria.class, int.class, int.class,
+            SiteSortColumn.class, Sort.Direction.class);
   }
 
   @Test

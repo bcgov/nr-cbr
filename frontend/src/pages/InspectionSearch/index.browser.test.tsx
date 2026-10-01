@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -223,21 +223,13 @@ describe('InspectionSearchPage — criteria form', () => {
     expect(grid?.querySelectorAll('.cds--toggle')).toHaveLength(4);
   });
 
-  it('stacks the Sort By options rather than letting them wrap into each other', () => {
-    // Both labels wrap in half a two-column cell, and a wrapped horizontal radio puts its second
-    // line under the other option's button — four fragments where there are two choices.
+  it('offers no Sort By on the form — the results headers sort instead', () => {
+    // Legacy's radio picked one of two fixed orders. Its default is still the order a search
+    // answers with; every other order is a header click away.
     renderPage();
 
-    expect(document.querySelector('.cds--radio-button-group')).toHaveClass(
-      'cds--radio-button-group--vertical',
-    );
-  });
-
-  it('defaults Sort By to structure then date, as the legacy reset() does', () => {
-    renderPage();
-
-    expect(screen.getByTestId('inspection-search-sortBy-structure')).toBeChecked();
-    expect(screen.getByTestId('inspection-search-sortBy-project')).not.toBeChecked();
+    expect(screen.queryByText('Sort By')).not.toBeInTheDocument();
+    expect(document.querySelector('.cds--radio-button-group')).toBeNull();
   });
 });
 
@@ -343,6 +335,7 @@ describe('InspectionSearchPage — validation', () => {
       expect.objectContaining({ inspectionDateStart: '' }),
       0,
       20,
+      null,
     );
   });
 
@@ -390,6 +383,7 @@ describe('InspectionSearchPage — searching', () => {
       expect.objectContaining({ siteId: '12345' }),
       0,
       20,
+      null,
     );
   });
 
@@ -421,6 +415,7 @@ describe('InspectionSearchPage — searching', () => {
         expect.objectContaining({ siteId: '12345' }),
         1,
         20,
+        null,
       );
     });
   });
@@ -699,5 +694,82 @@ describe('InspectionSearchPage — deleting an offline inspection', () => {
     await screen.findByTestId('inspection-search-results');
 
     expect(screen.queryByTestId(`inspection-delete-${inspectionRow.id}`)).toBeNull();
+  });
+});
+
+describe('InspectionSearchPage — sorting by a header', () => {
+  // Carbon puts a sortable header's own props on the button inside it, so the test id is the button.
+  // Found rather than got: while a page loads the table is a skeleton, with no headers to click.
+  const sortBy = async (column: string) => {
+    fireEvent.click(await screen.findByTestId(`inspection-search-sort-${column}`));
+    await screen.findByTestId('inspection-search-results');
+  };
+
+  const searchSomething = async () => {
+    searchApi.searchInspections.mockResolvedValue(page([inspectionRow], 100));
+    renderPage();
+    type('siteId', '12345');
+    search();
+    await screen.findByTestId('inspection-search-results');
+  };
+
+  it('asks the server to sort every match, not the rows on screen', async () => {
+    await searchSomething();
+
+    await sortBy('INSPECTION_DATE');
+
+    await waitFor(() => {
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
+        column: 'INSPECTION_DATE',
+        direction: 'ASC',
+      });
+    });
+  });
+
+  it('turns descending on a second click and back to the default on a third', async () => {
+    await searchSomething();
+
+    await sortBy('STRUCTURE_NAME');
+    await sortBy('STRUCTURE_NAME');
+    await waitFor(() => {
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
+        column: 'STRUCTURE_NAME',
+        direction: 'DESC',
+      });
+    });
+
+    await sortBy('STRUCTURE_NAME');
+    await waitFor(() => {
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
+    });
+  });
+
+  it('goes back to page one when the order changes', async () => {
+    await searchSomething();
+    fireEvent.click(screen.getByLabelText('Next page'));
+    await waitFor(() => {
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 1, 20, null);
+    });
+
+    await sortBy('STATUS');
+
+    await waitFor(() => {
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
+        column: 'STATUS',
+        direction: 'ASC',
+      });
+    });
+  });
+
+  it('does not offer to sort the Actions column', async () => {
+    searchApi.searchInspections.mockResolvedValue(page([inspectionRow], 1));
+    renderPage(true);
+    search();
+    await screen.findByTestId('inspection-search-results');
+
+    const actions = screen
+      .getAllByRole('columnheader')
+      .find((cell) => cell.textContent === 'Actions') as HTMLElement;
+    expect(within(actions).queryByRole('button')).not.toBeInTheDocument();
   });
 });

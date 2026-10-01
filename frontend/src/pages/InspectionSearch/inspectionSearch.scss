@@ -172,13 +172,6 @@
   margin-block-end: $spacing-03;
 }
 
-.inspection-search__sort {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  align-self: start;
-}
-
 // Search / Clear get a row to themselves, right-aligned. `1 / -1` spans every column at any
 // breakpoint, so they never fill whichever column happened to be left over after the last field.
 .inspection-search__actions {

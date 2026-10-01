@@ -109,6 +109,41 @@ export const toCreateRequest = (site: SiteFormValues): SiteCreateRequest => ({
   pointOfAccessDescription: text(site.pointOfAccessDescription),
 });
 
+/**
+ * What `PUT /v1/sites/{siteId}` takes: the fields a user can type into on Site Detail.
+ *
+ * <p>No number — it is in the path and never changes — and none of the fields LRMOPS writes and no
+ * role sets here: the maintainer, User Kilometres, BCTS BA Responsible and Capital Road. The
+ * server keeps those as stored; leaving them out means no client can send them.
+ */
+export type SiteUpdateRequest = Omit<
+  SiteCreateRequest,
+  'siteId' | 'userKm' | 'businessAreaOrgUnitNo' | 'clientNumber' | 'clientLocnCode' | 'capitalRoad'
+>;
+
+/** A site being edited, as the update endpoint takes it. */
+export const toUpdateRequest = (site: SiteFormValues): SiteUpdateRequest => {
+  const all = toCreateRequest(site);
+  return {
+    crossingName: all.crossingName,
+    pointOfCommencementDistance: all.pointOfCommencementDistance,
+    crossingSiteStatusCode: all.crossingSiteStatusCode,
+    structureInspectionStatusCode: all.structureInspectionStatusCode,
+    crossingSiteTypeCode: all.crossingSiteTypeCode,
+    specialAccessRqmtCode: all.specialAccessRqmtCode,
+    orgUnitNo: all.orgUnitNo,
+    managementOrgUnitNo: all.managementOrgUnitNo,
+    forestFileId: all.forestFileId,
+    roadSectionId: all.roadSectionId,
+    longitude: all.longitude,
+    latitude: all.latitude,
+    utmZone: all.utmZone,
+    utmEasting: all.utmEasting,
+    utmNorthing: all.utmNorthing,
+    pointOfAccessDescription: all.pointOfAccessDescription,
+  };
+};
+
 /** The fields the server can complain about that the form does not hold under the same name. */
 const SERVER_ONLY_FIELDS: Record<string, keyof SiteFormValues> = {
   clientLocnCode: 'clientLocationCode',

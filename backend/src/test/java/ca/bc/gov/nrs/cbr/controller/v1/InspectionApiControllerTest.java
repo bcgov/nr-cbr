@@ -8,8 +8,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -47,9 +49,9 @@ class InspectionApiControllerTest {
   void searchDelegates() {
     InspectionSearchCriteria criteria = InspectionSearchCriteria.builder().siteId("S").build();
 
-    controller.searchInspections(criteria, 2, 50);
+    controller.searchInspections(criteria, 2, 50, InspectionSortColumn.STATUS, Sort.Direction.DESC);
 
-    verify(searchService).search(criteria, 2, 50);
+    verify(searchService).search(criteria, 2, 50, InspectionSortColumn.STATUS, Sort.Direction.DESC);
     verifyNoInteractions(inspectionService);
   }
 }

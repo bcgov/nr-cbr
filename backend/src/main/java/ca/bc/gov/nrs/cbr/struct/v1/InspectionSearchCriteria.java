@@ -51,8 +51,7 @@ public record InspectionSearchCriteria(
     /** BCTS Business Area — a third, separate org-unit filter, not a child of the district. */
     String businessAreaOrgUnitNo,
     String inspectorName,
-    String inspectionReviewerId,
-    String sortBy
+    String inspectionReviewerId
 ) {
 
   /**
@@ -72,12 +71,6 @@ public record InspectionSearchCriteria(
 
   static final String INVALID_MONTH = "Enter a month as yyyy/mm, e.g. 2026/01";
 
-  /** Legacy {@code sortBy}: structure name ascending, then inspection date descending. */
-  public static final String STRUCTURE_ID_DATE_SORT = "structureIdDateSort";
-
-  /** Legacy {@code sortBy}: project file, road section, kilometre ascending, then date descending. */
-  public static final String PROJECT_BRANCH_KM_DATE_SORT = "projectBranchKmDateSort";
-
   /**
    * True when nothing is set that would narrow the search.
    *
@@ -86,10 +79,13 @@ public record InspectionSearchCriteria(
    * unpaginated, and it is not reproduced here or on Site Search. This survives as the one honest
    * way to say "the caller asked for everything" in a log line, which is worth being able to see.
    *
-   * <p>Two fields are deliberately not counted. {@link #sortBy} is not a criterion — it always has
-   * a value, and legacy does not count it either. {@link #findMovedStructures} is not one either: it
-   * changes what {@link #siteId} matches against rather than narrowing anything, so on its own it
-   * does nothing at all.
+   * <p>One field is deliberately not counted: {@link #findMovedStructures} changes what
+   * {@link #siteId} matches against rather than narrowing anything, so on its own it does
+   * nothing at all.
+   *
+   * <p>The order is not a criterion and is not here at all — it travels beside the paging, as
+   * {@link InspectionSortColumn}. Legacy's "Sort by" radio, the field that used to be here, is gone
+   * from the screen; the results headers sort instead.
    */
   public boolean isEmpty() {
     return isBlank(siteId)

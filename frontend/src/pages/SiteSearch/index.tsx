@@ -6,7 +6,12 @@ import PageTitle from '@/components/core/PageTitle';
 
 import SiteSearchCriteriaForm, { type CodeTables } from './SiteSearchCriteria';
 import SiteSearchResults from './SiteSearchResults';
-import { EMPTY_CRITERIA, type SiteSearchCriteria, type SiteSearchResult } from './types';
+import {
+  EMPTY_CRITERIA,
+  type SiteSearchCriteria,
+  type SiteSearchResult,
+  type SiteSort,
+} from './types';
 
 import './siteSearch.scss';
 
@@ -55,6 +60,8 @@ const SiteSearchPage: FC = () => {
   const [submitted, setSubmitted] = useState<SiteSearchCriteria | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  /** The header the results are sorted by. Kept across new searches; cleared by Reset. */
+  const [sort, setSort] = useState<SiteSort | null>(null);
   const [pendingDelete, setPendingDelete] = useState<SiteSearchResult | null>(null);
   /**
    * Incremented by {@link reset}, to remount the one control that cannot be cleared by emptying the
@@ -71,7 +78,7 @@ const SiteSearchPage: FC = () => {
    */
 
   // Carbon's Pagination is one-based; the backend, like Spring Data, is zero-based.
-  const results = useSiteSearch(submitted, page - 1, pageSize);
+  const results = useSiteSearch(submitted, page - 1, pageSize, sort);
   const deleteSite = useDeleteSite();
 
   const siteStatusCodes = useSiteStatusCodes();
@@ -135,6 +142,7 @@ const SiteSearchPage: FC = () => {
     setCriteria(EMPTY_CRITERIA);
     setSubmitted(null);
     setPage(1);
+    setSort(null);
     setResetToken((token) => token + 1);
   }, []);
 
@@ -211,6 +219,12 @@ const SiteSearchPage: FC = () => {
                 setPageSize(nextPageSize);
               }}
               onDelete={setPendingDelete}
+              sort={sort}
+              onSortChange={(next) => {
+                setSort(next);
+                // Back to page one: page 4 in one order is a different twenty sites in another.
+                setPage(1);
+              }}
             />
           )}
         </Column>

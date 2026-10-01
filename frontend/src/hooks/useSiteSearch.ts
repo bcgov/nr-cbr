@@ -1,6 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { PagedResponse, SiteSearchCriteria, SiteSearchResult } from '@/pages/SiteSearch/types';
+import type {
+  PagedResponse,
+  SiteSearchCriteria,
+  SiteSearchResult,
+  SiteSort,
+} from '@/pages/SiteSearch/types';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
@@ -37,15 +42,18 @@ export const useSite = (siteId: string | undefined) =>
  *
  * @param criteria   the criteria as submitted, or `null` before the first search
  * @param pageNumber zero-based, as the backend expects
+ * @param sort       the header the user sorted by, or `null` for legacy's order
  */
 export const useSiteSearch = (
   criteria: SiteSearchCriteria | null,
   pageNumber: number,
   pageSize: number,
+  sort: SiteSort | null = null,
 ): UseQueryResult<PagedResponse<SiteSearchResult>> =>
   useQuery({
-    queryKey: [SITE_SEARCH_QUERY_KEY, criteria, pageNumber, pageSize],
-    queryFn: () => API.siteSearch.searchSites(criteria as SiteSearchCriteria, pageNumber, pageSize),
+    queryKey: [SITE_SEARCH_QUERY_KEY, criteria, pageNumber, pageSize, sort],
+    queryFn: () =>
+      API.siteSearch.searchSites(criteria as SiteSearchCriteria, pageNumber, pageSize, sort),
     enabled: criteria !== null,
     // Keeps the current page on screen while the next one loads, instead of collapsing the table to
     // empty and back. Without it, paging through results flashes "No sites found." between pages —

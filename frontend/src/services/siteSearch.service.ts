@@ -1,9 +1,15 @@
-import type { SiteCreateRequest } from '@/components/SiteForm/request';
+import type { SiteCreateRequest, SiteUpdateRequest } from '@/components/SiteForm/request';
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type { SiteDetailResponse } from '@/pages/SiteDetail/siteResponse';
-import type { PagedResponse, SiteSearchCriteria, SiteSearchResult } from '@/pages/SiteSearch/types';
+import type {
+  PagedResponse,
+  SiteSearchCriteria,
+  SiteSearchResult,
+  SiteSort,
+} from '@/pages/SiteSearch/types';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
+import { sortParams } from '@/utils/headerSort';
 
 /** What `POST /v1/sites` answers with: the number the site was stored under, upper-cased. */
 export type SiteCreatedResponse = { siteId: string };
@@ -31,11 +37,18 @@ export class SiteSearchService extends HttpClient {
     criteria: SiteSearchCriteria,
     pageNumber: number,
     pageSize: number,
+    sort: SiteSort | null = null,
   ): CancelablePromise<PagedResponse<SiteSearchResult>> {
     return this.doRequest<PagedResponse<SiteSearchResult>>(this.config, {
       method: 'GET',
       url: '/v1/sites/search',
-      query: { ...populated(criteria), pageNumber, pageSize },
+      query: {
+        ...populated(criteria),
+        pageNumber,
+        pageSize,
+        // Only when a header was clicked; absent, the server answers in legacy's order.
+        ...sortParams(sort),
+      },
     });
   }
 
@@ -70,6 +83,22 @@ export class SiteSearchService extends HttpClient {
     return this.doRequest<SiteCreatedResponse>(this.config, {
       method: 'POST',
       url: '/v1/sites',
+      body: site,
+    });
+  }
+
+  /**
+   * Saves an edit to a site.
+   *
+   * <p>204 on success, with nothing to read: the caller re-reads the site, because the road's name
+   * and the maintainer come from other tables. 400 carries a message per field, as the create does.
+   * A Level 1 caller's save changes Site Details alone, whatever else is sent — the server decides.
+   */
+  updateSite(siteId: string, site: SiteUpdateRequest): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/sites/{siteId}',
+      path: { siteId },
       body: site,
     });
   }

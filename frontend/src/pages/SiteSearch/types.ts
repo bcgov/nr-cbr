@@ -1,3 +1,5 @@
+import type { HeaderSort } from '@/utils/headerSort';
+
 /**
  * Site Search criteria and results.
  *
@@ -71,6 +73,24 @@ export type SiteSearchResult = {
   /** The decoded status — what the pill reads. */
   crossingSiteStatusDescription: string;
 };
+
+/**
+ * The results columns a user can sort by, one per header, by the server's names for them.
+ *
+ * <p>New in CBR — legacy's results table has fixed headers and one fixed order, which is still what
+ * a search answers with until a header is clicked.
+ */
+export type SiteSortColumn =
+  | 'SITE_ID'
+  | 'DISTRICT'
+  | 'FOREST_SERVICE_ROAD'
+  | 'KILOMETRES'
+  | 'CROSSING_NAME'
+  | 'PROJECT_FILE'
+  | 'STATUS';
+
+/** A header the user sorted by, and which way. `null` where used means legacy's order. */
+export type SiteSort = HeaderSort<SiteSortColumn>;
 
 export const EMPTY_CRITERIA: SiteSearchCriteria = {
   siteId: '',

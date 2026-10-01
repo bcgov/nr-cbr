@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
-import UnderConstructionTag from '@/components/core/Tags/UnderConstructionTag';
 import RoadSearchModal from '@/components/RoadSearchModal';
 import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
 
@@ -13,6 +12,7 @@ import { toFormValues } from './siteResponse';
 import type { FC } from 'react';
 
 import { syncCoordinates } from '@/components/SiteForm/coordinateSync';
+import { toUpdateRequest } from '@/components/SiteForm/request';
 import { EMPTY_SITE, SITE_TYPE, type SiteFormValues } from '@/components/SiteForm/types';
 import {
   crossFieldErrors,
@@ -20,6 +20,7 @@ import {
   fieldErrors,
   fieldWarnings,
   savedSiteConflicts,
+  withRoadErrors,
   type SiteErrors,
 } from '@/components/SiteForm/validation';
 import { useAuthorization } from '@/hooks/useAuthorization';
@@ -35,8 +36,10 @@ import {
   useStructureInspectionStatusCodes,
 } from '@/hooks/useConfiguration';
 import { useSettledFields } from '@/hooks/useSettledFields';
+import { useSiteRoad } from '@/hooks/useSiteRoad';
 import { useSite } from '@/hooks/useSiteSearch';
 import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt';
+import { useUpdateSite } from '@/hooks/useUpdateSite';
 import { apiErrorMessage } from '@/utils/apiError';
 import { errorsForSettledFields } from '@/utils/validation';
 
@@ -65,6 +68,12 @@ const NEVER_EDITABLE = new Set<keyof SiteFormValues>([
   'businessAreaOrgUnitNo',
   'capitalRoad',
 ]);
+
+/** The one message a Level 1 save can be refused over. */
+const onlySiteDetails = (errors: SiteErrors): SiteErrors =>
+  errors.pointOfAccessDescription === undefined
+    ? {}
+    : { pointOfAccessDescription: errors.pointOfAccessDescription };
 
 /**
  * Site detail — what the Site # in the search results opens.
@@ -114,6 +123,9 @@ const SiteDetailPage: FC = () => {
   // the file, not from the whole province.
   const recreationDistricts = useRecreationDistricts(site.forestFileId);
   const referenceData = useSiteReferenceDataState();
+  // The road the pair names. It writes the district only while editing: reading a stored site
+  // must not change it. See `useSiteRoad`.
+  const road = useSiteRoad(site, setSite, mode === 'edit');
 
   const codeTables = useMemo<SiteCodeTables>(
     () => ({
@@ -161,6 +173,15 @@ const SiteDetailPage: FC = () => {
   /** Whether this user may change anything at all — what decides if Edit is offered. */
   const canEditSomething = canEdit || canDelete;
 
+  /**
+   * Level 1: may save, but changes Site Details alone — every other control on `site.jsp` sits in
+   * an `isLevel2` branch. Checked on that field alone too, here and on the server: the rest of the
+   * site is not theirs to change, so it is not theirs to be refused over.
+   */
+  const siteDetailsOnly = canEdit && !canDelete;
+
+  const updated = useUpdateSite(siteId);
+
   /** Whether the road lookup is open. */
   const [findingRoad, setFindingRoad] = useState(false);
 
@@ -194,6 +215,14 @@ const SiteDetailPage: FC = () => {
             (field === 'crossingSiteTypeCode' && value === SITE_TYPE.RECREATION)
               ? { managementOrgUnitNo: '' }
               : {}),
+            // A recreation district is chosen from the ones the project file names — the same
+            // rule as Add Site: with the file gone, a choice kept from its list can be neither
+            // seen nor changed.
+            ...(field === 'forestFileId' &&
+            String(value).trim() === '' &&
+            current.crossingSiteTypeCode === SITE_TYPE.RECREATION
+              ? { orgUnitNo: '' }
+              : {}),
           },
           // Which box was touched decides which notation is recomputed — legacy's `longLatUpdate`
           // and `utmUpdate` flags, set the same way from the changed field's name.
@@ -218,13 +247,31 @@ const SiteDetailPage: FC = () => {
   });
 
   const settledErrors = fieldErrors(site, 'settled');
-  const errors: SiteErrors = {
+  const merged: SiteErrors = {
     ...fieldErrors(site, 'typing'),
     ...errorsForSettledFields(settledErrors, settled, (key) => String(site[key] ?? '')),
     ...(submitted ? settledErrors : {}),
     // The two-field rules, live rather than held to Save — see `crossFieldErrors`.
     ...(mode === 'edit' ? { ...crossFieldErrors(site), ...stored.errors } : {}),
   };
+  const editErrors: SiteErrors = siteDetailsOnly
+    ? onlySiteDetails(merged)
+    : // As on Add Site: a district the road decides is reported on Project File ID#.
+      withRoadErrors(merged, site.crossingSiteTypeCode, road);
+  const errors: SiteErrors =
+    mode === 'edit'
+      ? // What the server refused, over what the form decided — see Add Site.
+        { ...editErrors, ...updated.fieldErrors }
+      : merged;
+
+  /*
+   * The road's name. Read from the stored record while viewing — it comes back with the site, and
+   * does not depend on the section still having a segment. While editing, from the live lookup,
+   * because the pair may have changed. A recreation site's Project Name is never stored, so it is
+   * always looked up.
+   */
+  const storedRoadName = mode === 'view' ? loaded.data?.forestServiceRoad : null;
+  const forestServiceRoad = storedRoadName || road.forestServiceRoad;
 
   // The amber tier. Never gated on Save — see the note on the same pair in Add Site — and shown
   // only while editing, because a read-only page is a record of what was decided rather than an
@@ -238,14 +285,39 @@ const SiteDetailPage: FC = () => {
   // one the user merely looked at would be nonsense.
   useUnsavedChangesPrompt(mode === 'edit');
 
+  /**
+   * Saves, once the form agrees the edit is storable, and returns to reading the site as stored.
+   *
+   * <p>The local check first, so an obviously incomplete form is answered without a round trip —
+   * the same rules the server applies, and for Level 1 the same single field. The server decides;
+   * anything it refuses lands beside the boxes through `updated.fieldErrors`.
+   */
   const save = useCallback(() => {
     setSubmitted(true);
-  }, []);
+    const settledNow = fieldErrors(site, 'settled');
+    const blocking = siteDetailsOnly
+      ? onlySiteDetails(settledNow)
+      : { ...settledNow, ...crossFieldErrors(site), ...stored.errors };
+    if (Object.keys(blocking).length > 0 || (!siteDetailsOnly && road.noRoad)) {
+      return;
+    }
+    updated.mutate(toUpdateRequest(site), {
+      // The site has been read again by now — the hook waits for it — so view mode shows what was
+      // stored, including anything the server kept or derived rather than took from the form.
+      onSuccess: () => {
+        setMode('view');
+        setSubmitted(false);
+      },
+    });
+  }, [road.noRoad, site, siteDetailsOnly, stored.errors, updated]);
+
+  const saveLabel = updated.isPending ? 'Saving…' : 'Save';
 
   const cancelEdit = useCallback(() => {
     setMode('view');
     setSubmitted(false);
-  }, []);
+    updated.reset();
+  }, [updated]);
 
   return (
     <Grid fullWidth className="default-grid">
@@ -318,9 +390,10 @@ const SiteDetailPage: FC = () => {
                   type="submit"
                   form={FORM_ID}
                   renderIcon={Save}
+                  disabled={updated.isPending}
                   data-testid="site-detail-save"
                 >
-                  Save
+                  {saveLabel}
                 </Button>,
               ]}
         </div>
@@ -352,21 +425,18 @@ const SiteDetailPage: FC = () => {
         </Column>
       )}
 
-      {/* Saving is still unbuilt, so the page says so while it is — but only to someone who could
-          otherwise have pressed Save. A reader has nothing to be warned about. */}
-      {canEditSomething && (
+      {/* A refusal with no field to hang on — a 500, a lost connection, an expired session. Field
+          refusals go beside their boxes instead, as every validation message does. */}
+      {mode === 'edit' && updated.isError && Object.keys(updated.fieldErrors).length === 0 && (
         <Column sm={4} md={8} lg={16}>
-          <div className="site-detail__notice">
-            <UnderConstructionTag type="page" />
-            <InlineNotification
-              kind="info"
-              lowContrast
-              hideCloseButton
-              title="Changes cannot be saved yet"
-              subtitle="The site reads from the server, but the endpoint behind Save has not been built."
-              data-testid="site-detail-placeholder"
-            />
-          </div>
+          <InlineNotification
+            kind="error"
+            lowContrast
+            hideCloseButton
+            title="This site could not be saved"
+            subtitle={apiErrorMessage(updated.error, 'The site could not be saved. Try again.')}
+            data-testid="site-detail-save-error"
+          />
         </Column>
       )}
 
@@ -388,6 +458,9 @@ const SiteDetailPage: FC = () => {
             onSettle={markSettled}
             onSave={save}
             onFindRoad={() => setFindingRoad(true)}
+            forestServiceRoad={forestServiceRoad}
+            forestServiceRoadLoading={road.forestServiceRoadLoading}
+            roadResolved={road.roadResolved}
           />
         )}
       </Column>

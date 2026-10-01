@@ -3,6 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import type {
   InspectionSearchCriteria,
   InspectionSearchResult,
+  InspectionSort,
   PagedResponse,
 } from '@/pages/InspectionSearch/types';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
@@ -30,14 +31,16 @@ export const useInspectionSearch = (
   criteria: InspectionSearchCriteria | null,
   pageNumber: number,
   pageSize: number,
+  sort: InspectionSort | null = null,
 ): UseQueryResult<PagedResponse<InspectionSearchResult>> =>
   useQuery({
-    queryKey: [INSPECTION_SEARCH_QUERY_KEY, criteria, pageNumber, pageSize],
+    queryKey: [INSPECTION_SEARCH_QUERY_KEY, criteria, pageNumber, pageSize, sort],
     queryFn: () =>
       API.inspectionSearch.searchInspections(
         criteria as InspectionSearchCriteria,
         pageNumber,
         pageSize,
+        sort,
       ),
     enabled: criteria !== null,
     // Keeps the current page on screen while the next one loads, instead of collapsing the table to

@@ -5,7 +5,9 @@ import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,8 +34,10 @@ public class InspectionApiController implements InspectionApiEndpoint {
 
   @Override
   public ResponseEntity<PagedResponse<InspectionSearchResult>> searchInspections(
-      InspectionSearchCriteria criteria, int pageNumber, int pageSize) {
-    return ResponseEntity.ok(inspectionSearchService.search(criteria, pageNumber, pageSize));
+      InspectionSearchCriteria criteria, int pageNumber, int pageSize,
+      InspectionSortColumn sortBy, Sort.Direction sortDirection) {
+    return ResponseEntity.ok(
+        inspectionSearchService.search(criteria, pageNumber, pageSize, sortBy, sortDirection));
   }
 
   @Override
