@@ -75,6 +75,38 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Superstructure types, by description. A Structure Search filter on the bridge record. */
+  getSuperstructureTypeCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/superstructure-type-codes',
+    });
+  }
+
+  /** Bridge curb types, by description. */
+  getStructureCurbTypeCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/structure-curb-type-codes',
+    });
+  }
+
+  /** Engineered culvert types, by description. A filter on the culvert record. */
+  getCulvertTypeCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/culvert-type-codes',
+    });
+  }
+
+  /** Special equipment requirements, by description. */
+  getSpecialEquipmentCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/special-equipment-codes',
+    });
+  }
+
   /** Inspection types, by description. Retired codes are included. */
   getInspectionTypeCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {

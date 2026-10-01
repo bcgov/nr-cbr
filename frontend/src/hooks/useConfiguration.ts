@@ -87,6 +87,30 @@ export const forestDistrictsQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const superstructureTypeCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'superstructure-type-codes'],
+  queryFn: () => API.configuration.getSuperstructureTypeCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const structureCurbTypeCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'structure-curb-type-codes'],
+  queryFn: () => API.configuration.getStructureCurbTypeCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const culvertTypeCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'culvert-type-codes'],
+  queryFn: () => API.configuration.getCulvertTypeCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const specialEquipmentCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'special-equipment-codes'],
+  queryFn: () => API.configuration.getSpecialEquipmentCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 /**
  * The parameterless lookups each search screen draws on.
  *
@@ -116,6 +140,18 @@ const INSPECTION_SEARCH_LOOKUPS = [
   inspectionReportStatusCodesQuery,
   forestDistrictsQuery,
   businessAreasQuery,
+] as const;
+
+const STRUCTURE_SEARCH_LOOKUPS = [
+  structureTypeClassCodesQuery,
+  superstructureTypeCodesQuery,
+  structureCurbTypeCodesQuery,
+  culvertTypeCodesQuery,
+  siteStatusCodesQuery,
+  siteTypeCodesQuery,
+  forestDistrictsQuery,
+  specialAccessCodesQuery,
+  specialEquipmentCodesQuery,
 ] as const;
 
 /**
@@ -160,6 +196,18 @@ export const useBusinessAreas = (): UseQueryResult<OrgUnitOption[]> => useQuery(
 
 export const useForestDistricts = (): UseQueryResult<OrgUnitOption[]> =>
   useQuery(forestDistrictsQuery);
+
+export const useSuperstructureTypeCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(superstructureTypeCodesQuery);
+
+export const useStructureCurbTypeCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(structureCurbTypeCodesQuery);
+
+export const useCulvertTypeCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(culvertTypeCodesQuery);
+
+export const useSpecialEquipmentCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(specialEquipmentCodesQuery);
 
 /**
  * The recreation districts for a project file — the Recreation District list on a recreation site.
@@ -231,6 +279,10 @@ export const useSiteReferenceDataState = (): ReferenceDataState =>
 export const useInspectionReferenceDataState = (): ReferenceDataState =>
   useQueries({ queries: INSPECTION_SEARCH_LOOKUPS, combine: combineReferenceData });
 
+/** The same, for the lookups Structure Search draws on. */
+export const useStructureReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: STRUCTURE_SEARCH_LOOKUPS, combine: combineReferenceData });
+
 /**
  * Warms the parameterless lookups once, in the background, as soon as there is a session.
  *
@@ -280,5 +332,9 @@ export const usePrefetchConfiguration = (enabled: boolean): void => {
     void queryClient.query(inspectionTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(inspectionReportStatusCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(businessAreasQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(superstructureTypeCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(structureCurbTypeCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(culvertTypeCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(specialEquipmentCodesQuery).catch(ignoreWarmUpFailure);
   }, [enabled, queryClient]);
 };

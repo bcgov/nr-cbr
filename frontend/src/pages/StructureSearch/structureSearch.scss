@@ -1,0 +1,79 @@
+@use '@carbon/react/scss/spacing' as *;
+
+// The same layout as Site Search — see siteSearch.scss for why each rule is what it is. Kept as its
+// own block rather than shared classes so either screen can change without moving the other.
+
+.structure-search__form {
+  margin-block-end: 0;
+}
+
+.structure-search__criteria {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: $spacing-05;
+  align-items: start;
+
+  @media (max-width: 1055px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.structure-search__paired {
+  display: flex;
+  gap: $spacing-03;
+
+  > :first-child {
+    flex: 1 1 auto;
+  }
+
+  > :last-child {
+    flex: 0 0 6rem;
+  }
+}
+
+.structure-search__range {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.structure-search__range-inputs {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-03;
+}
+
+.structure-search__range-inputs .cds--form-item {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.structure-search__range-dash {
+  block-size: 2.5rem;
+  line-height: 2.5rem;
+}
+
+.structure-search__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  align-self: start;
+  column-gap: $spacing-06;
+  row-gap: $spacing-05;
+}
+
+.structure-search__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-03;
+  margin-block-start: $spacing-03;
+}
+
+.structure-search__numeric {
+  text-align: end;
+}
