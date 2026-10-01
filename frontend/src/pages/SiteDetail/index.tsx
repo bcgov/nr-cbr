@@ -1,7 +1,7 @@
 import { Add, Edit, ListChecked, Save } from '@carbon/icons-react';
 import { Button, Column, Grid, InlineNotification, SkeletonText } from '@carbon/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
 import RoadSearchModal from '@/components/RoadSearchModal';
@@ -90,6 +90,7 @@ const onlySiteDetails = (errors: SiteErrors): SiteErrors =>
  */
 const SiteDetailPage: FC = () => {
   const { siteId } = useParams<{ siteId: string }>();
+  const navigate = useNavigate();
   const { canEdit, canDelete } = useAuthorization();
 
   const [site, setSite] = useState<SiteFormValues>({ ...EMPTY_SITE, siteId: siteId ?? '' });
@@ -331,31 +332,27 @@ const SiteDetailPage: FC = () => {
       >
         <div className="site-detail__header-actions">
           {/* Shown only once the site is on screen, as legacy's `structuresButton` div is
-              `display:none` until `actionType` is UPDATE. Both are disabled because neither screen
-              exists yet — the structure inventory is the next thing to be ported. Disabled rather
-              than hidden on purpose: withholding them would say this site has no structures, which
-              is a different and possibly untrue statement. */}
+              `display:none` until `actionType` is UPDATE. Add Structure opens a placeholder page;
+              Display Structures opens Structure Search, not yet filtered to this site. */}
           {mode === 'view' && loaded.data && (
             <>
               {canEdit && (
                 <Button
-                  kind="ghost"
+                  kind="tertiary"
                   size="md"
                   renderIcon={Add}
-                  disabled
                   data-testid="site-detail-add-structure"
-                  title="The structure screens have not been built yet"
+                  onClick={() => navigate(`/inventory/site/${siteId}/add-structure`)}
                 >
                   Add Structure
                 </Button>
               )}
               <Button
-                kind="ghost"
+                kind="tertiary"
                 size="md"
                 renderIcon={ListChecked}
-                disabled
                 data-testid="site-detail-structures"
-                title="The structure screens have not been built yet"
+                onClick={() => navigate('/inventory/structure-search')}
               >
                 Display Structures
               </Button>

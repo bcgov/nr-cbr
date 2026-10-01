@@ -18,12 +18,15 @@ const idsOf = (roles: string[]) => getMenuEntries(roles).map((entry) => entry.id
 const entry = (roles: string[], id: string) => getMenuEntries(roles).find((e) => e.id === id);
 
 describe('getMenuEntries', () => {
-  it('offers Inventory with Site Search beneath it to a reader', () => {
+  it('offers Inventory with Site Search and Structure Search beneath it to a reader', () => {
     const inventory = entry(['CBR_GENERAL'], 'Inventory');
 
     expect(inventory).toBeDefined();
     expect(inventory?.path).toBe('/inventory');
-    expect(inventory?.children?.map((child) => child.id)).toEqual(['Site Search']);
+    expect(inventory?.children?.map((child) => child.id)).toEqual([
+      'Site Search',
+      'Structure Search',
+    ]);
   });
 
   it('gives the child a relative path, which the nav joins onto its parent', () => {
@@ -40,6 +43,14 @@ describe('getMenuEntries', () => {
       // /showSiteSearch sits at the GENERAL floor, and CBR_ADMIN gained read in the 2026-09-15
       // decision, so there is no CBR role that can sign in and not see this.
       expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).toContain('Site Search');
+    },
+  );
+
+  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
+    'shows Structure Search to %s — every role that can read',
+    (role) => {
+      // /showStructureSearch sits at the GENERAL floor, beside /showSiteSearch.
+      expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).toContain('Structure Search');
     },
   );
 
@@ -61,10 +72,11 @@ describe('getMenuEntries', () => {
     },
   );
 
-  it('orders the Inventory items as the legacy menu did — Site Search, then Add Site', () => {
+  it('orders the Inventory items as the legacy menu did — Site Search, Add Site, Structure Search', () => {
     expect(entry(['CBR_LEVEL_2'], 'Inventory')?.children?.map((c) => c.id)).toEqual([
       'Site Search',
       'Add Site',
+      'Structure Search',
     ]);
   });
 

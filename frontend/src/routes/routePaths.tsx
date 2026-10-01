@@ -3,6 +3,7 @@ import { Navigate, type RouteObject } from 'react-router-dom';
 
 import Layout from '@/components/Layout';
 import AddSitePage from '@/pages/AddSite';
+import AddStructurePage from '@/pages/AddStructure';
 import AuthCallbackPage from '@/pages/AuthCallback';
 import GlobalErrorPage from '@/pages/GlobalError';
 import InspectionSearchPage from '@/pages/InspectionSearch';
@@ -11,6 +12,8 @@ import NotFoundPage from '@/pages/NotFound';
 import RoleErrorPage from '@/pages/RoleError';
 import SiteDetailPage from '@/pages/SiteDetail';
 import SiteSearchPage from '@/pages/SiteSearch';
+import StructureDetailPage from '@/pages/StructureDetail';
+import StructureSearchPage from '@/pages/StructureSearch';
 
 import ProtectedRoute from './ProtectedRoute';
 
@@ -173,6 +176,53 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         ),
         isSideMenu: true,
         roles: [...ROLE_CAPABILITIES.destructive],
+      },
+      {
+        // Third in the legacy Inventory menu, after Add Site (cbr-navigation.local.md §1).
+        path: 'structure-search',
+        id: 'Structure Search',
+        element: (
+          <ProtectedRoute>
+            <Layout>
+              <StructureSearchPage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: true,
+        // Legacy gate: /showStructureSearch, which every role that can read holds.
+        roles: [...ROLE_CAPABILITIES.read],
+      },
+      {
+        // Reached from Site Detail's Add Structure button, not from the side menu. A placeholder
+        // for now — see the page.
+        path: 'site/:siteId/add-structure',
+        id: 'Add Structure',
+        element: (
+          <ProtectedRoute>
+            <Layout>
+              <AddStructurePage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: false,
+        // Legacy gate: /level1Access, the same one Site Detail shows the button behind.
+        roles: [...ROLE_CAPABILITIES.write],
+      },
+      {
+        // Reached from a structure number in Structure Search, not from the side menu. The
+        // parameter is CROSSING_STRUCTURE_ID. A placeholder for now — see the page.
+        path: 'structure/:structureId',
+        id: 'Structure',
+        element: (
+          <ProtectedRoute>
+            <Layout>
+              <StructureDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: false,
+        // Legacy gate: /showStructure. A user who can find a structure can open it.
+        roles: [...ROLE_CAPABILITIES.read],
       },
       {
         // Reached from a site number in the search results, not from the side menu — hence

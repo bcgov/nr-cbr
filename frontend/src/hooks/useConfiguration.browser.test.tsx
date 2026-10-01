@@ -12,6 +12,10 @@ const api = vi.hoisted(() => ({
   getInspectionReportStatusCodes: vi.fn(),
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
+  getSuperstructureTypeCodes: vi.fn(),
+  getStructureCurbTypeCodes: vi.fn(),
+  getCulvertTypeCodes: vi.fn(),
+  getSpecialEquipmentCodes: vi.fn(),
   getManagementAreas: vi.fn(),
 }));
 
@@ -69,6 +73,10 @@ const PARAMETERLESS = [
   api.getInspectionTypeCodes,
   api.getInspectionReportStatusCodes,
   api.getBusinessAreas,
+  api.getSuperstructureTypeCodes,
+  api.getStructureCurbTypeCodes,
+  api.getCulvertTypeCodes,
+  api.getSpecialEquipmentCodes,
 ];
 
 beforeEach(() => {

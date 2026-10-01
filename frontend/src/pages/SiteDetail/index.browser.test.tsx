@@ -84,6 +84,15 @@ const renderPage = async ({ canEdit = false, canDelete = false } = {}) => {
       <MemoryRouter initialEntries={['/inventory/site/BOWRON-001']}>
         <Routes>
           <Route path="/inventory/site/:siteId" element={<SiteDetailPage />} />
+          {/* Stand-ins for where the structure buttons go, so a test can see it arrived. */}
+          <Route
+            path="/inventory/site/:siteId/add-structure"
+            element={<p data-testid="arrived">add structure</p>}
+          />
+          <Route
+            path="/inventory/structure-search"
+            element={<p data-testid="arrived">structure search</p>}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -244,13 +253,20 @@ describe('SiteDetailPage — the structure actions', () => {
     expect(screen.getByTestId('site-detail-structures')).toBeInTheDocument();
   });
 
-  it('disables both until the structure screens exist', async () => {
-    // Disabled rather than hidden: withholding them would say this site has no structures, which
-    // is a different statement and possibly an untrue one.
+  it('opens Add Structure for this site', async () => {
     await renderPage({ canEdit: true });
 
-    expect(screen.getByTestId('site-detail-add-structure')).toBeDisabled();
-    expect(screen.getByTestId('site-detail-structures')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('site-detail-add-structure'));
+
+    expect(await screen.findByTestId('arrived')).toHaveTextContent('add structure');
+  });
+
+  it('opens Structure Search from Display Structures', async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getByTestId('site-detail-structures'));
+
+    expect(await screen.findByTestId('arrived')).toHaveTextContent('structure search');
   });
 });
 
