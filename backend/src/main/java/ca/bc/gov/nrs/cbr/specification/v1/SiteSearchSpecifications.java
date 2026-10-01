@@ -1,5 +1,11 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
+
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
@@ -13,7 +19,6 @@ import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -133,24 +138,26 @@ public final class SiteSearchSpecifications {
         .ifPresent(predicates::add);
     contains(builder, root.get(CROSSING_NAME), criteria.crossingName()).ifPresent(predicates::add);
 
-    equals(builder, root.get(SITE_STATUS_CODE), criteria.siteStatusCode())
+    equalsText(builder, root.get(SITE_STATUS_CODE), criteria.siteStatusCode())
         .ifPresent(predicates::add);
-    equals(builder, root.get(INSPECTION_STATUS_CODE), criteria.structureInspectionStatusCode())
+    equalsText(builder, root.get(INSPECTION_STATUS_CODE), criteria.structureInspectionStatusCode())
         .ifPresent(predicates::add);
-    equals(builder, root.get(SPECIAL_ACCESS_CODE), criteria.specialAccessCode())
+    equalsText(builder, root.get(SPECIAL_ACCESS_CODE), criteria.specialAccessCode())
         .ifPresent(predicates::add);
-    equals(builder, root.get(SITE_TYPE_CODE), criteria.siteTypeCode()).ifPresent(predicates::add);
-    equals(builder, root.get(CLIENT_NUMBER), criteria.clientNumber()).ifPresent(predicates::add);
-    equals(builder, root.get(CLIENT_LOCATION_CODE), criteria.clientLocationCode())
+    equalsText(builder, root.get(SITE_TYPE_CODE), criteria.siteTypeCode())
+        .ifPresent(predicates::add);
+    equalsText(builder, root.get(CLIENT_NUMBER), criteria.clientNumber())
+        .ifPresent(predicates::add);
+    equalsText(builder, root.get(CLIENT_LOCATION_CODE), criteria.clientLocationCode())
         .ifPresent(predicates::add);
 
     equalsNumber(builder, root.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
     equalsNumber(builder, root.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
         .ifPresent(predicates::add);
 
-    range(builder, root.get(KILOMETRES), criteria.kiloStart(), criteria.kiloEnd())
+    decimalRange(builder, root.get(KILOMETRES), criteria.kiloStart(), criteria.kiloEnd())
         .ifPresent(predicates::add);
-    range(builder, root.get(USER_KM), criteria.userKmStart(), criteria.userKmEnd())
+    decimalRange(builder, root.get(USER_KM), criteria.userKmStart(), criteria.userKmEnd())
         .ifPresent(predicates::add);
   }
 
@@ -380,18 +387,6 @@ public final class SiteSearchSpecifications {
   }
 
   /**
-   * Whether this execution of the specification returns entities rather than a count.
-   *
-   * <p>Spring Data runs the page and the count from the same specification. A fetch join in a count
-   * is invalid — Hibernate rejects it — and a count has no ordering, so both are guarded on this.
-   */
-  private static boolean returnsEntities(CriteriaQuery<?> query) {
-    return query != null
-        && !Long.class.equals(query.getResultType())
-        && !long.class.equals(query.getResultType());
-  }
-
-  /**
    * One left join, fetched when the query returns entities.
    *
    * <p>The cast is safe and is the standard way to use a fetch as a join: Hibernate's {@code Fetch}
@@ -403,99 +398,5 @@ public final class SiteSearchSpecifications {
     return projecting
         ? (From<?, ?>) root.fetch(attribute, JoinType.LEFT)
         : root.join(attribute, JoinType.LEFT);
-  }
-
-  /**
-   * Legacy's {@code Search.LIKE}: an unanchored, case-insensitive contains.
-   *
-   * <p><b>The case folding is legacy's, and it was missing here.</b>
-   * {@code AbstractOracleDMLDAO.generateWhere} emits
-   * {@code UPPER(col) LIKE UPPER('%'||?||'%')} for every criterion not declared case-sensitive,
-   * and nothing on either search form declares one — {@code SearchCriteriaDTO.caseSensitive} is a
-   * primitive that defaults to {@code false}, and the only two calls that set it true are
-   * {@code EQUALS} predicates in an internal count, which never reach this branch at all.
-   *
-   * <p>Without it these matched only the stored casing. That is invisible on a code column, which
-   * is upper-case either way, and wrong on every name: typing {@code Deadman Creek} found nothing,
-   * because {@code CROSSING_NAME} holds {@code DEADMAN CREEK}.
-   *
-   * <p><b>No index is given up by wrapping the column.</b> The leading wildcard already rules out a
-   * range scan, so these were full scans before {@code UPPER} was applied and are full scans after.
-   *
-   * <p>The value is folded in Java rather than by a second {@code UPPER} in SQL. It is the same
-   * comparison, one function call cheaper per row, and {@link Locale#ROOT} keeps it so — a
-   * default-locale fold turns a Turkish {@code i} into {@code İ} and stops matching.
-   */
-  private static Optional<Predicate> contains(
-      CriteriaBuilder builder, Expression<String> path, String value) {
-    if (!StringUtils.hasText(value)) {
-      return Optional.empty();
-    }
-    return Optional.of(builder.like(
-        builder.upper(path), WILDCARD + value.trim().toUpperCase(Locale.ROOT) + WILDCARD));
-  }
-
-  private static Optional<Predicate> equals(
-      CriteriaBuilder builder, Expression<String> path, String value) {
-    if (!StringUtils.hasText(value)) {
-      return Optional.empty();
-    }
-    return Optional.of(builder.equal(path, value.trim()));
-  }
-
-  private static Optional<Predicate> equalsNumber(
-      CriteriaBuilder builder, Expression<Long> path, String value) {
-    if (!StringUtils.hasText(value)) {
-      return Optional.empty();
-    }
-    try {
-      return Optional.of(builder.equal(path, Long.valueOf(value.trim())));
-    } catch (NumberFormatException ex) {
-      // Legacy's SiteSearchForm rejects a non-numeric org unit in validate(); by the time a value
-      // reaches a query it has been checked. Treating it as "unset" rather than throwing keeps a
-      // malformed query parameter from becoming a 500.
-      return Optional.empty();
-    }
-  }
-
-  /**
-   * A kilometre range. <b>Inclusive at both ends, in all three forms.</b>
-   *
-   * <p>Legacy is inconsistent: with both bounds filled it emits {@code BETWEEN}, which includes
-   * them, but with one bound filled it emits {@code Search.GREATER_THAN} / {@code LESS_THAN} —
-   * literally {@code ">"} and {@code "<"}. So "from 5 to 10" finds a site at km 5 and "from 5" does
-   * not. Nothing depends on the asymmetry and no user could predict it.
-   *
-   * <p>Legacy also guards the User Km upper bound with a test on {@code kiloEnd} rather than
-   * {@code userKmEnd} — the wrong getter, copy-pasted — so "User Kilometres To" on its own is
-   * silently dropped. Here each bound stands on its own, which is the whole point of passing them
-   * through one helper.
-   */
-  private static Optional<Predicate> range(
-      CriteriaBuilder builder, Expression<BigDecimal> path, String from, String to) {
-    BigDecimal lower = decimal(from);
-    BigDecimal upper = decimal(to);
-    if (lower != null && upper != null) {
-      return Optional.of(builder.between(path, lower, upper));
-    }
-    if (lower != null) {
-      return Optional.of(builder.greaterThanOrEqualTo(path, lower));
-    }
-    if (upper != null) {
-      return Optional.of(builder.lessThanOrEqualTo(path, upper));
-    }
-    return Optional.empty();
-  }
-
-  private static BigDecimal decimal(String value) {
-    if (!StringUtils.hasText(value)) {
-      return null;
-    }
-    try {
-      return new BigDecimal(value.trim());
-    } catch (NumberFormatException ex) {
-      // @Pattern on SiteSearchCriteria rejects these with a 400 before they reach here.
-      return null;
-    }
   }
 }

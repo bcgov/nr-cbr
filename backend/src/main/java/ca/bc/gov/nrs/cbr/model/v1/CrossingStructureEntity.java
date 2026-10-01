@@ -1,13 +1,16 @@
 package ca.bc.gov.nrs.cbr.model.v1;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -19,11 +22,13 @@ import lombok.ToString;
 /**
  * {@code THE.CROSSING_STRUCTURE} — a bridge or culvert standing on a crossing site.
  *
- * <p><b>Only the columns its two readers need.</b> The real table is wide and is the root of the
- * inspection, repair and monitoring trees; most of it is unmapped, and arrives with the structure
- * screens. What is here serves the guard on deleting a site, and Inspection Search — which reaches
- * the site through this table, filters on the structure's name and type, and reads
- * {@code CLOSE_PROXIMITY_IND} for one of its four toggles.
+ * <p><b>Only the columns its readers need.</b> The real table is wide and is the root of the
+ * inspection, repair and monitoring trees; much of it is unmapped, and arrives with the structure
+ * detail screen. What is here serves the guard on deleting a site; Inspection Search — which
+ * reaches the site through this table, filters on the structure's name and type, and reads
+ * {@code CLOSE_PROXIMITY_IND} for one of its four toggles; and Structure Search, which filters on
+ * the replacement years, the load ratings and the completeness columns below. Read-only there:
+ * nothing in CBR writes those yet.
  *
  * <p>{@code crossingSiteId} stays a plain column <em>as well as</em> an association. The column is
  * what the delete guard counts by — loading a site in order to count its children is the wrong way
@@ -34,7 +39,7 @@ import lombok.ToString;
 @Entity
 @Table(name = "CROSSING_STRUCTURE", schema = "THE")
 @Getter
-@ToString
+@ToString(exclude = {"site", "typeClass"})
 @EqualsAndHashCode(of = "crossingStructureId")
 @NoArgsConstructor
 @AllArgsConstructor
@@ -100,6 +105,56 @@ public class CrossingStructureEntity {
   @Setter
   @Column(name = "LOAD_RATING_UNKNOWN_INDICATOR", length = 1)
   private String loadRatingUnknownIndicator;
+
+  /**
+   * The capacity in tons the superstructure was built to. With {@link #currentLoadRating}, what
+   * Structure Search's "Downrated Structure?" compares.
+   */
+  @Column(name = "DESIGN_LOAD_RATING")
+  private BigDecimal designLoadRating;
+
+  /** "Year Superstructure Installed" on Structure Search. */
+  @Column(name = "YEAR_BUILT")
+  private Integer yearBuilt;
+
+  /** "Estimated Load Restriction" — a year, though the column is named as a date. */
+  @Column(name = "FULL_LOG_HAUL_TRFFC_RPLCMNT_DT")
+  private Integer fullLogHaulReplacementYear;
+
+  /** "Estimated Replacement" — a year, though the column is named as a date. */
+  @Column(name = "LIGHT_VEHICLE_TRFFC_RPLCMNT_DT")
+  private Integer lightVehicleReplacementYear;
+
+  /** "Estimated Closure" — a year, though the column is named as a date. */
+  @Column(name = "ESTIMATED_CLOSURE_DATE")
+  private Integer estimatedClosureYear;
+
+  /** {@code 'Y'} or {@code 'N'}. */
+  @Column(name = "PORTABLE_STRUCTURE_IND", length = 1)
+  private String portableStructureInd;
+
+  @Column(name = "SPECIAL_EQUIPMENT_RQMT_CODE", length = 10)
+  private String specialEquipmentRqmtCode;
+
+  /** Read by "Incomplete Data?" only. */
+  @Column(name = "NEXT_PLANNED_INSPECTION_DATE")
+  private LocalDate nextPlannedInspectionDate;
+
+  /** Read by "Incomplete Data?" only. */
+  @Column(name = "STRUCTURE_SOURCE_CODE", length = 10)
+  private String structureSourceCode;
+
+  /**
+   * The Type/Class column's description. Read-only, as {@link #site} is.
+   *
+   * <p>{@code NO_CONSTRAINT} because the database already has the foreign key and this mapping only
+   * reads it; left to itself, Hibernate's generated test schema would add one of its own, and every
+   * fixture that names a type would have to create the code row first.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "STRUCTURE_TYPE_CLASS_CODE", insertable = false, updatable = false,
+      foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+  private StructureTypeClassCodeEntity typeClass;
 
   /** The site the structure stands on <em>now</em> — see the note on {@code crossingSiteId} above. */
   @ManyToOne(fetch = FetchType.LAZY)

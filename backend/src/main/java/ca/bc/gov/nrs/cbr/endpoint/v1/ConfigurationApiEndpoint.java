@@ -122,4 +122,24 @@ public interface ConfigurationApiEndpoint {
   @GetMapping("/management-areas")
   ResponseEntity<List<OrgUnitResponse>> getManagementAreas(
       @RequestParam(name = "forestDistrictOrgUnitNo") String forestDistrictOrgUnitNo);
+
+  /** Superstructure types — the Superstructure Type select on Structure Search. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/superstructure-type-codes")
+  ResponseEntity<List<CodeOptionResponse>> getSuperstructureTypeCodes();
+
+  /** Bridge curb types — the Curb Type select on Structure Search. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/structure-curb-type-codes")
+  ResponseEntity<List<CodeOptionResponse>> getStructureCurbTypeCodes();
+
+  /** Culvert types — the Culvert Type select on Structure Search. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/culvert-type-codes")
+  ResponseEntity<List<CodeOptionResponse>> getCulvertTypeCodes();
+
+  /** Special equipment requirements — the Special Equipment Requirements select. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/special-equipment-codes")
+  ResponseEntity<List<CodeOptionResponse>> getSpecialEquipmentCodes();
 }

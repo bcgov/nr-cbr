@@ -8,6 +8,10 @@ import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
@@ -77,6 +81,10 @@ public class ConfigurationService {
   private final InspectionReportStatusCodeRepository inspectionReportStatusCodeRepository;
   private final CbrOrgUnitRepository cbrOrgUnitRepository;
   private final RecreationProjectRepository recreationProjectRepository;
+  private final SuperstructureTypeCodeRepository superstructureTypeCodeRepository;
+  private final StructureCurbTypeCodeRepository structureCurbTypeCodeRepository;
+  private final EngineeredCulvertTypeCodeRepository engineeredCulvertTypeCodeRepository;
+  private final SpecialEquipmentRequirementCodeRepository specialEquipmentRequirementCodeRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -87,7 +95,11 @@ public class ConfigurationService {
       StrctreInspectionTypeCodeRepository strctreInspectionTypeCodeRepository,
       InspectionReportStatusCodeRepository inspectionReportStatusCodeRepository,
       CbrOrgUnitRepository cbrOrgUnitRepository,
-      RecreationProjectRepository recreationProjectRepository) {
+      RecreationProjectRepository recreationProjectRepository,
+      SuperstructureTypeCodeRepository superstructureTypeCodeRepository,
+      StructureCurbTypeCodeRepository structureCurbTypeCodeRepository,
+      EngineeredCulvertTypeCodeRepository engineeredCulvertTypeCodeRepository,
+      SpecialEquipmentRequirementCodeRepository specialEquipmentRequirementCodeRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -97,6 +109,10 @@ public class ConfigurationService {
     this.inspectionReportStatusCodeRepository = inspectionReportStatusCodeRepository;
     this.cbrOrgUnitRepository = cbrOrgUnitRepository;
     this.recreationProjectRepository = recreationProjectRepository;
+    this.superstructureTypeCodeRepository = superstructureTypeCodeRepository;
+    this.structureCurbTypeCodeRepository = structureCurbTypeCodeRepository;
+    this.engineeredCulvertTypeCodeRepository = engineeredCulvertTypeCodeRepository;
+    this.specialEquipmentRequirementCodeRepository = specialEquipmentRequirementCodeRepository;
   }
 
   /**
@@ -315,5 +331,42 @@ public class ConfigurationService {
     // The number is a String on the wire because it is a <select> value, never arithmetic.
     return new OrgUnitResponse(
         String.valueOf(entity.getOrgUnitNo()), entity.getOrgUnitCode(), entity.getOrgUnitName());
+  }
+
+  /** Superstructure types — {@code THE.SUPERSTRUCTURE_TYPE_CODE}, by description. */
+  @Cacheable("superstructureTypeCodes")
+  public List<CodeOptionResponse> getSuperstructureTypeCodes() {
+    return superstructureTypeCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getSuperstructureTypeCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Bridge curb types — {@code THE.STRUCTURE_CURB_TYPE_CODE}, by description. */
+  @Cacheable("structureCurbTypeCodes")
+  public List<CodeOptionResponse> getStructureCurbTypeCodes() {
+    return structureCurbTypeCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getStructureCurbTypeCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Culvert types — {@code THE.ENGINEERED_CULVERT_TYPE_CODE}, by description. */
+  @Cacheable("culvertTypeCodes")
+  public List<CodeOptionResponse> getCulvertTypeCodes() {
+    return engineeredCulvertTypeCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getEngineeredCulvertTypeCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Special equipment requirements — {@code THE.SPECIAL_EQUIPMENT_RQMT_CODE}, by description. */
+  @Cacheable("specialEquipmentCodes")
+  public List<CodeOptionResponse> getSpecialEquipmentCodes() {
+    return specialEquipmentRequirementCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(
+                entity.getSpecialEquipmentRequirementCode(), entity.getDescription()))
+        .toList();
   }
 }
