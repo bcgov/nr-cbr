@@ -89,7 +89,7 @@ class InspectionSearchServiceTest {
     givenOneResult();
 
     PagedResponse<InspectionSearchResult> response =
-        service.search(InspectionSearchCriteria.builder().build(), 0, 20);
+        service.search(InspectionSearchCriteria.builder().build(), 0, 20, null, null);
 
     assertThat(response.content()).hasSize(1);
     verify(repository).findAll(any(Specification.class), any(Pageable.class));
@@ -102,7 +102,8 @@ class InspectionSearchServiceTest {
     // site → org unit — and every one of them is a String. Crossing two over compiles.
     givenOneResult();
 
-    InspectionSearchResult row = service.search(someCriteria(), 0, 20).content().getFirst();
+    InspectionSearchResult row =
+        service.search(someCriteria(), 0, 20, null, null).content().getFirst();
 
     assertThat(row.id()).isEqualTo("42");
     assertThat(row.inspectionDate()).isEqualTo("2026-06-15");
@@ -134,7 +135,8 @@ class InspectionSearchServiceTest {
     when(repository.findAll(any(Specification.class), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(bare), PageRequest.of(0, 20), 1));
 
-    InspectionSearchResult row = service.search(someCriteria(), 0, 20).content().getFirst();
+    InspectionSearchResult row =
+        service.search(someCriteria(), 0, 20, null, null).content().getFirst();
 
     assertThat(row.id()).isEqualTo("7");
     assertThat(row.inspectionReportStatusCode()).isEqualTo("OFL");
@@ -149,7 +151,7 @@ class InspectionSearchServiceTest {
   void keepsDecimalScale() {
     givenOneResult();
 
-    assertThat(service.search(someCriteria(), 0, 20).content().getFirst()
+    assertThat(service.search(someCriteria(), 0, 20, null, null).content().getFirst()
         .pointOfCommencementDistance()).isEqualTo("12.50");
   }
 
@@ -159,7 +161,7 @@ class InspectionSearchServiceTest {
     givenOneResult();
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
 
-    service.search(someCriteria(), -5, 5000);
+    service.search(someCriteria(), -5, 5000, null, null);
 
     verify(repository).findAll(any(Specification.class), pageable.capture());
     assertThat(pageable.getValue().getPageNumber()).isZero();
@@ -172,7 +174,7 @@ class InspectionSearchServiceTest {
     givenOneResult();
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
 
-    service.search(someCriteria(), 0, 0);
+    service.search(someCriteria(), 0, 0, null, null);
 
     verify(repository).findAll(any(Specification.class), pageable.capture());
     assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
@@ -186,7 +188,7 @@ class InspectionSearchServiceTest {
     givenOneResult();
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
 
-    service.search(someCriteria(), 0, 20);
+    service.search(someCriteria(), 0, 20, null, null);
 
     verify(repository).findAll(any(Specification.class), pageable.capture());
     assertThat(pageable.getValue().getSort().isSorted()).isFalse();

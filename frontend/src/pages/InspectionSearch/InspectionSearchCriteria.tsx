@@ -3,8 +3,6 @@ import {
   Button,
   DatePicker,
   DatePickerInput,
-  RadioButton,
-  RadioButtonGroup,
   Select,
   SelectItem,
   TextInput,
@@ -12,14 +10,12 @@ import {
 } from '@carbon/react';
 import { useRef } from 'react';
 
-import { PROJECT_BRANCH_KM_DATE_SORT, STRUCTURE_ID_DATE_SORT } from './types';
 import { MONTH_PATTERN, criteriaErrors, isMonth } from './validation';
 
 import type {
   CodeOption,
   InspectionReviewerOption,
   InspectionSearchCriteria as Criteria,
-  InspectionSortBy,
   OrgUnitOption,
 } from './types';
 import type { ChangeEvent, FC, SubmitEventHandler } from 'react';
@@ -468,33 +464,6 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
             {toggle('findChangedReviewed', 'Previously Reviewed Inspections Only?')}
             {toggle('findMovedStructures', 'Include Inspections for Structures at Previous Sites?')}
           </div>
-        </fieldset>
-
-        <fieldset className="inspection-search__sort inspection-search__span-2">
-          {/* Stacked, not side by side. Both labels are long enough to wrap in half a two-column
-              cell, and a wrapped horizontal radio puts its second line under the *other* option's
-              button — so the two read as four fragments. Legacy stacks them too, with a <br>. */}
-          <RadioButtonGroup
-            legendText="Sort By"
-            name="inspection-search-sortBy"
-            orientation="vertical"
-            valueSelected={criteria.sortBy}
-            onChange={(value) => onChange('sortBy', value as InspectionSortBy)}
-          >
-            <RadioButton
-              // Legacy's `reset()` selects this one, so it is what an untouched form sorts by.
-              labelText="Structure Id (Asc), Date (Desc)"
-              value={STRUCTURE_ID_DATE_SORT}
-              id="inspection-search-sortBy-structure"
-              data-testid="inspection-search-sortBy-structure"
-            />
-            <RadioButton
-              labelText="Project Number, Branch, KM (Asc), Date (Desc)"
-              value={PROJECT_BRANCH_KM_DATE_SORT}
-              id="inspection-search-sortBy-project"
-              data-testid="inspection-search-sortBy-project"
-            />
-          </RadioButtonGroup>
         </fieldset>
 
         <div className="inspection-search__actions">

@@ -18,11 +18,14 @@ const api = vi.hoisted(() => ({
   getForestDistricts: vi.fn(),
   getManagementAreas: vi.fn(),
   getBusinessAreas: vi.fn(),
+  getRecreationDistricts: vi.fn(),
+  getRecreationProjectName: vi.fn(),
 }));
+const roadApi = vi.hoisted(() => ({ getRoadSection: vi.fn(), searchRoads: vi.fn() }));
 const clientApi = vi.hoisted(() => ({ searchClients: vi.fn() }));
-const siteApi = vi.hoisted(() => ({ getSite: vi.fn() }));
+const siteApi = vi.hoisted(() => ({ getSite: vi.fn(), updateSite: vi.fn() }));
 vi.mock('@/services/APIs', () => ({
-  default: { configuration: api, client: clientApi, siteSearch: siteApi },
+  default: { configuration: api, client: clientApi, siteSearch: siteApi, road: roadApi },
 }));
 
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
@@ -115,6 +118,22 @@ beforeEach(() => {
   clientApi.searchClients.mockResolvedValue([]);
   siteApi.getSite.mockReset();
   siteApi.getSite.mockResolvedValue(response);
+  siteApi.updateSite.mockReset();
+  siteApi.updateSite.mockResolvedValue(undefined);
+  api.getRecreationDistricts.mockResolvedValue([]);
+  api.getRecreationProjectName.mockResolvedValue({ forestFileId: '', projectName: null });
+  roadApi.getRoadSection.mockReset();
+  // The stored pair names a road, in district 18 — the site's own.
+  roadApi.getRoadSection.mockImplementation((file: string, section: string) =>
+    file === 'R00123' && section === '01'
+      ? Promise.resolve({
+          forestFileId: 'R00123',
+          roadSectionId: '01',
+          forestServiceRoad: 'Bowron FSR',
+          orgUnitNo: 18,
+        })
+      : Promise.reject(new Error('No road section was found.')),
+  );
 });
 
 describe('SiteDetailPage — reading', () => {
@@ -180,6 +199,14 @@ describe('SiteDetailPage — the values it shows', () => {
     expect(
       screen.getByText('CANFOR CORPORATION · Prince George · 00001012-01'),
     ).toBeInTheDocument();
+  });
+
+  it('shows the Forest Service Road the server returned with the site', async () => {
+    // The page used to drop it on the floor: the response carried the name and the form was never
+    // given it, so every site read "—".
+    await renderPage();
+
+    expect(screen.getByText('Bowron FSR')).toBeInTheDocument();
   });
 
   it('reads the capital road flag as a word', async () => {
@@ -326,5 +353,161 @@ describe('SiteDetailPage — editing', () => {
     await waitFor(() => {
       expect(screen.getByTestId('site-form-crossingName')).toHaveValue('Bowron River');
     });
+  });
+});
+
+describe('SiteDetailPage — the road, while editing', () => {
+  it('keeps showing the road name once Edit is pressed', async () => {
+    await renderPage({ canEdit: true, canDelete: true });
+
+    edit();
+
+    expect(await screen.findByText('Bowron FSR')).toBeInTheDocument();
+  });
+
+  it("keeps a storage site's Forest District read-only while its road decides it", async () => {
+    // Legacy disables the district for a storage site once the pair names a road, as it always
+    // does for a crossing. The page never told the form the road had resolved, so a storage site
+    // came up with an editable district dropdown.
+    siteApi.getSite.mockResolvedValue({ ...response, crossingSiteTypeCode: 'STRG' });
+    await renderPage({ canEdit: true, canDelete: true });
+
+    edit();
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('site-form-orgUnitNo')).not.toBeInTheDocument();
+    });
+    expect(isReadOnlyCell('Forest District')).toBe(true);
+  });
+
+  it('says on Project File ID# when an edit leaves the pair naming no road', async () => {
+    await renderPage({ canEdit: true, canDelete: true });
+    edit();
+    await screen.findByText('Bowron FSR');
+
+    fireEvent.change(screen.getByTestId('site-form-roadSectionId'), { target: { value: '99' } });
+
+    expect(
+      await screen.findByText('No road matches this Project File ID# and Br.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Bowron FSR')).not.toBeInTheDocument();
+  });
+
+  it('does not rewrite the stored district just by being viewed', async () => {
+    // The road's region is not the stored district here. Reading the site must show what is
+    // stored; only an edit lets the road write the district.
+    roadApi.getRoadSection.mockResolvedValue({
+      forestFileId: 'R00123',
+      roadSectionId: '01',
+      forestServiceRoad: 'Bowron FSR',
+      orgUnitNo: 99,
+    });
+    await renderPage();
+
+    await waitFor(() => expect(roadApi.getRoadSection).toHaveBeenCalled());
+    expect(screen.getByText('DPG - Prince George')).toBeInTheDocument();
+  });
+});
+
+describe('SiteDetailPage — saving', () => {
+  const type = (name: string, value: string) =>
+    fireEvent.change(screen.getByTestId(`site-form-${name}`), { target: { value } });
+  const save = () => fireEvent.click(screen.getByTestId('site-detail-save'));
+
+  it('sends the edit and goes back to reading the site', async () => {
+    await renderPage({ canEdit: true, canDelete: true });
+    edit();
+    await screen.findByText('Bowron FSR');
+
+    type('crossingName', 'Deadman Creek Bridge');
+    save();
+
+    await waitFor(() => {
+      expect(siteApi.updateSite).toHaveBeenCalledWith(
+        'BOWRON-001',
+        expect.objectContaining({ crossingName: 'Deadman Creek Bridge' }),
+      );
+    });
+    expect(await screen.findByTestId('site-detail-edit')).toBeInTheDocument();
+    // Read again rather than trusted: the stored site is what view mode shows.
+    expect(siteApi.getSite).toHaveBeenCalledTimes(2);
+  });
+
+  it('never sends the fields LRMOPS writes', async () => {
+    await renderPage({ canEdit: true, canDelete: true });
+    edit();
+    await screen.findByText('Bowron FSR');
+
+    save();
+
+    await waitFor(() => expect(siteApi.updateSite).toHaveBeenCalled());
+    const sent = siteApi.updateSite.mock.calls[0][1];
+    for (const locked of [
+      'siteId',
+      'userKm',
+      'businessAreaOrgUnitNo',
+      'clientNumber',
+      'clientLocnCode',
+      'capitalRoad',
+    ]) {
+      expect(sent).not.toHaveProperty(locked);
+    }
+  });
+
+  it('refuses to send a required field left blank', async () => {
+    await renderPage({ canEdit: true, canDelete: true });
+    edit();
+    await screen.findByText('Bowron FSR');
+
+    type('crossingName', '');
+    save();
+
+    expect(await screen.findByText('Crossing Name is required.')).toBeInTheDocument();
+    expect(siteApi.updateSite).not.toHaveBeenCalled();
+  });
+
+  it('lets Level 1 save Site Details on a site with gaps they cannot fill', async () => {
+    // Only Site Details is theirs to change, so only Site Details is checked.
+    siteApi.getSite.mockResolvedValue({ ...response, crossingName: null, latitude: null });
+    await renderPage({ canEdit: true });
+    edit();
+
+    type('pointOfAccessDescription', 'Gate key at the district office.');
+    save();
+
+    await waitFor(() => {
+      expect(siteApi.updateSite).toHaveBeenCalledWith(
+        'BOWRON-001',
+        expect.objectContaining({ pointOfAccessDescription: 'Gate key at the district office.' }),
+      );
+    });
+  });
+
+  it('shows what the server refused beside the field', async () => {
+    siteApi.updateSite.mockRejectedValue({
+      body: { detail: 'Refused.', fieldErrors: { crossingName: 'Crossing Name is taken.' } },
+    });
+    await renderPage({ canEdit: true, canDelete: true });
+    edit();
+    await screen.findByText('Bowron FSR');
+
+    save();
+
+    expect(await screen.findByText('Crossing Name is taken.')).toBeInTheDocument();
+    expect(screen.queryByTestId('site-detail-save-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('site-detail-cancel')).toBeInTheDocument();
+  });
+
+  it('says so when a save fails for a reason no field explains', async () => {
+    siteApi.updateSite.mockRejectedValue({ body: { detail: 'Service unavailable.' } });
+    await renderPage({ canEdit: true, canDelete: true });
+    edit();
+    await screen.findByText('Bowron FSR');
+
+    save();
+
+    expect(await screen.findByTestId('site-detail-save-error')).toHaveTextContent(
+      'Service unavailable.',
+    );
   });
 });

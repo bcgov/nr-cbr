@@ -66,6 +66,10 @@ public class SiteValidator {
   private static final String FOREST_FILE_ID = "forestFileId";
   private static final String LONGITUDE = "longitude";
   private static final String LATITUDE = "latitude";
+  private static final String SITE_DETAILS = "pointOfAccessDescription";
+  private static final String SITE_STATUS = "crossingSiteStatusCode";
+
+  private static final String PROPOSED = "PP";
 
   private static final String CROSSING = "CRS";
   private static final String RECREATION = "REC";
@@ -114,6 +118,19 @@ public class SiteValidator {
    * @throws SiteValidationException if anything fails
    */
   public void validate(SiteCreateRequest request, boolean siteIdTaken, Long roadSegmentId) {
+    validate(request, siteIdTaken, roadSegmentId, 0);
+  }
+
+  /**
+   * Checks a site, new or edited, throwing if anything is wrong with it.
+   *
+   * @param activeStructureCount structures standing on the site — zero for a site being created,
+   *                             which owns nothing yet. Only the edit can make it matter: see
+   *                             {@link #checkStructures}
+   */
+  public void validate(
+      SiteCreateRequest request, boolean siteIdTaken, Long roadSegmentId,
+      long activeStructureCount) {
     Map<String, String> errors = new LinkedHashMap<>();
     String type = trimmed(request.crossingSiteTypeCode());
 
@@ -126,7 +143,25 @@ public class SiteValidator {
     checkOrgUnits(request, errors);
     checkInspectionAgreesWithStatus(request, type, errors);
     checkRoadResolves(request, type, roadSegmentId, errors);
+    checkStructures(request, activeStructureCount, errors);
 
+    if (!errors.isEmpty()) {
+      throw new SiteValidationException(errors);
+    }
+  }
+
+  /**
+   * Checks the one field a Level 1 user may change, and nothing else.
+   *
+   * <p>Level 1 edits Site Details alone — every other control on {@code site.jsp} is inside an
+   * {@code isLevel2} branch. The rest of the site is stored as it was, so checking it would refuse
+   * a save over a gap the user has no way to fill.
+   *
+   * @throws SiteValidationException if the text would not fit its column
+   */
+  public void validateSiteDetails(String pointOfAccessDescription) {
+    Map<String, String> errors = new LinkedHashMap<>();
+    limit(errors, SITE_DETAILS, pointOfAccessDescription, POINT_OF_ACCESS_MAX, "Site Details");
     if (!errors.isEmpty()) {
       throw new SiteValidationException(errors);
     }
@@ -159,7 +194,7 @@ public class SiteValidator {
   /** The eleven fields the legacy screen marks mandatory, with its three type-based exemptions. */
   private void checkRequired(
       SiteCreateRequest request, String type, Map<String, String> errors) {
-    requireText(errors, "crossingSiteStatusCode", request.crossingSiteStatusCode(), "Status");
+    requireText(errors, SITE_STATUS, request.crossingSiteStatusCode(), "Status");
     requireText(errors, "crossingSiteTypeCode", request.crossingSiteTypeCode(), "Site Type");
     requireText(
         errors,
@@ -200,7 +235,7 @@ public class SiteValidator {
     limit(errors, "crossingName", request.crossingName(), CROSSING_NAME_MAX, "Crossing Name");
     limit(
         errors,
-        "pointOfAccessDescription",
+        SITE_DETAILS,
         request.pointOfAccessDescription(),
         POINT_OF_ACCESS_MAX,
         "Site Details");
@@ -262,7 +297,7 @@ public class SiteValidator {
   /** Every code must be one the matching table still carries. */
   private void checkCodes(SiteCreateRequest request, Map<String, String> errors) {
     codeExists(
-        errors, "crossingSiteStatusCode", request.crossingSiteStatusCode(),
+        errors, SITE_STATUS, request.crossingSiteStatusCode(),
         siteStatusCodes::existsById, "Status");
     codeExists(
         errors, "crossingSiteTypeCode", request.crossingSiteTypeCode(),
@@ -344,6 +379,24 @@ public class SiteValidator {
         && StringUtils.hasText(request.roadSectionId())) {
       errors.putIfAbsent(
           FOREST_FILE_ID, "No road matches this Project File ID# and Br.");
+    }
+  }
+
+  /**
+   * A Proposed site may not have structures standing on it.
+   *
+   * <p>Legacy's {@code errors.site.proposed}, raised on {@code crossingSiteStatusCode} in the edit
+   * branch of {@code SiteAction.validate} and refused by the save gate. Only an edit can reach it:
+   * a site being created owns no structures. A Deactivated site with structures is a warning in
+   * legacy and does not refuse the save, so it is not here — Site Detail shows it.
+   */
+  private void checkStructures(
+      SiteCreateRequest request, long activeStructureCount, Map<String, String> errors) {
+    if (PROPOSED.equals(trimmed(request.crossingSiteStatusCode())) && activeStructureCount > 0) {
+      errors.putIfAbsent(
+          SITE_STATUS,
+          "A Proposed site cannot have structures, and this one has " + activeStructureCount
+              + ". Change the status, or archive the structures first.");
     }
   }
 

@@ -9,6 +9,7 @@ import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Sort;
 
 /**
  * Paging, ordering and the mapping to a results row.
@@ -76,7 +78,71 @@ class SiteSearchServiceTest {
 
   private PagedResponse<SiteSearchResult> searchAll(int pageNumber, int pageSize) {
     flushAndClear();
-    return service.search(SiteSearchCriteria.builder().build(), pageNumber, pageSize);
+    return service.search(SiteSearchCriteria.builder().build(), pageNumber, pageSize, null, null);
+  }
+
+  private java.util.List<String> sortedBy(SiteSortColumn column, Sort.Direction direction) {
+    flushAndClear();
+    return service.search(SiteSearchCriteria.builder().build(), 0, 20, column, direction)
+        .content().stream().map(SiteSearchResult::id).toList();
+  }
+
+  private void givenNamedSite(String id, String crossingName, String km) {
+    entityManager.persist(CrossingSiteEntity.builder()
+        .crossingSiteId(id).crossingName(crossingName)
+        .pointOfCommencementDistance(km == null ? null : new BigDecimal(km))
+        .capitalRoadInd("N").build());
+  }
+
+  @Test
+  @DisplayName("sorts by the column whose header was clicked, either way")
+  void sortsByAColumn() {
+    givenNamedSite("SITE-A", "Riske Cr", "3.0");
+    givenNamedSite("SITE-B", "Cattle underpass", "1.0");
+    givenNamedSite("SITE-C", "Unnamed", "2.0");
+
+    assertThat(sortedBy(SiteSortColumn.CROSSING_NAME, Sort.Direction.ASC))
+        .containsExactly("SITE-B", "SITE-A", "SITE-C");
+    assertThat(sortedBy(SiteSortColumn.KILOMETRES, Sort.Direction.DESC))
+        .containsExactly("SITE-A", "SITE-C", "SITE-B");
+  }
+
+  @Test
+  @DisplayName("sorts text without regard to case, as a reader expects")
+  void sortsTextIgnoringCase() {
+    // Binary order puts every capital before every lower-case letter: "Zed" ahead of "apple".
+    givenNamedSite("SITE-1", "Zed Creek", null);
+    givenNamedSite("SITE-2", "apple Creek", null);
+
+    assertThat(sortedBy(SiteSortColumn.CROSSING_NAME, Sort.Direction.ASC))
+        .containsExactly("SITE-2", "SITE-1");
+  }
+
+  @Test
+  @DisplayName("sorts by a joined column without dropping sites that lack the join")
+  void sortsByAJoinedColumnKeepingUnjoinedSites() {
+    givenDistrict(18L, "DPG", "Prince George");
+    givenDistrict(21L, "DKA", "Thompson Rivers");
+    givenSite("IN-DPG", 18L, "01", "1.0");
+    givenSite("IN-DKA", 21L, "01", "1.0");
+    givenSite("NO-ORG", null, null, null);
+
+    assertThat(sortedBy(SiteSortColumn.DISTRICT, Sort.Direction.DESC))
+        .containsSubsequence("IN-DPG", "IN-DKA")
+        .contains("NO-ORG")
+        .hasSize(3);
+  }
+
+  @Test
+  @DisplayName("breaks ties on the chosen column by legacy's order, then the site number")
+  void breaksTiesStably() {
+    // Equal crossing names: the rest of the order decides, and the site number last, so a page
+    // boundary never falls between two rows that could swap.
+    givenNamedSite("SITE-2", "Same Creek", null);
+    givenNamedSite("SITE-1", "Same Creek", null);
+
+    assertThat(sortedBy(SiteSortColumn.CROSSING_NAME, Sort.Direction.DESC))
+        .containsExactly("SITE-1", "SITE-2");
   }
 
   @Test

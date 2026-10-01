@@ -14,10 +14,11 @@ import {
 } from '@carbon/react';
 import { Link } from 'react-router-dom';
 
-import type { InspectionSearchResult } from './types';
+import type { InspectionSearchResult, InspectionSort, InspectionSortColumn } from './types';
 import type { FC } from 'react';
 
 import { formatShortDate } from '@/utils/date';
+import { directionOf, nextSort } from '@/utils/headerSort';
 import {
   inspectionStatusLabel,
   inspectionStatusTagType,
@@ -35,7 +36,31 @@ type Props = {
   canDelete: boolean;
   onPageChange: (next: { page: number; pageSize: number }) => void;
   onDelete: (inspection: InspectionSearchResult) => void;
+  /** The header the results are sorted by, or `null` for legacy's default order. */
+  sort?: InspectionSort | null;
+  onSortChange?: (next: InspectionSort | null) => void;
 };
+
+/**
+ * The ten sortable columns, in the legacy table's order.
+ *
+ * <p>District and road lead the row, ahead of the inspection's own columns: they are what a reader
+ * scans down to find the crossing they are after, and the date and status are what they read once
+ * they have found it. Status is last of the data columns, next to Actions: it decides whether a row
+ * offers delete at all, so the two sit together rather than at opposite ends of the table.
+ */
+const COLUMNS: { column: InspectionSortColumn; label: string }[] = [
+  { column: 'INSPECTION_ID', label: 'Id' },
+  { column: 'DISTRICT', label: 'District Code' },
+  { column: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
+  { column: 'INSPECTION_DATE', label: 'Inspection Date' },
+  { column: 'SITE_ID', label: 'Site #' },
+  { column: 'STRUCTURE_NAME', label: 'Structure Name' },
+  { column: 'KILOMETRES', label: 'KM' },
+  { column: 'CROSSING_NAME', label: 'Crossing Name' },
+  { column: 'PROJECT_FILE', label: 'Project File ID#-Br.' },
+  { column: 'STATUS', label: 'Status' },
+];
 
 /**
  * Inspection Search results.
@@ -51,6 +76,10 @@ type Props = {
  *       rule carried forward: an action you cannot perform is never rendered, not disabled
  *       (cbr-navigation.local.md §2).
  * </ul>
+ *
+ * <p><b>Every header but Actions sorts</b>, in place of legacy's "Sort by" radio. On the server,
+ * not the page: the results are paged there, so sorting the rows on screen would order twenty
+ * inspections out of thousands and call it sorted.
  */
 const InspectionSearchResults: FC<Props> = ({
   results,
@@ -61,21 +90,30 @@ const InspectionSearchResults: FC<Props> = ({
   canDelete,
   onPageChange,
   onDelete,
-}) =>
-  loading ? (
-    // A skeleton, not "No inspections found." An empty table while a search is running says the
-    // search finished and matched nothing, which is a different answer and one the user would act
-    // on.
-    <DataTableSkeleton
-      role="progressbar"
-      aria-label="Searching"
-      data-testid="inspection-search-loading"
-      columnCount={canDelete ? 11 : 10}
-      rowCount={5}
-      showHeader={false}
-      showToolbar={false}
-    />
-  ) : (
+  sort = null,
+  onSortChange,
+}) => {
+  // The ten legacy columns, and Actions when the user may delete.
+  const columnCount = canDelete ? 11 : 10;
+
+  if (loading) {
+    return (
+      // A skeleton, not "No inspections found." An empty table while a search is running says the
+      // search finished and matched nothing, which is a different answer and one the user would act
+      // on.
+      <DataTableSkeleton
+        role="progressbar"
+        aria-label="Searching"
+        data-testid="inspection-search-loading"
+        columnCount={columnCount}
+        rowCount={5}
+        showHeader={false}
+        showToolbar={false}
+      />
+    );
+  }
+
+  return (
     <>
       <TableContainer
         // "Inspections — 12 matches", the shape nr-frep's search results use. The count is the
@@ -87,22 +125,18 @@ const InspectionSearchResults: FC<Props> = ({
         <Table useZebraStyles size="lg">
           <TableHead>
             <TableRow>
-              <TableHeader>Id</TableHeader>
-              {/* District and road lead the row, ahead of the inspection's own columns: they are
-                  what a reader scans down to find the crossing they are after, and the date and
-                  status are what they read once they have found it. */}
-              <TableHeader>District Code</TableHeader>
-              <TableHeader>Forest Service Road</TableHeader>
-              <TableHeader>Inspection Date</TableHeader>
-              <TableHeader>Site #</TableHeader>
-              <TableHeader>Structure Name</TableHeader>
-              <TableHeader>KM</TableHeader>
-              <TableHeader>Crossing Name</TableHeader>
-              <TableHeader>Project File ID#-Br.</TableHeader>
-              {/* Last of the data columns, next to Actions: the status is what decides whether a
-                  row offers delete at all, so the two sit together rather than at opposite ends of
-                  a ten-column table. */}
-              <TableHeader>Status</TableHeader>
+              {COLUMNS.map(({ column, label }) => (
+                <TableHeader
+                  key={column}
+                  isSortable={Boolean(onSortChange)}
+                  isSortHeader={sort?.column === column}
+                  sortDirection={directionOf(sort, column)}
+                  onClick={() => onSortChange?.(nextSort(sort, column))}
+                  data-testid={`inspection-search-sort-${column}`}
+                >
+                  {label}
+                </TableHeader>
+              ))}
               {/* "Actions", not "Delete": the column is gated on the destructive capability, but
                   naming it after its only current occupant would have to be renamed the moment a
                   second one lands. Hidden entirely when the user cannot delete, as legacy does. */}
@@ -115,7 +149,7 @@ const InspectionSearchResults: FC<Props> = ({
                 {/* Legacy's own wording, which tells the user what to do next rather than only what
                     happened. Its colspan is 7 against a 10-column table, so the message sits under
                     part of the row; this one spans the table. */}
-                <TableCell colSpan={canDelete ? 11 : 10}>
+                <TableCell colSpan={columnCount}>
                   No inspection record found that matches search criteria, please try again.
                 </TableCell>
               </TableRow>
@@ -226,5 +260,6 @@ const InspectionSearchResults: FC<Props> = ({
       />
     </>
   );
+};
 
 export default InspectionSearchResults;

@@ -14,9 +14,10 @@ import {
 } from '@carbon/react';
 import { Link } from 'react-router-dom';
 
-import type { SiteSearchResult } from './types';
+import type { SiteSearchResult, SiteSort, SiteSortColumn } from './types';
 import type { FC } from 'react';
 
+import { directionOf, nextSort } from '@/utils/headerSort';
 import { siteStatusLabel, siteStatusTagType } from '@/utils/siteStatus';
 
 type Props = {
@@ -30,7 +31,21 @@ type Props = {
   canDelete: boolean;
   onPageChange: (next: { page: number; pageSize: number }) => void;
   onDelete: (site: SiteSearchResult) => void;
+  /** The header the results are sorted by, or `null` for legacy's order. */
+  sort?: SiteSort | null;
+  onSortChange?: (next: SiteSort | null) => void;
 };
+
+/** The seven sortable columns, in the legacy table's order. */
+const COLUMNS: { column: SiteSortColumn; label: string }[] = [
+  { column: 'SITE_ID', label: 'Site #' },
+  { column: 'DISTRICT', label: 'District Code' },
+  { column: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
+  { column: 'KILOMETRES', label: 'KM' },
+  { column: 'CROSSING_NAME', label: 'Crossing Name' },
+  { column: 'PROJECT_FILE', label: 'Project File ID#-Br.' },
+  { column: 'STATUS', label: 'Status' },
+];
 
 /**
  * Site Search results.
@@ -39,6 +54,10 @@ type Props = {
  * legacy wraps in `<cbr:authorize grantedAction="/deleteSite">`. Rendering that column only when the
  * caller holds the privilege is the legacy rule carried forward: an action you cannot perform is
  * never rendered, not disabled (cbr-navigation.local.md §2).
+ *
+ * <p><b>Every header but Actions sorts</b>, which legacy's did not. On the server, not the page:
+ * the results are paged there, so sorting only the rows on screen would order twenty sites out of
+ * thousands and call it sorted.
  */
 const SiteSearchResults: FC<Props> = ({
   results,
@@ -49,20 +68,29 @@ const SiteSearchResults: FC<Props> = ({
   canDelete,
   onPageChange,
   onDelete,
-}) =>
-  loading ? (
-    // A skeleton, not "No sites found." An empty table while a search is running says the search
-    // finished and matched nothing, which is a different answer and one the user would act on.
-    <DataTableSkeleton
-      role="progressbar"
-      aria-label="Searching"
-      data-testid="site-search-loading"
-      columnCount={canDelete ? 8 : 7}
-      rowCount={5}
-      showHeader={false}
-      showToolbar={false}
-    />
-  ) : (
+  sort = null,
+  onSortChange,
+}) => {
+  // The seven legacy columns, and Actions when the user may delete.
+  const columnCount = canDelete ? 8 : 7;
+
+  if (loading) {
+    return (
+      // A skeleton, not "No sites found." An empty table while a search is running says the search
+      // finished and matched nothing, which is a different answer and one the user would act on.
+      <DataTableSkeleton
+        role="progressbar"
+        aria-label="Searching"
+        data-testid="site-search-loading"
+        columnCount={columnCount}
+        rowCount={5}
+        showHeader={false}
+        showToolbar={false}
+      />
+    );
+  }
+
+  return (
     <>
       <TableContainer
         // "Sites — 12 matches", the same shape nr-frep's search results use. The count is the server's
@@ -74,24 +102,29 @@ const SiteSearchResults: FC<Props> = ({
         <Table useZebraStyles size="lg">
           <TableHead>
             <TableRow>
-              <TableHeader>Site #</TableHeader>
-              <TableHeader>District Code</TableHeader>
-              <TableHeader>Forest Service Road</TableHeader>
-              <TableHeader>KM</TableHeader>
-              <TableHeader>Crossing Name</TableHeader>
-              <TableHeader>Project File ID#-Br.</TableHeader>
-              <TableHeader>Status</TableHeader>
+              {COLUMNS.map(({ column, label }) => (
+                <TableHeader
+                  key={column}
+                  isSortable={Boolean(onSortChange)}
+                  isSortHeader={sort?.column === column}
+                  sortDirection={directionOf(sort, column)}
+                  onClick={() => onSortChange?.(nextSort(sort, column))}
+                  data-testid={`site-search-sort-${column}`}
+                >
+                  {label}
+                </TableHeader>
+              ))}
               {/* "Actions", not "Delete": the column is still gated on the destructive capability,
-                  but naming it after its only current occupant would have to be renamed the moment
-                  a second one lands. It stays hidden entirely when the user cannot delete — an
-                  empty Actions column is noise, and legacy renders no column at all. */}
+                    but naming it after its only current occupant would have to be renamed the moment
+                    a second one lands. It stays hidden entirely when the user cannot delete — an
+                    empty Actions column is noise, and legacy renders no column at all. */}
               {canDelete && <TableHeader>Actions</TableHeader>}
             </TableRow>
           </TableHead>
           <TableBody>
             {results.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canDelete ? 8 : 7}>No sites found.</TableCell>
+                <TableCell colSpan={columnCount}>No sites found.</TableCell>
               </TableRow>
             ) : (
               results.map((site) => (
@@ -100,13 +133,13 @@ const SiteSearchResults: FC<Props> = ({
                     <Link to={`/inventory/site/${site.id}`}>{site.id}</Link>
                   </TableCell>
                   {/* "DPG — Prince George Natural Resource District", as nr-frep renders an org
-                    unit. Legacy shows the bare code and hides the name in a title attribute, which
-                    its 7%-wide column forced — a tooltip only reaches a user who already suspects
-                    there is more to see, and never reaches one reading on a touchscreen.
+                      unit. Legacy shows the bare code and hides the name in a title attribute, which
+                      its 7%-wide column forced — a tooltip only reaches a user who already suspects
+                      there is more to see, and never reaches one reading on a touchscreen.
 
-                    Joined rather than interpolated so a site with no org unit renders empty, and one
-                    with a code but no name renders the code alone, instead of "DPG — undefined" or a
-                    stray leading dash. */}
+                      Joined rather than interpolated so a site with no org unit renders empty, and one
+                      with a code but no name renders the code alone, instead of "DPG — undefined" or a
+                      stray leading dash. */}
                   <TableCell>
                     {[site.orgUnitCode, site.orgUnitName].filter(Boolean).join(' — ')}
                   </TableCell>
@@ -120,10 +153,10 @@ const SiteSearchResults: FC<Props> = ({
                   </TableCell>
                   <TableCell>
                     {/* A pill, as nr-frep renders a status. The colour comes from the code and the
-                        label from the description — see utils/siteStatus for why that way round.
-                        Nothing is rendered at all for a site with no status, rather than an empty
-                        pill: "Incomplete Data?" exists to find those, and a bare outline would read
-                        as a status whose name failed to load. */}
+                          label from the description — see utils/siteStatus for why that way round.
+                          Nothing is rendered at all for a site with no status, rather than an empty
+                          pill: "Incomplete Data?" exists to find those, and a bare outline would read
+                          as a status whose name failed to load. */}
                     {site.crossingSiteStatusCode || site.crossingSiteStatusDescription ? (
                       <Tag type={siteStatusTagType(site.crossingSiteStatusCode)} size="sm">
                         {siteStatusLabel(
@@ -158,8 +191,8 @@ const SiteSearchResults: FC<Props> = ({
       </TableContainer>
 
       {/* Legacy paginates server-side via its own <cbr:pagination> tag, which posts the form back with
-        page/pageSize. Carbon's Pagination is the same contract in a different shape — the page and
-        size come back out and the caller re-queries. */}
+          page/pageSize. Carbon's Pagination is the same contract in a different shape — the page and
+          size come back out and the caller re-queries. */}
       <Pagination
         data-testid="site-search-pagination"
         page={page}
@@ -172,5 +205,6 @@ const SiteSearchResults: FC<Props> = ({
       />
     </>
   );
+};
 
 export default SiteSearchResults;

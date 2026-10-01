@@ -12,11 +12,13 @@ import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import ca.bc.gov.nrs.cbr.security.CbrRoles;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteUpdateRequest;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -128,6 +130,115 @@ public class SiteService {
     log.info("Created site {}", siteId);
 
     return new SiteCreatedResponse(siteId);
+  }
+
+  /**
+   * Saves an edit to a site, or refuses with a message for every field at fault.
+   *
+   * <p>Replaces {@code saveSite.do?actionMapping=save} and {@code CBR.UPDATE_SITE}, a bare
+   * {@code UPDATE} of every column. Legacy has no concurrency check and neither does this: the last
+   * save wins.
+   *
+   * <p><b>What changes depends on who is saving</b>, as it does on {@code site.jsp}:
+   * <ul>
+   *   <li><b>Level 2 and P.Eng</b> — every field in the request, checked by the same rules as a new
+   *       site, plus one only an edit can meet: a Proposed site may not have structures.</li>
+   *   <li><b>Level 1</b> — Site Details, and nothing else. Every other control is inside an
+   *       {@code isLevel2} branch of the page, so anything else a request carries is ignored and
+   *       the stored value kept. Only Site Details is checked: the rest is not the user's to
+   *       fix.</li>
+   * </ul>
+   *
+   * <p><b>Never from the request</b>, for anyone: the number, the Designated Maintainer, User
+   * Kilometres, BCTS BA Responsible and Capital Road. No role sets them on this screen — LRMOPS
+   * writes them — so they are kept as stored, which is what legacy's disabled inputs amounted to.
+   * The map sheet columns and the entry audit pair are kept too.
+   *
+   * <p><b>The road segment is derived again</b> on every save, as legacy's hidden select re-posts
+   * the section's first segment. A pair that names no segment is refused, as on create.
+   *
+   * @throws SiteNotFoundException if no such site exists
+   * @throws ca.bc.gov.nrs.cbr.exception.SiteValidationException if anything is wrong with it
+   */
+  @Transactional
+  public void update(String siteId, SiteUpdateRequest request) {
+    CrossingSiteEntity stored = crossingSiteRepository.findById(siteId)
+        .orElseThrow(() -> new SiteNotFoundException(siteId));
+
+    CrossingSiteEntity.CrossingSiteEntityBuilder edited =
+        loggedUser.isAtLeast(CbrRoles.LEVEL_2)
+            ? wholeSite(stored, request)
+            : siteDetailsOnly(stored, request);
+
+    CrossingSiteEntity site = edited
+        .updateUserid(loggedUser.getLoggedUserId())
+        .updateTimestamp(LocalDateTime.now())
+        .build();
+
+    crossingSiteRepository.saveAndFlush(site);
+    log.info("Updated site {}", siteId);
+  }
+
+  /** Level 1: Site Details alone, checked alone. */
+  private CrossingSiteEntity.CrossingSiteEntityBuilder siteDetailsOnly(
+      CrossingSiteEntity stored, SiteUpdateRequest request) {
+    validator.validateSiteDetails(request.pointOfAccessDescription());
+    return stored.toBuilder().pointOfAccessDesc(blankToNull(request.pointOfAccessDescription()));
+  }
+
+  /** Level 2 and P.Eng: everything the request carries, checked as a new site is. */
+  private CrossingSiteEntity.CrossingSiteEntityBuilder wholeSite(
+      CrossingSiteEntity stored, SiteUpdateRequest request) {
+    // The request as a whole site: the edited fields, and the stored values of the ones no role
+    // sets here — so the validator judges the site that would be saved.
+    SiteCreateRequest site = new SiteCreateRequest(
+        stored.getCrossingSiteId(),
+        request.crossingName(),
+        request.pointOfCommencementDistance(),
+        stored.getUserKm(),
+        request.crossingSiteStatusCode(),
+        request.structureInspectionStatusCode(),
+        request.crossingSiteTypeCode(),
+        request.specialAccessRqmtCode(),
+        request.orgUnitNo(),
+        request.managementOrgUnitNo(),
+        stored.getBusinessAreaOrgUnitNo(),
+        request.forestFileId(),
+        request.roadSectionId(),
+        stored.getClientNumber(),
+        stored.getClientLocnCode(),
+        ACTIVE.equals(stored.getCapitalRoadInd()),
+        request.longitude(),
+        request.latitude(),
+        request.utmZone(),
+        request.utmEasting(),
+        request.utmNorthing(),
+        request.pointOfAccessDescription());
+
+    Long roadSegmentId = resolveRoadSegment(site);
+    long structures = crossingStructureRepository.countByCrossingSiteIdAndActiveInd(
+        stored.getCrossingSiteId(), ACTIVE);
+    // Not taken: the number is the one being edited, so there is nothing for it to clash with.
+    validator.validate(site, false, roadSegmentId, structures);
+
+    return stored.toBuilder()
+        .crossingName(blankToNull(request.crossingName()))
+        .pointOfCommencementDistance(request.pointOfCommencementDistance())
+        .crossingSiteStatusCode(blankToNull(request.crossingSiteStatusCode()))
+        .structureInspectionStatusCode(blankToNull(request.structureInspectionStatusCode()))
+        .crossingSiteTypeCode(blankToNull(request.crossingSiteTypeCode()))
+        .specialAccessRqmtCode(blankToNull(request.specialAccessRqmtCode()))
+        .orgUnitNo(request.orgUnitNo())
+        .managementOrgUnitNo(request.managementOrgUnitNo())
+        .forestFileId(blankToNull(request.forestFileId()))
+        .roadSectionId(blankToNull(request.roadSectionId()))
+        .roadSegmentId(roadSegmentId)
+        .longitude(request.longitude())
+        .latitude(request.latitude())
+        .utmZone(request.utmZone())
+        .utmEasting(request.utmEasting())
+        .utmNorthing(request.utmNorthing())
+        .pointOfAccessDesc(blankToNull(request.pointOfAccessDescription()));
   }
 
   /**

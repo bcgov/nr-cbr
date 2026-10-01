@@ -80,13 +80,6 @@ class InspectionSearchCriteriaTest {
     }
 
     @Test
-    @DisplayName("sortBy is not a criterion")
-    void sortByIsNotACriterion() {
-      assertThat(InspectionSearchCriteria.builder()
-          .sortBy(InspectionSearchCriteria.STRUCTURE_ID_DATE_SORT).build().isEmpty()).isTrue();
-    }
-
-    @Test
     @DisplayName("structures at previous sites is not a criterion either")
     void findMovedStructuresIsNotACriterion() {
       // It is not a filter — it changes what Site # means, so on its own it narrows nothing. Legacy

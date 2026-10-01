@@ -15,7 +15,7 @@ import API from '@/services/APIs';
  * <p>The backend puts them on the problem detail alongside `detail`, keyed by field. Anything else
  * — a 500, a network failure, a 403 — has none, and the caller falls back to the sentence.
  */
-const fieldErrorsFrom = (error: unknown): SiteErrors => {
+export const fieldErrorsFrom = (error: unknown): SiteErrors => {
   const body = (error as { body?: unknown })?.body;
   if (body === null || typeof body !== 'object') return {};
 

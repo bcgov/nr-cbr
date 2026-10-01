@@ -11,6 +11,7 @@ import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 /**
  * The criteria-to-SQL translation, against a real database.
@@ -206,8 +208,19 @@ class InspectionSearchSpecificationsTest {
   }
 
   private static InspectionSearchCriteria.InspectionSearchCriteriaBuilder criteria() {
-    return InspectionSearchCriteria.builder()
-        .sortBy(InspectionSearchCriteria.STRUCTURE_ID_DATE_SORT);
+    return InspectionSearchCriteria.builder();
+  }
+
+  private List<Long> sorted(InspectionSortColumn column, Sort.Direction direction) {
+    return repository
+        .findAll(
+            InspectionSearchSpecifications.matching(
+                criteria().siteId("site-1").build(), column, direction),
+            PageRequest.of(0, 50))
+        .getContent()
+        .stream()
+        .map(StructureInspectionEntity::getInspectionId)
+        .toList();
   }
 
   /* ------------------------------------------------------------------ the tests */
@@ -494,19 +507,34 @@ class InspectionSearchSpecificationsTest {
     }
 
     @Test
-    @DisplayName("structure sort is name ascending, then date descending")
-    void structureSort() {
-      assertThat(search(criteria().siteId("site-1")
-          .sortBy(InspectionSearchCriteria.STRUCTURE_ID_DATE_SORT).build()))
+    @DisplayName("defaults to legacy's order: structure name ascending, then date descending")
+    void defaultOrder() {
+      assertThat(search(criteria().siteId("site-1").build())).containsExactly(3L, 2L, 1L);
+    }
+
+    @Test
+    @DisplayName("sorts by the header the user clicked, either way")
+    void sortsByAHeader() {
+      assertThat(sorted(InspectionSortColumn.INSPECTION_DATE, Sort.Direction.ASC))
+          .containsExactly(1L, 3L, 2L);
+      assertThat(sorted(InspectionSortColumn.INSPECTION_ID, Sort.Direction.DESC))
           .containsExactly(3L, 2L, 1L);
     }
 
     @Test
-    @DisplayName("project sort falls through to date descending when the site columns tie")
-    void projectSort() {
-      assertThat(search(criteria().siteId("site-1")
-          .sortBy(InspectionSearchCriteria.PROJECT_BRANCH_KM_DATE_SORT).build()))
-          .containsExactly(2L, 3L, 1L);
+    @DisplayName("breaks ties on the clicked column by the default order")
+    void breaksTiesByTheDefault() {
+      // Every inspection is at the same site, so Site # ties throughout and the default decides.
+      assertThat(sorted(InspectionSortColumn.SITE_ID, Sort.Direction.DESC))
+          .containsExactly(3L, 2L, 1L);
+    }
+
+    @Test
+    @DisplayName("sorts by a joined column without dropping rows that lack the join")
+    void sortsByAJoinedColumn() {
+      // No org unit on the site: the left join keeps every row.
+      assertThat(sorted(InspectionSortColumn.DISTRICT, Sort.Direction.ASC)).hasSize(3);
+      assertThat(sorted(InspectionSortColumn.STATUS, Sort.Direction.DESC)).hasSize(3);
     }
 
     @Test

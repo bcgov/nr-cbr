@@ -1,6 +1,6 @@
 import { Save } from '@carbon/icons-react';
 import { Button, Column, Grid, InlineNotification } from '@carbon/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
@@ -11,17 +11,13 @@ import type { FC } from 'react';
 
 import { syncCoordinates } from '@/components/SiteForm/coordinateSync';
 import { toCreateRequest } from '@/components/SiteForm/request';
-import {
-  EMPTY_SITE,
-  isDistrictFromRoad,
-  SITE_TYPE,
-  type SiteFormValues,
-} from '@/components/SiteForm/types';
+import { EMPTY_SITE, SITE_TYPE, type SiteFormValues } from '@/components/SiteForm/types';
 import {
   crossFieldErrors,
   crossFieldWarnings,
   fieldErrors,
   fieldWarnings,
+  withRoadErrors,
   type SiteErrors,
 } from '@/components/SiteForm/validation';
 import { WORK_SAVED } from '@/context/unsavedChanges/workSaved';
@@ -29,7 +25,6 @@ import {
   useBusinessAreas,
   useForestDistricts,
   useRecreationDistricts,
-  useRecreationProjectName,
   useManagementAreas,
   useSiteReferenceDataState,
   useSiteStatusCodes,
@@ -38,9 +33,9 @@ import {
   useStructureInspectionStatusCodes,
 } from '@/hooks/useConfiguration';
 import { useCreateSite } from '@/hooks/useCreateSite';
-import { useRoadSection } from '@/hooks/useRoadSection';
 import { useSettledFields } from '@/hooks/useSettledFields';
 import { useSiteNumberTaken } from '@/hooks/useSiteNumberTaken';
+import { useSiteRoad } from '@/hooks/useSiteRoad';
 import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt';
 import { apiErrorMessage } from '@/utils/apiError';
 import { errorsForSettledFields } from '@/utils/validation';
@@ -111,67 +106,13 @@ const AddSitePage: FC = () => {
   // Only ever asked for once a project file is given — a recreation site's districts come from
   // the file, not from the whole province.
   const recreationDistricts = useRecreationDistricts(site.forestFileId);
-  // The other half of the same question the road lookup asks. A recreation site's Project File ID#
-  // names a recreation project rather than a road file, so only one of the two is ever asked.
-  const isRecreationSite = site.crossingSiteTypeCode === SITE_TYPE.RECREATION;
-  const recreationProject = useRecreationProjectName(site.forestFileId, isRecreationSite);
   const referenceData = useSiteReferenceDataState();
-  // Debounced inside the hook, and asked nothing until both halves are present — a road file alone
-  // names many sections, and they are different roads.
-  const road = useRoadSection(site.forestFileId, site.roadSectionId);
+  // The road the pair names, and the district it writes — see `useSiteRoad`.
+  const road = useSiteRoad(site, setSite, true);
   // Asked as the number is typed, so a clash is known before the other thirty fields are filled
   // in. Legacy checks the same thing in the same two places — live, and again at the save.
   const siteNumberTaken = useSiteNumberTaken(site.siteId);
   const created = useCreateSite();
-
-  /**
-   * The district the road last wrote into the form, or `null` if the one there was not the road's.
-   *
-   * <p>What lets the road take back only what it gave: a storage site with no road picks its own
-   * district, and losing the road must not wipe a choice the user made.
-   */
-  const districtFromRoad = useRef<string | null>(null);
-
-  /**
-   * The road sets the Forest District, as `SiteAction` does on every redisplay — and, unlike
-   * legacy, takes it away again when there is no longer a road.
-   *
-   * <p>Legacy only ever writes the district: clear Project File ID#, or change the pair to one that
-   * names no road, and the old road's district stays in a field the user cannot edit. Here it
-   * follows the road both ways, once the lookup has settled — not while it is still in flight, or
-   * the district would blink out and back on every keystroke. A road with no region gives no
-   * district rather than leaving the previous road's.
-   *
-   * <p>Never for a recreation site, whose district is the user's choice from a list the file
-   * narrows — writing the road's org unit there would overwrite what they picked.
-   */
-  useEffect(() => {
-    if (site.crossingSiteTypeCode === SITE_TYPE.RECREATION) return;
-    if (road.isFetching) return;
-
-    let next: string;
-    if (road.data) {
-      next =
-        road.data.orgUnitNo === null || road.data.orgUnitNo === undefined
-          ? ''
-          : String(road.data.orgUnitNo);
-    } else if (districtFromRoad.current !== null) {
-      next = '';
-    } else {
-      return;
-    }
-    const hadFromRoad = districtFromRoad.current;
-    const hasRoad = Boolean(road.data);
-
-    setSite((current) => {
-      // No road any more, and the user has since picked a district of their own: keep theirs.
-      if (!hasRoad && current.orgUnitNo !== hadFromRoad) return current;
-      return current.orgUnitNo === next
-        ? current
-        : { ...current, orgUnitNo: next, managementOrgUnitNo: '' };
-    });
-    districtFromRoad.current = hasRoad ? next : null;
-  }, [road.data, road.isFetching, site.crossingSiteTypeCode]);
 
   const codeTables = useMemo<SiteCodeTables>(
     () => ({
@@ -262,19 +203,6 @@ const AddSitePage: FC = () => {
   const settledErrors = fieldErrors(site, 'settled');
   const conflicts = crossFieldErrors(site);
 
-  /**
-   * The pair was looked up and names no road — the server's own refusal, known before Save.
-   *
-   * <p>Live, like the Site # clash: it is the answer to a question already asked, not a gap the
-   * user has yet to fill. Not for a recreation site, whose file names a project rather than a road.
-   */
-  const noRoad =
-    site.crossingSiteTypeCode !== SITE_TYPE.RECREATION &&
-    site.forestFileId.trim() !== '' &&
-    site.roadSectionId.trim() !== '' &&
-    road.isError &&
-    !road.isFetching;
-
   const merged: SiteErrors = {
     ...fieldErrors(site, 'typing'),
     ...errorsForSettledFields(settledErrors, settled, (key) => String(site[key] ?? '')),
@@ -292,24 +220,7 @@ const AddSitePage: FC = () => {
     ...created.fieldErrors,
   };
 
-  /**
-   * Where the road decides the district, a complaint about the district is shown on Project File
-   * ID# — the box the user can change to fix it.
-   *
-   * <p>Forest District is then a read-only value with nowhere to put a message, and a Save refused
-   * over an error nobody can see is a button that does nothing. Two causes, and the more useful
-   * sentence wins: no road at all, or a road with no district (a null `FOREST_REGION`). Neither
-   * overrides a complaint Project File ID# already has of its own, such as being blank.
-   */
-  const districtIsDerived = isDistrictFromRoad(site.crossingSiteTypeCode, Boolean(road.data));
-  const { orgUnitNo: districtError, ...rest } = merged;
-  const districtMessage = noRoad
-    ? 'No road matches this Project File ID# and Br.'
-    : 'This road has no Forest District on record.';
-  const errors: SiteErrors =
-    districtIsDerived && (noRoad || districtError !== undefined)
-      ? { ...rest, forestFileId: merged.forestFileId ?? districtMessage }
-      : merged;
+  const errors = withRoadErrors(merged, site.crossingSiteTypeCode, road);
 
   /**
    * The amber tier, which never waits for Save.
@@ -334,7 +245,7 @@ const AddSitePage: FC = () => {
     setSubmitted(true);
     if (
       siteNumberTaken ||
-      noRoad ||
+      road.noRoad ||
       Object.keys(settledErrors).length > 0 ||
       Object.keys(crossFieldErrors(site)).length > 0
     ) {
@@ -351,7 +262,7 @@ const AddSitePage: FC = () => {
         void navigate(`/inventory/site/${stored.siteId}`, { state: WORK_SAVED });
       },
     });
-  }, [created, navigate, noRoad, settledErrors, site, siteNumberTaken]);
+  }, [created, navigate, road.noRoad, settledErrors, site, siteNumberTaken]);
 
   /**
    * Anything typed, picked or ticked.
@@ -465,15 +376,9 @@ const AddSitePage: FC = () => {
           onSettle={markSettled}
           onSave={save}
           onFindRoad={() => setFindingRoad(true)}
-          forestServiceRoad={
-            isRecreationSite
-              ? (recreationProject.data?.projectName ?? '')
-              : (road.data?.forestServiceRoad ?? '')
-          }
-          forestServiceRoadLoading={
-            isRecreationSite ? recreationProject.isFetching : road.isFetching
-          }
-          roadResolved={Boolean(road.data)}
+          forestServiceRoad={road.forestServiceRoad}
+          forestServiceRoadLoading={road.forestServiceRoadLoading}
+          roadResolved={road.roadResolved}
           isEditable={isEditableOnCreate}
         />
       </Column>

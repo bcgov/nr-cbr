@@ -3,11 +3,13 @@ package ca.bc.gov.nrs.cbr.specification.v1;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -19,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
@@ -121,6 +124,8 @@ public final class InspectionSearchSpecifications {
   private static final String ORG_UNIT_CODE = "orgUnitCode";
   private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String STATUS_CODE_VALUE = "inspectionReportStatusCode";
+  private static final String STATUS_DESCRIPTION = "description";
+  private static final String CROSSING_NAME = "crossingName";
   private static final String STATUS_HISTORY_INSPECTION_ID = "inspectionId";
 
   /** The value an indicator column carries when it is set. */
@@ -145,6 +150,17 @@ public final class InspectionSearchSpecifications {
    * (divergence 3).
    */
   public static Specification<StructureInspectionEntity> matching(InspectionSearchCriteria criteria) {
+    return matching(criteria, null, Sort.Direction.ASC);
+  }
+
+  /**
+   * Builds the predicate, ordered by the header the user chose — or legacy's default when none.
+   *
+   * @param sortBy    the results column whose header was clicked, or null for the default order
+   * @param direction which way; ignored when {@code sortBy} is null
+   */
+  public static Specification<StructureInspectionEntity> matching(
+      InspectionSearchCriteria criteria, InspectionSortColumn sortBy, Sort.Direction direction) {
     return (root, query, builder) -> {
       List<Predicate> predicates = new ArrayList<>();
 
@@ -212,9 +228,8 @@ public final class InspectionSearchSpecifications {
       // still a candidate for every other criterion.
       From<?, ?> roadSection = joinOrFetch(site, ROAD_SECTION, JoinType.LEFT, projecting);
       From<?, ?> orgUnit = joinOrFetch(site, ORG_UNIT, JoinType.LEFT, projecting);
-      if (projecting) {
-        joinOrFetch(status, STATUS_CODE, JoinType.LEFT, true);
-      }
+      From<?, ?> statusCode =
+          projecting ? joinOrFetch(status, STATUS_CODE, JoinType.LEFT, true) : null;
 
       contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
           .ifPresent(predicates::add);
@@ -226,7 +241,8 @@ public final class InspectionSearchSpecifications {
         predicates.add(findChangedReviewed(builder, query, root, status));
       }
 
-      order(root, structure, site, orgUnit, query, builder, criteria.sortBy());
+      order(new Joined(root, structure, site, orgUnit, roadSection, statusCode), query, builder,
+          sortBy, direction);
 
       return predicates.isEmpty()
           ? builder.conjunction()
@@ -404,28 +420,30 @@ public final class InspectionSearchSpecifications {
     }
   }
 
+  /** The joins a results row reads, made once in {@code matching} and reused by the ordering. */
+  private record Joined(
+      Root<StructureInspectionEntity> root,
+      From<?, ?> structure,
+      From<?, ?> site,
+      From<?, ?> orgUnit,
+      From<?, ?> roadSection,
+      From<?, ?> statusCode) {}
+
   /**
-   * Applies the ordering the form asked for.
+   * Orders the results: by the header the user clicked, then by legacy's default.
    *
-   * <p>The two orderings are legacy's, from {@code InspectionSearchForm.createSearch()}:
-   *
-   * <ul>
-   *   <li>{@code structureIdDateSort} — structure name ascending, then inspection date descending.
-   *       Legacy's default, selected by {@code reset()}.</li>
-   *   <li>{@code projectBranchKmDateSort} — project file, road section and kilometre ascending, then
-   *       inspection date descending.</li>
-   * </ul>
-   *
-   * <p>Legacy carries a third, unreachable ordering for when {@code sortBy} is empty — district
-   * code, road, road section, kilometre, then date descending. It is reproduced here as the fallback
-   * for a caller that omits {@code sortBy}, which the screen never does but the API allows.
+   * <p>The default is legacy's {@code structureIdDateSort} — structure name ascending, then the
+   * newest inspection first — the order {@code InspectionSearchForm.reset()} selected. Its
+   * "Sort by" radio is gone from this screen; the results headers replace it. A clicked column
+   * goes first, the default then breaks its ties, and the inspection's own id closes the list, so
+   * the order is total and a row cannot appear on two pages, or on none, as the user pages
+   * through. Text sorts without regard to case.
    *
    * <h3>Why the sort is here and not on the {@code Pageable}</h3>
    * Every key lives on a joined table, and Spring Data resolves a sort path with an <em>inner</em>
-   * join. For the keys on {@code CROSSING_SITE} that is harmless — the join is already inner — but
-   * the fallback ordering keys on the org unit, which is joined left. Ordering inside the
-   * specification is what lets each join type be stated once, and lets the ordering reuse the joins
-   * the projection already needs rather than adding more.
+   * join — which would drop every inspection whose site has no org unit or road section. Ordering
+   * inside the specification is what lets each join type be stated once, and lets the ordering
+   * reuse the joins the projection already needs rather than adding more.
    *
    * <h3>Divergence 3 — the org unit</h3>
    * Legacy joins {@code CBR_ORG_UNIT}, a six-branch union whose {@code ORG_UNIT_NO} is not unique
@@ -439,36 +457,45 @@ public final class InspectionSearchSpecifications {
    * <p>Skipped entirely for the count query, which has no ordering.
    */
   private static void order(
-      Root<StructureInspectionEntity> root,
-      From<?, ?> structure,
-      From<?, ?> site,
-      From<?, ?> orgUnit,
+      Joined joined,
       CriteriaQuery<?> query,
       CriteriaBuilder builder,
-      String sortBy) {
+      InspectionSortColumn sortBy,
+      Sort.Direction direction) {
     if (!returnsEntities(query)) {
       return;
     }
 
-    if (InspectionSearchCriteria.PROJECT_BRANCH_KM_DATE_SORT.equals(sortBy)) {
-      query.orderBy(
-          builder.asc(site.get(FOREST_FILE_ID)),
-          builder.asc(site.get(ROAD_SECTION_ID)),
-          builder.asc(site.get(KILOMETRES)),
-          builder.desc(root.get(INSPECTION_DATE)));
-      return;
+    List<Order> order = new ArrayList<>();
+    if (sortBy != null) {
+      for (Expression<?> key : sortKeys(sortBy, joined, builder)) {
+        order.add(direction == Sort.Direction.DESC ? builder.desc(key) : builder.asc(key));
+      }
     }
-    if (StringUtils.hasText(sortBy)) {
-      query.orderBy(
-          builder.asc(structure.get(STRUCTURE_NAME)),
-          builder.desc(root.get(INSPECTION_DATE)));
-      return;
-    }
-    query.orderBy(
-        builder.asc(orgUnit.get(ORG_UNIT_CODE)),
-        builder.asc(site.get(ROAD_SECTION_ID)),
-        builder.asc(site.get(KILOMETRES)),
-        builder.desc(root.get(INSPECTION_DATE)));
+    order.add(builder.asc(joined.structure().get(STRUCTURE_NAME)));
+    order.add(builder.desc(joined.root().get(INSPECTION_DATE)));
+    order.add(builder.asc(joined.root().get(INSPECTION_ID)));
+    query.orderBy(order);
+  }
+
+  /** What a results column sorts on — the value it displays, through the same joins. */
+  private static List<Expression<?>> sortKeys(
+      InspectionSortColumn column, Joined joined, CriteriaBuilder builder) {
+    return switch (column) {
+      case INSPECTION_ID -> List.of(joined.root().get(INSPECTION_ID));
+      case DISTRICT -> List.of(joined.orgUnit().get(ORG_UNIT_CODE));
+      case FOREST_SERVICE_ROAD ->
+          List.of(builder.upper(joined.roadSection().get(ROAD_SECTION_NAME)));
+      case INSPECTION_DATE -> List.of(joined.root().get(INSPECTION_DATE));
+      case SITE_ID -> List.of(builder.upper(joined.root().get(SITE_AT_TIME_OF_INSPECTION)));
+      case STRUCTURE_NAME -> List.of(builder.upper(joined.structure().get(STRUCTURE_NAME)));
+      case KILOMETRES -> List.of(joined.site().get(KILOMETRES));
+      case CROSSING_NAME -> List.of(builder.upper(joined.site().get(CROSSING_NAME)));
+      case PROJECT_FILE -> List.of(
+          builder.upper(joined.site().get(FOREST_FILE_ID)),
+          builder.upper(joined.site().get(ROAD_SECTION_ID)));
+      case STATUS -> List.of(builder.upper(joined.statusCode().get(STATUS_DESCRIPTION)));
+    };
   }
 
   /**

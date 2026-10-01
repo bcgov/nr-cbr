@@ -88,14 +88,24 @@ describe('InspectionSearchService', () => {
     expect(urlOf(request)).not.toContain('mostRecentInspections');
   });
 
-  it('always sends sortBy, which is not a criterion but is what the server orders by', async () => {
-    // Omitting it falls through to the legacy default ordering — district, road, section, km —
-    // which is not what the form asked for and not what the user would see in the table.
+  it('sends no sort until a header is chosen, leaving the server its default order', async () => {
     const { service, request } = withMockedRequest();
 
     await service.searchInspections(criteria({ siteId: '12345' }), 0, 20);
 
-    expect(urlOf(request)).toContain('sortBy=structureIdDateSort');
+    expect(urlOf(request)).not.toContain('sortBy');
+  });
+
+  it('sends the header the user sorted by, and which way', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.searchInspections(criteria({ siteId: '12345' }), 0, 20, {
+      column: 'INSPECTION_DATE',
+      direction: 'DESC',
+    });
+
+    expect(urlOf(request)).toContain('sortBy=INSPECTION_DATE');
+    expect(urlOf(request)).toContain('sortDirection=DESC');
   });
 
   it('passes the page and size through as given', async () => {

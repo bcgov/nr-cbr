@@ -7,11 +7,15 @@ import ca.bc.gov.nrs.cbr.struct.v1.SiteCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteUpdateRequest;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -43,6 +47,11 @@ public interface SiteApiEndpoint {
    * <p>{@code @Valid} is what turns a non-numeric kilometre bound into a 400 naming the field,
    * rather than a value that reaches the {@code WHERE} clause and matches nothing.
    *
+   * <p><b>Sorted by a results column</b> when {@code sortBy} names one ({@link SiteSortColumn}),
+   * {@code sortDirection} {@code ASC} or {@code DESC}; legacy's fixed order otherwise. Applied
+   * on the server so it orders every match, not just the page on screen. An unknown value is a
+   * 400.
+   *
    * <p>Gated on {@link CbrAuthorities#READ}, the legacy {@code /showSiteSearch} privilege — every
    * role that can read holds it, and {@code CBR_ADMIN} now does too. This is an admission check, not
    * a row filter: CBR has no region, district or client scoping, so a caller who passes it sees
@@ -53,7 +62,9 @@ public interface SiteApiEndpoint {
   ResponseEntity<PagedResponse<SiteSearchResult>> searchSites(
       @Valid @ModelAttribute SiteSearchCriteria criteria,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-      @RequestParam(name = "pageSize", defaultValue = "20") int pageSize);
+      @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
+      @RequestParam(name = "sortBy", required = false) SiteSortColumn sortBy,
+      @RequestParam(name = "sortDirection", defaultValue = "ASC") Sort.Direction sortDirection);
 
   /**
    * One site, for the detail screen.
@@ -100,6 +111,24 @@ public interface SiteApiEndpoint {
   @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
   @PostMapping
   SiteCreatedResponse createSite(@RequestBody SiteCreateRequest request);
+
+  /**
+   * Saves an edit to a site.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — legacy's {@code /saveSite}, held from
+   * {@code CBR_LEVEL_1} up. What a caller may change within that is decided by role in
+   * {@link ca.bc.gov.nrs.cbr.service.v1.SiteService#update}: Level 1 changes Site Details alone.
+   *
+   * <p><b>204 on success.</b> The page re-reads the site rather than trusting an echo: the road's
+   * name and the maintainer come from other tables and are worth reading afresh. <b>400</b> with a
+   * message per field when a rule fails, as the create does; <b>404</b> if the site is gone.
+   *
+   * @param siteId the {@code CROSSING_SITE_ID}; the number itself never changes
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{siteId}")
+  ResponseEntity<Void> updateSite(
+      @PathVariable("siteId") String siteId, @RequestBody SiteUpdateRequest request);
 
   /**
    * Deletes a site.

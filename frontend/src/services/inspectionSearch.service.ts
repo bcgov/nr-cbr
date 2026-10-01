@@ -2,10 +2,12 @@ import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type {
   InspectionSearchCriteria,
   InspectionSearchResult,
+  InspectionSort,
   PagedResponse,
 } from '@/pages/InspectionSearch/types';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
+import { sortParams } from '@/utils/headerSort';
 
 /**
  * Inspection Search, backed by `/api/v1/inspections/search`.
@@ -36,11 +38,14 @@ export class InspectionSearchService extends HttpClient {
     criteria: InspectionSearchCriteria,
     pageNumber: number,
     pageSize: number,
+    sort: InspectionSort | null = null,
   ): CancelablePromise<PagedResponse<InspectionSearchResult>> {
     return this.doRequest<PagedResponse<InspectionSearchResult>>(this.config, {
       method: 'GET',
       url: '/v1/inspections/search',
-      query: { ...populated(criteria), pageNumber, pageSize },
+      // The sort only when a header was clicked; absent, the server answers in legacy's default
+      // order — structure name, then the newest inspection first.
+      query: { ...populated(criteria), pageNumber, pageSize, ...sortParams(sort) },
     });
   }
   /**
@@ -68,12 +73,7 @@ export class InspectionSearchService extends HttpClient {
   }
 }
 
-/**
- * Drops blank strings and false booleans, leaving only the criteria the user actually set.
- *
- * <p>`sortBy` always has a value and is always sent — it is not a criterion, it is what the server
- * orders by, and omitting it would silently fall through to the legacy default ordering.
- */
+/** Drops blank strings and false booleans, leaving only the criteria the user actually set. */
 const populated = (criteria: InspectionSearchCriteria): Record<string, string | boolean> => {
   const query: Record<string, string | boolean> = {};
   for (const [field, value] of Object.entries(criteria)) {

@@ -9,6 +9,9 @@ import ca.bc.gov.nrs.cbr.struct.v1.SiteCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteUpdateRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,8 +35,10 @@ public class SiteApiController implements SiteApiEndpoint {
 
   @Override
   public ResponseEntity<PagedResponse<SiteSearchResult>> searchSites(
-      SiteSearchCriteria criteria, int pageNumber, int pageSize) {
-    return ResponseEntity.ok(siteSearchService.search(criteria, pageNumber, pageSize));
+      SiteSearchCriteria criteria, int pageNumber, int pageSize,
+      SiteSortColumn sortBy, Sort.Direction sortDirection) {
+    return ResponseEntity.ok(
+        siteSearchService.search(criteria, pageNumber, pageSize, sortBy, sortDirection));
   }
 
   @Override
@@ -44,6 +49,12 @@ public class SiteApiController implements SiteApiEndpoint {
   @Override
   public SiteCreatedResponse createSite(SiteCreateRequest request) {
     return siteService.create(request);
+  }
+
+  @Override
+  public ResponseEntity<Void> updateSite(String siteId, SiteUpdateRequest request) {
+    siteService.update(siteId, request);
+    return ResponseEntity.noContent().build();
   }
 
   @Override

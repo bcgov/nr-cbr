@@ -3,8 +3,10 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -53,13 +55,20 @@ public interface InspectionApiEndpoint {
    * every role that can read holds it. This is an admission check, not a row filter: CBR has no
    * region, district or client scoping, so a caller who passes it can search every inspection in the
    * province. There is no narrower gate to apply (cbr-auth-and-roles.local.md §3.3).
+   *
+   * <p><b>Sorted by a results column</b> when {@code sortBy} names one
+   * ({@link InspectionSortColumn}), {@code sortDirection} {@code ASC} or {@code DESC}; legacy's
+   * default order — structure name, then newest first — otherwise. On the server, so it orders
+   * every match rather than the page on screen. An unknown value is a 400.
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/search")
   ResponseEntity<PagedResponse<InspectionSearchResult>> searchInspections(
       @Valid @ModelAttribute InspectionSearchCriteria criteria,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-      @RequestParam(name = "pageSize", defaultValue = "20") int pageSize);
+      @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
+      @RequestParam(name = "sortBy", required = false) InspectionSortColumn sortBy,
+      @RequestParam(name = "sortDirection", defaultValue = "ASC") Sort.Direction sortDirection);
 
   /**
    * Deletes an offline inspection.

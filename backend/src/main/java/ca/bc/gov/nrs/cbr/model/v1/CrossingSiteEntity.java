@@ -61,7 +61,7 @@ import org.hibernate.annotations.NotFoundAction;
 @EqualsAndHashCode(of = "crossingSiteId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class CrossingSiteEntity {
 
   @Id

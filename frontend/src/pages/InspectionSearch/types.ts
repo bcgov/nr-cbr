@@ -1,3 +1,5 @@
+import type { HeaderSort } from '@/utils/headerSort';
+
 /**
  * Inspection Search criteria and results.
  *
@@ -35,17 +37,25 @@ export type InspectionReviewerOption = {
 };
 
 /**
- * The two orderings the legacy form offers, by their legacy `sortBy` values.
+ * The results columns a user can sort by, one per header, by the server's names for them.
  *
- * <p>Legacy `reset()` selects {@link STRUCTURE_ID_DATE_SORT}, so that is the default on a fresh
- * form. `createSearch()` also carries a third, unreachable ordering for when `sortBy` is empty —
- * district code, road, branch, km ascending then date descending — which only happens on a
- * back-navigation into a restored search. It is not offered here because it is not offered there.
+ * <p>These replace legacy's "Sort by" radio. Its default — structure name, then the newest
+ * inspection first — is still the order until a header is clicked, and breaks ties after.
  */
-export const STRUCTURE_ID_DATE_SORT = 'structureIdDateSort';
-export const PROJECT_BRANCH_KM_DATE_SORT = 'projectBranchKmDateSort';
+export type InspectionSortColumn =
+  | 'INSPECTION_ID'
+  | 'DISTRICT'
+  | 'FOREST_SERVICE_ROAD'
+  | 'INSPECTION_DATE'
+  | 'SITE_ID'
+  | 'STRUCTURE_NAME'
+  | 'KILOMETRES'
+  | 'CROSSING_NAME'
+  | 'PROJECT_FILE'
+  | 'STATUS';
 
-export type InspectionSortBy = typeof STRUCTURE_ID_DATE_SORT | typeof PROJECT_BRANCH_KM_DATE_SORT;
+/** A header the user sorted by, and which way. `null` where used means the default order. */
+export type InspectionSort = HeaderSort<InspectionSortColumn>;
 
 /**
  * The 19 criteria the legacy form offers, in its own order.
@@ -94,7 +104,6 @@ export type InspectionSearchCriteria = {
   businessAreaOrgUnitNo: string;
   inspectorName: string;
   inspectionReviewerId: string;
-  sortBy: InspectionSortBy;
 };
 
 /**
@@ -159,6 +168,4 @@ export const EMPTY_CRITERIA: InspectionSearchCriteria = {
   businessAreaOrgUnitNo: '',
   inspectorName: '',
   inspectionReviewerId: '',
-  // Legacy `reset()` sets exactly this, so an untouched form sorts by structure then date.
-  sortBy: STRUCTURE_ID_DATE_SORT,
 };

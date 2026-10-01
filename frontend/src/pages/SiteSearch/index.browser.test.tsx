@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@vitest/browser/context';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -239,6 +239,15 @@ describe('SiteSearchPage — criteria form', () => {
   });
 });
 
+/**
+ * The headers as a sighted user reads them. A sortable header also carries text only a screen
+ * reader hears, so its visible label is read rather than the whole cell.
+ */
+const headerLabels = () =>
+  screen
+    .getAllByRole('columnheader')
+    .map((cell) => cell.querySelector('.cds--table-header-label')?.textContent ?? cell.textContent);
+
 describe('SiteSearchPage — results', () => {
   it('shows no results table until a search is run', () => {
     // Legacy gates the whole block on `<c:if test="${search}">`. An empty table on an untouched
@@ -284,6 +293,7 @@ describe('SiteSearchPage — results', () => {
       expect.objectContaining({ siteId: '12345' }),
       0,
       20,
+      null,
     );
   });
 
@@ -329,7 +339,7 @@ describe('SiteSearchPage — results', () => {
     fireEvent.click(screen.getByLabelText('Next page'));
 
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, null);
     });
   });
 
@@ -345,13 +355,13 @@ describe('SiteSearchPage — results', () => {
     await searchAndWait();
     fireEvent.click(screen.getByLabelText('Next page'));
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, null);
     });
 
     search();
 
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
     });
   });
 
@@ -456,7 +466,7 @@ describe('SiteSearchPage — results', () => {
     renderPage();
     await searchAndWait();
 
-    const headers = screen.getAllByRole('columnheader').map((cell) => cell.textContent);
+    const headers = headerLabels();
     expect(headers).toEqual([
       'Site #',
       'District Code',
@@ -476,7 +486,7 @@ describe('SiteSearchPage — the Delete column is privilege-gated', () => {
     renderPage(false);
     await searchAndWait();
 
-    const headers = screen.getAllByRole('columnheader').map((cell) => cell.textContent);
+    const headers = headerLabels();
     expect(headers).not.toContain('Actions');
   });
 
@@ -484,7 +494,7 @@ describe('SiteSearchPage — the Delete column is privilege-gated', () => {
     renderPage(true);
     await searchAndWait();
 
-    const headers = screen.getAllByRole('columnheader').map((cell) => cell.textContent);
+    const headers = headerLabels();
     expect(headers).toContain('Actions');
   });
 });
@@ -519,6 +529,7 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       expect.objectContaining({ siteStatusCode: '' }),
       0,
       20,
+      null,
     );
   });
 
@@ -584,6 +595,7 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       expect.objectContaining({ orgUnit: '18' }),
       0,
       20,
+      null,
     );
   });
 
@@ -1073,5 +1085,100 @@ describe('SiteSearchPage — User Kilometres', () => {
     expect(screen.queryByTestId('site-search-userKmStart')).not.toBeInTheDocument();
     expect(screen.queryByTestId('site-search-userKmEnd')).not.toBeInTheDocument();
     expect(screen.queryByText('User Kilometres')).not.toBeInTheDocument();
+  });
+});
+
+describe('SiteSearchPage — sorting by a header', () => {
+  // Carbon puts a sortable header's own props on the button inside it, so the test id is the button.
+  // Found rather than got: while a page loads the table is a skeleton, with no headers to click.
+  const sortBy = async (column: string) => {
+    fireEvent.click(await screen.findByTestId(`site-search-sort-${column}`));
+    await screen.findByTestId('site-search-results');
+  };
+
+  const manyResults = () =>
+    siteSearchApi.searchSites.mockResolvedValue({
+      ...emptyPage(),
+      content: [site('SITE-1')],
+      totalElements: 40,
+      totalPages: 2,
+    });
+
+  it('asks the server to sort every match, not the rows on screen', async () => {
+    // The results are paged on the server, so ordering the twenty rows in hand would not be a sort
+    // of the search at all.
+    renderPage();
+    await searchAndWait();
+
+    await sortBy('CROSSING_NAME');
+
+    await waitFor(() => {
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
+        column: 'CROSSING_NAME',
+        direction: 'ASC',
+      });
+    });
+  });
+
+  it('turns descending on a second click and back to legacy order on a third', async () => {
+    renderPage();
+    await searchAndWait();
+
+    await sortBy('KILOMETRES');
+    await sortBy('KILOMETRES');
+    await waitFor(() => {
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
+        column: 'KILOMETRES',
+        direction: 'DESC',
+      });
+    });
+
+    await sortBy('KILOMETRES');
+    await waitFor(() => {
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
+    });
+  });
+
+  it('goes back to page one when the order changes', async () => {
+    // Page two in one order is a different twenty sites in another.
+    manyResults();
+    renderPage();
+    await searchAndWait();
+    fireEvent.click(screen.getByLabelText('Next page'));
+    await waitFor(() => {
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, null);
+    });
+
+    await sortBy('SITE_ID');
+
+    await waitFor(() => {
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
+        column: 'SITE_ID',
+        direction: 'ASC',
+      });
+    });
+  });
+
+  it('does not offer to sort the Actions column', async () => {
+    renderPage(true);
+    await searchAndWait();
+
+    const actions = screen
+      .getAllByRole('columnheader')
+      .find((cell) => cell.textContent === 'Actions') as HTMLElement;
+    expect(within(actions).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('forgets the order on Reset', async () => {
+    renderPage();
+    await searchAndWait();
+    await sortBy('STATUS');
+
+    fireEvent.click(screen.getByTestId('site-search-reset'));
+    await searchAndWait();
+
+    await waitFor(() => {
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
+    });
   });
 });

@@ -3,11 +3,13 @@ package ca.bc.gov.nrs.cbr.specification.v1;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -16,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
@@ -74,6 +77,7 @@ public final class SiteSearchSpecifications {
   private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String CLIENT_NAME = "clientName";
   private static final String STATUS = "status";
+  private static final String STATUS_DESCRIPTION = "description";
 
   /** The value {@code CAPITAL_ROAD_IND} carries when a road is a capital road. */
   private static final String YES = "Y";
@@ -89,13 +93,24 @@ public final class SiteSearchSpecifications {
    * (cbr-auth-and-roles.local.md §3.3).
    */
   public static Specification<CrossingSiteEntity> matching(SiteSearchCriteria criteria) {
+    return matching(criteria, null, Sort.Direction.ASC);
+  }
+
+  /**
+   * Builds the predicate, ordered by the column the user chose — or legacy's order when none.
+   *
+   * @param sortBy    the results column whose header was clicked, or null for legacy's order
+   * @param direction which way; ignored when {@code sortBy} is null
+   */
+  public static Specification<CrossingSiteEntity> matching(
+      SiteSearchCriteria criteria, SiteSortColumn sortBy, Sort.Direction direction) {
     return (root, query, builder) -> {
       List<Predicate> predicates = new ArrayList<>();
 
       scalarCriteria(builder, root, criteria, predicates);
       toggleCriteria(builder, root, criteria, predicates);
       maintainedBy(builder, query, root, criteria.primaryUserName()).ifPresent(predicates::add);
-      joinedCriteriaAndProjection(root, query, builder, criteria, predicates);
+      joinedCriteriaAndProjection(root, query, builder, criteria, predicates, sortBy, direction);
 
       return allOf(builder, predicates);
     };
@@ -183,7 +198,9 @@ public final class SiteSearchSpecifications {
       CriteriaQuery<?> query,
       CriteriaBuilder builder,
       SiteSearchCriteria criteria,
-      List<Predicate> predicates) {
+      List<Predicate> predicates,
+      SiteSortColumn sortBy,
+      Sort.Direction direction) {
     boolean projecting = returnsEntities(query);
     boolean filtering = StringUtils.hasText(criteria.forestServiceRoad());
     if (!projecting && !filtering) {
@@ -196,7 +213,7 @@ public final class SiteSearchSpecifications {
           .ifPresent(predicates::add);
     }
     if (projecting) {
-      fetchAndOrder(root, roadSection, query, builder);
+      fetchAndOrder(root, roadSection, query, builder, sortBy, direction);
     }
   }
 
@@ -263,21 +280,57 @@ public final class SiteSearchSpecifications {
    * the guard is what lets one specification serve both. The guard itself is now on the caller,
    * which needs the same answer to decide whether the road section is a fetch or a plain join.
    *
+   * <h3>A column the user chose comes first</h3>
+   * A header click puts that column ahead of legacy's four, which then break its ties — so sites
+   * sharing a crossing name still come out in district and road order rather than at random. The
+   * site number closes the list: it is unique, so the order is total and a site cannot appear on
+   * two pages, or on none, as the user pages through. Text sorts without regard to case, which is
+   * how a reader expects "Riske Cr" and "Unnamed" to fall.
+   *
    * @param roadSection the join {@code matching} already made, reused here rather than made again
    */
   private static void fetchAndOrder(
       Root<CrossingSiteEntity> root,
       From<?, ?> roadSection,
       CriteriaQuery<?> query,
-      CriteriaBuilder builder) {
+      CriteriaBuilder builder,
+      SiteSortColumn sortBy,
+      Sort.Direction direction) {
     From<?, ?> orgUnit = (From<?, ?>) root.fetch(ORG_UNIT, JoinType.LEFT);
-    root.fetch(STATUS, JoinType.LEFT);
+    From<?, ?> status = (From<?, ?>) root.fetch(STATUS, JoinType.LEFT);
 
-    query.orderBy(
-        builder.asc(orgUnit.get(ORG_UNIT_CODE)),
-        builder.asc(roadSection.get(ROAD_SECTION_NAME)),
-        builder.asc(root.get(ROAD_SECTION_ID)),
-        builder.asc(root.get(KILOMETRES)));
+    List<Order> order = new ArrayList<>();
+    if (sortBy != null) {
+      for (Expression<?> key : sortKeys(sortBy, root, orgUnit, roadSection, status, builder)) {
+        order.add(direction == Sort.Direction.DESC ? builder.desc(key) : builder.asc(key));
+      }
+    }
+    order.add(builder.asc(orgUnit.get(ORG_UNIT_CODE)));
+    order.add(builder.asc(roadSection.get(ROAD_SECTION_NAME)));
+    order.add(builder.asc(root.get(ROAD_SECTION_ID)));
+    order.add(builder.asc(root.get(KILOMETRES)));
+    order.add(builder.asc(root.get(SITE_ID)));
+    query.orderBy(order);
+  }
+
+  /** What a results column sorts on — the value it displays, through the same left joins. */
+  private static List<Expression<?>> sortKeys(
+      SiteSortColumn column,
+      Root<CrossingSiteEntity> root,
+      From<?, ?> orgUnit,
+      From<?, ?> roadSection,
+      From<?, ?> status,
+      CriteriaBuilder builder) {
+    return switch (column) {
+      case SITE_ID -> List.of(builder.upper(root.get(SITE_ID)));
+      case DISTRICT -> List.of(orgUnit.get(ORG_UNIT_CODE));
+      case FOREST_SERVICE_ROAD -> List.of(builder.upper(roadSection.get(ROAD_SECTION_NAME)));
+      case KILOMETRES -> List.of(root.get(KILOMETRES));
+      case CROSSING_NAME -> List.of(builder.upper(root.get(CROSSING_NAME)));
+      case PROJECT_FILE -> List.of(
+          builder.upper(root.get(FOREST_FILE_ID)), builder.upper(root.get(ROAD_SECTION_ID)));
+      case STATUS -> List.of(builder.upper(status.get(STATUS_DESCRIPTION)));
+    };
   }
 
   /**

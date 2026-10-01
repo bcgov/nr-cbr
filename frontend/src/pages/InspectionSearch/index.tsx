@@ -10,6 +10,7 @@ import {
   EMPTY_CRITERIA,
   type InspectionSearchCriteria,
   type InspectionSearchResult,
+  type InspectionSort,
 } from './types';
 
 import './inspectionSearch.scss';
@@ -71,6 +72,8 @@ const InspectionSearchPage: FC = () => {
   const [submitted, setSubmitted] = useState<InspectionSearchCriteria | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  /** The header the results are sorted by. Kept across new searches; cleared by Reset. */
+  const [sort, setSort] = useState<InspectionSort | null>(null);
   const [pendingDelete, setPendingDelete] = useState<InspectionSearchResult | null>(null);
 
   const structureTypeClassCodes = useStructureTypeClassCodes();
@@ -86,7 +89,7 @@ const InspectionSearchPage: FC = () => {
 
   // `page` is 1-based because Carbon's Pagination is; the backend is 0-based, so the conversion
   // happens here rather than either side pretending otherwise.
-  const results = useInspectionSearch(submitted, page - 1, pageSize);
+  const results = useInspectionSearch(submitted, page - 1, pageSize, sort);
   const deleteInspection = useDeleteInspection();
 
   /**
@@ -144,6 +147,7 @@ const InspectionSearchPage: FC = () => {
     setCriteria(EMPTY_CRITERIA);
     setSubmitted(null);
     setPage(1);
+    setSort(null);
   }, []);
 
   return (
@@ -215,6 +219,12 @@ const InspectionSearchPage: FC = () => {
                 setPageSize(nextPageSize);
               }}
               onDelete={setPendingDelete}
+              sort={sort}
+              onSortChange={(next) => {
+                setSort(next);
+                // Back to page one: page 4 in one order is a different twenty rows in another.
+                setPage(1);
+              }}
             />
           )}
         </Column>
