@@ -118,13 +118,9 @@ public final class StructureSearchSpecifications {
 
   private StructureSearchSpecifications() {}
 
-  /** Builds the predicate for a set of criteria; everything matches when nothing is set. */
-  public static Specification<CrossingStructureEntity> matching(StructureSearchCriteria criteria) {
-    return matching(criteria, null, Sort.Direction.ASC);
-  }
-
   /**
-   * The same, sorted by a results column first when one was chosen.
+   * Builds the predicate for a set of criteria — everything matches when nothing is set — sorted by
+   * a results column first when one was chosen.
    *
    * @param sortBy    the results column whose header was clicked, or null for legacy's order
    * @param direction which way; ignored when {@code sortBy} is null
@@ -147,16 +143,7 @@ public final class StructureSearchSpecifications {
       }
 
       if (projecting) {
-        From<?, ?> typeClass = (From<?, ?>) root.fetch(TYPE_CLASS, JoinType.LEFT);
-        List<Order> order = new ArrayList<>();
-        if (sortBy != null) {
-          for (Expression<?> key :
-              sortKeys(sortBy, root, site, roadSection, orgUnit, typeClass, builder)) {
-            order.add(direction == Sort.Direction.DESC ? builder.desc(key) : builder.asc(key));
-          }
-        }
-        order.addAll(legacyOrder(root, site, roadSection, orgUnit, builder));
-        query.orderBy(order);
+        fetchAndOrder(root, site, roadSection, orgUnit, query, builder, sortBy, direction);
       }
 
       return predicates.isEmpty()
@@ -364,6 +351,32 @@ public final class StructureSearchSpecifications {
         builder.upper(client.get(CLIENT_NAME)),
         WILDCARD + name.trim().toUpperCase(Locale.ROOT) + WILDCARD));
     return Optional.of(site.get(CLIENT_NUMBER).in(clients));
+  }
+
+  /**
+   * Fetches the type/class a results row displays, and orders the page: the chosen column first,
+   * when there is one, then legacy's order to break its ties. Only when projecting — a count has
+   * no fetch and no order.
+   */
+  private static void fetchAndOrder(
+      Root<CrossingStructureEntity> root,
+      From<?, ?> site,
+      From<?, ?> roadSection,
+      From<?, ?> orgUnit,
+      CriteriaQuery<?> query,
+      CriteriaBuilder builder,
+      StructureSortColumn sortBy,
+      Sort.Direction direction) {
+    From<?, ?> typeClass = (From<?, ?>) root.fetch(TYPE_CLASS, JoinType.LEFT);
+    List<Order> order = new ArrayList<>();
+    if (sortBy != null) {
+      for (Expression<?> key :
+          sortKeys(sortBy, root, site, roadSection, orgUnit, typeClass, builder)) {
+        order.add(direction == Sort.Direction.DESC ? builder.desc(key) : builder.asc(key));
+      }
+    }
+    order.addAll(legacyOrder(root, site, roadSection, orgUnit, builder));
+    query.orderBy(order);
   }
 
   /**

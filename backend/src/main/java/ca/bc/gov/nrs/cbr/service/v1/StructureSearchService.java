@@ -57,26 +57,17 @@ public class StructureSearchService {
   }
 
   /**
-   * One page of matching structures, in legacy's order — district, road, branch, kilometre.
-   *
-   * @param pageNumber zero-based
-   * @param pageSize   rows per page, capped at {@value #MAX_PAGE_SIZE}
-   */
-  @Transactional(readOnly = true)
-  public PagedResponse<StructureSearchResult> search(
-      StructureSearchCriteria criteria, int pageNumber, int pageSize) {
-    return search(criteria, pageNumber, pageSize, null, Sort.Direction.ASC);
-  }
-
-  /**
-   * The same, sorted by a results column first when one is given.
+   * One page of matching structures, sorted by a results column first when one is given, then in
+   * legacy's order — district, road, branch, kilometre.
    *
    * <p>The {@link Pageable} carries no sort: the keys are on left-joined tables, and Spring Data
    * would resolve them with inner joins, dropping the structures "Incomplete Data?" exists to find.
    * The specification orders instead — see Site Search, which does the same.
    *
-   * @param sortBy    the results column the user sorted by, or null for legacy's order
-   * @param direction which way, when {@code sortBy} is set
+   * @param pageNumber zero-based
+   * @param pageSize   rows per page, capped at {@value #MAX_PAGE_SIZE}
+   * @param sortBy     the results column the user sorted by, or null for legacy's order
+   * @param direction  which way, when {@code sortBy} is set
    */
   @Transactional(readOnly = true)
   public PagedResponse<StructureSearchResult> search(

@@ -118,7 +118,12 @@ class StructureSearchServiceTest {
       StructureSearchCriteria.StructureSearchCriteriaBuilder criteria) {
     entityManager.flush();
     entityManager.clear();
-    return service.search(criteria.build(), 0, 50);
+    return service.search(criteria.build(), 0, 50, null, Sort.Direction.ASC);
+  }
+
+  /** One page of every structure, in legacy's order. */
+  private PagedResponse<StructureSearchResult> unsorted(int pageNumber, int pageSize) {
+    return service.search(criteria().build(), pageNumber, pageSize, null, Sort.Direction.ASC);
   }
 
   private List<String> sorted(StructureSortColumn column, Sort.Direction direction) {
@@ -404,7 +409,7 @@ class StructureSearchServiceTest {
       entityManager.flush();
       entityManager.clear();
 
-      PagedResponse<StructureSearchResult> first = service.search(criteria().build(), 0, 2);
+      PagedResponse<StructureSearchResult> first = unsorted(0, 2);
 
       assertThat(first.content()).hasSize(2);
       assertThat(first.totalElements()).isEqualTo(5);
@@ -414,8 +419,8 @@ class StructureSearchServiceTest {
     @Test
     @DisplayName("caps the page size, so one request cannot ask for the province")
     void capsThePageSize() {
-      assertThat(service.search(criteria().build(), 0, 5000).pageSize()).isEqualTo(200);
-      assertThat(service.search(criteria().build(), -1, 0).pageSize()).isEqualTo(20);
+      assertThat(unsorted(0, 5000).pageSize()).isEqualTo(200);
+      assertThat(unsorted(-1, 0).pageSize()).isEqualTo(20);
     }
   }
 }
