@@ -12,25 +12,33 @@ import static org.mockito.Mockito.when;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.EngineeredCulvertTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SpecialAccessRequirementCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.SpecialEquipmentRequirementCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StrctreInspectionTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureCurbTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
+import ca.bc.gov.nrs.cbr.model.v1.SuperstructureTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -61,6 +69,14 @@ class ConfigurationServiceTest {
   private final CbrOrgUnitRepository orgUnits = mock(CbrOrgUnitRepository.class);
   private final RecreationProjectRepository recreationProjects =
       mock(RecreationProjectRepository.class);
+  private final SuperstructureTypeCodeRepository superstructureTypes =
+      mock(SuperstructureTypeCodeRepository.class);
+  private final StructureCurbTypeCodeRepository curbTypes =
+      mock(StructureCurbTypeCodeRepository.class);
+  private final EngineeredCulvertTypeCodeRepository culvertTypes =
+      mock(EngineeredCulvertTypeCodeRepository.class);
+  private final SpecialEquipmentRequirementCodeRepository specialEquipment =
+      mock(SpecialEquipmentRequirementCodeRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes,
@@ -71,7 +87,11 @@ class ConfigurationServiceTest {
       inspectionTypeCodes,
       inspectionReportStatusCodes,
       orgUnits,
-      recreationProjects);
+      recreationProjects,
+      superstructureTypes,
+      curbTypes,
+      culvertTypes,
+      specialEquipment);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -103,6 +123,20 @@ class ConfigurationServiceTest {
         InspectionReportStatusCodeEntity.builder()
             .inspectionReportStatusCode("RS").description("from the report status table").build()));
 
+    when(superstructureTypes.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        SuperstructureTypeCodeEntity.builder()
+            .superstructureTypeCode("SS").description("from the superstructure table").build()));
+    when(curbTypes.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        StructureCurbTypeCodeEntity.builder()
+            .structureCurbTypeCode("CB").description("from the curb table").build()));
+    when(culvertTypes.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        EngineeredCulvertTypeCodeEntity.builder()
+            .engineeredCulvertTypeCode("CV").description("from the culvert table").build()));
+    when(specialEquipment.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        SpecialEquipmentRequirementCodeEntity.builder()
+            .specialEquipmentRequirementCode("EQ")
+            .description("from the equipment table").build()));
+
     assertThat(service.getSiteStatusCodes())
         .containsExactly(new CodeOptionResponse("ST", "from the status table"));
     assertThat(service.getStructureInspectionStatusCodes())
@@ -117,6 +151,14 @@ class ConfigurationServiceTest {
         .containsExactly(new CodeOptionResponse("IT", "from the inspection type table"));
     assertThat(service.getInspectionReportStatusCodes())
         .containsExactly(new CodeOptionResponse("RS", "from the report status table"));
+    assertThat(service.getSuperstructureTypeCodes())
+        .containsExactly(new CodeOptionResponse("SS", "from the superstructure table"));
+    assertThat(service.getStructureCurbTypeCodes())
+        .containsExactly(new CodeOptionResponse("CB", "from the curb table"));
+    assertThat(service.getCulvertTypeCodes())
+        .containsExactly(new CodeOptionResponse("CV", "from the culvert table"));
+    assertThat(service.getSpecialEquipmentCodes())
+        .containsExactly(new CodeOptionResponse("EQ", "from the equipment table"));
   }
 
   @Test

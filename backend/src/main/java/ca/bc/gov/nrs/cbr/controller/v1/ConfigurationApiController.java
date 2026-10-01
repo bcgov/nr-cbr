@@ -82,4 +82,24 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   public ResponseEntity<List<OrgUnitResponse>> getManagementAreas(String forestDistrictOrgUnitNo) {
     return ResponseEntity.ok(configurationService.getManagementAreas(forestDistrictOrgUnitNo));
   }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getSuperstructureTypeCodes() {
+    return ResponseEntity.ok(configurationService.getSuperstructureTypeCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getStructureCurbTypeCodes() {
+    return ResponseEntity.ok(configurationService.getStructureCurbTypeCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getCulvertTypeCodes() {
+    return ResponseEntity.ok(configurationService.getCulvertTypeCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getSpecialEquipmentCodes() {
+    return ResponseEntity.ok(configurationService.getSpecialEquipmentCodes());
+  }
 }
