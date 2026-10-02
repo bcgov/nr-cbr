@@ -36,6 +36,9 @@ type Props = {
   helperText?: string;
   /** The same, for the placeholder — "maintainer" is wrong anywhere but the site form. */
   placeholder?: string;
+  /** Marks the field in error, with the message shown beneath it in place of the helper text. */
+  invalid?: boolean;
+  invalidText?: string;
 };
 
 /**
@@ -58,6 +61,8 @@ const ClientCombo: FC<Props> = ({
   scope = 'MAINTAINERS',
   helperText,
   placeholder,
+  invalid,
+  invalidText,
 }) => {
   const [term, setTerm] = useState(selectedLabel);
 
@@ -105,6 +110,8 @@ const ClientCombo: FC<Props> = ({
         helperText ?? `Name, city or client number (min. ${MIN_CLIENT_TERM_LENGTH} characters)`
       }
       placeholder={placeholder ?? 'Search for a maintainer'}
+      invalid={invalid}
+      invalidText={invalidText}
       items={items}
       itemToString={(item: ClientSuggestion | null) => (item ? clientLabel(item) : '')}
       // A stand-in carrying only what itemToString reads, because the picked suggestion is usually

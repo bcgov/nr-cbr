@@ -11,3 +11,11 @@
   inline-size: 1rem;
   block-size: 1rem;
 }
+
+// Carbon renders the combo box in a plain block, so its inline-block label sits on a text baseline
+// and gains the line's descent — 2px — above the box. A Select's wrapper is a flex column, which has
+// no baseline, so beside one this box sat 2px low. A block label has no baseline to sit on.
+.client-combo > .cds--label {
+  display: block;
+  inline-size: fit-content;
+}

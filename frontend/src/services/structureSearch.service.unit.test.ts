@@ -99,4 +99,28 @@ describe('StructureSearchService', () => {
 
     expect(urlOf(request)).not.toContain('sortBy');
   });
+
+  it('archives with one PUT, carrying the ids as numbers', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.archiveStructures(['12', '345']);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'PUT',
+        url: '/api/v1/structures/archive',
+        data: { structureIds: [12, 345] },
+      }),
+    );
+  });
+
+  it('deletes one structure by id', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.deleteStructure('12');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'DELETE', url: '/api/v1/structures/12' }),
+    );
+  });
 });

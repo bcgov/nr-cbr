@@ -15,10 +15,23 @@
  * the bare status phrase — "Conflict", "Bad Request" — which tells the user nothing they cannot see
  * from the fact that something failed.
  *
+ * <p><b>Not for a server error.</b> A 5xx returns the `fallback` whatever it carries — see below.
+ *
  * <p><b>Always give a real `fallback`.</b> The default is a last resort for a caller with nothing
  * specific to say; a message naming the thing that failed is worth more than "Unknown error".
  */
 export function apiErrorMessage(err: unknown, fallback = 'Unknown error'): string {
+  // A server error says nothing the user can act on, and what it does say is internal: with
+  // `server.error.include-message` on, an unhandled exception's own text arrives as `message` —
+  // "Request processing failed: org.hibernate.exception.SQLGrammarException: … [DELETE FROM …]
+  // [ORA-01031: insufficient privileges]". The caller's own wording is the message for those.
+  // Only a 4xx carries a sentence written for the user, such as a 409's "Structure B1 has
+  // inspections and cannot be deleted."
+  const status = (err as { status?: unknown })?.status;
+  if (typeof status === 'number' && status >= 500) {
+    return fallback;
+  }
+
   const body = (err as { body?: unknown })?.body;
 
   if (body !== null && typeof body === 'object') {
