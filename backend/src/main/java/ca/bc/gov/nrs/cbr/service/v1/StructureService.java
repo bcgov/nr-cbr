@@ -13,6 +13,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityResponse;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -28,6 +29,13 @@ public class StructureService {
 
   private static final Logger log = LoggerFactory.getLogger(StructureService.class);
 
+  /**
+   * The zone the audit columns are written in: the JVM's, which the deployment sets with
+   * {@code TZ=America/Vancouver} ({@code openshift.deploy.yml}) — Pacific time, as legacy's
+   * stamps are. Named rather than left implicit so it is a decision, not an accident.
+   */
+  private static final ZoneId AUDIT_ZONE = ZoneId.systemDefault();
+
   /** Oracle refuses an {@code IN} list longer than this (ORA-01795). */
   static final int IN_LIST_LIMIT = 1000;
 
@@ -35,7 +43,9 @@ public class StructureService {
    * What a delete removes along with the structure, in legacy's order
    * ({@code CBR.DELETE_STRUCTURE}): each table that holds a foreign key to the structure, or to its
    * bridge, and is not one of the blockers. Piers and spans go before the bridge they hang from.
-   * Native, because only the bridge, culvert and load rating are mapped, and those two read-only.
+   * Native rather than through the entities: the bridge and culvert, and the four tables mapped
+   * only for this, are read-only ({@code @Immutable}), and one statement per table is what legacy
+   * runs.
    */
   private static final List<String> CHILD_DELETES = List.of(
       "DELETE FROM THE.STRUCTURE_LOAD_RATING WHERE CROSSING_STRUCTURE_ID = :id",
@@ -91,7 +101,7 @@ public class StructureService {
   public StructureArchiveResponse archive(List<Long> structureIds) {
     List<Long> ids = structureIds.stream().filter(Objects::nonNull).distinct().toList();
     String user = loggedUser.getLoggedUserId();
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(AUDIT_ZONE);
 
     int archived = sumInBatches(ids, batch -> structures.archive(batch, user, now));
 
@@ -138,7 +148,7 @@ public class StructureService {
         onSites.stream().map(CrossingStructureEntity::getCrossingSiteId).distinct().toList();
 
     String user = loggedUser.getLoggedUserId();
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = LocalDateTime.now(AUDIT_ZONE);
     int siteCount = sumInBatches(siteIds,
         batch -> sites.setMaintainer(batch, clientNumber, location, user, now));
     int structureCount = sumInBatches(structureIds,

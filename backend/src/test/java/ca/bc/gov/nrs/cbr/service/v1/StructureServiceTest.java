@@ -13,9 +13,13 @@ import ca.bc.gov.nrs.cbr.model.v1.CloseProximityInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileDetailEntity;
+import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureNameHistEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgePierEntity;
+import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeSpanEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceCulvertEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureCommentEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureMonitorItemEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
@@ -67,13 +71,11 @@ class StructureServiceTest {
     for (String entity : List.of("StructureInspectionEntity", "CrossingStructureFileDetailEntity",
         "StructureRepairEntity", "StructureMonitorItemEntity", "CloseProximityInspectionEntity",
         "StructureReplacementXrefEntity", "StructureLoadRatingEntity", "ForestServiceBridgeEntity",
-        "ForestServiceCulvertEntity", "CrossingStructureEntity", "CrossingSiteEntity",
+        "ForestServiceCulvertEntity", "ForestServiceBridgePierEntity",
+        "ForestServiceBridgeSpanEntity", "StructureCommentEntity",
+        "CrossingStructureNameHistEntity", "CrossingStructureEntity", "CrossingSiteEntity",
         "ClientLocationEntity", "ClientPublicEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
-    }
-    for (String table : List.of("FOREST_SERVICE_BRIDGE_PIER", "FOREST_SERVICE_BRIDGE_SPAN",
-        "STRUCTURE_COMMENT", "CROSSING_STRUCTURE_NAME_HIST")) {
-      entityManager.createNativeQuery("DELETE FROM THE." + table).executeUpdate();
     }
     when(loggedUser.getLoggedUserId()).thenReturn(ARCHIVER);
   }
@@ -169,10 +171,6 @@ class StructureServiceTest {
 
   /* ------------------------------------------------------------------ delete */
 
-  private void sql(String statement) {
-    entityManager.createNativeQuery(statement).executeUpdate();
-  }
-
   private long count(String table, String where) {
     return ((Number) entityManager.createNativeQuery(
         "SELECT COUNT(*) FROM THE." + table + " WHERE " + where).getSingleResult()).longValue();
@@ -185,11 +183,16 @@ class StructureServiceTest {
         .structureLoadRatingId(id * 10).crossingStructureId(id).build());
     entityManager.persist(ForestServiceBridgeEntity.builder()
         .forestServiceBridgeId(id * 10).crossingStructureId(id).build());
+    entityManager.persist(ForestServiceBridgePierEntity.builder()
+        .forestServiceBridgePierId(id * 10).forestServiceBridgeId(id * 10).build());
+    entityManager.persist(ForestServiceBridgeSpanEntity.builder()
+        .forestServiceBridgeSpanId(id * 10).forestServiceBridgeId(id * 10).build());
+    entityManager.persist(StructureCommentEntity.builder()
+        .structureCommentId(id * 10).crossingStructureId(id).build());
+    entityManager.persist(CrossingStructureNameHistEntity.builder()
+        .oldCrossingStructureName("OLD" + id).changeTimestamp(LAST_YEAR)
+        .crossingStructureId(id).build());
     entityManager.flush();
-    sql("INSERT INTO THE.FOREST_SERVICE_BRIDGE_PIER VALUES (" + id * 10 + ", " + id * 10 + ")");
-    sql("INSERT INTO THE.FOREST_SERVICE_BRIDGE_SPAN VALUES (" + id * 10 + ", " + id * 10 + ")");
-    sql("INSERT INTO THE.STRUCTURE_COMMENT VALUES (" + id * 10 + ", " + id + ")");
-    sql("INSERT INTO THE.CROSSING_STRUCTURE_NAME_HIST VALUES ('OLD" + id + "', " + id + ")");
   }
 
   @Test
@@ -424,7 +427,9 @@ class StructureServiceTest {
     givenSiteMaintainedBy("SITE-1", "00000001", "00");
     givenStructureOn(1L, "SITE-1", "Y");
 
-    assertThatThrownBy(() -> reassign(List.of(1L)))
+    List<Long> ids = List.of(1L);
+
+    assertThatThrownBy(() -> reassign(ids))
         .isInstanceOf(MaintainerNotFoundException.class)
         .hasMessageContaining("Designated maintainer 00001012-01 does not exist.")
         .satisfies(failure -> assertThat(((ResponseStatusException) failure).getStatusCode())

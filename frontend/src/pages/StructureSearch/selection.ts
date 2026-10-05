@@ -8,9 +8,7 @@ export type BlockedStructure = DeleteTarget & { blockers: string[] };
 
 /** "repairs", "repairs and monitors", "inspections, repairs and monitors" — as the server words it. */
 export const joinedLabels = (labels: string[]): string =>
-  labels.length < 2
-    ? (labels[0] ?? '')
-    : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+  labels.length < 2 ? (labels[0] ?? '') : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
 
 /**
  * Splits the ticked structures into those a delete will be attempted on and those it will skip.

@@ -75,6 +75,23 @@ export type DeleteOutcome = {
 };
 
 /**
+ * Deletes one structure and records what happened in {@link outcome}. Never rejects: a refusal is
+ * an outcome like any other, so the deletes after it still run.
+ */
+const deleteOne = (target: DeleteTarget, outcome: DeleteOutcome): Promise<void> =>
+  API.structureSearch.deleteStructure(target.id).then(
+    () => {
+      outcome.deleted.push(target);
+    },
+    (error: unknown) => {
+      outcome.failed.push({
+        ...target,
+        reason: apiErrorMessage(error, `${target.name} could not be deleted.`),
+      });
+    },
+  );
+
+/**
  * Deletes structures one request at a time, then re-runs every structure search.
  *
  * <p>One request per structure, each its own transaction on the server, as legacy deletes them: a
@@ -89,20 +106,16 @@ export const useDeleteStructures = (): UseMutationResult<DeleteOutcome, Error, D
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (targets: DeleteTarget[]) => {
+    mutationFn: (targets: DeleteTarget[]) => {
       const outcome: DeleteOutcome = { deleted: [], failed: [] };
-      for (const target of targets) {
-        try {
-          await API.structureSearch.deleteStructure(target.id);
-          outcome.deleted.push(target);
-        } catch (error) {
-          outcome.failed.push({
-            ...target,
-            reason: apiErrorMessage(error, `${target.name} could not be deleted.`),
-          });
-        }
-      }
-      return outcome;
+      // Each delete chained onto the one before, so the next starts only when the last has
+      // settled — one at a time, without an `await` in a loop.
+      return targets
+        .reduce<Promise<void>>(
+          (previous, target) => previous.then(() => deleteOne(target, outcome)),
+          Promise.resolve(),
+        )
+        .then(() => outcome);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: [STRUCTURE_SEARCH_QUERY_KEY] }),
   });

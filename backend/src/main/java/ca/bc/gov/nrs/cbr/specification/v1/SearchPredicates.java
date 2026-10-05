@@ -123,11 +123,11 @@ final class SearchPredicates {
    * @param type {@link JoinType#LEFT} for an association a row may lack — a site with no road, a
    *             structure with no site — so the row is kept rather than dropped
    */
-  static From<?, ?> joinOrFetch(
-      From<?, ?> parent, String attribute, JoinType type, boolean projecting) {
+  static <X, Y> From<X, Y> joinOrFetch(
+      From<?, X> parent, String attribute, JoinType type, boolean projecting) {
     return projecting
-        ? (From<?, ?>) parent.fetch(attribute, type)
-        : parent.join(attribute, type);
+        ? (From<X, Y>) parent.<X, Y>fetch(attribute, type)
+        : parent.<X, Y>join(attribute, type);
   }
 
   private static <T extends Comparable<? super T>> Optional<Predicate> range(

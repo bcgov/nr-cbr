@@ -1053,6 +1053,40 @@ describe('StructureSearchPage — deleting', () => {
     expect(structureSearchApi.deleteStructure).toHaveBeenNthCalledWith(2, '3');
   });
 
+  it('sends each delete only once the one before has finished', async () => {
+    // One at a time on purpose, so a large selection does not reach the server as a burst.
+    let finishFirst: () => void = () => {};
+    structureSearchApi.deleteStructure.mockImplementationOnce(
+      () =>
+        new Promise<void>((done) => {
+          finishFirst = done;
+        }),
+    );
+    twoPages();
+    renderPage(true, true);
+    await searchAndWait();
+    await userEvent.click(checkbox('1'));
+    fireEvent.click(screen.getByLabelText('Next page'));
+    await waitFor(() => {
+      expect(screen.getByTestId('structure-row-3')).toBeInTheDocument();
+    });
+    await userEvent.click(checkbox('3'));
+    await userEvent.click(screen.getByTestId('structure-search-delete'));
+
+    await confirm();
+
+    await waitFor(() => {
+      expect(structureSearchApi.deleteStructure).toHaveBeenCalledTimes(1);
+    });
+    expect(structureSearchApi.deleteStructure).not.toHaveBeenCalledWith('3');
+
+    finishFirst();
+
+    await waitFor(() => {
+      expect(structureSearchApi.deleteStructure).toHaveBeenCalledWith('3');
+    });
+  });
+
   it('reports what went and what was skipped, and keeps the skipped ones ticked', async () => {
     await startDelete('1', '2');
 

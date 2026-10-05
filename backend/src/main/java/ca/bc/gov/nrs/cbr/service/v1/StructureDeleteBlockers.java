@@ -1,6 +1,16 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
+import ca.bc.gov.nrs.cbr.model.v1.CloseProximityInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileDetailEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureMonitorItemEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureReplacementXrefEntity;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -27,19 +37,22 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class StructureDeleteBlockers {
 
+  /** The attribute that holds the structure's id on most of the blocking tables. */
+  private static final String STRUCTURE_ID = "crossingStructureId";
+
   /** Each blocking table, the attribute holding its structure id, and how a message names it. */
-  private record Source(String entity, String attribute, String label) {}
+  private record Source(Class<?> entity, String attribute, String label) {}
 
   private static final List<Source> SOURCES = List.of(
-      new Source("StructureInspectionEntity", "crossingStructureId", "inspections"),
-      new Source("CrossingStructureFileDetailEntity", "crossingStructureId", "documents or photos"),
-      new Source("StructureRepairEntity", "crossingStructureId", "repairs"),
-      new Source("StructureMonitorItemEntity", "crossingStructureId", "monitors"),
-      new Source("CloseProximityInspectionEntity", "crossingStructureId",
+      new Source(StructureInspectionEntity.class, STRUCTURE_ID, "inspections"),
+      new Source(CrossingStructureFileDetailEntity.class, STRUCTURE_ID, "documents or photos"),
+      new Source(StructureRepairEntity.class, STRUCTURE_ID, "repairs"),
+      new Source(StructureMonitorItemEntity.class, STRUCTURE_ID, "monitors"),
+      new Source(CloseProximityInspectionEntity.class, STRUCTURE_ID,
           "close proximity inspections"),
-      new Source("StructureReplacementXrefEntity", "replacedStructureNumber",
+      new Source(StructureReplacementXrefEntity.class, "replacedStructureNumber",
           "a replacement record"),
-      new Source("StructureReplacementXrefEntity", "replacesStructureNumber",
+      new Source(StructureReplacementXrefEntity.class, "replacesStructureNumber",
           "a replacement record"));
 
   private final EntityManager entityManager;
@@ -75,13 +88,19 @@ public class StructureDeleteBlockers {
     return blockers;
   }
 
-  /** The ones among {@code ids} that have at least one row in {@code source}. */
+  /**
+   * The ones among {@code ids} that have at least one row in {@code source}.
+   *
+   * <p>Built with the criteria API rather than a JPQL string, so the entity and attribute names are
+   * never text spliced into a query — both come from {@link #SOURCES}, but a string query would
+   * leave that to be taken on trust by whoever reads it next.
+   */
   private Set<Long> holding(Source source, List<Long> ids) {
-    String jpql = "SELECT DISTINCT e." + source.attribute() + " FROM " + source.entity() + " e"
-        + " WHERE e." + source.attribute() + " IN :ids";
-    return entityManager.createQuery(jpql, Long.class)
-        .setParameter("ids", ids)
-        .getResultStream()
-        .collect(Collectors.toSet());
+    CriteriaBuilder builder = entityManager.getCriteriaBuilder();
+    CriteriaQuery<Long> query = builder.createQuery(Long.class);
+    Root<?> row = query.from(source.entity());
+    Path<Long> structureId = row.get(source.attribute());
+    query.select(structureId).distinct(true).where(structureId.in(ids));
+    return entityManager.createQuery(query).getResultStream().collect(Collectors.toSet());
   }
 }
