@@ -34,4 +34,11 @@ public class StructureMonitorItemEntity {
 
   @Column(name = "INSPECTION_ID")
   private Long inspectionId;
+
+  /**
+   * The structure this belongs to. Mapped for one reason: a structure with any of these cannot be
+   * deleted — see {@code StructureService.delete}.
+   */
+  @Column(name = "CROSSING_STRUCTURE_ID")
+  private Long crossingStructureId;
 }

@@ -1,7 +1,9 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.ClientLocationEntity;
+import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -204,4 +206,17 @@ public interface ClientLocationRepository
       """)
   List<ClientLookupResult> findMaintainerClientsByNumber(
       @Param("digits") String digits, Pageable limit);
+
+  /**
+   * Clients by number — the names in Structure Search's Maintainer column, a page of results at a
+   * time rather than one query per row.
+   *
+   * <p>By number alone, without the location join the lookups above make: a site may name a
+   * location since removed, and its maintainer should still be named rather than shown blank.
+   *
+   * <p>On this repository rather than one of its own because every other maintainer lookup is
+   * here; the entity it reads, {@code V_CLIENT_PUBLIC}, is the one they all join for the name.
+   */
+  @Query("SELECT client FROM ClientPublicEntity client WHERE client.clientNumber IN :numbers")
+  List<ClientPublicEntity> findClientsByNumber(@Param("numbers") Collection<String> numbers);
 }

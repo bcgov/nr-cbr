@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
@@ -10,7 +11,10 @@ import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceCulvertEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
+import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
@@ -20,7 +24,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -29,13 +35,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Sort;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Structure Search, against the database — the rules are joins, subqueries and null checks, and a
  * mocked repository would only assert what it was told.
  */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import(StructureSearchService.class)
+@Import({StructureSearchService.class, StructureDeleteBlockers.class})
 class StructureSearchServiceTest {
 
   @Autowired
@@ -44,9 +51,13 @@ class StructureSearchServiceTest {
   @Autowired
   private EntityManager entityManager;
 
+  @MockitoBean
+  private LoggedUserHelper loggedUser;
+
   @BeforeEach
   void setUp() {
-    for (String entity : List.of("ForestServiceBridgeEntity", "ForestServiceCulvertEntity",
+    for (String entity : List.of("StructureInspectionEntity", "StructureRepairEntity",
+        "ForestServiceBridgeEntity", "ForestServiceCulvertEntity",
         "CrossingStructureEntity", "CrossingSiteEntity", "CbrRoadSectionEntity", "OrgUnitEntity",
         "ClientPublicEntity", "StructureTypeClassCodeEntity", "CrossingSiteStatusCodeEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
@@ -370,6 +381,36 @@ class StructureSearchServiceTest {
       for (StructureSortColumn column : StructureSortColumn.values()) {
         assertThat(sorted(column, Sort.Direction.DESC)).as(column.name()).hasSize(2);
       }
+    }
+
+    @Test
+    @DisplayName("tells a caller who can delete what stops each structure being deleted")
+    void reportsDeleteBlockers() {
+      when(loggedUser.canDestroy()).thenReturn(true);
+      givenSite("SITE-1");
+      givenStructure(1L, "FREE", "SITE-1");
+      givenStructure(2L, "INSPECTED", "SITE-1");
+      entityManager.persist(StructureInspectionEntity.builder()
+          .inspectionId(100L).crossingStructureId(2L).build());
+      entityManager.persist(StructureRepairEntity.builder()
+          .repairId(100L).crossingStructureId(2L).build());
+
+      Map<String, List<String>> blockers = page(criteria()).content().stream().collect(
+          Collectors.toMap(StructureSearchResult::structureName,
+              StructureSearchResult::deleteBlockers));
+
+      assertThat(blockers.get("FREE")).isEmpty();
+      assertThat(blockers.get("INSPECTED")).containsExactly("inspections", "repairs");
+    }
+
+    @Test
+    @DisplayName("does not work blockers out for a caller who cannot delete")
+    void skipsBlockersForReaders() {
+      givenSite("SITE-1");
+      givenStructure(1L, "FREE", "SITE-1");
+
+      assertThat(page(criteria()).content()).singleElement()
+          .satisfies(row -> assertThat(row.deleteBlockers()).isNull());
     }
 
     @Test

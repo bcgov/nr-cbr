@@ -1,5 +1,7 @@
 package ca.bc.gov.nrs.cbr.struct.v1;
 
+import java.util.List;
+
 /**
  * One row of Structure Search — the columns legacy's results table shows, with the maintainer as
  * one value rather than legacy's second row.
@@ -33,4 +35,9 @@ public record StructureSearchResult(
     String roadSectionId,
     String clientNumber,
     String clientLocationCode,
-    String clientName) {}
+    String clientName,
+    /*
+     * What stops this structure being deleted — "inspections", "repairs" and so on; empty when
+     * nothing does. Null for a caller who cannot delete, for whom it is not worked out at all.
+     */
+    List<String> deleteBlockers) {}

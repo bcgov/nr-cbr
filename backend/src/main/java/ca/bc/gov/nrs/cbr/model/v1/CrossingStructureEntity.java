@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -143,6 +144,16 @@ public class CrossingStructureEntity {
   /** Read by "Incomplete Data?" only. */
   @Column(name = "STRUCTURE_SOURCE_CODE", length = 10)
   private String structureSourceCode;
+
+  /**
+   * Who last changed the row, as {@code IDIR\jsmith}. Written by archiving — legacy passed back
+   * the values it had read, so an archive never recorded who did it.
+   */
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 
   /**
    * The Type/Class column's description. Read-only, as {@link #site} is.

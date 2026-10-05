@@ -3,6 +3,8 @@ package ca.bc.gov.nrs.cbr.specification.v1;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.From;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import java.math.BigDecimal;
 import java.util.Locale;
@@ -17,7 +19,8 @@ import org.springframework.util.StringUtils;
  * documents them: text is an unanchored, case-insensitive contains ({@code Search.LIKE}); codes and
  * numbers are exact; ranges are inclusive at both ends, in all three forms.
  *
- * <p>Shared by Site, Inspection and Structure Search, each of which once carried its own copy.
+ * <p>Shared by Site, Inspection and Structure Search, each of which once carried its own copy —
+ * along with {@link #joinOrFetch}, which is not a predicate but is how each of them joins.
  */
 final class SearchPredicates {
 
@@ -99,6 +102,32 @@ final class SearchPredicates {
     return query != null
         && !Long.class.equals(query.getResultType())
         && !long.class.equals(query.getResultType());
+  }
+
+  /**
+   * One join, fetched when the query returns entities.
+   *
+   * <p>Every association a search joins is read by its results row, so when the query projects
+   * entities each join is a fetch and the page is one statement. Left lazy they would be the
+   * classic N+1 — a page of twenty rows costing twenty extra selects per association, invisible in
+   * a test with three rows and very visible on a district. In a count, which cannot fetch, it is a
+   * plain join, there for the predicates.
+   *
+   * <p>Only for to-one associations: those duplicate no row, need no {@code distinct}, and do not
+   * interfere with paging the way a collection fetch would.
+   *
+   * <p>The cast is safe and is the standard way to use a fetch as a join: Hibernate's
+   * {@code Fetch} implementations are {@code Join}s. It is what lets one join serve the predicate,
+   * the ordering and the projection instead of three.
+   *
+   * @param type {@link JoinType#LEFT} for an association a row may lack — a site with no road, a
+   *             structure with no site — so the row is kept rather than dropped
+   */
+  static From<?, ?> joinOrFetch(
+      From<?, ?> parent, String attribute, JoinType type, boolean projecting) {
+    return projecting
+        ? (From<?, ?>) parent.fetch(attribute, type)
+        : parent.join(attribute, type);
   }
 
   private static <T extends Comparable<? super T>> Optional<Predicate> range(
