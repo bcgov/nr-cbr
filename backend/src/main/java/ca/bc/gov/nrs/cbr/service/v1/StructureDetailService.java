@@ -55,6 +55,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.Section;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.Site;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.StructureRef;
 import jakarta.persistence.EntityManager;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -88,8 +89,8 @@ public class StructureDetailService {
   private static final String RECREATION = "REC";
   /** A portable superstructure in storage, which has no abutments to record. */
   private static final String IN_STORAGE = "S";
-  private static final List<String> BRIDGES = List.of("PB", "TB");
-  private static final List<String> CULVERTS = List.of("CUL", "WLC");
+  private static final List<String> BRIDGE_TYPE_CLASSES = List.of("PB", "TB");
+  private static final List<String> CULVERT_TYPE_CLASSES = List.of("CUL", "WLC");
   private static final List<String> REVIEWED_STATUSES = List.of("RVD", "ACC");
 
   private final CrossingStructureRepository structures;
@@ -270,7 +271,7 @@ public class StructureDetailService {
     long onSite = structure.getCrossingSiteId() == null
         ? 0
         : structures.countByCrossingSiteIdAndActiveIndAndStructureTypeClassCodeIn(
-            structure.getCrossingSiteId(), ACTIVE, CULVERTS);
+            structure.getCrossingSiteId(), ACTIVE, CULVERT_TYPE_CLASSES);
     return new Culvert(
         culvert.getCulvertNumber(),
         onSite,
@@ -318,64 +319,8 @@ public class StructureDetailService {
     Optional<StructureLoadRatingEntity> current = loadRatingService.currentLoadRating(structureId);
     Long currentId = current.map(StructureLoadRatingEntity::getStructureLoadRatingId).orElse(null);
 
-    List<Row> rows = new ArrayList<>();
-    for (StructureLoadRatingEntity manual :
-        loadRatings.findByCrossingStructureIdAndInspectionIdIsNull(structureId)) {
-      rows.add(new Row(manual.getEntryTimestamp(), manual.getStructureLoadRatingId(),
-          new LoadRatingEntry(
-              String.valueOf(manual.getStructureLoadRatingId()),
-              manual.getLoadRating(),
-              reason(manual.getReasonCode()),
-              manual.getReasonComment(),
-              manual.getEntryTimestamp() == null ? null : manual.getEntryTimestamp().toLocalDate(),
-              manual.getEntryUserid(),
-              null,
-              LoadRatingStatus.MANUAL,
-              null,
-              manual.getStructureLoadRatingId().equals(currentId))));
-    }
-
-    List<StructureInspectionEntity> reviewed =
-        inspections.findReviewedByStructure(structureId, REVIEWED_STATUSES);
-    if (!reviewed.isEmpty()) {
-      List<Long> inspectionIds =
-          reviewed.stream().map(StructureInspectionEntity::getInspectionId).toList();
-      Map<Long, StructureLoadRatingEntity> ratingByInspection =
-          loadRatings.findByInspectionIdIn(inspectionIds).stream().collect(Collectors.toMap(
-              StructureLoadRatingEntity::getInspectionId, Function.identity(),
-              (first, second) -> first));
-      Map<Long, String> reviewerIds = reviewers.findAllById(reviewed.stream()
-              .map(StructureInspectionEntity::getInspectionReviewerId)
-              .filter(Objects::nonNull).distinct().toList())
-          .stream().collect(Collectors.toMap(
-              StructureInspectionReviewerEntity::getInspectionReviewerId,
-              StructureInspectionReviewerEntity::getUserid));
-
-      for (StructureInspectionEntity inspection : reviewed) {
-        StructureLoadRatingEntity rating = ratingByInspection.get(inspection.getInspectionId());
-        Long ratingId = rating == null ? null : rating.getStructureLoadRatingId();
-        rows.add(new Row(
-            inspection.getInspectionDate() == null
-                ? null
-                : inspection.getInspectionDate().atStartOfDay(),
-            ratingId,
-            new LoadRatingEntry(
-                ratingId == null
-                    ? "inspection-" + inspection.getInspectionId()
-                    : String.valueOf(ratingId),
-                rating == null ? null : rating.getLoadRating(),
-                rating == null ? CodeValue.NONE : reason(rating.getReasonCode()),
-                rating == null ? null : rating.getReasonComment(),
-                inspection.getInspectionDate(),
-                reviewerIds.get(inspection.getInspectionReviewerId()),
-                inspection.getPengReviewerDate() == null
-                    ? null
-                    : inspection.getPengReviewerDate().toLocalDate(),
-                LoadRatingStatus.REVIEWED,
-                String.valueOf(inspection.getInspectionId()),
-                ratingId != null && ratingId.equals(currentId))));
-      }
-    }
+    List<Row> rows = new ArrayList<>(manualRows(structureId, currentId));
+    rows.addAll(reviewedRows(structureId, currentId));
 
     // Newest first; legacy lists oldest first and reverses on the page.
     rows.sort(Comparator.comparing(Row::sortedOn, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -391,6 +336,76 @@ public class StructureDetailService {
             DesignVehicleLoadCodeEntity::getDescription),
         structure.getDesignVehicleCmt(),
         structure.getDesignLoadRating());
+  }
+
+  /** Ratings entered by hand, outside any inspection. */
+  private List<Row> manualRows(long structureId, Long currentId) {
+    return loadRatings.findByCrossingStructureIdAndInspectionIdIsNull(structureId).stream()
+        .map(manual -> new Row(manual.getEntryTimestamp(), manual.getStructureLoadRatingId(),
+            new LoadRatingEntry(
+                String.valueOf(manual.getStructureLoadRatingId()),
+                manual.getLoadRating(),
+                reason(manual.getReasonCode()),
+                manual.getReasonComment(),
+                toDate(manual.getEntryTimestamp()),
+                manual.getEntryUserid(),
+                null,
+                LoadRatingStatus.MANUAL,
+                null,
+                manual.getStructureLoadRatingId().equals(currentId))))
+        .toList();
+  }
+
+  /** Reviewed inspections, each with the rating it recorded if it recorded one. */
+  private List<Row> reviewedRows(long structureId, Long currentId) {
+    List<StructureInspectionEntity> reviewed =
+        inspections.findReviewedByStructure(structureId, REVIEWED_STATUSES);
+    if (reviewed.isEmpty()) {
+      return List.of();
+    }
+    List<Long> inspectionIds =
+        reviewed.stream().map(StructureInspectionEntity::getInspectionId).toList();
+    Map<Long, StructureLoadRatingEntity> ratingByInspection =
+        loadRatings.findByInspectionIdIn(inspectionIds).stream().collect(Collectors.toMap(
+            StructureLoadRatingEntity::getInspectionId, Function.identity(),
+            (first, second) -> first));
+    Map<Long, String> reviewerIds = reviewers.findAllById(reviewed.stream()
+            .map(StructureInspectionEntity::getInspectionReviewerId)
+            .filter(Objects::nonNull).distinct().toList())
+        .stream().collect(Collectors.toMap(
+            StructureInspectionReviewerEntity::getInspectionReviewerId,
+            StructureInspectionReviewerEntity::getUserid));
+
+    return reviewed.stream()
+        .map(inspection -> reviewedRow(inspection,
+            ratingByInspection.get(inspection.getInspectionId()),
+            reviewerIds.get(inspection.getInspectionReviewerId()), currentId))
+        .toList();
+  }
+
+  private Row reviewedRow(StructureInspectionEntity inspection, StructureLoadRatingEntity rating,
+      String reviewerId, Long currentId) {
+    if (rating == null) {
+      return new Row(toDateTime(inspection.getInspectionDate()), null, new LoadRatingEntry(
+          "inspection-" + inspection.getInspectionId(), null, CodeValue.NONE, null,
+          inspection.getInspectionDate(), reviewerId,
+          toDate(inspection.getPengReviewerDate()), LoadRatingStatus.REVIEWED,
+          String.valueOf(inspection.getInspectionId()), false));
+    }
+    Long ratingId = rating.getStructureLoadRatingId();
+    return new Row(toDateTime(inspection.getInspectionDate()), ratingId, new LoadRatingEntry(
+        String.valueOf(ratingId), rating.getLoadRating(), reason(rating.getReasonCode()),
+        rating.getReasonComment(), inspection.getInspectionDate(), reviewerId,
+        toDate(inspection.getPengReviewerDate()), LoadRatingStatus.REVIEWED,
+        String.valueOf(inspection.getInspectionId()), ratingId.equals(currentId)));
+  }
+
+  private static LocalDate toDate(LocalDateTime timestamp) {
+    return timestamp == null ? null : timestamp.toLocalDate();
+  }
+
+  private static LocalDateTime toDateTime(LocalDate date) {
+    return date == null ? null : date.atStartOfDay();
   }
 
   /** A history row and what it sorts by. */
@@ -456,10 +471,10 @@ public class StructureDetailService {
       items.add(new OutstandingItem(Section.SITE, "Site #"));
     }
     String typeClass = structure.getStructureTypeClassCode();
-    if (BRIDGES.contains(typeClass)) {
+    if (BRIDGE_TYPE_CLASSES.contains(typeClass)) {
       bridgeOutstanding(bridge, items);
     }
-    if (CULVERTS.contains(typeClass)) {
+    if (CULVERT_TYPE_CLASSES.contains(typeClass)) {
       culvertOutstanding(culvert, items);
     }
     return items;

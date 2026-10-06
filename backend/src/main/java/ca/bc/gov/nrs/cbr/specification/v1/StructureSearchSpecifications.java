@@ -110,7 +110,6 @@ public final class StructureSearchSpecifications {
   private static final String CULVERT_TYPE = "engineeredCulvertTypeCode";
 
   private static final String YES = "Y";
-  /** A portable superstructure in service — its abutments then have to be recorded. */
   /** A portable superstructure in storage, which has no abutments to record. */
   private static final String IN_STORAGE = "S";
   private static final String RECREATION = "REC";
