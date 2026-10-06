@@ -69,4 +69,21 @@ public class ForestServiceBridgeEntity {
 
   @Column(name = "LEFT_ABUTMENT_CODE", length = 10)
   private String leftAbutmentCode;
+
+  // The structure page's Bridge section.
+
+  @Column(name = "NEEDLE_BEAM_IND", length = 1)
+  private String needleBeamInd;
+
+  @Column(name = "SUPERSTRUCTURE_COMMENT", length = 2000)
+  private String superstructureComment;
+
+  @Column(name = "DECK_TYPE_COMMENT", length = 2000)
+  private String deckTypeComment;
+
+  @Column(name = "ABUTMENT_COMMENT", length = 2000)
+  private String abutmentComment;
+
+  @Column(name = "STRUCTURE_CURB_TYPE_CMT", length = 2000)
+  private String structureCurbTypeCmt;
 }

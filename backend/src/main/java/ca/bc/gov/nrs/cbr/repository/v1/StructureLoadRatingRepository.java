@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -62,4 +63,11 @@ public interface StructureLoadRatingRepository
 
   /** Deletes every rating an inspection produced. */
   void deleteByInspectionId(Long inspectionId);
+
+  /** A structure's manual ratings — those with no inspection behind them. */
+  List<StructureLoadRatingEntity> findByCrossingStructureIdAndInspectionIdIsNull(
+      Long crossingStructureId);
+
+  /** The ratings the given inspections recorded. */
+  List<StructureLoadRatingEntity> findByInspectionIdIn(Collection<Long> inspectionIds);
 }

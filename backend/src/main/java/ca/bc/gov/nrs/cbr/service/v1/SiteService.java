@@ -350,7 +350,7 @@ public class SiteService {
   }
 
   /** "CANFOR CORPORATION · Northern Division · Prince George · 00001012-01". */
-  private static String describe(ClientLookupResult client) {
+  static String describe(ClientLookupResult client) {
     String pair = client.clientNumber() + "-" + client.clientLocnCode();
     return Stream.of(client.clientName(), client.clientLocnName(), client.city(), pair)
         .filter(part -> part != null && !part.isBlank())

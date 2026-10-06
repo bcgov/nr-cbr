@@ -10,8 +10,11 @@ import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceCulvertEntity;
+import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
@@ -56,7 +59,8 @@ class StructureSearchServiceTest {
 
   @BeforeEach
   void setUp() {
-    for (String entity : List.of("StructureInspectionEntity", "StructureRepairEntity",
+    for (String entity : List.of("InspectionReportStatusEntity", "StructureLoadRatingEntity",
+        "StructureInspectionEntity", "StructureRepairEntity", "InspectionReportStatusCodeEntity",
         "ForestServiceBridgeEntity", "ForestServiceCulvertEntity",
         "CrossingStructureEntity", "CrossingSiteEntity", "CbrRoadSectionEntity", "OrgUnitEntity",
         "ClientPublicEntity", "StructureTypeClassCodeEntity", "CrossingSiteStatusCodeEntity")) {
@@ -102,6 +106,9 @@ class StructureSearchServiceTest {
             .portableStructureInd("N")
             .designLoadRating(new BigDecimal("50"))
             .currentLoadRating(new BigDecimal("50"))
+            // A load rating, as the completeness rules count one: none recorded, but a review is
+            // flagged as required. Tests about load ratings themselves clear this.
+            .loadRatingUnknownIndicator("Y")
             .fullLogHaulReplacementYear(2040)
             .nextPlannedInspectionDate(LocalDate.of(2027, 1, 1))
             .structureSourceCode("MOF");
@@ -118,7 +125,8 @@ class StructureSearchServiceTest {
         .forestServiceBridgeId(id).crossingStructureId(structureId)
         .superstructureTypeCode(superstructure).structureCurbTypeCode(curb)
         .totalBridgeLength(new BigDecimal("12.5")).deckWidth(new BigDecimal("4.2"))
-        .runningSurfaceCode("GRV").deckTypeCode("TIM").build());
+        .runningSurfaceCode("GRV").deckTypeCode("TIM")
+        .rightAbutmentCode("CON").leftAbutmentCode("CON").build());
   }
 
   private List<String> names(StructureSearchCriteria.StructureSearchCriteriaBuilder criteria) {
@@ -263,7 +271,7 @@ class StructureSearchServiceTest {
     @Test
     @DisplayName("finds a structure missing one of its own values")
     void findsAMissingValue() {
-      givenSite("SITE-1", site -> site.clientNumber("00001012").clientLocnCode("01"));
+      givenSite("SITE-1");
       givenStructure(1L, "COMPLETE", "SITE-1");
       givenCompleteBridge(11L, 1L, "STL", "CONC");
       givenStructure(2L, "NO-SOURCE", "SITE-1", s -> s.structureSourceCode(null));
@@ -273,9 +281,56 @@ class StructureSearchServiceTest {
     }
 
     @Test
+    @DisplayName("does not ask for the site's maintainer — legacy's page left that check out")
+    void ignoresTheMaintainer() {
+      givenSite("SITE-1");
+      givenStructure(1L, "NO-MAINTAINER", "SITE-1");
+      givenCompleteBridge(11L, 1L, "STL", "CONC");
+
+      assertThat(names(criteria().incomplete(true))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("does not ask a recreation site for a load restriction year")
+    void spareRecreationSitesTheLoadRestrictionYear() {
+      entityManager.persist(CrossingSiteStatusCodeEntity.builder()
+          .crossingSiteStatusCode("ACT").description("Active").build());
+      givenSite("REC-1", site -> site.crossingSiteTypeCode("REC"));
+      givenSite("XNG-1", site -> site.crossingSiteTypeCode("XNG"));
+      givenStructure(1L, "ON-REC", "REC-1", s -> s.fullLogHaulReplacementYear(null));
+      givenCompleteBridge(11L, 1L, "STL", "CONC");
+      givenStructure(2L, "ON-CROSSING", "XNG-1", s -> s.fullLogHaulReplacementYear(null));
+      givenCompleteBridge(12L, 2L, "STL", "CONC");
+
+      assertThat(names(criteria().incomplete(true))).containsExactly("ON-CROSSING");
+    }
+
+    @Test
+    @DisplayName("counts a manual rating or a reviewed inspection as a load rating")
+    void countsEitherLoadRating() {
+      givenSite("SITE-1");
+      givenStructure(1L, "NO-RATING", "SITE-1", s -> s.loadRatingUnknownIndicator("N"));
+      givenCompleteBridge(11L, 1L, "STL", "CONC");
+      givenStructure(2L, "MANUAL", "SITE-1", s -> s.loadRatingUnknownIndicator("N"));
+      givenCompleteBridge(12L, 2L, "STL", "CONC");
+      entityManager.persist(StructureLoadRatingEntity.builder()
+          .structureLoadRatingId(1L).crossingStructureId(2L).loadRating(new BigDecimal("40"))
+          .entryTimestamp(LocalDateTime.of(2024, 1, 1, 9, 0)).build());
+      givenStructure(3L, "REVIEWED", "SITE-1", s -> s.loadRatingUnknownIndicator("N"));
+      givenCompleteBridge(13L, 3L, "STL", "CONC");
+      givenReviewedInspection(100L, 3L, "RVD");
+      givenStructure(4L, "SUBMITTED-ONLY", "SITE-1", s -> s.loadRatingUnknownIndicator("N"));
+      givenCompleteBridge(14L, 4L, "STL", "CONC");
+      givenReviewedInspection(101L, 4L, "SUB");
+
+      assertThat(names(criteria().incomplete(true)))
+          .containsExactlyInAnyOrder("NO-RATING", "SUBMITTED-ONLY");
+    }
+
+    @Test
     @DisplayName("finds a bridge type with no bridge row, or with one missing a value")
     void findsAnIncompleteBridge() {
-      givenSite("SITE-1", site -> site.clientNumber("00001012").clientLocnCode("01"));
+      givenSite("SITE-1");
       givenStructure(1L, "COMPLETE", "SITE-1");
       givenCompleteBridge(11L, 1L, "STL", "CONC");
       givenStructure(2L, "NO-BRIDGE-ROW", "SITE-1");
@@ -283,30 +338,48 @@ class StructureSearchServiceTest {
       entityManager.persist(ForestServiceBridgeEntity.builder()
           .forestServiceBridgeId(13L).crossingStructureId(3L).superstructureTypeCode("STL")
           .totalBridgeLength(new BigDecimal("12.5")).runningSurfaceCode("GRV").deckTypeCode("TIM")
-          .build());
+          .rightAbutmentCode("CON").leftAbutmentCode("CON").build());
 
       assertThat(names(criteria().incomplete(true)))
           .containsExactlyInAnyOrder("NO-BRIDGE-ROW", "NO-DECK-WIDTH");
     }
 
     @Test
-    @DisplayName("asks for abutments only of a portable superstructure in service")
-    void asksForAbutmentsWhenInService() {
-      givenSite("SITE-1", site -> site.clientNumber("00001012").clientLocnCode("01"));
-      givenStructure(1L, "IN-SERVICE", "SITE-1", s -> s.structureTypeClassCode("PB"));
-      entityManager.persist(ForestServiceBridgeEntity.builder()
-          .forestServiceBridgeId(11L).crossingStructureId(1L).superstructureTypeCode("STL")
-          .totalBridgeLength(new BigDecimal("12.5")).deckWidth(new BigDecimal("4.2"))
-          .runningSurfaceCode("GRV").deckTypeCode("TIM")
-          .portableSuperstructureStatusCode("S").build());
-      givenStructure(2L, "IN-STORAGE", "SITE-1", s -> s.structureTypeClassCode("PB"));
-      entityManager.persist(ForestServiceBridgeEntity.builder()
-          .forestServiceBridgeId(12L).crossingStructureId(2L).superstructureTypeCode("STL")
-          .totalBridgeLength(new BigDecimal("12.5")).deckWidth(new BigDecimal("4.2"))
-          .runningSurfaceCode("GRV").deckTypeCode("TIM")
-          .portableSuperstructureStatusCode("R").build());
+    @DisplayName("asks for abutments unless a portable superstructure is in storage")
+    void asksForAbutmentsUnlessInStorage() {
+      givenSite("SITE-1");
+      givenStructure(1L, "IN-STORAGE", "SITE-1", s -> s.structureTypeClassCode("PB"));
+      givenBridgeWithoutAbutments(11L, 1L, "S");
+      givenStructure(2L, "IN-SERVICE", "SITE-1", s -> s.structureTypeClassCode("PB"));
+      givenBridgeWithoutAbutments(12L, 2L, "R");
+      givenStructure(3L, "NOT-PORTABLE", "SITE-1");
+      givenBridgeWithoutAbutments(13L, 3L, null);
 
-      assertThat(names(criteria().incomplete(true))).containsExactly("IN-SERVICE");
+      assertThat(names(criteria().incomplete(true)))
+          .containsExactlyInAnyOrder("IN-SERVICE", "NOT-PORTABLE");
+    }
+
+    private void givenBridgeWithoutAbutments(long id, long structureId, String portableStatus) {
+      entityManager.persist(ForestServiceBridgeEntity.builder()
+          .forestServiceBridgeId(id).crossingStructureId(structureId).superstructureTypeCode("STL")
+          .totalBridgeLength(new BigDecimal("12.5")).deckWidth(new BigDecimal("4.2"))
+          .runningSurfaceCode("GRV").deckTypeCode("TIM")
+          .portableSuperstructureStatusCode(portableStatus).build());
+    }
+
+    private void givenReviewedInspection(long inspectionId, long structureId, String status) {
+      if (entityManager.find(InspectionReportStatusCodeEntity.class, status) == null) {
+        entityManager.persist(InspectionReportStatusCodeEntity.builder()
+            .inspectionReportStatusCode(status).description(status)
+            .effectiveDate(LocalDateTime.of(2000, 1, 1, 0, 0))
+            .expiryDate(LocalDateTime.of(9999, 12, 31, 0, 0)).build());
+      }
+      entityManager.persist(StructureInspectionEntity.builder()
+          .inspectionId(inspectionId).crossingStructureId(structureId)
+          .inspectionDate(LocalDate.of(2024, 6, 1)).inspectionReviewerId(1L).build());
+      entityManager.persist(InspectionReportStatusEntity.builder()
+          .inspectionReportStatusId(inspectionId).inspectionId(inspectionId)
+          .inspectionReportStatusCode(status).build());
     }
   }
 

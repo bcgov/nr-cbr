@@ -62,4 +62,14 @@ public class StructureLoadRatingEntity {
    */
   @Column(name = "ENTRY_TIMESTAMP")
   private LocalDateTime entryTimestamp;
+
+  @Column(name = "STRCTRE_LOAD_RATING_RSN_CODE", length = 6)
+  private String reasonCode;
+
+  @Column(name = "STRCTRE_LOAD_RATING_RSN_CMNT", length = 4000)
+  private String reasonComment;
+
+  /** Who entered a manual rating — the IDIR ID it is listed under. */
+  @Column(name = "ENTRY_USERID", length = 30)
+  private String entryUserid;
 }

@@ -68,4 +68,12 @@ public interface CrossingStructureRepository
       @Param("ids") Collection<Long> ids,
       @Param("user") String user,
       @Param("now") LocalDateTime now);
+
+  /**
+   * How many active structures of the given types stand on a site — the "of N" after a culvert's
+   * number, as legacy's {@code FIND_CULVERTS_BY_SITE_ID} counts it (active {@code CUL} and
+   * {@code WLC}).
+   */
+  long countByCrossingSiteIdAndActiveIndAndStructureTypeClassCodeIn(
+      String crossingSiteId, String activeInd, Collection<String> structureTypeClassCodes);
 }

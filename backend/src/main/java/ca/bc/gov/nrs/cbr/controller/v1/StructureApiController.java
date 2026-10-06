@@ -1,11 +1,13 @@
 package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.StructureApiEndpoint;
+import ca.bc.gov.nrs.cbr.service.v1.StructureDetailService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureService;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
@@ -21,11 +23,15 @@ public class StructureApiController implements StructureApiEndpoint {
 
   private final StructureSearchService structureSearchService;
   private final StructureService structureService;
+  private final StructureDetailService structureDetailService;
 
   public StructureApiController(
-      StructureSearchService structureSearchService, StructureService structureService) {
+      StructureSearchService structureSearchService,
+      StructureService structureService,
+      StructureDetailService structureDetailService) {
     this.structureSearchService = structureSearchService;
     this.structureService = structureService;
+    this.structureDetailService = structureDetailService;
   }
 
   @Override
@@ -51,5 +57,10 @@ public class StructureApiController implements StructureApiEndpoint {
   public StructureRepairResponsibilityResponse updateRepairResponsibility(
       StructureRepairResponsibilityRequest request) {
     return structureService.updateRepairResponsibility(request);
+  }
+
+  @Override
+  public StructureDetailResponse getStructure(long structureId) {
+    return structureDetailService.findById(structureId);
   }
 }

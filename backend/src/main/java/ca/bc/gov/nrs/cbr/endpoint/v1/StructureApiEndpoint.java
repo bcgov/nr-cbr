@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
@@ -94,4 +95,18 @@ public interface StructureApiEndpoint {
   @PutMapping("/repair-responsibility")
   StructureRepairResponsibilityResponse updateRepairResponsibility(
       @Valid @RequestBody StructureRepairResponsibilityRequest request);
+
+  /**
+   * One structure, for its page — the header and the Details tab of legacy's
+   * {@code showStructure.do}.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ} — legacy's {@code /showStructure}, which every role
+   * that can read holds. <b>404</b> when there is no such structure; legacy showed a blank
+   * new-structure form instead.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}")
+  StructureDetailResponse getStructure(@PathVariable("structureId") long structureId);
 }

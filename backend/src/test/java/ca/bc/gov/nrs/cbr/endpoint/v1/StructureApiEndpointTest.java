@@ -102,4 +102,12 @@ class StructureApiEndpointTest {
         .isEqualTo(CbrAuthorities.CONTENT_EDIT);
     assertThat(update.getParameters()[0].isAnnotationPresent(Valid.class)).isTrue();
   }
+
+  @Test
+  @DisplayName("one structure is GET /api/v1/structures/{structureId}, gated on READ")
+  void getIsMappedAndGated() {
+    Method get = method("getStructure");
+    assertThat(get.getAnnotation(GetMapping.class).value()).containsExactly("/{structureId}");
+    assertThat(get.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
 }

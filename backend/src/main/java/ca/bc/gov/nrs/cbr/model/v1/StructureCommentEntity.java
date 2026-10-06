@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -15,10 +16,8 @@ import org.hibernate.annotations.Immutable;
 /**
  * {@code THE.STRUCTURE_COMMENT} — a comment on a structure.
  *
- * <p><b>Minimal and read-only:</b> the key and the column that ties it to its parent, nothing else.
- * Nothing reads this table yet; a structure delete clears it, with native SQL in
- * {@code StructureService.delete}. Mapped so the test schema has the table without hand-written
- * DDL. The structure screens will map the rest when they arrive.
+ * <p><b>Read-only.</b> The structure page reads the comments; a structure delete clears them, with
+ * native SQL in {@code StructureService.delete}.
  */
 @Entity
 @Immutable
@@ -37,4 +36,17 @@ public class StructureCommentEntity {
 
   @Column(name = "CROSSING_STRUCTURE_ID")
   private Long crossingStructureId;
+
+  @Column(name = "STRUCTURE_COMMENT", length = 2000)
+  private String structureComment;
+
+  /** {@code 'Y'} for a planned-inspection comment (the Inspections tab), {@code 'N'} otherwise. */
+  @Column(name = "PLANNED_INSPECTION_CMT_IND", length = 1)
+  private String plannedInspectionCmtInd;
+
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 }

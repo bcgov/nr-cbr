@@ -57,4 +57,24 @@ public class ForestServiceCulvertEntity {
 
   @Column(name = "ENGINEERED_CLVRT_MATERIAL_CODE", length = 10)
   private String engineeredCulvertMaterialCode;
+
+  // The structure page's Culvert section.
+
+  @Column(name = "SLOPE")
+  private BigDecimal slope;
+
+  @Column(name = "INLET_COVER_DEPTH")
+  private Long inletCoverDepth;
+
+  @Column(name = "OUTLET_COVER_DEPTH")
+  private Long outletCoverDepth;
+
+  @Column(name = "CULVERT_MATERIAL_COMMENT", length = 2000)
+  private String culvertMaterialComment;
+
+  @Column(name = "HEADWALL_LOCATION_CODE", length = 10)
+  private String headwallLocationCode;
+
+  @Column(name = "OPN_BTOM_CLVRT_SUBSTRCTRE_CODE", length = 10)
+  private String opnBtomClvrtSubstrctreCode;
 }
