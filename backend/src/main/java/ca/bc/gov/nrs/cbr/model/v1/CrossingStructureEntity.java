@@ -155,6 +155,45 @@ public class CrossingStructureEntity {
   @Column(name = "UPDATE_TIMESTAMP")
   private LocalDateTime updateTimestamp;
 
+  // The structure page's Details tab. Read-only so far; legacy's names are kept on the columns.
+
+  @Column(name = "BUILT_BY_CODE", length = 10)
+  private String builtByCode;
+
+  @Column(name = "YEAR_FABRICATED")
+  private Integer yearFabricated;
+
+  @Column(name = "INVENTORY_ADDED_YEAR")
+  private Integer inventoryAddedYear;
+
+  /** "End of Design Life (year)" — a year, despite the name. */
+  @Column(name = "ORIGINAL_REPLACEMENT_DATE")
+  private Integer originalReplacementYear;
+
+  @Column(name = "AS_BUILT_INFO_PRESENT_IND", length = 1)
+  private String asBuiltInfoPresentInd;
+
+  @Column(name = "INSTALLATION_COST")
+  private Long installationCost;
+
+  @Column(name = "MATERIAL_COST")
+  private Long materialCost;
+
+  @Column(name = "ESTIMATED_REPLACEMENT_COST")
+  private Long estimatedReplacementCost;
+
+  @Column(name = "ESTIMATED_REPLACEMENT_COST_CMT", length = 2000)
+  private String estimatedReplacementCostCmt;
+
+  @Column(name = "DESIGN_VEHICLE_LOAD_CODE", length = 10)
+  private String designVehicleLoadCode;
+
+  @Column(name = "DESIGN_VEHICLE_CMT", length = 2000)
+  private String designVehicleCmt;
+
+  @Column(name = "LOAD_POSTING_SIGN_WRRNTD_CODE", length = 10)
+  private String loadPostingSignWrrntdCode;
+
   /**
    * The Type/Class column's description. Read-only, as {@link #site} is.
    *

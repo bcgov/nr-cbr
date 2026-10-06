@@ -8,6 +8,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -71,6 +72,10 @@ public class StructureInspectionEntity {
   /** → {@code STRUCTURE_INSPECTION_REVIEWER}. Null unless the inspection is `RVD`/`ACC`. */
   @Column(name = "INSPECTION_REVIEWER_ID")
   private Long inspectionReviewerId;
+
+  /** When the P.Eng reviewed it — the Reviewed Date on the structure page's load ratings. */
+  @Column(name = "PENG_REVIEWER_DATE")
+  private LocalDateTime pengReviewerDate;
 
   @Column(name = "STRCTRE_INSPECTION_TYPE_CODE", length = 10)
   private String strctreInspectionTypeCode;

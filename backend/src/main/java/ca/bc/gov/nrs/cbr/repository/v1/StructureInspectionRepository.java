@@ -54,4 +54,21 @@ public interface StructureInspectionRepository
   Optional<LocalDate> findLatestReviewedInspectionDate(
       @Param("structureId") Long structureId,
       @Param("terminalStatuses") List<String> terminalStatuses);
+
+  /**
+   * A structure's inspections whose report was reviewed — current status {@code RVD} or
+   * {@code ACC}, with a reviewer recorded. Each is a row of the structure page's load rating
+   * history, with or without a rating, as legacy's {@code FIND_LOAD_RATINGS_BY_STRC_ID} lists them.
+   */
+  @Query("""
+      SELECT inspection
+        FROM StructureInspectionEntity inspection
+        JOIN FETCH inspection.currentStatus status
+       WHERE inspection.crossingStructureId = :structureId
+         AND status.inspectionReportStatusCode IN :reviewedStatuses
+         AND inspection.inspectionReviewerId IS NOT NULL
+      """)
+  List<StructureInspectionEntity> findReviewedByStructure(
+      @Param("structureId") Long structureId,
+      @Param("reviewedStatuses") List<String> reviewedStatuses);
 }

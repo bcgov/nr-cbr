@@ -12,12 +12,15 @@ import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceCulvertEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.From;
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
@@ -107,9 +110,11 @@ public final class StructureSearchSpecifications {
   private static final String CULVERT_TYPE = "engineeredCulvertTypeCode";
 
   private static final String YES = "Y";
-  private static final String NO = "N";
   /** A portable superstructure in service — its abutments then have to be recorded. */
-  private static final String IN_SERVICE = "S";
+  /** A portable superstructure in storage, which has no abutments to record. */
+  private static final String IN_STORAGE = "S";
+  private static final String RECREATION = "REC";
+  private static final List<String> REVIEWED_STATUSES = List.of("RVD", "ACC");
 
   /** The type/classes that carry a bridge row, and those that carry a culvert row. */
   private static final List<String> BRIDGES = List.of("PB", "TB");
@@ -256,11 +261,24 @@ public final class StructureSearchSpecifications {
   /**
    * "Incomplete Data?" — a structure missing any of the values that make it complete.
    *
-   * <p>Legacy's own disjunction from {@code OracleStructureDAO.search}, with its comment that the
-   * structure, bridge and culvert {@code isComplete} methods must be kept in step with it. The
-   * bridge and culvert halves read "a bridge type with no complete bridge row": legacy's left joins
-   * make a missing row look like one with every column null, which is incomplete either way, so
-   * {@code NOT EXISTS} of a complete row says the same thing.
+   * <p><b>Legacy's structure page rules</b> — {@code Structure}, {@code Bridge} and
+   * {@code Culvert.isComplete()} — so this filter and the structure page's Outstanding list always
+   * agree about a structure. Legacy's own search query disagreed with its page in four places;
+   * the page wins (decided 2026-10-06, {@code cbr-structure-page.local.md}):
+   *
+   * <ul>
+   *   <li><b>Abutments</b> are required unless a portable superstructure is in storage (status
+   *       {@code S}). Legacy's search had it the other way round.</li>
+   *   <li><b>Estimated Load Restriction (year)</b> is not required on a recreation site.</li>
+   *   <li><b>The site's maintainer</b> is not checked — legacy's page has the check commented
+   *       out.</li>
+   *   <li><b>A load rating</b> is any manual rating or reviewed inspection, not a stored design
+   *       rating.</li>
+   * </ul>
+   *
+   * <p>The bridge and culvert halves read "a bridge type with no complete bridge row": a missing
+   * row is incomplete either way, so {@code NOT EXISTS} of a complete row says the same thing.
+   * {@code StructureDetailService} applies the same rules to one structure, by name.
    */
   private static Predicate incomplete(
       CriteriaBuilder builder,
@@ -268,10 +286,17 @@ public final class StructureSearchSpecifications {
       Root<CrossingStructureEntity> root,
       From<?, ?> site) {
     Predicate loadRatingMissing = builder.and(
-        builder.isNull(root.get(DESIGN_LOAD_RATING)),
         builder.or(
             builder.isNull(root.get(LOAD_RATING_UNKNOWN)),
-            builder.equal(root.get(LOAD_RATING_UNKNOWN), NO)));
+            builder.notEqual(root.get(LOAD_RATING_UNKNOWN), YES)),
+        builder.not(builder.exists(manualRating(query, builder, root))),
+        builder.not(builder.exists(reviewedInspection(query, builder, root))));
+
+    Predicate loadRestrictionMissing = builder.and(
+        builder.isNull(root.get(LOAD_RESTRICTION_YEAR)),
+        builder.or(
+            builder.isNull(site.get(SITE_TYPE)),
+            builder.notEqual(site.get(SITE_TYPE), RECREATION)));
 
     Predicate bridgeIncomplete = builder.and(
         root.get(TYPE_CLASS_CODE).in(BRIDGES),
@@ -281,10 +306,9 @@ public final class StructureSearchSpecifications {
             b.isNotNull(bridge.get("runningSurfaceCode")),
             b.isNotNull(bridge.get("deckTypeCode")),
             b.isNotNull(bridge.get(SUPERSTRUCTURE_TYPE)),
-            // A portable superstructure in service needs both abutments recorded.
+            // Both abutments, unless the portable superstructure is in storage.
             b.or(
-                b.isNull(bridge.get("portableSuperstructureStatusCode")),
-                b.notEqual(bridge.get("portableSuperstructureStatusCode"), IN_SERVICE),
+                b.equal(bridge.get("portableSuperstructureStatusCode"), IN_STORAGE),
                 b.and(
                     b.isNotNull(bridge.get("rightAbutmentCode")),
                     b.isNotNull(bridge.get("leftAbutmentCode")))))))));
@@ -301,14 +325,38 @@ public final class StructureSearchSpecifications {
 
     return builder.or(
         loadRatingMissing,
-        builder.isNull(root.get(LOAD_RESTRICTION_YEAR)),
+        loadRestrictionMissing,
         builder.isNull(root.get(NEXT_PLANNED_INSPECTION)),
-        builder.isNull(site.get(CLIENT_NUMBER)),
-        builder.isNull(site.get(CLIENT_LOCATION)),
         builder.isNull(root.get(STRUCTURE_SOURCE)),
         builder.isNull(root.get(STRUCTURE_SITE_ID)),
         bridgeIncomplete,
         culvertIncomplete);
+  }
+
+  /** A manual load rating on this structure — one with no inspection behind it. */
+  private static Subquery<Long> manualRating(
+      CriteriaQuery<?> query, CriteriaBuilder builder, Root<CrossingStructureEntity> root) {
+    Subquery<Long> rows = query.subquery(Long.class);
+    Root<StructureLoadRatingEntity> rating = rows.from(StructureLoadRatingEntity.class);
+    return rows.select(rating.get("structureLoadRatingId")).where(
+        builder.equal(rating.get(OWNING_STRUCTURE), root.get(STRUCTURE_ID)),
+        builder.isNull(rating.get("inspectionId")));
+  }
+
+  /**
+   * An inspection of this structure whose report was reviewed — current status {@code RVD} or
+   * {@code ACC}, with a reviewer — which counts as a load rating whether or not it recorded one, as
+   * legacy's {@code FIND_LOAD_RATINGS_BY_STRC_ID} counts it.
+   */
+  private static Subquery<Long> reviewedInspection(
+      CriteriaQuery<?> query, CriteriaBuilder builder, Root<CrossingStructureEntity> root) {
+    Subquery<Long> rows = query.subquery(Long.class);
+    Root<StructureInspectionEntity> inspection = rows.from(StructureInspectionEntity.class);
+    Join<?, ?> status = inspection.join("currentStatus");
+    return rows.select(inspection.get("inspectionId")).where(
+        builder.equal(inspection.get(OWNING_STRUCTURE), root.get(STRUCTURE_ID)),
+        status.get("inspectionReportStatusCode").in(REVIEWED_STATUSES),
+        builder.isNotNull(inspection.get("inspectionReviewerId")));
   }
 
   /** This structure's bridge row, if it has one that meets {@code condition}. */
