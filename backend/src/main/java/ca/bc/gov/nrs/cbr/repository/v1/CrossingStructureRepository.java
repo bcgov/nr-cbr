@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -23,6 +24,17 @@ public interface CrossingStructureRepository
    * carry a good number of them.
    */
   long countByCrossingSiteIdAndActiveInd(String crossingSiteId, String activeInd);
+
+  /**
+   * The ids of the structures of one kind on a site, oldest first — what Site Detail's Display
+   * Structures needs to open the one structure directly when there is only one.
+   */
+  @Query("""
+      SELECT structure.crossingStructureId FROM CrossingStructureEntity structure
+      WHERE structure.crossingSiteId = :crossingSiteId AND structure.activeInd = :activeInd
+      ORDER BY structure.crossingStructureId""")
+  List<Long> findIdsByCrossingSiteIdAndActiveInd(
+      @Param("crossingSiteId") String crossingSiteId, @Param("activeInd") String activeInd);
 
   /**
    * Archives structures: {@code ACTIVE_IND = 'N'}, stamped with who and when.

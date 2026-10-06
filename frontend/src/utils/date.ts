@@ -11,3 +11,18 @@ export function formatShortDate(value: string | null | undefined): string {
   const date = DateTime.fromFormat(value.trim(), 'yyyy-MM-dd');
   return date.isValid ? date.toFormat('MMM d, yyyy') : value;
 }
+
+/**
+ * Formats an ISO `yyyy-MM-ddTHH:mm:ss` timestamp as `MMM d, yyyy h:mm a` (e.g. `Dec 1, 2002 3:07 PM`).
+ * A bare `yyyy-MM-dd` date is formatted as {@link formatShortDate} does; blank input is returned
+ * empty and anything else unchanged. Read in the local zone, as the audit columns are written.
+ */
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  const timestamp = DateTime.fromISO(trimmed);
+  if (!timestamp.isValid) return value;
+  return trimmed.includes('T')
+    ? timestamp.toFormat('MMM d, yyyy h:mm a')
+    : timestamp.toFormat('MMM d, yyyy');
+}

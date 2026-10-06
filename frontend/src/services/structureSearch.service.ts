@@ -1,4 +1,5 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
+import type { StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
 import type {
   PagedResponse,
   StructureSearchCriteria,
@@ -91,6 +92,20 @@ export class StructureSearchService extends HttpClient {
       method: 'PUT',
       url: '/v1/structures/repair-responsibility',
       body: { structureIds: structureIds.map(Number), clientNumber, clientLocationCode },
+    });
+  }
+
+  /**
+   * One structure, for its page — the header and the Details tab.
+   *
+   * <p>404 when there is no such structure, which is ordinary: the link here comes from a results
+   * page that may have been on screen for some time.
+   */
+  getStructure(structureId: string): CancelablePromise<StructureDetailResponse> {
+    return this.doRequest<StructureDetailResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}',
+      path: { structureId },
     });
   }
 }

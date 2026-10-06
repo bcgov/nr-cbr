@@ -47,13 +47,13 @@ vi.mock('@/services/APIs', () => ({
   default: { configuration: api, structureSearch: structureSearchApi, client: clientApi },
 }));
 
-const renderPage = (canEdit = false, canDelete = false) => {
+const renderPage = (canEdit = false, canDelete = false, url = '/inventory/structure-search') => {
   authorization.canEdit = canEdit;
   authorization.canDelete = canDelete;
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <StructureSearchPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -115,6 +115,8 @@ beforeEach(() => {
     siteCount: 0,
   });
   display.mockClear();
+  // The page keeps its search for the tab; without this one test's search greets the next.
+  sessionStorage.clear();
   clientApi.searchClients.mockReset();
   clientApi.searchClients.mockResolvedValue([]);
   clientApi.clientLocations.mockReset();
@@ -248,6 +250,21 @@ describe('StructureSearchPage — searching', () => {
     renderPage();
 
     expect(screen.queryByTestId('structure-search-results')).not.toBeInTheDocument();
+  });
+
+  it('opens already searched for a site when Site Detail sends one', async () => {
+    // Display Structures on a site with several structures, as legacy's `location=site` does.
+    renderPage(false, false, '/inventory/structure-search?siteId=BOWRON-001');
+
+    await waitFor(() =>
+      expect(structureSearchApi.searchStructures).toHaveBeenCalledWith(
+        expect.objectContaining({ siteId: 'BOWRON-001' }),
+        expect.anything(),
+        expect.anything(),
+        null,
+      ),
+    );
+    expect(screen.getByTestId('structure-search-siteId')).toHaveValue('BOWRON-001');
   });
 
   it('does not search while the user is still typing', () => {
@@ -401,10 +418,11 @@ describe('StructureSearchPage — results', () => {
     renderPage();
     await searchAndWait();
 
-    expect(screen.getByRole('link', { name: '12345' })).toHaveAttribute(
-      'href',
-      '/inventory/site/12345',
-    );
+    // The site in a new tab, so the results stay put; the hidden text says so to a screen reader.
+    const site = screen.getByRole('link', { name: '12345 (opens in a new tab)' });
+    expect(site).toHaveAttribute('href', '/inventory/site/12345');
+    expect(site).toHaveAttribute('target', '_blank');
+    expect(site).toHaveAttribute('rel', 'noopener noreferrer');
     // By id, not by name: CROSSING_STRUCTURE_ID is the key, and a name is not unique.
     expect(screen.getByRole('link', { name: 'B7' })).toHaveAttribute(
       'href',
@@ -1352,5 +1370,66 @@ describe('StructureSearchPage — updating repair responsibility', () => {
       );
     });
     expect(screen.getByRole('checkbox', { name: 'Select structure B1' })).toBeChecked();
+  });
+});
+
+describe('StructureSearchPage — coming back to the search', () => {
+  const searchFor = async (name: string) => {
+    fireEvent.change(screen.getByTestId('structure-search-structureName'), {
+      target: { value: name },
+    });
+    await searchAndWait();
+  };
+
+  it('finds the last search as it was left, results included', async () => {
+    // Open a structure from the results, then return by the breadcrumb or the side nav.
+    const first = renderPage();
+    await searchFor('B100');
+    first.unmount();
+    structureSearchApi.searchStructures.mockClear();
+
+    renderPage();
+
+    expect(screen.getByTestId('structure-search-structureName')).toHaveValue('B100');
+    await waitFor(() => {
+      expect(structureSearchApi.searchStructures).toHaveBeenCalledWith(
+        expect.objectContaining({ structureName: 'B100' }),
+        0,
+        20,
+        null,
+      );
+    });
+  });
+
+  it('forgets it on Reset', async () => {
+    const first = renderPage();
+    await searchFor('B100');
+    fireEvent.click(screen.getByTestId('structure-search-reset'));
+    first.unmount();
+
+    renderPage();
+
+    expect(screen.getByTestId('structure-search-structureName')).toHaveValue('');
+    expect(screen.queryByTestId('structure-search-results')).not.toBeInTheDocument();
+  });
+
+  it('runs the site Site Detail sent rather than the kept search', async () => {
+    const first = renderPage();
+    await searchFor('B100');
+    first.unmount();
+
+    renderPage(false, false, '/inventory/structure-search?siteId=BOWRON-001');
+
+    expect(screen.getByTestId('structure-search-structureName')).toHaveValue('');
+    expect(screen.getByTestId('structure-search-siteId')).toHaveValue('BOWRON-001');
+  });
+
+  it('opens blank when what was saved cannot be read', () => {
+    sessionStorage.setItem('cbr.structureSearch', '{not json');
+
+    renderPage();
+
+    expect(screen.getByTestId('structure-search-structureName')).toHaveValue('');
+    expect(screen.queryByTestId('structure-search-results')).not.toBeInTheDocument();
   });
 });

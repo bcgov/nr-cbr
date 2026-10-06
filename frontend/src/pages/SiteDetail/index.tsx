@@ -9,6 +9,7 @@ import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
 
 import { toFormValues } from './siteResponse';
 
+import type { StructureLinkState } from '@/pages/StructureDetail';
 import type { FC } from 'react';
 
 import { syncCoordinates } from '@/components/SiteForm/coordinateSync';
@@ -243,6 +244,9 @@ const SiteDetailPage: FC = () => {
    * treating "not yet known" as "has some" would flash a message about structures that may not
    * exist.
    */
+  /** The site's active structures, for Display Structures. */
+  const structureIds = loaded.data?.activeStructureIds ?? [];
+
   const stored = savedSiteConflicts(site, {
     activeStructureCount: loaded.data?.activeStructureCount ?? 0,
   });
@@ -332,8 +336,10 @@ const SiteDetailPage: FC = () => {
       >
         <div className="site-detail__header-actions">
           {/* Shown only once the site is on screen, as legacy's `structuresButton` div is
-              `display:none` until `actionType` is UPDATE. Add Structure opens a placeholder page;
-              Display Structures opens Structure Search, not yet filtered to this site. */}
+              `display:none` until `actionType` is UPDATE. Add Structure opens a placeholder page.
+              Display Structures opens the structure itself when the site has one, and Structure
+              Search filtered to the site when it has several — legacy always opens the search.
+              With none there is nothing to display, so the button is not shown. */}
           {mode === 'view' && loaded.data && (
             <>
               {canEdit && (
@@ -347,15 +353,25 @@ const SiteDetailPage: FC = () => {
                   Add Structure
                 </Button>
               )}
-              <Button
-                kind="tertiary"
-                size="md"
-                renderIcon={ListChecked}
-                data-testid="site-detail-structures"
-                onClick={() => navigate('/inventory/structure-search')}
-              >
-                Display Structures
-              </Button>
+              {structureIds.length > 0 && (
+                <Button
+                  kind="tertiary"
+                  size="md"
+                  renderIcon={ListChecked}
+                  data-testid="site-detail-structures"
+                  onClick={() =>
+                    structureIds.length === 1
+                      ? navigate(`/inventory/structure/${structureIds[0]}`, {
+                          state: { fromSiteId: siteId } satisfies StructureLinkState,
+                        })
+                      : navigate(
+                          `/inventory/structure-search?siteId=${encodeURIComponent(siteId ?? '')}`,
+                        )
+                  }
+                >
+                  Display Structures
+                </Button>
+              )}
             </>
           )}
           {mode === 'view'

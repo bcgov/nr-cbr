@@ -108,6 +108,8 @@ beforeEach(() => {
   // Shared across tests because vi.hoisted runs once — without this a "was a toast shown" assertion
   // passes on a call the previous test made.
   display.mockClear();
+  // The page keeps its search for the tab; without this one test's search greets the next.
+  sessionStorage.clear();
 });
 
 const search = () => fireEvent.click(screen.getByTestId('site-search-submit'));
@@ -1180,5 +1182,51 @@ describe('SiteSearchPage — sorting by a header', () => {
     await waitFor(() => {
       expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
     });
+  });
+});
+
+describe('SiteSearchPage — coming back to the search', () => {
+  it('finds the last search as it was left, results included', async () => {
+    // Open a site from the results, then return by the breadcrumb or the side nav.
+    const first = renderPage();
+    fireEvent.change(screen.getByTestId('site-search-siteId'), { target: { value: '62-002' } });
+    await searchAndWait();
+    first.unmount();
+    siteSearchApi.searchSites.mockClear();
+
+    renderPage();
+
+    expect(screen.getByTestId('site-search-siteId')).toHaveValue('62-002');
+    await waitFor(() => {
+      expect(screen.getByTestId('site-search-results')).toBeInTheDocument();
+    });
+    expect(siteSearchApi.searchSites).toHaveBeenCalledWith(
+      expect.objectContaining({ siteId: '62-002' }),
+      0,
+      20,
+      null,
+    );
+  });
+
+  it('forgets it on Reset', async () => {
+    const first = renderPage();
+    fireEvent.change(screen.getByTestId('site-search-siteId'), { target: { value: '62-002' } });
+    await searchAndWait();
+    fireEvent.click(screen.getByTestId('site-search-reset'));
+    first.unmount();
+
+    renderPage();
+
+    expect(screen.getByTestId('site-search-siteId')).toHaveValue('');
+    expect(screen.queryByTestId('site-search-results')).not.toBeInTheDocument();
+  });
+
+  it('opens blank when what was saved cannot be read', () => {
+    sessionStorage.setItem('cbr.siteSearch', '{not json');
+
+    renderPage();
+
+    expect(screen.getByTestId('site-search-siteId')).toHaveValue('');
+    expect(screen.queryByTestId('site-search-results')).not.toBeInTheDocument();
   });
 });

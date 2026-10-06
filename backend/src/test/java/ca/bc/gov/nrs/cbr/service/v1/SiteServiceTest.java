@@ -307,6 +307,20 @@ class SiteServiceTest {
     }
 
     @Test
+    @DisplayName("lists the active structures' ids, oldest first, for Display Structures")
+    void listsActiveStructureIds() {
+      // One id opens that structure; several open Structure Search filtered to the site.
+      givenCompleteSite("SITE-1");
+      givenStructure(7L, "SITE-1", "Y");
+      givenStructure(3L, "SITE-1", "Y");
+      givenStructure(5L, "SITE-1", "N");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.findById("SITE-1").activeStructureIds()).containsExactly("3", "7");
+    }
+
+    @Test
     @DisplayName("leaves archived structures out of that count, as FIND_STRUCTURES_BY_SITE_ID does")
     void ignoresArchivedStructures() {
       // The procedure behind legacy's Site.hasStructures() ends AND S.ACTIVE_IND = 'Y'. An

@@ -15,6 +15,8 @@ import {
 } from '@carbon/react';
 import { Link } from 'react-router-dom';
 
+import ExternalLink from '@/components/core/ExternalLink';
+
 import type {
   SelectedStructure,
   StructureSearchResult,
@@ -243,7 +245,10 @@ const StructureSearchResults: FC<Props> = ({
                   </Link>
                 </TableCell>
                 <TableCell>
-                  {row.siteId && <Link to={`/inventory/site/${row.siteId}`}>{row.siteId}</Link>}
+                  {/* A new tab, as on Structure Detail, so the results stay where they are. */}
+                  {row.siteId && (
+                    <ExternalLink to={`/inventory/site/${row.siteId}`}>{row.siteId}</ExternalLink>
+                  )}
                 </TableCell>
                 <TableCell>
                   {[row.orgUnitCode, row.orgUnitName].filter(Boolean).join(' — ')}

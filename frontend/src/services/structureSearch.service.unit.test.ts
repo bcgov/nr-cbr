@@ -123,4 +123,14 @@ describe('StructureSearchService', () => {
       expect.objectContaining({ method: 'DELETE', url: '/api/v1/structures/12' }),
     );
   });
+
+  it('reads one structure by id', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getStructure('7');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', url: '/api/v1/structures/7' }),
+    );
+  });
 });

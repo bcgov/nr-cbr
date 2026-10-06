@@ -18,6 +18,22 @@ import { apiErrorMessage } from '@/utils/apiError';
 
 export const STRUCTURE_SEARCH_QUERY_KEY = 'structure-search';
 
+/** Query key for one structure read by id — distinct from the search, which is keyed on criteria. */
+export const STRUCTURE_QUERY_KEY = 'structure';
+
+/**
+ * One structure, for its page.
+ *
+ * <p>No `staleTime`, as for a site: a structure's data changes while people work, and someone
+ * returning to it expects to see it as it is now.
+ */
+export const useStructure = (structureId: string | undefined) =>
+  useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, structureId],
+    queryFn: () => API.structureSearch.getStructure(structureId as string),
+    enabled: Boolean(structureId),
+  });
+
 /**
  * Runs a structure search, or nothing until one has been submitted.
  *

@@ -1,5 +1,6 @@
 import { Column, Grid, InlineNotification } from '@carbon/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import DestructiveModal from '@/components/core/DestructiveModal';
 import PageTitle from '@/components/core/PageTitle';
@@ -38,6 +39,7 @@ import {
 } from '@/hooks/useConfiguration';
 import { useArchiveStructures, useStructureSearch } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
+import { readSessionState, writeSessionState } from '@/utils/sessionState';
 
 /**
  * Structure Search — Inventory's third screen, after Add Site.
@@ -50,17 +52,68 @@ import { apiErrorMessage } from '@/utils/apiError';
  * the query is keyed on the snapshot. Paging and ordering are the server's — district, road, Br.,
  * km, as legacy orders them.
  */
+/** Where the page keeps its search for the tab. */
+export const STRUCTURE_SEARCH_STATE_KEY = 'cbr.structureSearch';
+
+/**
+ * What is kept, so leaving for a structure and coming back finds the search as it was left. The
+ * ticks are not: they belong to the moment, and an action run on them later would act on rows the
+ * user may no longer have in mind.
+ */
+type SavedStructureSearch = {
+  criteria: StructureSearchCriteria;
+  submitted: StructureSearchCriteria | null;
+  page: number;
+  pageSize: number;
+  sort: StructureSort | null;
+};
+
+/**
+ * Where the page opens. A site sent by Site Detail's Display Structures (`?siteId=`) wins: it is a
+ * new search, run at once for that site, as legacy's `location=site` does. Otherwise the search
+ * kept for this tab, its criteria laid over the empty set so one saved before a criterion was added
+ * still restores; otherwise blank.
+ */
+const initialSearch = (siteId: string | null): SavedStructureSearch => {
+  if (siteId) {
+    const criteria = { ...EMPTY_CRITERIA, siteId };
+    return { criteria, submitted: criteria, page: 1, pageSize: 20, sort: null };
+  }
+  const saved = readSessionState<Partial<SavedStructureSearch>>(STRUCTURE_SEARCH_STATE_KEY);
+  return {
+    criteria: { ...EMPTY_CRITERIA, ...saved?.criteria },
+    submitted: saved?.submitted ? { ...EMPTY_CRITERIA, ...saved.submitted } : null,
+    page: saved?.page ?? 1,
+    pageSize: saved?.pageSize ?? 20,
+    sort: saved?.sort ?? null,
+  };
+};
+
 const StructureSearchPage: FC = () => {
   // Level 1 and above may tick rows — legacy's `/deleteStructure` or `/updateRepairResponsibility`.
   const { canEdit, canDelete } = useAuthorization();
-  const [criteria, setCriteria] = useState<StructureSearchCriteria>(EMPTY_CRITERIA);
+  // The last search in this tab comes back with the page — through the breadcrumb, the side nav or
+  // Back — unless Site Detail sent a site to search. Reset forgets it.
+  const [searchParams] = useSearchParams();
+  const [initial] = useState(() => initialSearch(searchParams.get('siteId')));
+  const [criteria, setCriteria] = useState<StructureSearchCriteria>(initial.criteria);
   /** The criteria the visible results belong to; `null` until the first search. */
-  const [submitted, setSubmitted] = useState<StructureSearchCriteria | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [submitted, setSubmitted] = useState<StructureSearchCriteria | null>(initial.submitted);
+  const [page, setPage] = useState(initial.page);
+  const [pageSize, setPageSize] = useState(initial.pageSize);
   const [resetToken, setResetToken] = useState(0);
   /** The header the results are sorted by. Kept across new searches; cleared by Reset. */
-  const [sort, setSort] = useState<StructureSort | null>(null);
+  const [sort, setSort] = useState<StructureSort | null>(initial.sort);
+
+  useEffect(() => {
+    writeSessionState(STRUCTURE_SEARCH_STATE_KEY, {
+      criteria,
+      submitted,
+      page,
+      pageSize,
+      sort,
+    } satisfies SavedStructureSearch);
+  }, [criteria, submitted, page, pageSize, sort]);
   /**
    * The ticked structures, by id. Kept while the user pages and sorts, so one action can cover rows
    * from several pages — which is why each carries its name and what blocks its delete: its row
