@@ -38,4 +38,11 @@ public class CloseProximityInspectionEntity {
 
   @Column(name = "CROSSING_SITE_ID", length = 14)
   private String crossingSiteId;
+
+  /**
+   * The structure this belongs to. Mapped for one reason: a structure with any of these cannot be
+   * deleted — see {@code StructureService.delete}.
+   */
+  @Column(name = "CROSSING_STRUCTURE_ID")
+  private Long crossingStructureId;
 }

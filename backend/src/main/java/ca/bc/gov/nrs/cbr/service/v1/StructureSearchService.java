@@ -6,14 +6,16 @@ import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
-import ca.bc.gov.nrs.cbr.repository.v1.ClientPublicRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.ClientLocationRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
+import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.specification.v1.StructureSearchSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -48,12 +50,19 @@ public class StructureSearchService {
   private static final int DEFAULT_PAGE_SIZE = 20;
 
   private final CrossingStructureRepository structures;
-  private final ClientPublicRepository clients;
+  private final ClientLocationRepository clients;
+  private final StructureDeleteBlockers deleteBlockers;
+  private final LoggedUserHelper loggedUser;
 
   public StructureSearchService(
-      CrossingStructureRepository structures, ClientPublicRepository clients) {
+      CrossingStructureRepository structures,
+      ClientLocationRepository clients,
+      StructureDeleteBlockers deleteBlockers,
+      LoggedUserHelper loggedUser) {
     this.structures = structures;
     this.clients = clients;
+    this.deleteBlockers = deleteBlockers;
+    this.loggedUser = loggedUser;
   }
 
   /**
@@ -78,12 +87,15 @@ public class StructureSearchService {
         StructureSearchSpecifications.matching(criteria, sortBy, direction), pageable);
 
     Map<String, String> names = maintainerNames(page);
+    Map<Long, List<String>> blockers = blockersFor(page);
 
     log.debug("Structure search matched {} structure(s) (page {} of {})",
         page.getTotalElements(), pageable.getPageNumber(), page.getTotalPages());
 
     return new PagedResponse<>(
-        page.getContent().stream().map(structure -> toResult(structure, names)).toList(),
+        page.getContent().stream()
+            .map(structure -> toResult(structure, names, blockers))
+            .toList(),
         page.getTotalElements(),
         page.getTotalPages(),
         page.getNumber(),
@@ -109,14 +121,32 @@ public class StructureSearchService {
     if (numbers.isEmpty()) {
       return Map.of();
     }
-    return clients.findAllById(numbers).stream()
+    // First name wins: nothing constrains V_CLIENT_PUBLIC to one row per number, and a duplicate
+    // there should not turn a search into a 500.
+    return clients.findClientsByNumber(numbers).stream()
         .filter(client -> client.getClientName() != null)
         .collect(Collectors.toMap(
-            ClientPublicEntity::getClientNumber, ClientPublicEntity::getClientName));
+            ClientPublicEntity::getClientNumber, ClientPublicEntity::getClientName,
+            (first, second) -> first));
+  }
+
+  /**
+   * What blocks each structure's delete, for the screen to warn about before a delete is
+   * confirmed. Six queries a page, so only for a caller who can delete; empty otherwise, which the
+   * results carry as null rather than as "nothing in the way".
+   */
+  private Map<Long, List<String>> blockersFor(Page<CrossingStructureEntity> page) {
+    if (!loggedUser.canDestroy() || page.isEmpty()) {
+      return Map.of();
+    }
+    return deleteBlockers.of(
+        page.getContent().stream().map(CrossingStructureEntity::getCrossingStructureId).toList());
   }
 
   private static StructureSearchResult toResult(
-      CrossingStructureEntity structure, Map<String, String> names) {
+      CrossingStructureEntity structure,
+      Map<String, String> names,
+      Map<Long, List<String>> blockers) {
     CrossingSiteEntity site = structure.getSite();
     String clientNumber = from(site, CrossingSiteEntity::getClientNumber);
     return new StructureSearchResult(
@@ -133,7 +163,8 @@ public class StructureSearchService {
         from(site, CrossingSiteEntity::getRoadSectionId),
         clientNumber,
         from(site, CrossingSiteEntity::getClientLocnCode),
-        clientNumber == null ? null : names.get(clientNumber));
+        clientNumber == null ? null : names.get(clientNumber),
+        blockers.get(structure.getCrossingStructureId()));
   }
 
   private static <T> String from(T association, Function<T, String> value) {

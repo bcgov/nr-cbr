@@ -4,6 +4,7 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
 
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
@@ -214,7 +215,7 @@ public final class SiteSearchSpecifications {
       return;
     }
 
-    From<?, ?> roadSection = joinOrFetch(root, ROAD_SECTION, projecting);
+    From<?, ?> roadSection = joinOrFetch(root, ROAD_SECTION, JoinType.LEFT, projecting);
     if (filtering) {
       contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
           .ifPresent(predicates::add);
@@ -384,19 +385,5 @@ public final class SiteSearchSpecifications {
             WILDCARD + name.trim().toUpperCase(Locale.ROOT) + WILDCARD));
 
     return Optional.of(root.get(CLIENT_NUMBER).in(clients));
-  }
-
-  /**
-   * One left join, fetched when the query returns entities.
-   *
-   * <p>The cast is safe and is the standard way to use a fetch as a join: Hibernate's {@code Fetch}
-   * implementations are {@code Join}s. It is what lets one join serve both the predicate and the
-   * projection instead of creating a second one.
-   */
-  private static From<?, ?> joinOrFetch(
-      Root<CrossingSiteEntity> root, String attribute, boolean projecting) {
-    return projecting
-        ? (From<?, ?>) root.fetch(attribute, JoinType.LEFT)
-        : root.join(attribute, JoinType.LEFT);
   }
 }

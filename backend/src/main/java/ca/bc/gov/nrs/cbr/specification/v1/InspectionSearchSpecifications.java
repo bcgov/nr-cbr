@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.specification.v1;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
 
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
@@ -500,29 +501,5 @@ public final class InspectionSearchSpecifications {
           builder.upper(joined.site().get(ROAD_SECTION_ID)));
       case STATUS -> List.of(builder.upper(joined.statusCode().get(STATUS_DESCRIPTION)));
     };
-  }
-
-  /**
-   * One join, fetched when the query returns entities.
-   *
-   * <p>Every association this specification touches is read by a results row, so when the query
-   * projects entities each join is a fetch and the page is one statement. Left lazy they would be
-   * the classic N+1 — a page of twenty inspections costing twenty extra selects per association,
-   * invisible in a test with three rows and very visible on a district. The org unit was exactly
-   * that: joined for the ordering but never fetched, so every row on every page went back for its
-   * district code.
-   *
-   * <p>These are all to-one, so no row is duplicated and no {@code distinct} is needed, and the
-   * fetch does not interfere with paging the way a collection fetch would.
-   *
-   * <p>The cast is safe and is the standard way to use a fetch as a join: Hibernate's
-   * {@code Fetch} implementations are {@code Join}s. It is what lets one join serve the predicate,
-   * the ordering and the projection instead of three.
-   */
-  private static From<?, ?> joinOrFetch(
-      From<?, ?> parent, String attribute, JoinType type, boolean projecting) {
-    return projecting
-        ? (From<?, ?>) parent.fetch(attribute, type)
-        : parent.join(attribute, type);
   }
 }

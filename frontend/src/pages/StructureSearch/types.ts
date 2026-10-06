@@ -91,6 +91,24 @@ export type StructureSearchResult = {
   clientNumber: string;
   clientLocationCode: string;
   clientName: string;
+  /**
+   * What stops this structure being deleted — "inspections", "repairs" and so on; empty when
+   * nothing does. Null when the caller cannot delete, for whom the server does not work it out.
+   */
+  deleteBlockers?: string[] | null;
+};
+
+/**
+ * A ticked structure, as remembered across pages: what the screen needs to act on it when its row
+ * is no longer in view.
+ */
+export type SelectedStructure = {
+  /** Its Structure #, or the id when it has none. */
+  name: string;
+  /** The site it stands on — whose maintainer Update Repair Responsibility sets. Null for none. */
+  siteId: string | null;
+  /** As on {@link StructureSearchResult} when it was ticked. */
+  deleteBlockers: string[] | null;
 };
 
 /**

@@ -1,8 +1,13 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
+import java.time.LocalDateTime;
+import java.util.Collection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -21,4 +26,26 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface CrossingSiteRepository
     extends JpaRepository<CrossingSiteEntity, String>, JpaSpecificationExecutor<CrossingSiteEntity> {
+
+  /**
+   * Sets the designated maintainer of sites — Structure Search's Update Repair Responsibility,
+   * which reaches a site through the structures standing on it. Stamped with who and when.
+   *
+   * @return how many sites were updated
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingSiteEntity site
+         SET site.clientNumber = :clientNumber,
+             site.clientLocnCode = :clientLocnCode,
+             site.updateUserid = :user,
+             site.updateTimestamp = :now
+       WHERE site.crossingSiteId IN :siteIds
+      """)
+  int setMaintainer(
+      @Param("siteIds") Collection<String> siteIds,
+      @Param("clientNumber") String clientNumber,
+      @Param("clientLocnCode") String clientLocnCode,
+      @Param("user") String user,
+      @Param("now") LocalDateTime now);
 }

@@ -77,3 +77,73 @@
 .structure-search__numeric {
   text-align: end;
 }
+
+// Headers on one line. Ten columns, the checkbox among them, wrapped "Structure #" and "Site #"
+// onto two lines and "Forest Service Road" onto three. Carbon's table scrolls sideways inside its
+// container when the row is wider than the page, so nothing is cut off.
+.structure-search__results th,
+.structure-search__results .cds--table-header-label {
+  white-space: nowrap;
+}
+
+// The title on the left, the bulk actions pushed to the right on the same line. Wraps under the
+// title rather than squeezing it when the window is narrow.
+.structure-search__results-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-05;
+}
+
+.structure-search__bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: $spacing-03;
+  margin-inline-start: auto;
+}
+
+// The delete confirmation's lines. Spans, because the modal wraps its message in a <p>, so each is
+// made a block of its own here.
+.structure-search__dialog-line {
+  display: block;
+}
+
+.structure-search__dialog-line + .structure-search__dialog-line,
+.structure-search__dialog-line + .structure-search__skipped,
+.structure-search__skipped + .structure-search__dialog-line {
+  margin-block-start: $spacing-03;
+}
+
+.structure-search__skipped {
+  display: block;
+  padding-inline-start: $spacing-04;
+}
+
+.structure-search__skipped .structure-search__dialog-line {
+  margin-block-start: 0;
+}
+
+// The repair-responsibility dialog's two pickers, side by side under its sentence. The maintainer
+// gets the wider share: its labels run to "CANFOR CORPORATION · Vancouver · 00001012-00", where a
+// location is a code and a city. Stacked on a phone-width dialog.
+.structure-search__dialog-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: $spacing-05;
+  margin-block-start: $spacing-05;
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Bottom-right, as DestructiveModal closes, rather than Carbon's full-width footer.
+.structure-search__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-05;
+  margin-block-start: $spacing-07;
+}

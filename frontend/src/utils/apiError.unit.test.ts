@@ -40,4 +40,31 @@ describe('apiErrorMessage', () => {
       'Could not delete the site.',
     );
   });
+
+  it('uses the caller fallback for a server error, never its internal text', () => {
+    // What the ORA-01031 on a structure delete put in front of the user, word for word.
+    const error = Object.assign(new Error('Internal Server Error'), {
+      status: 500,
+      body: {
+        status: 500,
+        message:
+          'Request processing failed: org.hibernate.exception.SQLGrammarException: JDBC ' +
+          'exception executing SQL [DELETE FROM THE.CROSSING_STRUCTURE_NAME_HIST WHERE ' +
+          'CROSSING_STRUCTURE_ID = ?] [ORA-01031: insufficient privileges ] [n/a]',
+      },
+    });
+
+    expect(apiErrorMessage(error, 'B1 could not be deleted.')).toBe('B1 could not be deleted.');
+  });
+
+  it('still shows the sentence a 4xx carries', () => {
+    const error = Object.assign(new Error('Conflict'), {
+      status: 409,
+      body: { detail: 'Structure B1 has inspections and cannot be deleted.' },
+    });
+
+    expect(apiErrorMessage(error, 'fallback')).toBe(
+      'Structure B1 has inspections and cannot be deleted.',
+    );
+  });
 });

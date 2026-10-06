@@ -289,6 +289,19 @@ class SiteUpdateTest {
     }
 
     @Test
+    @DisplayName("stamps the update pair and leaves the entry pair as it was")
+    void stampsTheAudit() {
+      // A Level 1 save keeps every column but one, so the audit pair is easy to keep by mistake.
+      save(edit -> edit.pointOfAccessDescription = "Gate key at the district office.");
+
+      CrossingSiteEntity site = stored();
+      assertThat(site.getUpdateUserid()).isEqualTo("IDIR\\EDITOR");
+      assertThat(site.getUpdateTimestamp()).isAfter(ENTERED);
+      assertThat(site.getEntryUserid()).isEqualTo("IDIR\\ORIGINAL");
+      assertThat(site.getEntryTimestamp()).isEqualTo(ENTERED);
+    }
+
+    @Test
     @DisplayName("saves Site Details on a site with gaps only Level 2 can fill")
     void ignoresTheRestOfTheSite() {
       // The rest of the site is not theirs to change, so it is not theirs to be refused over.

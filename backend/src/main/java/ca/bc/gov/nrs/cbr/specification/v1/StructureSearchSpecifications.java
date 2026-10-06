@@ -5,6 +5,7 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.integerRange;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
 
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
@@ -129,9 +130,9 @@ public final class StructureSearchSpecifications {
       StructureSearchCriteria criteria, StructureSortColumn sortBy, Sort.Direction direction) {
     return (root, query, builder) -> {
       boolean projecting = returnsEntities(query);
-      From<?, ?> site = joinOrFetch(root, SITE, projecting);
-      From<?, ?> roadSection = joinOrFetch(site, ROAD_SECTION, projecting);
-      From<?, ?> orgUnit = joinOrFetch(site, ORG_UNIT, projecting);
+      From<?, ?> site = joinOrFetch(root, SITE, JoinType.LEFT, projecting);
+      From<?, ?> roadSection = joinOrFetch(site, ROAD_SECTION, JoinType.LEFT, projecting);
+      From<?, ?> orgUnit = joinOrFetch(site, ORG_UNIT, JoinType.LEFT, projecting);
 
       List<Predicate> predicates = new ArrayList<>();
       structureCriteria(builder, root, criteria, predicates);
@@ -422,11 +423,5 @@ public final class StructureSearchSpecifications {
           builder.upper(site.get(FOREST_FILE_ID)), builder.upper(site.get(ROAD_SECTION_ID)));
       case MAINTAINER -> List.of(site.get(CLIENT_NUMBER), site.get(CLIENT_LOCATION));
     };
-  }
-
-  private static From<?, ?> joinOrFetch(From<?, ?> from, String attribute, boolean projecting) {
-    return projecting
-        ? (From<?, ?>) from.fetch(attribute, JoinType.LEFT)
-        : from.join(attribute, JoinType.LEFT);
   }
 }
