@@ -4,6 +4,8 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -71,4 +73,50 @@ public interface StructureInspectionRepository
   List<StructureInspectionEntity> findReviewedByStructure(
       @Param("structureId") Long structureId,
       @Param("reviewedStatuses") List<String> reviewedStatuses);
+
+  /**
+   * A page of a structure's inspections, newest first — legacy's
+   * {@code FIND_NEW_INSPECTIONS_BY_STRUCT}, or with {@code includeAll}
+   * {@code FIND_INSPECTIONS_BY_STRUCTURE}.
+   *
+   * <p>Without {@code includeAll}, only inspections dated after {@code after} — 1 January of the
+   * year the superstructure was installed. Joined inner to the current status, as legacy is, so an
+   * inspection with no status history is not listed; the status and its code are fetched with the
+   * page rather than one row at a time.
+   */
+  @Query(value = """
+      SELECT inspection
+        FROM StructureInspectionEntity inspection
+        JOIN FETCH inspection.currentStatus status
+        LEFT JOIN FETCH status.statusCode
+       WHERE inspection.crossingStructureId = :structureId
+         AND (:includeAll = TRUE OR inspection.inspectionDate > :after)
+       ORDER BY inspection.inspectionDate DESC, inspection.inspectionId DESC
+      """,
+      countQuery = """
+      SELECT COUNT(inspection)
+        FROM StructureInspectionEntity inspection
+        JOIN inspection.currentStatus status
+       WHERE inspection.crossingStructureId = :structureId
+         AND (:includeAll = TRUE OR inspection.inspectionDate > :after)
+      """)
+  Page<StructureInspectionEntity> findPageByStructure(
+      @Param("structureId") Long structureId,
+      @Param("after") LocalDate after,
+      @Param("includeAll") boolean includeAll,
+      Pageable pageable);
+
+  /**
+   * How many of a structure's inspections {@link #findPageByStructure} leaves out without
+   * {@code includeAll}: those dated on or before {@code after}, or not dated at all.
+   */
+  @Query("""
+      SELECT COUNT(inspection)
+        FROM StructureInspectionEntity inspection
+        JOIN inspection.currentStatus status
+       WHERE inspection.crossingStructureId = :structureId
+         AND (inspection.inspectionDate IS NULL OR inspection.inspectionDate <= :after)
+      """)
+  long countBeforeInstall(
+      @Param("structureId") Long structureId, @Param("after") LocalDate after);
 }

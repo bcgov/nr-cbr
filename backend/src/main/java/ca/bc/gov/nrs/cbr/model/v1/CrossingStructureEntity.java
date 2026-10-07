@@ -137,9 +137,17 @@ public class CrossingStructureEntity {
   @Column(name = "SPECIAL_EQUIPMENT_RQMT_CODE", length = 10)
   private String specialEquipmentRqmtCode;
 
-  /** Read by "Incomplete Data?" only. */
+  /** Read by "Incomplete Data?" and the structure page's Inspections tab. */
   @Column(name = "NEXT_PLANNED_INSPECTION_DATE")
   private LocalDate nextPlannedInspectionDate;
+
+  /** Shown on the Inspections tab when a close proximity inspection is required. */
+  @Column(name = "NEXT_PLANNED_CLS_PROX_INSP_DT")
+  private LocalDate nextPlannedClsProxInspDt;
+
+  /** Years between routine inspections, 1 to 6 — a one-character column. */
+  @Column(name = "ROUTINE_INSPECTION_FREQUENCY", length = 1)
+  private String routineInspectionFrequency;
 
   /** Read by "Incomplete Data?" only. */
   @Column(name = "STRUCTURE_SOURCE_CODE", length = 10)

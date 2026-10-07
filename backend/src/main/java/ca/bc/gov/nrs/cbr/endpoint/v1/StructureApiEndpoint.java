@@ -5,6 +5,12 @@ import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureSpansAndPiersResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
@@ -109,4 +115,115 @@ public interface StructureApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}")
   StructureDetailResponse getStructure(@PathVariable("structureId") long structureId);
+
+  /**
+   * A bridge's spans and piers — legacy's Spans &amp; Piers tab, fetched when that tab opens.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}, as the page is. Both lists are empty for a structure
+   * with no bridge row. <b>404</b> when there is no such structure.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/spans-and-piers")
+  StructureSpansAndPiersResponse getSpansAndPiers(@PathVariable("structureId") long structureId);
+
+  /**
+   * A structure's documents and photos — legacy's Documents &amp; Photos tab, fetched when that tab
+   * opens. Details only; each file's bytes come from {@link #getDocumentFile}.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}, as the page is. <b>404</b> when there is no such
+   * structure.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/documents")
+  StructureDocumentsResponse getDocuments(@PathVariable("structureId") long structureId);
+
+  /**
+   * One document's file. Images and PDFs are sent {@code inline} under their own type, for the
+   * browser to show; anything else as {@code application/octet-stream} to download.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when the structure has no such document.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the document belongs to
+   * @param fileId      the document's {@code FILE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/documents/{fileId}/file")
+  ResponseEntity<byte[]> getDocumentFile(
+      @PathVariable("structureId") long structureId, @PathVariable("fileId") long fileId);
+
+  /**
+   * The top of legacy's Inspections tab: planned-inspection comments, the next planned
+   * inspections and their frequency, and the completed close proximity inspections.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/inspection-schedule")
+  StructureInspectionScheduleResponse getInspectionSchedule(
+      @PathVariable("structureId") long structureId);
+
+  /**
+   * A page of the structure's inspections, newest first — legacy's inspection table, paged here.
+   * Those dated before the superstructure was installed only with {@code includeBeforeInstall}.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
+   *
+   * @param structureId          the {@code CROSSING_STRUCTURE_ID}
+   * @param pageNumber           zero-based
+   * @param pageSize             held to between 1 and 100
+   * @param includeBeforeInstall legacy's "Show Inspections before the Superstructure Install"
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/inspections")
+  StructureInspectionsResponse getInspections(
+      @PathVariable("structureId") long structureId,
+      @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
+      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
+      @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
+      boolean includeBeforeInstall);
+
+  /**
+   * A page of the structure's repairs — legacy's Repairs tab, paged here. Outstanding repairs by
+   * default, as legacy opens; {@code view=ALL} for every one.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   * @param view        {@code OUTSTANDING} or {@code ALL} — legacy's "Choose Viewing Option"
+   * @param pageNumber  zero-based
+   * @param pageSize    held to between 1 and 100
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/repairs")
+  PagedResponse<StructureRepairsResponse.Repair> getRepairs(
+      @PathVariable("structureId") long structureId,
+      @RequestParam(name = "view", defaultValue = "OUTSTANDING") StructureRepairsResponse.View view,
+      @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
+      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize);
+
+  /**
+   * A page of the structure's monitoring items — legacy's Monitoring tab, paged here. Outstanding
+   * items by default, as legacy opens; {@code view=ALL} for every one.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   * @param view        {@code OUTSTANDING} or {@code ALL} — legacy's "Choose Viewing Option"
+   * @param pageNumber  zero-based
+   * @param pageSize    held to between 1 and 100
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/monitors")
+  PagedResponse<StructureMonitorsResponse.Monitor> getMonitors(
+      @PathVariable("structureId") long structureId,
+      @RequestParam(name = "view", defaultValue = "OUTSTANDING")
+      StructureMonitorsResponse.View view,
+      @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
+      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize);
 }

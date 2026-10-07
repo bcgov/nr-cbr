@@ -15,10 +15,9 @@ import org.hibernate.annotations.Immutable;
 /**
  * {@code THE.FOREST_SERVICE_BRIDGE_PIER} — one pier of a bridge.
  *
- * <p><b>Minimal and read-only:</b> the key and the column that ties it to its parent, nothing else.
- * Nothing reads this table yet; a structure delete clears it, with native SQL in
- * {@code StructureService.delete}. Mapped so the test schema has the table without hand-written
- * DDL. The structure screens will map the rest when they arrive.
+ * <p><b>Read-only:</b> the structure page's Spans &amp; Piers tab lists these. A structure delete
+ * clears the table with native SQL in {@code StructureService.delete}. The audit columns are not
+ * mapped; nothing reads them yet.
  */
 @Entity
 @Immutable
@@ -37,4 +36,11 @@ public class ForestServiceBridgePierEntity {
 
   @Column(name = "FOREST_SERVICE_BRIDGE_ID")
   private Long forestServiceBridgeId;
+
+  @Column(name = "PIER_NUMBER")
+  private Long pierNumber;
+
+  /** {@code PIER_TYPE_CODE}. */
+  @Column(name = "PIER_TYPE_CODE", length = 10)
+  private String pierTypeCode;
 }

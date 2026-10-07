@@ -110,4 +110,58 @@ class StructureApiEndpointTest {
     assertThat(get.getAnnotation(GetMapping.class).value()).containsExactly("/{structureId}");
     assertThat(get.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
   }
+
+  @Test
+  @DisplayName("spans and piers are GET /api/v1/structures/{structureId}/spans-and-piers, on READ")
+  void spansAndPiersAreMappedAndGated() {
+    Method get = method("getSpansAndPiers");
+    assertThat(get.getAnnotation(GetMapping.class).value())
+        .containsExactly("/{structureId}/spans-and-piers");
+    assertThat(get.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
+
+  @Test
+  @DisplayName("documents and their files are GETs under /{structureId}/documents, on READ")
+  void documentsAreMappedAndGated() {
+    Method list = method("getDocuments");
+    assertThat(list.getAnnotation(GetMapping.class).value())
+        .containsExactly("/{structureId}/documents");
+    assertThat(list.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+
+    Method file = method("getDocumentFile");
+    assertThat(file.getAnnotation(GetMapping.class).value())
+        .containsExactly("/{structureId}/documents/{fileId}/file");
+    assertThat(file.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
+  @Test
+  @DisplayName("the Inspections tab's schedule and table are GETs, on READ")
+  void inspectionsAreMappedAndGated() {
+    Method schedule = method("getInspectionSchedule");
+    assertThat(schedule.getAnnotation(GetMapping.class).value())
+        .containsExactly("/{structureId}/inspection-schedule");
+    assertThat(schedule.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.READ);
+
+    Method table = method("getInspections");
+    assertThat(table.getAnnotation(GetMapping.class).value())
+        .containsExactly("/{structureId}/inspections");
+    assertThat(table.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
+  @Test
+  @DisplayName("the Repairs tab's page is GET /{structureId}/repairs, on READ")
+  void repairsAreMappedAndGated() {
+    Method repairs = method("getRepairs");
+    assertThat(repairs.getAnnotation(GetMapping.class).value())
+        .containsExactly("/{structureId}/repairs");
+    assertThat(repairs.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
+  @Test
+  @DisplayName("the Monitoring tab's page is GET /{structureId}/monitors, on READ")
+  void monitorsAreMappedAndGated() {
+    Method monitors = method("getMonitors");
+    assertThat(monitors.getAnnotation(GetMapping.class).value())
+        .containsExactly("/{structureId}/monitors");
+    assertThat(monitors.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.READ);
+  }
 }
