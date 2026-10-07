@@ -50,7 +50,7 @@ describe('HeaderPanelProfile', () => {
     // Component renders `<providerLabel>: <userName>` (see HeaderPanelProfile/index.tsx).
     expect(screen.getByText('IDIR: jdoe')).toBeInTheDocument();
     expect(screen.getByText('Email: jane@example.com')).toBeInTheDocument();
-    expect(screen.getByTestId('avatar-image')).toHaveTextContent('Jane Doe-large');
+    expect(screen.getByTestId('avatar-image')).toMatchTextContent('Jane Doe-large');
   });
 
   it('labels a BCeID Business user as "Business BCeID"', async () => {

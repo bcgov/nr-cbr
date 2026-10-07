@@ -1,7 +1,7 @@
 import { TextInput, Theme } from '@carbon/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { page } from '@vitest/browser/context';
+import { page } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EMPTY_SITE } from './types';

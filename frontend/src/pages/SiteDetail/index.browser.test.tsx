@@ -236,7 +236,7 @@ describe('SiteDetailPage — the values it shows', () => {
 
     await renderPage();
 
-    expect(await screen.findByTestId('site-detail-error')).toHaveTextContent(
+    expect(await screen.findByTestId('site-detail-error')).toMatchTextContent(
       'Site BOWRON-001 was not found.',
     );
   });
@@ -265,7 +265,7 @@ describe('SiteDetailPage — the structure actions', () => {
 
     fireEvent.click(screen.getByTestId('site-detail-add-structure'));
 
-    expect(await screen.findByTestId('arrived')).toHaveTextContent('add structure');
+    expect(await screen.findByTestId('arrived')).toMatchTextContent('add structure');
   });
 
   it('opens the structure itself when the site has one', async () => {
@@ -274,7 +274,7 @@ describe('SiteDetailPage — the structure actions', () => {
     fireEvent.click(screen.getByTestId('site-detail-structures'));
 
     // Carrying the site, so the structure's breadcrumb leads back here.
-    expect(await screen.findByTestId('arrived')).toHaveTextContent(
+    expect(await screen.findByTestId('arrived')).toMatchTextContent(
       '/inventory/structure/4021 from BOWRON-001',
     );
   });
@@ -286,7 +286,7 @@ describe('SiteDetailPage — the structure actions', () => {
 
     fireEvent.click(screen.getByTestId('site-detail-structures'));
 
-    expect(await screen.findByTestId('arrived')).toHaveTextContent(
+    expect(await screen.findByTestId('arrived')).toMatchTextContent(
       '/inventory/structure-search?siteId=BOWRON-001',
     );
   });
@@ -566,7 +566,7 @@ describe('SiteDetailPage — saving', () => {
 
     save();
 
-    expect(await screen.findByTestId('site-detail-save-error')).toHaveTextContent(
+    expect(await screen.findByTestId('site-detail-save-error')).toMatchTextContent(
       'Service unavailable.',
     );
   });

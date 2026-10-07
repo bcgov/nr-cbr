@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
-import { userEvent } from '@vitest/browser/context';
+import { userEvent } from 'vitest/browser';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -272,7 +272,7 @@ describe('StructureDetailPage — loading', () => {
     api.getStructure.mockRejectedValue(Object.assign(new Error('Not Found'), { status: 404 }));
     renderAt();
 
-    expect(await screen.findByTestId('structure-detail-error')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-detail-error')).toMatchTextContent(
       'Structure not found',
     );
   });
@@ -281,7 +281,7 @@ describe('StructureDetailPage — loading', () => {
     api.getStructure.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
     renderAt();
 
-    expect(await screen.findByTestId('structure-detail-error')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-detail-error')).toMatchTextContent(
       'This structure could not be loaded',
     );
   });
@@ -348,7 +348,7 @@ describe('StructureDetailPage — header', () => {
   it('shows the site status as a pill beside the title', async () => {
     await showing(bridge());
 
-    expect(screen.getByTestId('structure-site-status')).toHaveTextContent('Active');
+    expect(screen.getByTestId('structure-site-status')).toMatchTextContent('Active');
   });
 
   it('shows no status pill when the site has no status', async () => {
@@ -361,7 +361,7 @@ describe('StructureDetailPage — header', () => {
   it('tags an archived structure, which legacy never showed', async () => {
     await showing(bridge({ active: false }));
 
-    expect(screen.getByTestId('structure-archived')).toHaveTextContent('Archived');
+    expect(screen.getByTestId('structure-archived')).toMatchTextContent('Archived');
   });
 
   it('carries no tag on an active one', async () => {
@@ -384,7 +384,7 @@ describe('StructureDetailPage — incomplete data, in nr-frep form', () => {
   it('counts what is missing above the tabs', async () => {
     await showing(incomplete());
 
-    expect(screen.getByTestId('structure-outstanding-summary')).toHaveTextContent(
+    expect(screen.getByTestId('structure-outstanding-summary')).toMatchTextContent(
       'Structure data is incomplete: 3 required items outstanding',
     );
   });
@@ -399,10 +399,10 @@ describe('StructureDetailPage — incomplete data, in nr-frep form', () => {
     await showing(incomplete());
 
     const panel = screen.getByTestId('structure-outstanding-panel');
-    expect(panel).toHaveTextContent('Details');
-    expect(panel).toHaveTextContent('Deck Width');
-    expect(panel).toHaveTextContent('Inspections');
-    expect(panel).toHaveTextContent('Next Planned Routine Inspection');
+    expect(panel).toMatchTextContent('Details');
+    expect(panel).toMatchTextContent('Deck Width');
+    expect(panel).toMatchTextContent('Inspections');
+    expect(panel).toMatchTextContent('Next Planned Routine Inspection');
   });
 
   it('folds the list away on request', async () => {
@@ -503,10 +503,10 @@ describe('StructureDetailPage — Details tab', () => {
     expect(cards.at(-2)).toBe(screen.getByTestId('structure-section-replacement'));
     const rows = within(screen.getByTestId('structure-section-comments')).getAllByRole('row');
 
-    expect(rows[1]).toHaveTextContent('Deck replaced.');
-    expect(rows[1]).toHaveTextContent('IDIR\\JSMITH');
-    expect(rows[1]).toHaveTextContent('Jun 3, 2024 2:05 PM');
-    expect(rows[2]).toHaveTextContent('Installed.');
+    expect(rows[1]).toMatchTextContent('Deck replaced.');
+    expect(rows[1]).toMatchTextContent('IDIR\\JSMITH');
+    expect(rows[1]).toMatchTextContent('Jun 3, 2024 2:05 PM');
+    expect(rows[2]).toMatchTextContent('Installed.');
   });
 
   it('says when there are no comments', async () => {
@@ -514,7 +514,7 @@ describe('StructureDetailPage — Details tab', () => {
 
     await openDetails();
 
-    expect(screen.getByTestId('structure-section-comments')).toHaveTextContent('No comments.');
+    expect(screen.getByTestId('structure-section-comments')).toMatchTextContent('No comments.');
   });
 
   it('marks the current load rating', async () => {
@@ -647,11 +647,11 @@ describe('StructureDetailPage — Spans & Piers', () => {
     const spans = await screen.findByTestId('structure-section-spans');
     const rows = within(spans).getAllByRole('row');
 
-    expect(spans).toHaveTextContent(
+    expect(spans).toMatchTextContent(
       'Span # is numbered Left Bank to Right Bank (Looking Downstream).',
     );
-    expect(rows[1]).toHaveTextContent('19.75');
-    expect(rows[2]).toHaveTextContent('212.5');
+    expect(rows[1]).toMatchTextContent('19.75');
+    expect(rows[2]).toMatchTextContent('212.5');
   });
 
   it("lists the piers with their type's description", async () => {
@@ -664,7 +664,7 @@ describe('StructureDetailPage — Spans & Piers', () => {
     await openSpansAndPiers();
     const piers = await screen.findByTestId('structure-section-piers');
 
-    expect(within(piers).getAllByRole('row')[1]).toHaveTextContent('1Timber crib');
+    expect(within(piers).getAllByRole('row')[1]).toMatchTextContent('1Timber crib');
   });
 
   it('says when a bridge has no spans or piers', async () => {
@@ -672,8 +672,8 @@ describe('StructureDetailPage — Spans & Piers', () => {
 
     await openSpansAndPiers();
 
-    expect(await screen.findByTestId('structure-section-spans')).toHaveTextContent('No spans.');
-    expect(screen.getByTestId('structure-section-piers')).toHaveTextContent('No piers.');
+    expect(await screen.findByTestId('structure-section-spans')).toMatchTextContent('No spans.');
+    expect(screen.getByTestId('structure-section-piers')).toMatchTextContent('No piers.');
   });
 
   it('says so when they cannot be loaded', async () => {
@@ -682,7 +682,7 @@ describe('StructureDetailPage — Spans & Piers', () => {
 
     await openSpansAndPiers();
 
-    expect(await screen.findByTestId('structure-spans-piers-error')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-spans-piers-error')).toMatchTextContent(
       'Spans and piers could not be loaded',
     );
   });
@@ -742,14 +742,14 @@ describe('StructureDetailPage — Documents & Photos', () => {
       'Inspection: Jun 1, 2021',
     ]);
     const row = screen.getByTestId('structure-document-1');
-    expect(row).toHaveTextContent('Photograph');
-    expect(row).toHaveTextContent('May 1, 2020');
-    expect(row).toHaveTextContent('JPG');
-    expect(row).toHaveTextContent('Deck from the north abutment');
-    expect(within(row).getAllByRole('cell')[3]).toHaveTextContent('Structure');
+    expect(row).toMatchTextContent('Photograph');
+    expect(row).toMatchTextContent('May 1, 2020');
+    expect(row).toMatchTextContent('JPG');
+    expect(row).toMatchTextContent('Deck from the north abutment');
+    expect(within(row).getAllByRole('cell')[3]).toMatchTextContent('Structure');
     expect(
       within(screen.getByTestId('structure-document-2')).getAllByRole('cell')[3],
-    ).toHaveTextContent('Inspection');
+    ).toMatchTextContent('Inspection');
   });
 
   it('shows ten files a card at first, and the rest a page at a time', async () => {
@@ -795,7 +795,7 @@ describe('StructureDetailPage — Documents & Photos', () => {
 
     await openDocuments();
 
-    expect(await screen.findByTestId('structure-documents-empty')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-documents-empty')).toMatchTextContent(
       'No photos and/or documents have been loaded.',
     );
   });
@@ -830,7 +830,7 @@ describe('StructureDetailPage — Documents & Photos', () => {
       await screen.findByRole('button', { name: 'Photograph (opens in a new tab)' }),
     );
 
-    expect(await screen.findByTestId('structure-document-open-error')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-document-open-error')).toMatchTextContent(
       'The file could not be opened',
     );
     expect(opened.close).toHaveBeenCalled();
@@ -843,7 +843,7 @@ describe('StructureDetailPage — Documents & Photos', () => {
 
     await openDocuments();
 
-    expect(await screen.findByTestId('structure-documents-error')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-documents-error')).toMatchTextContent(
       'Documents and photos could not be loaded',
     );
   });
@@ -927,7 +927,7 @@ describe('StructureDetailPage — Inspections', () => {
 
     await openInspections();
 
-    expect(await screen.findByTestId('structure-section-planned-comments')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-section-planned-comments')).toMatchTextContent(
       'Bring a boat.',
     );
     // Last of the tab's cards.
@@ -935,7 +935,7 @@ describe('StructureDetailPage — Inspections', () => {
       screen.getByTestId('structure-inspections-tab').querySelectorAll('.structure-detail__card'),
     );
     expect(cards.at(-1)).toBe(screen.getByTestId('structure-section-planned-comments'));
-    expect(screen.getByTestId('structure-section-close-proximity')).toHaveTextContent(
+    expect(screen.getByTestId('structure-section-close-proximity')).toMatchTextContent(
       'Jun 1, 2024',
     );
   });
@@ -947,11 +947,11 @@ describe('StructureDetailPage — Inspections', () => {
     await openInspections();
     const row = await screen.findByTestId('structure-inspection-41');
 
-    expect(row).toHaveTextContent('Routine');
-    expect(row).toHaveTextContent('Reviewed');
-    expect(row).toHaveTextContent('Jul 2, 2023');
-    expect(row).toHaveTextContent('Pat Engineer');
-    expect(row).toHaveTextContent('Sam Inspector');
+    expect(row).toMatchTextContent('Routine');
+    expect(row).toMatchTextContent('Reviewed');
+    expect(row).toMatchTextContent('Jul 2, 2023');
+    expect(row).toMatchTextContent('Pat Engineer');
+    expect(row).toMatchTextContent('Sam Inspector');
     const link = within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' });
     expect(link).toHaveAttribute('href', '/inspection/41');
     expect(link).toHaveAttribute('target', '_blank');
@@ -1010,7 +1010,7 @@ describe('StructureDetailPage — Inspections', () => {
 
     await openInspections();
 
-    expect(await screen.findByTestId('structure-section-inspections')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-section-inspections')).toMatchTextContent(
       'There have been no inspections for this structure.',
     );
   });
@@ -1021,7 +1021,7 @@ describe('StructureDetailPage — Inspections', () => {
 
     await openInspections();
 
-    expect(await screen.findByTestId('structure-inspections-error')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-inspections-error')).toMatchTextContent(
       'Inspections could not be loaded',
     );
   });
@@ -1069,15 +1069,15 @@ describe('StructureDetailPage — Repairs', () => {
     await openRepairs();
     const row = await screen.findByTestId('structure-repair-3');
 
-    expect(row).toHaveTextContent('Required');
-    expect(row).toHaveTextContent('Deck planks');
-    expect(row).toHaveTextContent('Suggested: IDIR\\A, Jun 2, 2023');
-    expect(row).toHaveTextContent('Required: IDIR\\B, Jun 5, 2023');
-    expect(row).not.toHaveTextContent('Completed:');
-    expect(row).toHaveTextContent('Urgent');
-    expect(row).toHaveTextContent('$4,000');
-    expect(row).toHaveTextContent('12 m2');
-    expect(row).toHaveTextContent('Replace worn planks.');
+    expect(row).toMatchTextContent('Required');
+    expect(row).toMatchTextContent('Deck planks');
+    expect(row).toMatchTextContent('Suggested: IDIR\\A, Jun 2, 2023');
+    expect(row).toMatchTextContent('Required: IDIR\\B, Jun 5, 2023');
+    expect(row).not.toMatchTextContent('Completed:');
+    expect(row).toMatchTextContent('Urgent');
+    expect(row).toMatchTextContent('$4,000');
+    expect(row).toMatchTextContent('12 m2');
+    expect(row).toMatchTextContent('Replace worn planks.');
     expect(
       within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' }),
     ).toHaveAttribute('href', '/inspection/41');
@@ -1118,7 +1118,7 @@ describe('StructureDetailPage — Repairs', () => {
 
     await openRepairs();
 
-    expect(await screen.findByTestId('structure-section-repairs')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-section-repairs')).toMatchTextContent(
       'No outstanding repairs.',
     );
   });
@@ -1129,7 +1129,7 @@ describe('StructureDetailPage — Repairs', () => {
 
     await openRepairs();
 
-    expect(await screen.findByTestId('structure-repairs-error')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-repairs-error')).toMatchTextContent(
       'Repairs could not be loaded',
     );
   });
@@ -1172,11 +1172,11 @@ describe('StructureDetailPage — Monitoring', () => {
     await openMonitoring();
     const row = await screen.findByTestId('structure-monitor-2');
 
-    expect(row).toHaveTextContent('Required');
-    expect(row).toHaveTextContent('Required: IDIR\\B, Jun 5, 2023');
-    expect(row).not.toHaveTextContent('Suggested:');
-    expect(row).toHaveTextContent('Watch the scour at the south abutment.');
-    expect(row).toHaveTextContent('Annually — After freshet.');
+    expect(row).toMatchTextContent('Required');
+    expect(row).toMatchTextContent('Required: IDIR\\B, Jun 5, 2023');
+    expect(row).not.toMatchTextContent('Suggested:');
+    expect(row).toMatchTextContent('Watch the scour at the south abutment.');
+    expect(row).toMatchTextContent('Annually — After freshet.');
     expect(
       within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' }),
     ).toHaveAttribute('href', '/inspection/41');
@@ -1201,7 +1201,7 @@ describe('StructureDetailPage — Monitoring', () => {
 
     await openMonitoring();
 
-    expect(await screen.findByTestId('structure-section-monitoring')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-section-monitoring')).toMatchTextContent(
       'No outstanding monitoring items.',
     );
   });
@@ -1212,7 +1212,7 @@ describe('StructureDetailPage — Monitoring', () => {
 
     await openMonitoring();
 
-    expect(await screen.findByTestId('structure-monitors-error')).toHaveTextContent(
+    expect(await screen.findByTestId('structure-monitors-error')).toMatchTextContent(
       'Monitoring items could not be loaded',
     );
   });

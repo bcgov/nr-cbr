@@ -14,16 +14,15 @@ const signoutRedirect = vi.fn();
 const removeUser = vi.fn();
 const getUser = vi.fn();
 
+// Ordinary functions, not arrows: the code constructs both with `new`, and since Vitest 4 a mock
+// built from an arrow function cannot be.
 vi.mock('oidc-client-ts', () => ({
-  UserManager: vi.fn().mockImplementation((settings: unknown) => ({
-    settings,
-    signinRedirect,
-    signinSilent,
-    signoutRedirect,
-    removeUser,
-    getUser,
-  })),
-  WebStorageStateStore: vi.fn().mockImplementation((opts: unknown) => opts),
+  UserManager: vi.fn().mockImplementation(function (settings: unknown) {
+    return { settings, signinRedirect, signinSilent, signoutRedirect, removeUser, getUser };
+  }),
+  WebStorageStateStore: vi.fn().mockImplementation(function (opts: unknown) {
+    return opts;
+  }),
 }));
 
 import type { User } from 'oidc-client-ts';

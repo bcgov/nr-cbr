@@ -26,7 +26,7 @@ describe('PageTitle (browser)', () => {
   it('renders title and subtitle', () => {
     renderPageTitle({ title: 'Test Title', subtitle: 'Test Subtitle' });
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Test Title');
+    expect(screen.getByRole('heading', { level: 1 })).toMatchTextContent('Test Title');
     expect(screen.getByText('Test Subtitle')).toBeInTheDocument();
   });
 
@@ -58,6 +58,6 @@ describe('PageTitle (browser)', () => {
       title: 'With Children',
       children: <span data-testid="custom-child">Child Content</span>,
     });
-    expect(screen.getByTestId('custom-child')).toHaveTextContent('Child Content');
+    expect(screen.getByTestId('custom-child')).toMatchTextContent('Child Content');
   });
 });

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { page, userEvent } from '@vitest/browser/context';
+import { page, userEvent } from 'vitest/browser';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -441,7 +441,7 @@ describe('StructureSearchPage — results', () => {
     await searchAndWait();
 
     const cells = within(screen.getByTestId('structure-row-7')).getAllByRole('cell');
-    expect(cells.at(-1)).toHaveTextContent(/^$/);
+    expect(cells.at(-1)).toMatchTextContent(/^$/);
   });
 });
 
@@ -454,17 +454,17 @@ describe('StructureSearchPage — the dropdowns come from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('structure-search-superstructureTypeCode')).toHaveTextContent(
+      expect(screen.getByTestId('structure-search-superstructureTypeCode')).toMatchTextContent(
         'STL - Steel',
       );
     });
-    expect(screen.getByTestId('structure-search-structureCurbTypeCode')).toHaveTextContent(
+    expect(screen.getByTestId('structure-search-structureCurbTypeCode')).toMatchTextContent(
       'TMB - Timber',
     );
-    expect(screen.getByTestId('structure-search-culvertTypeCode')).toHaveTextContent(
+    expect(screen.getByTestId('structure-search-culvertTypeCode')).toMatchTextContent(
       'CSP - Corrugated',
     );
-    expect(screen.getByTestId('structure-search-specialEquipmentCode')).toHaveTextContent(
+    expect(screen.getByTestId('structure-search-specialEquipmentCode')).toMatchTextContent(
       'CRN - Crane',
     );
   });
@@ -487,11 +487,11 @@ describe('StructureSearchPage — the dropdowns come from the server', () => {
     ]);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByTestId('structure-search-orgUnit')).toHaveTextContent('Prince George');
+      expect(screen.getByTestId('structure-search-orgUnit')).toMatchTextContent('Prince George');
     });
     fireEvent.change(screen.getByTestId('structure-search-orgUnit'), { target: { value: '18' } });
     await waitFor(() => {
-      expect(screen.getByTestId('structure-search-managementOrgUnit')).toHaveTextContent(
+      expect(screen.getByTestId('structure-search-managementOrgUnit')).toMatchTextContent(
         'Robson Valley',
       );
     });
@@ -805,9 +805,9 @@ describe('StructureSearchPage — bulk action buttons', () => {
     renderPage(true, true);
     await searchAndWait();
 
-    expect(screen.getByTestId('structure-search-archive')).toHaveTextContent(/^Archive$/);
-    expect(screen.getByTestId('structure-search-delete')).toHaveTextContent(/^Delete$/);
-    expect(screen.getByTestId('structure-search-update-repair-responsibility')).toHaveTextContent(
+    expect(screen.getByTestId('structure-search-archive')).toMatchTextContent(/^Archive$/);
+    expect(screen.getByTestId('structure-search-delete')).toMatchTextContent(/^Delete$/);
+    expect(screen.getByTestId('structure-search-update-repair-responsibility')).toMatchTextContent(
       'Update Repair Responsibility',
     );
   });
@@ -884,7 +884,7 @@ describe('StructureSearchPage — archiving', () => {
   it('asks first, in legacy words, naming how many', async () => {
     await startArchive('1', '2');
 
-    expect(dialog()).toHaveTextContent(
+    expect(dialog()).toMatchTextContent(
       'Are you sure you would like to archive 2 selected structures? ' +
         'Archived structures cannot be recovered.',
     );
@@ -894,7 +894,7 @@ describe('StructureSearchPage — archiving', () => {
   it('names the count for one, too', async () => {
     await startArchive('1');
 
-    expect(dialog()).toHaveTextContent('archive 1 selected structure?');
+    expect(dialog()).toMatchTextContent('archive 1 selected structure?');
   });
 
   it('archives nothing when the dialog is cancelled, and keeps the ticks', async () => {
@@ -1014,7 +1014,7 @@ describe('StructureSearchPage — deleting', () => {
   it('asks first, naming how many', async () => {
     await startDelete('1');
 
-    expect(dialog()).toHaveTextContent(
+    expect(dialog()).toMatchTextContent(
       'Are you sure you would like to delete 1 selected structure? ' +
         'Deleted structures cannot be recovered.',
     );
@@ -1024,8 +1024,8 @@ describe('StructureSearchPage — deleting', () => {
   it('says beforehand which ticked structures will be skipped, and why', async () => {
     await startDelete('1', '2');
 
-    expect(dialog()).toHaveTextContent('1 of 2 selected structures will be deleted.');
-    expect(screen.getByTestId('structure-delete-skipped')).toHaveTextContent(
+    expect(dialog()).toMatchTextContent('1 of 2 selected structures will be deleted.');
+    expect(screen.getByTestId('structure-delete-skipped')).toMatchTextContent(
       'B2 has inspections and repairs',
     );
   });
@@ -1260,7 +1260,7 @@ describe('StructureSearchPage — updating repair responsibility', () => {
   it('says how many sites will change, counting a shared site once', async () => {
     await open('1', '2', '3');
 
-    expect(dialog()).toHaveTextContent(
+    expect(dialog()).toMatchTextContent(
       'This sets the maintainer of 2 sites. Every structure on those sites, ticked or not, ' +
         'will have the new maintainer.',
     );
@@ -1269,7 +1269,7 @@ describe('StructureSearchPage — updating repair responsibility', () => {
   it('says "that site" for one', async () => {
     await open('1', '2');
 
-    expect(dialog()).toHaveTextContent(
+    expect(dialog()).toMatchTextContent(
       'This sets the maintainer of 1 site. Every structure on that site',
     );
   });
@@ -1277,7 +1277,7 @@ describe('StructureSearchPage — updating repair responsibility', () => {
   it('says when a ticked structure stands on no site', async () => {
     await open('1', '4');
 
-    expect(dialog()).toHaveTextContent(
+    expect(dialog()).toMatchTextContent(
       '1 structure selected stand on no site and will be skipped.',
     );
   });

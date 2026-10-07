@@ -28,7 +28,7 @@ describe('InspectionDetailPage — placeholder', () => {
   it('says the page is under construction, and leads back to Inspection Search', () => {
     renderPage();
 
-    expect(screen.getByTestId('inspection-detail-placeholder')).toHaveTextContent(
+    expect(screen.getByTestId('inspection-detail-placeholder')).toMatchTextContent(
       'This page is under construction',
     );
     expect(screen.getByText('Inspection Search')).toBeInTheDocument();

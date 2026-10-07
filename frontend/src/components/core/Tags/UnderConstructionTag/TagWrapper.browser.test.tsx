@@ -42,6 +42,6 @@ describe('TagWrapper (browser)', () => {
   });
   it('renders any children passed to it', () => {
     renderTagWrapper({ children: <span data-testid="custom-child">Child Content</span> });
-    expect(screen.getByTestId('custom-child')).toHaveTextContent('Child Content');
+    expect(screen.getByTestId('custom-child')).toMatchTextContent('Child Content');
   });
 });

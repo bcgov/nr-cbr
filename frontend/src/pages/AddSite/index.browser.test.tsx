@@ -914,7 +914,7 @@ describe('AddSitePage — the rest of the screen', () => {
 
     save();
 
-    expect(await screen.findByTestId('add-site-save-error')).toHaveTextContent(
+    expect(await screen.findByTestId('add-site-save-error')).toMatchTextContent(
       'Service unavailable.',
     );
   });

@@ -22,7 +22,7 @@ describe('AddStructurePage — placeholder', () => {
     renderPage();
 
     expect(screen.getByText('Under construction')).toBeInTheDocument();
-    expect(screen.getByTestId('add-structure-placeholder')).toHaveTextContent(
+    expect(screen.getByTestId('add-structure-placeholder')).toMatchTextContent(
       'This page has not been built yet',
     );
   });
