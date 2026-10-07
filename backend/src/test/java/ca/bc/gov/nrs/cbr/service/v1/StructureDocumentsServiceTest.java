@@ -170,6 +170,17 @@ class StructureDocumentsServiceTest {
   }
 
   @Test
+  @DisplayName("compares files by their contents, and prints their size rather than their bytes")
+  void documentFileByContents() {
+    DocumentFile one = new DocumentFile("a.jpg", MediaType.IMAGE_JPEG, true, new byte[] {1, 2});
+    DocumentFile same = new DocumentFile("a.jpg", MediaType.IMAGE_JPEG, true, new byte[] {1, 2});
+    DocumentFile other = new DocumentFile("a.jpg", MediaType.IMAGE_JPEG, true, new byte[] {9});
+
+    assertThat(one).isEqualTo(same).hasSameHashCodeAs(same).isNotEqualTo(other);
+    assertThat(one.toString()).contains("content=2 bytes");
+  }
+
+  @Test
   @DisplayName("deletes files by id in one statement, without loading them")
   void bulkDelete() {
     givenDocument(1L, 7L, null, "a.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));

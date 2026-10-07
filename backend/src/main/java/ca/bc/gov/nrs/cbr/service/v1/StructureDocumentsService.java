@@ -16,6 +16,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse.Document;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -65,9 +66,35 @@ public class StructureDocumentsService {
     this.inspections = inspections;
   }
 
-  /** One file, ready to send: its name, what it is, and whether the browser may show it. */
+  /**
+   * One file, ready to send: its name, what it is, and whether the browser may show it.
+   *
+   * <p>Equality and {@code toString} by the file's contents rather than the array's identity, as a
+   * record would otherwise have them; {@code toString} gives the size, not the bytes.
+   */
   public record DocumentFile(
-      String filename, MediaType mediaType, boolean inline, byte[] content) {}
+      String filename, MediaType mediaType, boolean inline, byte[] content) {
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof DocumentFile file
+          && inline == file.inline
+          && Objects.equals(filename, file.filename)
+          && Objects.equals(mediaType, file.mediaType)
+          && Arrays.equals(content, file.content);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * Objects.hash(filename, mediaType, inline) + Arrays.hashCode(content);
+    }
+
+    @Override
+    public String toString() {
+      return "DocumentFile[filename=" + filename + ", mediaType=" + mediaType + ", inline="
+          + inline + ", content=" + (content == null ? "null" : content.length + " bytes") + "]";
+    }
+  }
 
   /**
    * The structure's documents in legacy's order — {@code INSPECTION_ID DESC} with Oracle's nulls

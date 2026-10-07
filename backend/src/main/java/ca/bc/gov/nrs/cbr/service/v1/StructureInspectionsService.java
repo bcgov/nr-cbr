@@ -159,17 +159,23 @@ public class StructureInspectionsService {
         type == null ? CodeValue.NONE : new CodeValue(type, types.get(type)),
         inspection.getInspectionDate(),
         inspection.getSiteAtTimeOfInspection(),
-        statusCode == null
-            ? CodeValue.NONE
-            : new CodeValue(statusCode, status.getStatusCode() == null
-                ? null
-                : status.getStatusCode().getDescription()),
+        status(status),
         inspection.getPengReviewerDate() == null
             ? null
             : inspection.getPengReviewerDate().toLocalDate(),
         reviewerNames.get(inspection.getInspectionReviewerId()),
         inspection.getInspectorName(),
         !OFFLINE.equals(statusCode));
+  }
+
+  /** The inspection's current status, decoded; none when it has no status history. */
+  private static CodeValue status(InspectionReportStatusEntity status) {
+    if (status == null || status.getInspectionReportStatusCode() == null) {
+      return CodeValue.NONE;
+    }
+    String description =
+        status.getStatusCode() == null ? null : status.getStatusCode().getDescription();
+    return new CodeValue(status.getInspectionReportStatusCode(), description);
   }
 
   private Map<String, String> typeDescriptions(Collection<StructureInspectionEntity> page) {
