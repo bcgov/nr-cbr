@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { userEvent } from '@vitest/browser/context';
+import { userEvent } from 'vitest/browser';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -508,17 +508,17 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent('Any status');
+      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('Any status');
     });
-    expect(screen.getByTestId('site-search-siteTypeCode')).toHaveTextContent('Any site type');
-    expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('Any district');
+    expect(screen.getByTestId('site-search-siteTypeCode')).toMatchTextContent('Any site type');
+    expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Any district');
   });
 
   it('keeps the unfiltered option valueless, so choosing it clears the filter', async () => {
     api.getSiteStatusCodes.mockResolvedValue([{ code: 'ACT', description: 'Active' }]);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent('ACT - Active');
+      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('ACT - Active');
     });
 
     fireEvent.change(screen.getByTestId('site-search-siteStatusCode'), {
@@ -545,20 +545,20 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       { orgUnitNo: '26', orgUnitCode: 'DRV', orgUnitName: 'Robson Valley' },
     ]);
     renderPage();
-    expect(screen.getByTestId('site-search-managementOrgUnit')).toHaveTextContent(
+    expect(screen.getByTestId('site-search-managementOrgUnit')).toMatchTextContent(
       'Select a forest district first',
     );
     // The districts have to be on the page first: a <select> silently ignores a value it has no
     // option for, so firing the change early leaves the criterion blank and the test green for the
     // wrong reason.
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('DPG - Prince George');
+      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('DPG - Prince George');
     });
 
     fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-managementOrgUnit')).toHaveTextContent(
+      expect(screen.getByTestId('site-search-managementOrgUnit')).toMatchTextContent(
         'Any management area',
       );
     });
@@ -574,9 +574,9 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent('ACT - Active');
+      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('ACT - Active');
     });
-    expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('DPG - Prince George');
+    expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('DPG - Prince George');
   });
 
   it('still submits the org unit number, not its code', async () => {
@@ -587,7 +587,7 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     ]);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('DPG - Prince George');
+      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('DPG - Prince George');
     });
 
     fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
@@ -606,9 +606,9 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteTypeCode')).toHaveTextContent('CRS');
+      expect(screen.getByTestId('site-search-siteTypeCode')).toMatchTextContent('CRS');
     });
-    expect(screen.getByTestId('site-search-siteTypeCode')).not.toHaveTextContent('CRS -');
+    expect(screen.getByTestId('site-search-siteTypeCode')).not.toMatchTextContent('CRS -');
   });
 
   it('fills every parameterless list from its own lookup', async () => {
@@ -627,17 +627,17 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-structureInspectionStatusCode')).toHaveTextContent(
+      expect(screen.getByTestId('site-search-structureInspectionStatusCode')).toMatchTextContent(
         'From the inspection lookup',
       );
     });
-    expect(screen.getByTestId('site-search-specialAccessCode')).toHaveTextContent(
+    expect(screen.getByTestId('site-search-specialAccessCode')).toMatchTextContent(
       'From the access lookup',
     );
-    expect(screen.getByTestId('site-search-siteTypeCode')).toHaveTextContent(
+    expect(screen.getByTestId('site-search-siteTypeCode')).toMatchTextContent(
       'From the type lookup',
     );
-    expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('From the district lookup');
+    expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('From the district lookup');
   });
 
   it('leaves Management Area empty until a district is chosen', async () => {
@@ -647,7 +647,7 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('Prince George');
+      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Prince George');
     });
     expect(api.getManagementAreas).not.toHaveBeenCalled();
   });
@@ -661,13 +661,13 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     ]);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('Prince George');
+      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Prince George');
     });
 
     fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-managementOrgUnit')).toHaveTextContent(
+      expect(screen.getByTestId('site-search-managementOrgUnit')).toMatchTextContent(
         'Robson Valley',
       );
     });
@@ -686,11 +686,11 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     ]);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toHaveTextContent('Prince George');
+      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Prince George');
     });
     fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-managementOrgUnit')).toHaveTextContent(
+      expect(screen.getByTestId('site-search-managementOrgUnit')).toMatchTextContent(
         'Robson Valley',
       );
     });
@@ -711,9 +711,9 @@ describe('SiteSearchPage — the Status list comes from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent('Active');
+      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('Active');
     });
-    expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent('Decommissioned');
+    expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('Decommissioned');
   });
 
   it('keeps the display order the server sent, rather than sorting', async () => {
@@ -727,7 +727,7 @@ describe('SiteSearchPage — the Status list comes from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent(
+      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent(
         'Zed, shown first',
       );
     });
@@ -742,7 +742,7 @@ describe('SiteSearchPage — the Status list comes from the server', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toHaveTextContent('Active');
+      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('Active');
     });
     expect(screen.getByTestId('site-search-siteStatusCode')).toHaveValue('');
   });

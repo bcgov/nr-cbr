@@ -208,8 +208,8 @@ describe('InspectionSearchPage — criteria form', () => {
     const toggle = screen.getByRole('switch', { name: 'Most Recent Inspections Only?' });
 
     expect(toggle).toBeInTheDocument();
-    expect(toggle.closest('.cds--toggle')).toHaveTextContent('Most Recent Inspections Only?');
-    expect(toggle.closest('.cds--toggle')).toHaveTextContent('Off');
+    expect(toggle.closest('.cds--toggle')).toMatchTextContent('Most Recent Inspections Only?');
+    expect(toggle.closest('.cds--toggle')).toMatchTextContent('Off');
   });
 
   it('lays the four filters out two to a column', () => {
@@ -474,17 +474,17 @@ describe('InspectionSearchPage — reference data', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-structureTypeClassCode')).toHaveTextContent(
+      expect(screen.getByTestId('inspection-search-structureTypeClassCode')).toMatchTextContent(
         'BRIDGE - Forest service bridge',
       );
     });
-    expect(screen.getByTestId('inspection-search-inspectionTypeCode')).toHaveTextContent(
+    expect(screen.getByTestId('inspection-search-inspectionTypeCode')).toMatchTextContent(
       'ROUT - Routine',
     );
-    expect(screen.getByTestId('inspection-search-inspectionReportStatusCode')).toHaveTextContent(
+    expect(screen.getByTestId('inspection-search-inspectionReportStatusCode')).toMatchTextContent(
       'SUB - Submitted',
     );
-    expect(screen.getByTestId('inspection-search-businessAreaOrgUnitNo')).toHaveTextContent(
+    expect(screen.getByTestId('inspection-search-businessAreaOrgUnitNo')).toMatchTextContent(
       'TBA - Babine Business Area',
     );
   });
@@ -514,7 +514,7 @@ describe('InspectionSearchPage — reference data', () => {
     // option for, so firing the change early leaves the criterion blank and the test green for the
     // wrong reason.
     await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-orgUnitNo')).toHaveTextContent(
+      expect(screen.getByTestId('inspection-search-orgUnitNo')).toMatchTextContent(
         'DPG - Prince George Natural Resource District',
       );
     });
@@ -533,7 +533,7 @@ describe('InspectionSearchPage — reference data', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-orgUnitNo')).toHaveTextContent(
+      expect(screen.getByTestId('inspection-search-orgUnitNo')).toMatchTextContent(
         'DPG - Prince George Natural Resource District',
       );
     });
@@ -542,7 +542,7 @@ describe('InspectionSearchPage — reference data', () => {
       target: { value: '10' },
     });
     await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-managementOrgUnitNo')).toHaveTextContent(
+      expect(screen.getByTestId('inspection-search-managementOrgUnitNo')).toMatchTextContent(
         'DVA - Vanderhoof Forest District',
       );
     });

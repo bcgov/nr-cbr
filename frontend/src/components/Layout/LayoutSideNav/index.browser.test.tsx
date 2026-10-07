@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { page } from '@vitest/browser/context';
+import { page } from 'vitest/browser';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
@@ -169,7 +169,7 @@ describe('LayoutSideNav', () => {
     layoutMock.isSideNavExpanded = false;
     await renderWithProviders('/settings/profile');
 
-    expect(screen.getByTestId('side-nav-section-Settings')).toHaveTextContent('Settings: Profile');
+    expect(screen.getByTestId('side-nav-section-Settings')).toMatchTextContent('Settings: Profile');
   });
 
   it('names the section alone when the user is not on any of its pages', async () => {
@@ -177,8 +177,8 @@ describe('LayoutSideNav', () => {
     await renderWithProviders('/dashboard');
 
     const section = screen.getByTestId('side-nav-section-Settings');
-    expect(section).toHaveTextContent('Settings');
-    expect(section).not.toHaveTextContent(':');
+    expect(section).toMatchTextContent('Settings');
+    expect(section).not.toMatchTextContent(':');
   });
 
   it('lights the collapsed section for a child route, whose path it never exactly matches', async () => {

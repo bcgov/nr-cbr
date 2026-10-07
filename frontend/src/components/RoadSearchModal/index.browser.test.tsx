@@ -317,7 +317,7 @@ describe('RoadSearchModal', () => {
 
     search();
 
-    expect(await screen.findByTestId('road-search-error')).toHaveTextContent(
+    expect(await screen.findByTestId('road-search-error')).toMatchTextContent(
       'The road view is unavailable.',
     );
   });

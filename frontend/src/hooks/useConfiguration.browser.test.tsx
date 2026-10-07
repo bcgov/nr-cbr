@@ -136,7 +136,7 @@ describe('usePrefetchConfiguration', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('reader')).toHaveTextContent('ACT');
+      expect(screen.getByTestId('reader')).toMatchTextContent('ACT');
     });
     expect(api.getSiteStatusCodes).toHaveBeenCalledTimes(1);
   });
@@ -156,7 +156,7 @@ describe('useManagementAreas', () => {
     render(<AreaReader district="18" />, { wrapper: wrapper() });
 
     await waitFor(() => {
-      expect(screen.getByTestId('areas')).toHaveTextContent('26');
+      expect(screen.getByTestId('areas')).toMatchTextContent('26');
     });
     expect(api.getManagementAreas).toHaveBeenCalledWith('18');
   });

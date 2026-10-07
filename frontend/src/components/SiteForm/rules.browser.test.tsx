@@ -94,7 +94,7 @@ describe('SiteForm — the longitude sign', () => {
     // magnitude, so without it the form shows 122 where the column holds -122.
     renderForm({});
 
-    expect(screen.getByTestId('site-form-longitude-sign')).toHaveTextContent('\u2212');
+    expect(screen.getByTestId('site-form-longitude-sign')).toMatchTextContent('\u2212');
   });
 
   it('puts it before the degrees box rather than anywhere else in the row', () => {
