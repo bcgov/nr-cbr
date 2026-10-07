@@ -77,11 +77,12 @@ public class StructureDocumentsService {
 
     @Override
     public boolean equals(Object other) {
-      return other instanceof DocumentFile file
-          && inline == file.inline
-          && Objects.equals(filename, file.filename)
-          && Objects.equals(mediaType, file.mediaType)
-          && Arrays.equals(content, file.content);
+      return other instanceof DocumentFile(
+              String otherName, MediaType otherType, boolean otherInline, byte[] otherContent)
+          && inline == otherInline
+          && Objects.equals(filename, otherName)
+          && Objects.equals(mediaType, otherType)
+          && Arrays.equals(content, otherContent);
     }
 
     @Override

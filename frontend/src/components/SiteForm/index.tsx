@@ -581,31 +581,33 @@ const SiteForm: FC<Props> = ({
         <div className="site-form__narrow-group">
           {text('pointOfCommencementDistance', 'Kilometres', 10, { required: !isStorage })}
           {text('userKm', 'User Kilometres', 10)}
-          {/* Disabled, as it is in every branch of the legacy form — including for a Level 2 user.
-              Capital Road is set by the road data, not on this screen. */}
-          {/* Never editable on this screen, in legacy or here — it is set from the road record. In a
-              read-only page it reads as a word rather than as a permanently greyed-out tick box. */}
-          {!isEditable('capitalRoad') ? (
-            <ReadOnlyField label="Capital Road" value={capitalRoadText} />
-          ) : (
-            <div className="site-form__checkbox">
-              {/* An empty label, not a margin — the same device the road lookup button uses. A
-                  checkbox carries its text beside the box rather than above it, so without this it
-                  starts where every other field's *label* starts and sits a line above the controls
-                  it shares a row with. Reserving whatever a label currently reserves keeps the two
-                  in step if that ever changes; a hard offset would silently stop matching. */}
-              <span className="cds--label" aria-hidden="true" />
-              <Checkbox
-                id="site-form-capitalRoad"
-                data-testid="site-form-capitalRoad"
-                labelText="Capital Road"
-                checked={values.capitalRoad}
-                disabled
-                onChange={(_event, { checked }) => onChange('capitalRoad', checked)}
-              />
-            </div>
-          )}
         </div>
+        {/* A cell of its own, so it sits in the next column — under BCTS BA Responsible — rather
+            than trailing the two kilometre boxes. */}
+        {/* Disabled, as it is in every branch of the legacy form — including for a Level 2 user.
+            Capital Road is set by the road data, not on this screen. */}
+        {/* Never editable on this screen, in legacy or here — it is set from the road record. In a
+            read-only page it reads as a word rather than as a permanently greyed-out tick box. */}
+        {!isEditable('capitalRoad') ? (
+          <ReadOnlyField label="Capital Road" value={capitalRoadText} />
+        ) : (
+          <div className="site-form__checkbox">
+            {/* An empty label, not a margin — the same device the road lookup button uses. A
+                checkbox carries its text beside the box rather than above it, so without this it
+                starts where every other field's *label* starts and sits a line above the controls
+                it shares a row with. Reserving whatever a label currently reserves keeps the two
+                in step if that ever changes; a hard offset would silently stop matching. */}
+            <span className="cds--label" aria-hidden="true" />
+            <Checkbox
+              id="site-form-capitalRoad"
+              data-testid="site-form-capitalRoad"
+              labelText="Capital Road"
+              checked={values.capitalRoad}
+              disabled
+              onChange={(_event, { checked }) => onChange('capitalRoad', checked)}
+            />
+          </div>
+        )}
 
         {/* No heading above these. "Coordinates" named a group whose three members already say
             what they are, so it only added a line between the user and the boxes. */}

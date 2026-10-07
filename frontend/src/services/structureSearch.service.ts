@@ -1,4 +1,12 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
+import type { DocumentsResponse } from '@/pages/StructureDetail/documentsResponse';
+import type {
+  InspectionScheduleResponse,
+  InspectionsResponse,
+} from '@/pages/StructureDetail/inspectionsResponse';
+import type { MonitorView, StructureMonitor } from '@/pages/StructureDetail/monitorsResponse';
+import type { RepairView, StructureRepair } from '@/pages/StructureDetail/repairsResponse';
+import type { SpansAndPiersResponse } from '@/pages/StructureDetail/spansAndPiersResponse';
 import type { StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
 import type {
   PagedResponse,
@@ -106,6 +114,107 @@ export class StructureSearchService extends HttpClient {
       method: 'GET',
       url: '/v1/structures/{structureId}',
       path: { structureId },
+    });
+  }
+
+  /** A bridge's spans and piers — the structure page's Spans & Piers tab. */
+  getSpansAndPiers(structureId: string): CancelablePromise<SpansAndPiersResponse> {
+    return this.doRequest<SpansAndPiersResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/spans-and-piers',
+      path: { structureId },
+    });
+  }
+
+  /** A structure's documents and photos — the structure page's Documents & Photos tab. */
+  getDocuments(structureId: string): CancelablePromise<DocumentsResponse> {
+    return this.doRequest<DocumentsResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/documents',
+      path: { structureId },
+    });
+  }
+
+  /**
+   * One document's file, as a Blob typed by the server: an image or a PDF under its own type,
+   * anything else as `application/octet-stream`. Fetched with the user's token, which a plain link
+   * could not send.
+   */
+  getDocumentFile(structureId: string, fileId: string): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/documents/{fileId}/file',
+      path: { structureId, fileId },
+      responseType: 'blob',
+    });
+  }
+
+  /** The top of a structure's Inspections tab: its comments, schedule and close proximity record. */
+  getInspectionSchedule(structureId: string): CancelablePromise<InspectionScheduleResponse> {
+    return this.doRequest<InspectionScheduleResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/inspection-schedule',
+      path: { structureId },
+    });
+  }
+
+  /**
+   * A page of a structure's inspections, newest first.
+   *
+   * @param pageNumber zero-based, as the backend expects
+   * @param includeBeforeInstall also those from before the superstructure went in
+   */
+  getStructureInspections(
+    structureId: string,
+    pageNumber: number,
+    pageSize: number,
+    includeBeforeInstall: boolean,
+  ): CancelablePromise<InspectionsResponse> {
+    return this.doRequest<InspectionsResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/inspections',
+      path: { structureId },
+      query: { pageNumber, pageSize, includeBeforeInstall },
+    });
+  }
+
+  /**
+   * A page of a structure's repairs, in legacy's order.
+   *
+   * @param view outstanding only, or all
+   * @param pageNumber zero-based, as the backend expects
+   */
+  getStructureRepairs(
+    structureId: string,
+    view: RepairView,
+    pageNumber: number,
+    pageSize: number,
+  ): CancelablePromise<PagedResponse<StructureRepair>> {
+    return this.doRequest<PagedResponse<StructureRepair>>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/repairs',
+      path: { structureId },
+      query: { view, pageNumber, pageSize },
+    });
+  }
+
+  /**
+   * A page of a structure's monitoring items, in legacy's order.
+   *
+   * @param view outstanding only, or all
+   * @param pageNumber zero-based, as the backend expects
+   */
+  getStructureMonitors(
+    structureId: string,
+    view: MonitorView,
+    pageNumber: number,
+    pageSize: number,
+  ): CancelablePromise<PagedResponse<StructureMonitor>> {
+    return this.doRequest<PagedResponse<StructureMonitor>>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/monitors',
+      path: { structureId },
+      query: { view, pageNumber, pageSize },
     });
   }
 }

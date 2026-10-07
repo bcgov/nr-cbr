@@ -75,9 +75,14 @@ export const getUserManager = (): UserManager => {
     // it is named here because it is a security property of the integration, not an incidental one.
     response_type: 'code',
     scope: 'openid profile email',
-    // sessionStorage, not cookies. The Amplify cookie arrangement existed only to satisfy its
-    // storage-before-configure ordering; nothing here needs the tokens to survive closing the tab.
-    userStore: new WebStorageStateStore({ store: window.sessionStorage }),
+    // The tokens in localStorage, so every tab of the app shares one sign-in: a page the app opens
+    // in a new tab — a site from a structure, an inspection — arrives signed in rather than at a
+    // signed-out tab's Not Found. They outlast the tab and the browser, until sign-out or expiry;
+    // signing out in one tab signs out all of them.
+    //
+    // The sign-in redirect's own state stays per tab: two tabs signing in at once each keep their
+    // own PKCE verifier rather than overwriting each other's.
+    userStore: new WebStorageStateStore({ store: window.localStorage }),
     stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
     // Renewal is driven explicitly (ensureFreshUser / forceRenew) so an API call and the idle-timeout
     // keepalive share one code path and one debounce, rather than racing a background timer.

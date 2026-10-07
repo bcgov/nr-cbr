@@ -138,10 +138,10 @@ describe('SiteForm — read-only labels', () => {
 });
 
 describe('SiteForm — the three narrow fields', () => {
-  it('sit together on one line rather than a column each', async () => {
-    // Kilometres, User Kilometres and Capital Road are a short number, a short number and a tick
-    // box. A column each left most of three columns empty and pushed them a third of the form
-    // apart.
+  it('keeps the two kilometre boxes together, and Capital Road under BCTS BA Responsible', async () => {
+    // Kilometres and User Kilometres are two short numbers, so they share a column. Capital Road is
+    // a cell of its own in the next column, lining up with the field above it rather than trailing
+    // the two boxes.
     await page.viewport(1400, 900);
     renderForm();
 
@@ -150,11 +150,12 @@ describe('SiteForm — the three narrow fields', () => {
     const checkbox = (
       document.querySelector('.site-form__checkbox .cds--checkbox-wrapper') as HTMLElement
     ).getBoundingClientRect();
+    const businessArea = box('site-form-businessAreaOrgUnitNo');
 
     expect(userKm.top).toBeCloseTo(kilometres.top, 0);
-    expect(checkbox.top).toBeCloseTo(kilometres.top, 0);
     expect(userKm.left - kilometres.right).toBeLessThanOrEqual(16);
-    expect(checkbox.left - userKm.right).toBeLessThanOrEqual(16);
+    expect(checkbox.top).toBeCloseTo(kilometres.top, 0);
+    expect(checkbox.left).toBeCloseTo(businessArea.left, 0);
   });
 
   it('keeps each box the width of its value, not of its share of the row', async () => {

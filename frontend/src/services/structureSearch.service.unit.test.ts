@@ -133,4 +133,87 @@ describe('StructureSearchService', () => {
       expect.objectContaining({ method: 'GET', url: '/api/v1/structures/7' }),
     );
   });
+
+  it("reads a structure's spans and piers", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getSpansAndPiers('7');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', url: '/api/v1/structures/7/spans-and-piers' }),
+    );
+  });
+
+  it("reads a structure's documents", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getDocuments('7');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', url: '/api/v1/structures/7/documents' }),
+    );
+  });
+
+  it("reads one document's file as a blob", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getDocumentFile('7', '12');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: '/api/v1/structures/7/documents/12/file',
+        responseType: 'blob',
+      }),
+    );
+  });
+
+  it("reads a structure's inspection schedule", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getInspectionSchedule('7');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', url: '/api/v1/structures/7/inspection-schedule' }),
+    );
+  });
+
+  it("reads a page of a structure's inspections", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getStructureInspections('7', 1, 10, true);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: '/api/v1/structures/7/inspections?pageNumber=1&pageSize=10&includeBeforeInstall=true',
+      }),
+    );
+  });
+
+  it("reads a page of a structure's repairs", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getStructureRepairs('7', 'ALL', 2, 10);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: '/api/v1/structures/7/repairs?view=ALL&pageNumber=2&pageSize=10',
+      }),
+    );
+  });
+
+  it("reads a page of a structure's monitoring items", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getStructureMonitors('7', 'OUTSTANDING', 0, 10);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: '/api/v1/structures/7/monitors?view=OUTSTANDING&pageNumber=0&pageSize=10',
+      }),
+    );
+  });
 });

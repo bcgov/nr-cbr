@@ -19,7 +19,7 @@ import {
  * AuthProvider — wires BC Gov SSO (Keycloak standard realm) into the React tree.
  *
  * <p>Almost all of the work lives in `services/keycloak.ts`: `oidc-client-ts` discovers every
- * endpoint from the issuer, drives PKCE, stores the tokens in sessionStorage and renews from the
+ * endpoint from the issuer, drives PKCE, stores the tokens in localStorage and renews from the
  * refresh token. What is left here is React state — hydrating the user on mount, and exposing the
  * four operations the app actually performs.
  *

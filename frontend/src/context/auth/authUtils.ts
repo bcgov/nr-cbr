@@ -9,10 +9,10 @@ import {
 
 import { env } from '@/env';
 
-// ── Session storage note ─────────────────────────────────────────────
+// ── Token storage note ───────────────────────────────────────────────
 
 /**
- * No cookies are read anywhere in the auth layer. The tokens live in sessionStorage under
+ * No cookies are read anywhere in the auth layer. The tokens live in localStorage under
  * `oidc-client-ts`'s own keys and are reached through the `UserManager` (see
  * `services/keycloak.ts`); the SPA sets the `Authorization` header itself.
  *

@@ -6,6 +6,7 @@ import AddSitePage from '@/pages/AddSite';
 import AddStructurePage from '@/pages/AddStructure';
 import AuthCallbackPage from '@/pages/AuthCallback';
 import GlobalErrorPage from '@/pages/GlobalError';
+import InspectionDetailPage from '@/pages/InspectionDetail';
 import InspectionSearchPage from '@/pages/InspectionSearch';
 import LandingPage from '@/pages/Landing';
 import NotFoundPage from '@/pages/NotFound';
@@ -271,6 +272,22 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         isSideMenu: true,
         // Legacy gate: /showInspectionSearch, which sits at the GENERAL floor alongside
         // /showSiteSearch — every role that can read holds it.
+        roles: [...ROLE_CAPABILITIES.read],
+      },
+      {
+        // Reached from an inspection in Inspection Search or on a structure's Inspections tab, not
+        // from the side menu. The parameter is INSPECTION_ID. A placeholder for now — see the page.
+        path: ':inspectionId',
+        id: 'Inspection Detail',
+        element: (
+          <ProtectedRoute>
+            <Layout>
+              <InspectionDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: false,
+        // Legacy gate: /showInspection, at the GENERAL floor — every role that can read holds it.
         roles: [...ROLE_CAPABILITIES.read],
       },
     ],
