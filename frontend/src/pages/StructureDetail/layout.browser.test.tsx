@@ -1,5 +1,6 @@
+import { Theme } from '@carbon/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { page, userEvent } from '@vitest/browser/context';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -78,14 +79,20 @@ const renderPage = async (overrides: Overrides = {}) => {
     },
     outstanding: [{ section: 'DETAILS', label: 'Deck Width' }],
   });
+  // Inside the app's Theme, which defines the colour tokens the cards and pane are painted with.
   render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={['/inventory/structure/7']}>
-        <Routes>
-          <Route path="/inventory/structure/:structureId" element={<StructureDetailPage />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <Theme theme="white">
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/inventory/structure/7']}>
+          {/* The app's content wrapper, whose grid padding the grey pane breaks out of. */}
+          <div className="cds--content">
+            <Routes>
+              <Route path="/inventory/structure/:structureId" element={<StructureDetailPage />} />
+            </Routes>
+          </div>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </Theme>,
   );
   await screen.findByTestId('structure-header');
 };
@@ -133,7 +140,7 @@ describe('StructureDetailPage — layout', () => {
     expect(pill.height).toBeLessThan(heading.height);
   });
 
-  it('sets each value close under its label, as nr-frep does', async () => {
+  it('sets each value 8px under its bold label, as nr-fspts does', async () => {
     await page.viewport(1400, 900);
     await renderPage();
 
@@ -141,7 +148,8 @@ describe('StructureDetailPage — layout', () => {
     const label = cell.querySelector('.read-only-field__label')!.getBoundingClientRect();
     const value = cell.querySelector('.read-only-field__value')!.getBoundingClientRect();
 
-    expect(value.top - label.bottom).toBeCloseTo(4, 0);
+    expect(value.top - label.bottom).toBeCloseTo(8, 0);
+    expect(getComputedStyle(cell.querySelector('.read-only-field__label')!).fontWeight).toBe('600');
   });
 
   it('sets the load rating history apart from the fields above, and its checkbox from its table', async () => {
@@ -178,6 +186,8 @@ describe('StructureDetailPage — layout', () => {
       },
     });
 
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+
     const fields = screen
       .getByTestId('structure-section-load-rating')
       .querySelector('.structure-detail__fields')!
@@ -204,7 +214,7 @@ describe('StructureDetailPage — layout', () => {
       ],
     });
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Comments' }));
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
 
     // The text's own line boxes, not the cell: the cell is as tall as the comment's row.
     const lines = (text: string) => {
@@ -238,6 +248,8 @@ describe('StructureDetailPage — layout', () => {
       },
     });
 
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+
     const lines = (text: string) => {
       const range = document.createRange();
       range.selectNodeContents(screen.getByText(text));
@@ -247,5 +259,66 @@ describe('StructureDetailPage — layout', () => {
     expect(lines('May 14, 2025')).toBe(1);
     expect(lines('IDIR\\LHIGGS')).toBe(1);
     expect(lines('Reviewed')).toBe(1);
+  });
+
+  it('sets each section as a white card on the grey tab pane, its title beside an icon', async () => {
+    await page.viewport(1400, 900);
+    await renderPage();
+
+    const card = screen.getByTestId('structure-information-tab');
+    const pane = card.closest('.cds--tab-content')!;
+    expect(getComputedStyle(card).backgroundColor).toBe('rgb(255, 255, 255)');
+    expect(getComputedStyle(pane).backgroundColor).not.toBe('rgb(255, 255, 255)');
+
+    const title = within(card).getByRole('heading', { name: 'Structure and site' });
+    const icon = title.querySelector('svg')!.getBoundingClientRect();
+    const text = title.querySelector('span')!.getBoundingClientRect();
+    expect(icon.right).toBeLessThanOrEqual(text.left);
+    expect(icon.top + icon.height / 2).toBeCloseTo(text.top + text.height / 2, 0);
+  });
+
+  it.each([1400, 400])(
+    'runs the grey pane the full width of the page at %ipx, cards in line with the tabs',
+    async (width) => {
+      // nr-fspts' FSP page: no white margin either side of the pane.
+      await page.viewport(width, 900);
+      await renderPage();
+
+      const grid = document.querySelector('.structure-detail')!.getBoundingClientRect();
+      const pane = screen
+        .getByTestId('structure-information-tab')
+        .closest('.cds--tab-content')!
+        .getBoundingClientRect();
+      const tabs = screen.getByRole('tablist').getBoundingClientRect();
+      const card = screen.getByTestId('structure-information-tab').getBoundingClientRect();
+
+      expect(pane.left).toBeCloseTo(grid.left, 0);
+      expect(pane.right).toBeCloseTo(grid.right, 0);
+      expect(pane.bottom).toBeCloseTo(grid.bottom, 0);
+      expect(card.left).toBeCloseTo(tabs.left, 0);
+      // Out to the page's edges and no further, so the pane adds no sideways scroll of its own.
+      expect(pane.right).toBeLessThanOrEqual(document.documentElement.clientWidth);
+    },
+  );
+
+  it('wraps the incomplete-data banner on a phone rather than running off the screen', async () => {
+    await page.viewport(400, 900);
+    await renderPage();
+
+    const banner = screen.getByTestId('structure-outstanding-summary').getBoundingClientRect();
+    const clientWidth = document.documentElement.clientWidth;
+    expect(banner.right).toBeLessThanOrEqual(clientWidth);
+    // The text's own line boxes, not the elements': text set `nowrap` spills out of its box.
+    for (const part of ['__title', '__subtitle']) {
+      const range = document.createRange();
+      range.selectNodeContents(
+        document.querySelector(
+          `.structure-detail__outstanding-summary .cds--inline-notification${part}`,
+        )!,
+      );
+      for (const line of Array.from(range.getClientRects())) {
+        expect(line.right).toBeLessThanOrEqual(banner.right);
+      }
+    }
   });
 });

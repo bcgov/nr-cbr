@@ -299,6 +299,21 @@ describe('SiteDetailPage — the structure actions', () => {
   });
 });
 
+describe('SiteDetailPage — the panel', () => {
+  it('sets the values on a grey panel, in the reading style until Edit is pressed', async () => {
+    // Grey over white; bold labels with their values close under them while reading. Editing keeps
+    // the form's own spacing, which lines a read-only value up with the input beside it.
+    await renderPage({ canEdit: true });
+    const panel = screen.getByTestId('site-detail-panel');
+
+    expect(panel).toHaveClass('site-detail__panel', 'site-detail__panel--view');
+
+    edit();
+
+    expect(panel).not.toHaveClass('site-detail__panel--view');
+  });
+});
+
 describe('SiteDetailPage — who is offered Edit', () => {
   it('offers it to a user who may change something', async () => {
     await renderPage({ canEdit: true });

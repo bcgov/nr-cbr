@@ -12,7 +12,16 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
 }));
 
-const api = vi.hoisted(() => ({ getStructure: vi.fn() }));
+const api = vi.hoisted(() => ({
+  getStructure: vi.fn(),
+  getSpansAndPiers: vi.fn(),
+  getDocuments: vi.fn(),
+  getDocumentFile: vi.fn(),
+  getInspectionSchedule: vi.fn(),
+  getStructureInspections: vi.fn(),
+  getStructureRepairs: vi.fn(),
+  getStructureMonitors: vi.fn(),
+}));
 vi.mock('@/services/APIs', () => ({ default: { structureSearch: api } }));
 
 const code = (value: string | null, description: string | null = value) => ({
@@ -181,6 +190,43 @@ const showing = async (structure: StructureDetailResponse) => {
   return screen.findByTestId('structure-header');
 };
 
+/** The top of the Inspections tab, empty unless a test fills it. */
+const schedule = (overrides: object = {}) => ({
+  plannedInspectionComments: [],
+  closeProximityRequired: false,
+  closeProximityEquipment: { code: null, description: null },
+  nextCloseProximityDate: null,
+  nextRoutineDate: null,
+  routineFrequencyYears: null,
+  completedCloseProximity: [],
+  ...overrides,
+});
+
+/** A page of the inspection table. */
+const inspectionsPage = (content: object[], overrides: object = {}) => ({
+  page: {
+    content,
+    totalElements: content.length,
+    totalPages: 1,
+    pageNumber: 0,
+    pageSize: 10,
+  },
+  beforeInstallCount: 0,
+  ...overrides,
+});
+
+/** A page of the repairs table. */
+const repairsPage = (content: object[], totalElements = content.length) => ({
+  content,
+  totalElements,
+  totalPages: Math.max(1, Math.ceil(totalElements / 10)),
+  pageNumber: 0,
+  pageSize: 10,
+});
+
+/** Opens the Details tab; Information is the one selected on arrival. */
+const openDetails = () => userEvent.click(screen.getByTestId('structure-tab-details'));
+
 /** A read-only field's value, found by its label within a container. */
 const valueOf = (label: string, container: HTMLElement = document.body) => {
   const labelElement = within(container)
@@ -191,6 +237,19 @@ const valueOf = (label: string, container: HTMLElement = document.body) => {
 
 beforeEach(() => {
   api.getStructure.mockReset();
+  api.getSpansAndPiers.mockReset();
+  api.getSpansAndPiers.mockResolvedValue({ spans: [], piers: [] });
+  api.getDocuments.mockReset();
+  api.getDocuments.mockResolvedValue({ documents: [] });
+  api.getDocumentFile.mockReset();
+  api.getInspectionSchedule.mockReset();
+  api.getInspectionSchedule.mockResolvedValue(schedule());
+  api.getStructureInspections.mockReset();
+  api.getStructureInspections.mockResolvedValue(inspectionsPage([]));
+  api.getStructureRepairs.mockReset();
+  api.getStructureRepairs.mockResolvedValue(repairsPage([]));
+  api.getStructureMonitors.mockReset();
+  api.getStructureMonitors.mockResolvedValue(repairsPage([]));
 });
 
 describe('StructureDetailPage — loading', () => {
@@ -348,6 +407,7 @@ describe('StructureDetailPage — incomplete data, in nr-frep form', () => {
 
   it('folds the list away on request', async () => {
     await showing(incomplete());
+    await openDetails();
 
     await userEvent.click(screen.getByRole('button', { name: /Outstanding/ }));
 
@@ -432,11 +492,16 @@ describe('StructureDetailPage — Details tab', () => {
     expect(within(section).queryByText('Open Bottom Substructure')).not.toBeInTheDocument();
   });
 
-  it('lists comments on their own tab, newest first, as the server sends them', async () => {
+  it('lists comments last on the Details tab, newest first, as the server sends them', async () => {
     await showing(bridge());
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Comments' }));
-    const rows = within(screen.getByTestId('structure-comments-tab')).getAllByRole('row');
+    await openDetails();
+    const cards = Array.from(
+      screen.getByTestId('structure-details-tab').querySelectorAll('.structure-detail__card'),
+    );
+    expect(cards.at(-1)).toBe(screen.getByTestId('structure-section-comments'));
+    expect(cards.at(-2)).toBe(screen.getByTestId('structure-section-replacement'));
+    const rows = within(screen.getByTestId('structure-section-comments')).getAllByRole('row');
 
     expect(rows[1]).toHaveTextContent('Deck replaced.');
     expect(rows[1]).toHaveTextContent('IDIR\\JSMITH');
@@ -444,20 +509,12 @@ describe('StructureDetailPage — Details tab', () => {
     expect(rows[2]).toHaveTextContent('Installed.');
   });
 
-  it('no longer lists comments on the Details tab', async () => {
-    await showing(bridge());
-
-    expect(
-      within(screen.getByTestId('structure-details-tab')).queryByText('Deck replaced.'),
-    ).not.toBeInTheDocument();
-  });
-
   it('says when there are no comments', async () => {
     await showing(bridge({ comments: [] }));
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Comments' }));
+    await openDetails();
 
-    expect(screen.getByTestId('structure-comments-tab')).toHaveTextContent('No comments.');
+    expect(screen.getByTestId('structure-section-comments')).toHaveTextContent('No comments.');
   });
 
   it('marks the current load rating', async () => {
@@ -476,6 +533,7 @@ describe('StructureDetailPage — Details tab', () => {
 
   it('hides ratings from before the superstructure was installed until asked, as legacy does', async () => {
     await showing(bridge());
+    await openDetails();
 
     expect(screen.queryByTestId('load-rating-r0')).not.toBeInTheDocument();
 
@@ -488,6 +546,7 @@ describe('StructureDetailPage — Details tab', () => {
 
   it('links the structures this one replaced, in a new tab', async () => {
     await showing(bridge());
+    await openDetails();
     const section = screen.getByTestId('structure-section-replacement-history');
 
     const link = within(section).getByRole('link', { name: 'B050 (opens in a new tab)' });
@@ -524,5 +583,637 @@ describe('StructureDetailPage — breadcrumb', () => {
     await screen.findByTestId('structure-header');
 
     expect(trail()).toEqual(['Inventory', 'Site Search', 'Site BOWRON-001']);
+  });
+});
+
+describe('StructureDetailPage — tabs', () => {
+  it('opens on Information, the first of its tabs', async () => {
+    // Legacy's header, moved into a tab of its own as nr-fspts' FSP page opens on Information.
+    await showing(bridge());
+
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent?.trim());
+    expect(tabs).toEqual([
+      'Information',
+      expect.stringMatching(/^Details/),
+      'Spans & Piers',
+      'Documents & Photos',
+      'Inspections',
+      'Repairs',
+      'Monitoring',
+    ]);
+    expect(screen.getByTestId('structure-tab-information')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(
+      within(screen.getByTestId('structure-information-tab')).getByRole('heading', {
+        name: 'Structure and site',
+      }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('StructureDetailPage — Spans & Piers', () => {
+  const openSpansAndPiers = () =>
+    userEvent.click(screen.getByTestId('structure-tab-spans-and-piers'));
+
+  it('is a tab for a bridge only, as legacy decides by the type/class', async () => {
+    await showing(culvert());
+
+    expect(screen.queryByTestId('structure-tab-spans-and-piers')).not.toBeInTheDocument();
+  });
+
+  it('loads nothing until the tab is opened', async () => {
+    await showing(bridge());
+
+    expect(api.getSpansAndPiers).not.toHaveBeenCalled();
+
+    await openSpansAndPiers();
+
+    expect(api.getSpansAndPiers).toHaveBeenCalledWith('7');
+  });
+
+  it('lists the spans in the order the server sends, under the numbering note', async () => {
+    api.getSpansAndPiers.mockResolvedValue({
+      spans: [
+        { id: 's1', number: 1, lengthMetres: 9.75 },
+        { id: 's2', number: 2, lengthMetres: 12.5 },
+      ],
+      piers: [],
+    });
+    await showing(bridge());
+
+    await openSpansAndPiers();
+    const spans = await screen.findByTestId('structure-section-spans');
+    const rows = within(spans).getAllByRole('row');
+
+    expect(spans).toHaveTextContent(
+      'Span # is numbered Left Bank to Right Bank (Looking Downstream).',
+    );
+    expect(rows[1]).toHaveTextContent('19.75');
+    expect(rows[2]).toHaveTextContent('212.5');
+  });
+
+  it("lists the piers with their type's description", async () => {
+    api.getSpansAndPiers.mockResolvedValue({
+      spans: [],
+      piers: [{ id: 'p1', number: 1, type: { code: 'CRIB', description: 'Timber crib' } }],
+    });
+    await showing(bridge());
+
+    await openSpansAndPiers();
+    const piers = await screen.findByTestId('structure-section-piers');
+
+    expect(within(piers).getAllByRole('row')[1]).toHaveTextContent('1Timber crib');
+  });
+
+  it('says when a bridge has no spans or piers', async () => {
+    await showing(bridge());
+
+    await openSpansAndPiers();
+
+    expect(await screen.findByTestId('structure-section-spans')).toHaveTextContent('No spans.');
+    expect(screen.getByTestId('structure-section-piers')).toHaveTextContent('No piers.');
+  });
+
+  it('says so when they cannot be loaded', async () => {
+    api.getSpansAndPiers.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openSpansAndPiers();
+
+    expect(await screen.findByTestId('structure-spans-piers-error')).toHaveTextContent(
+      'Spans and piers could not be loaded',
+    );
+  });
+});
+
+describe('StructureDetailPage — Documents & Photos', () => {
+  const openDocuments = () => userEvent.click(screen.getByTestId('structure-tab-documents'));
+
+  const doc = (id: string, overrides: object = {}) => ({
+    id,
+    inspectionId: null,
+    inspectionDate: null,
+    attachmentType: { code: 'PHOTO', description: 'Photograph' },
+    created: '2020-05-01',
+    extension: 'JPG',
+    description: 'Deck from the north abutment',
+    filename: `${id}.jpg`,
+    ...overrides,
+  });
+
+  it('is a tab for a culvert too, after Details where there is no Spans & Piers', async () => {
+    await showing(culvert());
+
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent?.trim());
+    expect(tabs[2]).toBe('Documents & Photos');
+
+    await openDocuments();
+
+    await vi.waitFor(() => expect(api.getDocuments).toHaveBeenCalledWith('8'));
+  });
+
+  it('loads nothing until the tab is opened', async () => {
+    await showing(bridge());
+
+    expect(api.getDocuments).not.toHaveBeenCalled();
+  });
+
+  it("groups the files into the structure's own and each inspection's, as legacy's folders do", async () => {
+    api.getDocuments.mockResolvedValue({
+      documents: [
+        doc('1'),
+        doc('2', { inspectionId: '30', inspectionDate: '2023-06-01' }),
+        doc('3', { inspectionId: '20', inspectionDate: '2021-06-01' }),
+      ],
+    });
+    await showing(bridge());
+
+    await openDocuments();
+    await screen.findByTestId('structure-documents-structure');
+
+    const titles = Array.from(
+      screen.getByTestId('structure-documents-tab').querySelectorAll('.structure-detail__card h2'),
+    ).map((title) => title.textContent);
+    expect(titles).toEqual([
+      'Structure Documents & Photos',
+      'Inspection: Jun 1, 2023',
+      'Inspection: Jun 1, 2021',
+    ]);
+    const row = screen.getByTestId('structure-document-1');
+    expect(row).toHaveTextContent('Photograph');
+    expect(row).toHaveTextContent('May 1, 2020');
+    expect(row).toHaveTextContent('JPG');
+    expect(row).toHaveTextContent('Deck from the north abutment');
+    expect(within(row).getAllByRole('cell')[3]).toHaveTextContent('Structure');
+    expect(
+      within(screen.getByTestId('structure-document-2')).getAllByRole('cell')[3],
+    ).toHaveTextContent('Inspection');
+  });
+
+  it('shows ten files a card at first, and the rest a page at a time', async () => {
+    api.getDocuments.mockResolvedValue({
+      documents: Array.from({ length: 12 }, (_, index) => doc(String(index + 1))),
+    });
+    await showing(bridge());
+
+    await openDocuments();
+    await screen.findByTestId('structure-document-1');
+
+    expect(screen.getByTestId('structure-document-10')).toBeInTheDocument();
+    expect(screen.queryByTestId('structure-document-11')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }));
+
+    expect(screen.getByTestId('structure-document-11')).toBeInTheDocument();
+    expect(screen.getByTestId('structure-document-12')).toBeInTheDocument();
+    expect(screen.queryByTestId('structure-document-1')).not.toBeInTheDocument();
+  });
+
+  it('hides files from before the superstructure was installed until asked, as legacy does', async () => {
+    // Here the superstructure went in in 2015.
+    api.getDocuments.mockResolvedValue({
+      documents: [doc('1', { created: '2010-01-01' }), doc('2', { created: '2016-01-01' })],
+    });
+    await showing(bridge({ details: { ...bridge().details, yearBuilt: 2015 } }));
+
+    await openDocuments();
+    await screen.findByTestId('structure-document-2');
+
+    expect(screen.queryByTestId('structure-document-1')).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByText('Show documents from before the superstructure was installed (1)'),
+    );
+
+    expect(screen.getByTestId('structure-document-1')).toBeInTheDocument();
+  });
+
+  it("says so when there are none, in legacy's words", async () => {
+    await showing(bridge());
+
+    await openDocuments();
+
+    expect(await screen.findByTestId('structure-documents-empty')).toHaveTextContent(
+      'No photos and/or documents have been loaded.',
+    );
+  });
+
+  it('opens a photo in a new tab, fetched with the signed-in request', async () => {
+    api.getDocuments.mockResolvedValue({ documents: [doc('1')] });
+    api.getDocumentFile.mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }));
+    const opened = { close: vi.fn(), location: { href: '' } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(opened as unknown as Window);
+    await showing(bridge());
+
+    await openDocuments();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Photograph (opens in a new tab)' }),
+    );
+
+    expect(api.getDocumentFile).toHaveBeenCalledWith('7', '1');
+    expect(open).toHaveBeenCalledWith('', '_blank');
+    await vi.waitFor(() => expect(opened.location.href).toMatch(/^blob:/));
+    open.mockRestore();
+  });
+
+  it('says so beside the files when one cannot be opened', async () => {
+    api.getDocuments.mockResolvedValue({ documents: [doc('1')] });
+    api.getDocumentFile.mockRejectedValue(new Error('boom'));
+    const opened = { close: vi.fn(), location: { href: '' } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(opened as unknown as Window);
+    await showing(bridge());
+
+    await openDocuments();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Photograph (opens in a new tab)' }),
+    );
+
+    expect(await screen.findByTestId('structure-document-open-error')).toHaveTextContent(
+      'The file could not be opened',
+    );
+    expect(opened.close).toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it('says so when the list cannot be loaded', async () => {
+    api.getDocuments.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openDocuments();
+
+    expect(await screen.findByTestId('structure-documents-error')).toHaveTextContent(
+      'Documents and photos could not be loaded',
+    );
+  });
+});
+
+describe('StructureDetailPage — Inspections', () => {
+  const openInspections = () => userEvent.click(screen.getByTestId('structure-tab-inspections'));
+
+  const inspection = (id: string, overrides: object = {}) => ({
+    id,
+    type: { code: 'ROUT', description: 'Routine' },
+    inspectionDate: '2023-06-01',
+    siteId: '62-001',
+    status: { code: 'RVD', description: 'Reviewed' },
+    reviewedDate: '2023-07-02',
+    reviewedBy: 'Pat Engineer',
+    inspectorName: 'Sam Inspector',
+    viewable: true,
+    ...overrides,
+  });
+
+  it('loads nothing until the tab is opened, then its first page of ten', async () => {
+    await showing(bridge());
+
+    expect(api.getInspectionSchedule).not.toHaveBeenCalled();
+    expect(api.getStructureInspections).not.toHaveBeenCalled();
+
+    await openInspections();
+
+    await vi.waitFor(() => {
+      expect(api.getInspectionSchedule).toHaveBeenCalledWith('7');
+      expect(api.getStructureInspections).toHaveBeenCalledWith('7', 0, 10, false);
+    });
+  });
+
+  it('shows the schedule, the close proximity fields only when one is required', async () => {
+    api.getInspectionSchedule.mockResolvedValue(
+      schedule({
+        closeProximityRequired: true,
+        closeProximityEquipment: { code: 'UBIU', description: 'Under-bridge inspection unit' },
+        nextCloseProximityDate: '2027-05-01',
+        nextRoutineDate: '2026-09-01',
+        routineFrequencyYears: 3,
+      }),
+    );
+    await showing(bridge());
+
+    await openInspections();
+    const card = await screen.findByTestId('structure-section-schedule');
+
+    expect(valueOf('Close Proximity Inspection Required?', card)).toBe('Yes');
+    expect(valueOf('Close Proximity Special Equipment Requirements', card)).toBe(
+      'Under-bridge inspection unit',
+    );
+    expect(valueOf('Next Planned Close Proximity Inspection', card)).toBe('May 1, 2027');
+    expect(valueOf('Next Planned Routine Inspection', card)).toBe('Sep 1, 2026');
+    expect(valueOf('Routine Inspection Frequency (years)', card)).toBe('3');
+  });
+
+  it('hides the close proximity fields when none is required, as legacy does', async () => {
+    await showing(bridge());
+
+    await openInspections();
+    const card = await screen.findByTestId('structure-section-schedule');
+
+    expect(
+      within(card).queryByText('Close Proximity Special Equipment Requirements'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lists the planned-inspection comments and the completed close proximity inspections', async () => {
+    api.getInspectionSchedule.mockResolvedValue(
+      schedule({
+        plannedInspectionComments: [
+          { id: '1', text: 'Bring a boat.', userId: 'IDIR\\B', timestamp: '2024-01-01T09:00:00' },
+        ],
+        completedCloseProximity: [{ id: '5', completed: '2024-06-01', userId: 'IDIR\\P' }],
+      }),
+    );
+    await showing(bridge());
+
+    await openInspections();
+
+    expect(await screen.findByTestId('structure-section-planned-comments')).toHaveTextContent(
+      'Bring a boat.',
+    );
+    // Last of the tab's cards.
+    const cards = Array.from(
+      screen.getByTestId('structure-inspections-tab').querySelectorAll('.structure-detail__card'),
+    );
+    expect(cards.at(-1)).toBe(screen.getByTestId('structure-section-planned-comments'));
+    expect(screen.getByTestId('structure-section-close-proximity')).toHaveTextContent(
+      'Jun 1, 2024',
+    );
+  });
+
+  it('lists each inspection, linked to its page in a new tab', async () => {
+    api.getStructureInspections.mockResolvedValue(inspectionsPage([inspection('41')]));
+    await showing(bridge());
+
+    await openInspections();
+    const row = await screen.findByTestId('structure-inspection-41');
+
+    expect(row).toHaveTextContent('Routine');
+    expect(row).toHaveTextContent('Reviewed');
+    expect(row).toHaveTextContent('Jul 2, 2023');
+    expect(row).toHaveTextContent('Pat Engineer');
+    expect(row).toHaveTextContent('Sam Inspector');
+    const link = within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' });
+    expect(link).toHaveAttribute('href', '/inspection/41');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('offers no link to an inspection still out on the offline client', async () => {
+    api.getStructureInspections.mockResolvedValue(
+      inspectionsPage([
+        inspection('41', { viewable: false, status: { code: 'OFL', description: 'Offline' } }),
+      ]),
+    );
+    await showing(bridge());
+
+    await openInspections();
+    const row = await screen.findByTestId('structure-inspection-41');
+
+    expect(within(row).queryByRole('link', { name: /Jun 1, 2023/ })).not.toBeInTheDocument();
+  });
+
+  it('asks the server for the next page', async () => {
+    api.getStructureInspections.mockResolvedValue(
+      inspectionsPage(
+        Array.from({ length: 10 }, (_, index) => inspection(String(index + 1))),
+        { page: { content: [], totalElements: 12, totalPages: 2, pageNumber: 0, pageSize: 10 } },
+      ),
+    );
+    await showing(bridge());
+
+    await openInspections();
+    await screen.findByTestId('structure-section-inspections');
+    await userEvent.click(await screen.findByRole('button', { name: 'Next page' }));
+
+    await vi.waitFor(() =>
+      expect(api.getStructureInspections).toHaveBeenLastCalledWith('7', 1, 10, false),
+    );
+  });
+
+  it('asks for the inspections from before the superstructure went in when ticked', async () => {
+    api.getStructureInspections.mockResolvedValue(
+      inspectionsPage([inspection('41')], { beforeInstallCount: 2 }),
+    );
+    await showing(bridge());
+
+    await openInspections();
+    await userEvent.click(
+      await screen.findByText('Show inspections from before the superstructure was installed (2)'),
+    );
+
+    await vi.waitFor(() =>
+      expect(api.getStructureInspections).toHaveBeenLastCalledWith('7', 0, 10, true),
+    );
+  });
+
+  it("says so when there are none, in legacy's words", async () => {
+    await showing(bridge());
+
+    await openInspections();
+
+    expect(await screen.findByTestId('structure-section-inspections')).toHaveTextContent(
+      'There have been no inspections for this structure.',
+    );
+  });
+
+  it('says so when the inspections cannot be loaded', async () => {
+    api.getStructureInspections.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openInspections();
+
+    expect(await screen.findByTestId('structure-inspections-error')).toHaveTextContent(
+      'Inspections could not be loaded',
+    );
+  });
+});
+
+describe('StructureDetailPage — Repairs', () => {
+  const openRepairs = () => userEvent.click(screen.getByTestId('structure-tab-repairs'));
+
+  const repair = (id: string, overrides: object = {}) => ({
+    id,
+    number: Number(id),
+    status: { code: 'REQ', description: 'Required' },
+    type: { code: 'DECK', description: 'Deck planks' },
+    suggested: { userId: 'IDIR\\A', date: '2023-06-02' },
+    required: { userId: 'IDIR\\B', date: '2023-06-05' },
+    completed: null,
+    inspectionId: '41',
+    inspectionDate: '2023-06-01',
+    priority: { code: 'P1', description: 'Urgent' },
+    completedDate: null,
+    estimate: 4000,
+    actualCost: null,
+    quantity: 12,
+    unit: 'm2',
+    description: 'Replace worn planks.',
+    ...overrides,
+  });
+
+  it('loads the outstanding repairs, ten to a page, once the tab is opened', async () => {
+    await showing(bridge());
+
+    expect(api.getStructureRepairs).not.toHaveBeenCalled();
+
+    await openRepairs();
+
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10),
+    );
+  });
+
+  it('lists each repair, its user audits written out in the cell', async () => {
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    await showing(bridge());
+
+    await openRepairs();
+    const row = await screen.findByTestId('structure-repair-3');
+
+    expect(row).toHaveTextContent('Required');
+    expect(row).toHaveTextContent('Deck planks');
+    expect(row).toHaveTextContent('Suggested: IDIR\\A, Jun 2, 2023');
+    expect(row).toHaveTextContent('Required: IDIR\\B, Jun 5, 2023');
+    expect(row).not.toHaveTextContent('Completed:');
+    expect(row).toHaveTextContent('Urgent');
+    expect(row).toHaveTextContent('$4,000');
+    expect(row).toHaveTextContent('12 m2');
+    expect(row).toHaveTextContent('Replace worn planks.');
+    expect(
+      within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' }),
+    ).toHaveAttribute('href', '/inspection/41');
+  });
+
+  it('asks for every repair when All Items is chosen, back on the first page', async () => {
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(
+      within(await screen.findByTestId('structure-section-repairs')).getByText('All Items'),
+    );
+
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'ALL', 0, 10),
+    );
+  });
+
+  it('asks the server for the next page', async () => {
+    api.getStructureRepairs.mockResolvedValue(
+      repairsPage(
+        Array.from({ length: 10 }, (_, index) => repair(String(index + 1))),
+        12,
+      ),
+    );
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(await screen.findByRole('button', { name: 'Next page' }));
+
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 1, 10),
+    );
+  });
+
+  it('says when there are none in the view chosen', async () => {
+    await showing(bridge());
+
+    await openRepairs();
+
+    expect(await screen.findByTestId('structure-section-repairs')).toHaveTextContent(
+      'No outstanding repairs.',
+    );
+  });
+
+  it('says so when the repairs cannot be loaded', async () => {
+    api.getStructureRepairs.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openRepairs();
+
+    expect(await screen.findByTestId('structure-repairs-error')).toHaveTextContent(
+      'Repairs could not be loaded',
+    );
+  });
+});
+
+describe('StructureDetailPage — Monitoring', () => {
+  const openMonitoring = () => userEvent.click(screen.getByTestId('structure-tab-monitoring'));
+
+  const monitor = (id: string, overrides: object = {}) => ({
+    id,
+    number: Number(id),
+    status: { code: 'REQ', description: 'Required' },
+    suggested: null,
+    required: { userId: 'IDIR\\B', date: '2023-06-05' },
+    completed: null,
+    inspectionId: '41',
+    inspectionDate: '2023-06-01',
+    description: 'Watch the scour at the south abutment.',
+    frequency: { code: 'ANN', description: 'Annually' },
+    frequencyComment: 'After freshet.',
+    ...overrides,
+  });
+
+  it('loads the outstanding items, ten to a page, once the tab is opened', async () => {
+    await showing(bridge());
+
+    expect(api.getStructureMonitors).not.toHaveBeenCalled();
+
+    await openMonitoring();
+
+    await vi.waitFor(() =>
+      expect(api.getStructureMonitors).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10),
+    );
+  });
+
+  it('lists each item, its user audits written out and its frequency with its comment', async () => {
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    const row = await screen.findByTestId('structure-monitor-2');
+
+    expect(row).toHaveTextContent('Required');
+    expect(row).toHaveTextContent('Required: IDIR\\B, Jun 5, 2023');
+    expect(row).not.toHaveTextContent('Suggested:');
+    expect(row).toHaveTextContent('Watch the scour at the south abutment.');
+    expect(row).toHaveTextContent('Annually — After freshet.');
+    expect(
+      within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' }),
+    ).toHaveAttribute('href', '/inspection/41');
+  });
+
+  it('asks for every item when All Items is chosen, without changing Repairs', async () => {
+    await showing(bridge());
+
+    await openMonitoring();
+    await userEvent.click(
+      within(await screen.findByTestId('structure-section-monitoring')).getByText('All Items'),
+    );
+
+    await vi.waitFor(() =>
+      expect(api.getStructureMonitors).toHaveBeenLastCalledWith('7', 'ALL', 0, 10),
+    );
+    expect(api.getStructureRepairs).not.toHaveBeenCalled();
+  });
+
+  it('says when there are none in the view chosen', async () => {
+    await showing(bridge());
+
+    await openMonitoring();
+
+    expect(await screen.findByTestId('structure-section-monitoring')).toHaveTextContent(
+      'No outstanding monitoring items.',
+    );
+  });
+
+  it('says so when the items cannot be loaded', async () => {
+    api.getStructureMonitors.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openMonitoring();
+
+    expect(await screen.findByTestId('structure-monitors-error')).toHaveTextContent(
+      'Monitoring items could not be loaded',
+    );
   });
 });

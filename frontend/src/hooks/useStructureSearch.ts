@@ -1,5 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { MonitorView } from '@/pages/StructureDetail/monitorsResponse';
+import type { RepairView } from '@/pages/StructureDetail/repairsResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
 import type {
   PagedResponse,
@@ -32,6 +34,109 @@ export const useStructure = (structureId: string | undefined) =>
     queryKey: [STRUCTURE_QUERY_KEY, structureId],
     queryFn: () => API.structureSearch.getStructure(structureId as string),
     enabled: Boolean(structureId),
+  });
+
+/**
+ * A bridge's spans and piers, fetched only once its tab is opened (`enabled`) — legacy loads its
+ * later tabs after the page, and most visits never open this one. Under the structure's key, so
+ * invalidating a structure refreshes its spans and piers too.
+ */
+export const useStructureSpansAndPiers = (structureId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'spans-and-piers'],
+    queryFn: () => API.structureSearch.getSpansAndPiers(structureId as string),
+    enabled: enabled && Boolean(structureId),
+  });
+
+/** The top of a structure's Inspections tab, fetched only once the tab is opened (`enabled`). */
+export const useStructureInspectionSchedule = (structureId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'inspection-schedule'],
+    queryFn: () => API.structureSearch.getInspectionSchedule(structureId as string),
+    enabled: enabled && Boolean(structureId),
+  });
+
+/**
+ * A page of a structure's inspections, fetched only once the tab is opened. The previous page stays
+ * on screen while the next loads, as on Structure Search.
+ *
+ * @param pageNumber zero-based
+ */
+export const useStructureInspections = (
+  structureId: string | undefined,
+  enabled: boolean,
+  pageNumber: number,
+  pageSize: number,
+  includeBeforeInstall: boolean,
+) =>
+  useQuery({
+    queryKey: [
+      STRUCTURE_QUERY_KEY,
+      structureId,
+      'inspections',
+      pageNumber,
+      pageSize,
+      includeBeforeInstall,
+    ],
+    queryFn: () =>
+      API.structureSearch.getStructureInspections(
+        structureId as string,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+      ),
+    enabled: enabled && Boolean(structureId),
+    placeholderData: keepPreviousData,
+  });
+
+/**
+ * A page of a structure's repairs, fetched only once the tab is opened. The previous page stays on
+ * screen while the next loads.
+ *
+ * @param pageNumber zero-based
+ */
+export const useStructureRepairs = (
+  structureId: string | undefined,
+  enabled: boolean,
+  view: RepairView,
+  pageNumber: number,
+  pageSize: number,
+) =>
+  useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs', view, pageNumber, pageSize],
+    queryFn: () =>
+      API.structureSearch.getStructureRepairs(structureId as string, view, pageNumber, pageSize),
+    enabled: enabled && Boolean(structureId),
+    placeholderData: keepPreviousData,
+  });
+
+/**
+ * A page of a structure's monitoring items, fetched only once the tab is opened. The previous page
+ * stays on screen while the next loads.
+ *
+ * @param pageNumber zero-based
+ */
+export const useStructureMonitors = (
+  structureId: string | undefined,
+  enabled: boolean,
+  view: MonitorView,
+  pageNumber: number,
+  pageSize: number,
+) =>
+  useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors', view, pageNumber, pageSize],
+    queryFn: () =>
+      API.structureSearch.getStructureMonitors(structureId as string, view, pageNumber, pageSize),
+    enabled: enabled && Boolean(structureId),
+    placeholderData: keepPreviousData,
+  });
+
+/** A structure's documents and photos, fetched only once their tab is opened (`enabled`). */
+export const useStructureDocuments = (structureId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'documents'],
+    queryFn: () => API.structureSearch.getDocuments(structureId as string),
+    enabled: enabled && Boolean(structureId),
   });
 
 /**

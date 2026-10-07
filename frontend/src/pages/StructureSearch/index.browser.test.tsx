@@ -167,10 +167,10 @@ describe('StructureSearchPage — criteria form', () => {
     expect(screen.queryByTestId('structure-search-userKmStart')).not.toBeInTheDocument();
   });
 
-  it('is badged as under construction', () => {
+  it('is no longer badged as under construction', () => {
     renderPage();
 
-    expect(screen.getByText('Under construction')).toBeInTheDocument();
+    expect(screen.queryByText('Under construction')).not.toBeInTheDocument();
   });
 
   it('keeps the legacy labels', () => {

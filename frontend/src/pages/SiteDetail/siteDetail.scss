@@ -1,4 +1,5 @@
 @use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/breakpoint' as *;
 
 // Edit, or Cancel and Save, beside the page heading. PageTitle's title row is a flex row whose h1
 // is `width: 100%`, so these are pushed right without saying so; what they need is to not be
@@ -8,4 +9,40 @@
   align-self: center;
   flex-shrink: 0;
   gap: $spacing-03;
+}
+
+// The site's values on a grey panel over the white page — Carbon's layering, layer-01 on the
+// background, as its dashboards set their tiles.
+.site-detail__panel {
+  padding: $spacing-06 $spacing-05;
+  background-color: var(--cds-layer-01);
+
+  @include breakpoint(md) {
+    padding: $spacing-07 $spacing-07;
+  }
+}
+
+// Reading a site, not editing it: each label bold in the primary text colour, its value 0.5rem
+// under it — the structure page's Information tab. Not while editing, where a read-only value has
+// to sit level with the input boxes beside it (see ReadOnlyField).
+.site-detail__panel--view {
+  .read-only-field {
+    gap: 0.5rem;
+  }
+
+  .read-only-field__label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--cds-text-primary);
+  }
+
+  .read-only-field__value {
+    min-block-size: 0;
+  }
+
+  // Rows 2rem apart, as the structure page spaces its values. The form's own gap is for rows of
+  // input boxes, which carry their own height.
+  .site-form__fields {
+    row-gap: $spacing-07;
+  }
 }

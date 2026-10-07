@@ -250,11 +250,9 @@ $label-block-size: 1rem;
 // Wrapping, because Site Detail shows all three where Add Site shows two: the pair plus a checkbox
 // fits, the trio does not, and a second line inside the cell is better than a row that overflows.
 .site-form__narrow-group {
-  // Two columns, because Site Detail puts three members here and two columns is what three of them
-  // need. It costs nothing: the group is the last cell in its row — the coordinates below take a
-  // full-width row of their own — so the columns it spans were empty anyway. At the narrow
-  // breakpoints the grid has fewer columns than this asks for and the browser clamps it.
-  grid-column: span 2;
+  // Kilometres and User Kilometres, together in one column. Capital Road, on Site Detail, takes the
+  // next column as a cell of its own, so it lines up under BCTS BA Responsible rather than trailing
+  // the two boxes. Where the column is too narrow for both boxes, the second wraps under the first.
   display: flex;
   flex-wrap: wrap;
   gap: $spacing-03 $spacing-05;

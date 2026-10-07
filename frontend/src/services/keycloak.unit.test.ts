@@ -50,7 +50,7 @@ beforeEach(() => {
 });
 
 describe('UserManager settings', () => {
-  it('configures PKCE against the issuer, with tokens in sessionStorage', async () => {
+  it('configures PKCE against the issuer, with tokens in localStorage', async () => {
     const { getUserManager } = await loadKeycloak();
     const manager = getUserManager() as unknown as { settings: Record<string, unknown> };
 
@@ -63,6 +63,10 @@ describe('UserManager settings', () => {
       // path rather than racing a background timer.
       automaticSilentRenew: false,
       monitorSession: false,
+      // Shared by every tab, so a page opened in a new tab arrives signed in; the redirect's own
+      // state stays with the tab that started it.
+      userStore: { store: window.localStorage },
+      stateStore: { store: window.sessionStorage },
     });
   });
 

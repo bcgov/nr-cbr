@@ -244,7 +244,6 @@ const StructureSearchPage: FC = () => {
     <Grid fullWidth className="default-grid structure-search-grid">
       <PageTitle
         title="Structure Search"
-        experimental
         subtitle="Find a bridge or culvert by its type, its site, its maintainer or its replacement dates."
         breadCrumbs={[{ name: 'Inventory', path: '/inventory' }]}
       />

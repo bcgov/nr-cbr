@@ -1,5 +1,5 @@
 import { Add, Edit, ListChecked, Save } from '@carbon/icons-react';
-import { Button, Column, Grid, InlineNotification, SkeletonText } from '@carbon/react';
+import { Button, Column, Grid, InlineNotification, Layer, SkeletonText } from '@carbon/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -459,22 +459,32 @@ const SiteDetailPage: FC = () => {
           // which is a different answer from "not read yet".
           <SkeletonText paragraph lineCount={10} data-testid="site-detail-loading" />
         ) : (
-          <SiteForm
-            values={site}
-            errors={errors}
-            warnings={warnings}
-            codeTables={codeTables}
-            codeTablesLoading={referenceData.isLoading}
-            managementAreasLoading={managementAreas.isFetching}
-            isEditable={isEditable}
-            onChange={update}
-            onSettle={markSettled}
-            onSave={save}
-            onFindRoad={() => setFindingRoad(true)}
-            forestServiceRoad={forestServiceRoad}
-            forestServiceRoadLoading={road.forestServiceRoadLoading}
-            roadResolved={road.roadResolved}
-          />
+          // Grey over white, as Carbon lays a page out: the site's values on a layer-01 panel. Inside
+          // Carbon's Layer, so the inputs Edit brings up are white on the grey, as fields on a
+          // raised layer are.
+          <div
+            className={`site-detail__panel${mode === 'view' ? ' site-detail__panel--view' : ''}`}
+            data-testid="site-detail-panel"
+          >
+            <Layer>
+              <SiteForm
+                values={site}
+                errors={errors}
+                warnings={warnings}
+                codeTables={codeTables}
+                codeTablesLoading={referenceData.isLoading}
+                managementAreasLoading={managementAreas.isFetching}
+                isEditable={isEditable}
+                onChange={update}
+                onSettle={markSettled}
+                onSave={save}
+                onFindRoad={() => setFindingRoad(true)}
+                forestServiceRoad={forestServiceRoad}
+                forestServiceRoadLoading={road.forestServiceRoadLoading}
+                roadResolved={road.roadResolved}
+              />
+            </Layer>
+          </div>
         )}
       </Column>
 

@@ -1,25 +1,37 @@
+import { Forum } from '@carbon/icons-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@carbon/react';
+
+import Card from './Card';
 
 import type { StructureComment } from './structureResponse';
 import type { FC } from 'react';
 
 import { formatDateTime } from '@/utils/date';
 
-type Props = { comments: StructureComment[] };
+type Props = {
+  comments: StructureComment[];
+  /** The card's title; the general comments' by default. */
+  title?: string;
+  testId?: string;
+};
 
 /**
- * The structure's general comments, newest first — legacy's "Comments" fieldset on the Details tab
- * (`detailsTab.jsp:821-869`), given a tab of its own here so a long run of comments does not push
- * the load ratings and replacement details down the page.
+ * The structure's general comments, newest first — legacy's "Comments" fieldset, last on its Details
+ * tab (`detailsTab.jsp:821-869`), and last of the Details tab's cards here.
  *
- * <p>Planned-inspection comments are not here: legacy keeps those on the Inspections tab.
+ * <p>Also the Inspections tab's Planned Inspection Comments, under that title: legacy keeps those
+ * there, in the same table.
  */
-const CommentsTab: FC<Props> = ({ comments }) => (
-  <div className="structure-detail__details" data-testid="structure-comments-tab">
+const CommentsCard: FC<Props> = ({
+  comments,
+  title = 'Comments',
+  testId = 'structure-section-comments',
+}) => (
+  <Card title={title} icon={Forum} testId={testId}>
     {comments.length === 0 ? (
       <p className="structure-detail__empty">No comments.</p>
     ) : (
-      <Table size="md" useZebraStyles aria-label="Comments">
+      <Table size="md" useZebraStyles aria-label={title}>
         <TableHead>
           <TableRow>
             <TableHeader>Comment</TableHeader>
@@ -40,7 +52,7 @@ const CommentsTab: FC<Props> = ({ comments }) => (
         </TableBody>
       </Table>
     )}
-  </div>
+  </Card>
 );
 
-export default CommentsTab;
+export default CommentsCard;

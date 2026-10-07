@@ -1,3 +1,4 @@
+import { Building, Pipelines, RecentlyViewed, Renew, Road, Scales } from '@carbon/icons-react';
 import {
   Checkbox,
   Table,
@@ -13,6 +14,8 @@ import { useState } from 'react';
 import ExternalLink from '@/components/core/ExternalLink';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
 
+import Card from './Card';
+import CommentsCard from './CommentsCard';
 import { describe, isOther, money, number, yesNo } from './format';
 import OutstandingPanel from './OutstandingPanel';
 
@@ -24,7 +27,7 @@ import type {
   StructureDetailResponse,
   StructureRef,
 } from './structureResponse';
-import type { FC, ReactNode } from 'react';
+import type { FC } from 'react';
 
 import { formatShortDate } from '@/utils/date';
 
@@ -32,18 +35,6 @@ type Props = {
   structure: StructureDetailResponse;
   outstanding: OutstandingGroup[];
 };
-
-/** A titled block of the tab. */
-const Section: FC<{ title: string; testId: string; children: ReactNode }> = ({
-  title,
-  testId,
-  children,
-}) => (
-  <section className="structure-detail__section" data-testid={testId}>
-    <h2 className="structure-detail__section-title">{title}</h2>
-    {children}
-  </section>
-);
 
 /** A code field, followed by its "If Other, please specify" comment when the code is Other. */
 const codeWithOther = (
@@ -142,8 +133,7 @@ const beforeInstall = (entry: LoadRatingEntry, yearBuilt: number | null): boolea
 
 /**
  * The Details tab, read-only: the structure's own fields, then legacy's fieldsets — Load Rating
- * Details, Replacement History and Replacement Details (`detailsTab.jsp`). Legacy's fourth,
- * Comments, is a tab of its own here — see `CommentsTab`.
+ * Details, Replacement History, Replacement Details and Comments (`detailsTab.jsp`).
  *
  * <p>Bridge or culvert fields by which record the server sent, as the server decides it from the
  * bridge or culvert row. A field with nothing stored shows an em dash; legacy's invented values —
@@ -161,10 +151,10 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
     : loadRating.history.filter((entry) => !beforeInstall(entry, details.yearBuilt));
 
   return (
-    <div className="structure-detail__details" data-testid="structure-details-tab">
+    <div className="structure-detail__tab-panel" data-testid="structure-details-tab">
       <OutstandingPanel groups={outstanding} />
 
-      <Section title="Structure" testId="structure-section-common">
+      <Card title="Structure" icon={Building} testId="structure-section-common">
         <div className="structure-detail__fields">
           <ReadOnlyField label="Built For" value={describe(details.builtBy)} />
           <ReadOnlyField
@@ -189,28 +179,28 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
           <ReadOnlyField label="Installation Cost ($)" value={money(details.installationCost)} />
           <ReadOnlyField label="Material Cost ($)" value={money(details.materialCost)} />
         </div>
-      </Section>
+      </Card>
 
       {bridge && (
-        <Section title="Bridge" testId="structure-section-bridge">
+        <Card title="Bridge" icon={Road} testId="structure-section-bridge">
           <div className="structure-detail__fields">
             <BridgeFields bridge={bridge} />
           </div>
-        </Section>
+        </Card>
       )}
 
       {culvert && (
-        <Section title="Culvert" testId="structure-section-culvert">
+        <Card title="Culvert" icon={Pipelines} testId="structure-section-culvert">
           <div className="structure-detail__fields">
             <CulvertFields
               culvert={culvert}
               woodLog={structure.typeClass.code === WOOD_LOG_CULVERT}
             />
           </div>
-        </Section>
+        </Card>
       )}
 
-      <Section title="Load Rating Details" testId="structure-section-load-rating">
+      <Card title="Load Rating Details" icon={Scales} testId="structure-section-load-rating">
         <div className="structure-detail__fields">
           <ReadOnlyField
             label="Current Load Rating GVW (tonnes)"
@@ -304,9 +294,13 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
             </Table>
           </div>
         )}
-      </Section>
+      </Card>
 
-      <Section title="Replacement History" testId="structure-section-replacement-history">
+      <Card
+        title="Replacement History"
+        icon={RecentlyViewed}
+        testId="structure-section-replacement-history"
+      >
         <div className="structure-detail__fields">
           <ReadOnlyField
             label="This structure replaced structure #"
@@ -317,9 +311,9 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
             value={structureLinks(structure.replacedBy)}
           />
         </div>
-      </Section>
+      </Card>
 
-      <Section title="Replacement Details" testId="structure-section-replacement">
+      <Card title="Replacement Details" icon={Renew} testId="structure-section-replacement">
         <div className="structure-detail__fields">
           <ReadOnlyField
             label="Estimated Closure (year)"
@@ -344,7 +338,9 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
             value={replacement.replacementCostComment}
           />
         </div>
-      </Section>
+      </Card>
+
+      <CommentsCard comments={structure.comments} />
     </div>
   );
 };
