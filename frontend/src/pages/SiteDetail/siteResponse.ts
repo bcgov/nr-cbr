@@ -19,6 +19,8 @@ export type SiteDetailResponse = {
   forestServiceRoad: string | null;
   /** Structures standing on the site — what the Proposed and Deactivated rules turn on. */
   activeStructureCount: number;
+  /** Those structures' ids, oldest first — where Display Structures goes. */
+  activeStructureIds: string[];
   clientNumber: string | null;
   clientLocnCode: string | null;
   maintainerLabel: string | null;

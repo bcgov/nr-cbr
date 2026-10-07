@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.struct.v1;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * One crossing site, as the detail screen reads it.
@@ -25,6 +26,9 @@ import java.math.BigDecimal;
  *                          {@code FIND_STRUCTURES_BY_SITE_ID} — and that procedure ends
  *                          {@code AND S.ACTIVE_IND = 'Y'}, so an archived structure does not
  *                          count here either
+ * @param activeStructureIds the ids of those structures, oldest first. Display Structures opens
+ *                          the structure itself when there is one, and Structure Search filtered
+ *                          to the site when there are several
  */
 public record SiteDetailResponse(
     String siteId,
@@ -42,6 +46,7 @@ public record SiteDetailResponse(
     String roadSectionId,
     String forestServiceRoad,
     long activeStructureCount,
+    List<String> activeStructureIds,
     String clientNumber,
     String clientLocnCode,
     String maintainerLabel,

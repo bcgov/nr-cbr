@@ -20,6 +20,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.SiteCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteUpdateRequest;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -296,6 +297,10 @@ public class SiteService {
   public SiteDetailResponse findById(String siteId) {
     CrossingSiteEntity site = crossingSiteRepository.findById(siteId)
         .orElseThrow(() -> new SiteNotFoundException(siteId));
+    List<String> structureIds = crossingStructureRepository
+        .findIdsByCrossingSiteIdAndActiveInd(site.getCrossingSiteId(), ACTIVE).stream()
+        .map(String::valueOf)
+        .toList();
 
     return new SiteDetailResponse(
         site.getCrossingSiteId(),
@@ -314,8 +319,8 @@ public class SiteService {
         // Null whenever the road-section snapshot does not carry this pair — a stale mview, not an
         // error. The mapping reads a dangling reference as "no road section"; so does legacy.
         site.getRoadSection() == null ? null : site.getRoadSection().getRoadSectName(),
-        crossingStructureRepository.countByCrossingSiteIdAndActiveInd(
-            site.getCrossingSiteId(), ACTIVE),
+        structureIds.size(),
+        structureIds,
         site.getClientNumber(),
         site.getClientLocnCode(),
         maintainerLabel(site),

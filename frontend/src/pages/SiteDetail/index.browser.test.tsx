@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SiteDetailPage from './index';
@@ -57,6 +57,7 @@ const response = {
   forestFileId: 'R00123',
   roadSectionId: '01',
   forestServiceRoad: 'Bowron FSR',
+  activeStructureIds: ['4021'],
   clientNumber: '00001012',
   clientLocnCode: '01',
   maintainerLabel: 'CANFOR CORPORATION \u00b7 Prince George \u00b7 00001012-01',
@@ -69,6 +70,14 @@ const response = {
   pointOfAccessDescription: 'Helicopter required to reach the cove.',
   ntsMapSheetNumber: '92P/10',
   trimMapSheetNumber: '093G025',
+};
+
+/** A stand-in destination that shows where navigation landed, query string included. */
+const Arrived = () => {
+  const location = useLocation();
+  const state = location.state as { fromSiteId?: string } | null;
+  const from = state?.fromSiteId ? ` from ${state.fromSiteId}` : '';
+  return <p data-testid="arrived">{`${location.pathname}${location.search}${from}`}</p>;
 };
 
 /**
@@ -89,10 +98,8 @@ const renderPage = async ({ canEdit = false, canDelete = false } = {}) => {
             path="/inventory/site/:siteId/add-structure"
             element={<p data-testid="arrived">add structure</p>}
           />
-          <Route
-            path="/inventory/structure-search"
-            element={<p data-testid="arrived">structure search</p>}
-          />
+          <Route path="/inventory/structure/:structureId" element={<Arrived />} />
+          <Route path="/inventory/structure-search" element={<Arrived />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -261,12 +268,34 @@ describe('SiteDetailPage — the structure actions', () => {
     expect(await screen.findByTestId('arrived')).toHaveTextContent('add structure');
   });
 
-  it('opens Structure Search from Display Structures', async () => {
+  it('opens the structure itself when the site has one', async () => {
     await renderPage();
 
     fireEvent.click(screen.getByTestId('site-detail-structures'));
 
-    expect(await screen.findByTestId('arrived')).toHaveTextContent('structure search');
+    // Carrying the site, so the structure's breadcrumb leads back here.
+    expect(await screen.findByTestId('arrived')).toHaveTextContent(
+      '/inventory/structure/4021 from BOWRON-001',
+    );
+  });
+
+  it('opens Structure Search filtered to the site when it has several', async () => {
+    // A site can hold several culverts at once; legacy lists them through the search.
+    siteApi.getSite.mockResolvedValue({ ...response, activeStructureIds: ['4021', '4022'] });
+    await renderPage();
+
+    fireEvent.click(screen.getByTestId('site-detail-structures'));
+
+    expect(await screen.findByTestId('arrived')).toHaveTextContent(
+      '/inventory/structure-search?siteId=BOWRON-001',
+    );
+  });
+
+  it('leaves Display Structures off a site with no structures', async () => {
+    siteApi.getSite.mockResolvedValue({ ...response, activeStructureIds: [] });
+    await renderPage();
+
+    expect(screen.queryByTestId('site-detail-structures')).not.toBeInTheDocument();
   });
 });
 

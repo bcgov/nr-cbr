@@ -1,5 +1,5 @@
 import { Column, Grid, InlineNotification } from '@carbon/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import DestructiveModal from '@/components/core/DestructiveModal';
 import PageTitle from '@/components/core/PageTitle';
@@ -30,6 +30,7 @@ import {
 } from '@/hooks/useConfiguration';
 import { useDeleteSite, useSiteSearch } from '@/hooks/useSiteSearch';
 import { apiErrorMessage } from '@/utils/apiError';
+import { readSessionState, writeSessionState } from '@/utils/sessionState';
 
 /**
  * Site Search — the first screen of the Inventory section.
@@ -44,11 +45,44 @@ import { apiErrorMessage } from '@/utils/apiError';
  * <p>Deleting a site is a hard delete and cannot be undone — see `SiteService.delete`. It is
  * reachable only to a role holding the destructive capability, and only behind a confirmation.
  */
+/** Where the page keeps its search for the tab. */
+export const SITE_SEARCH_STATE_KEY = 'cbr.siteSearch';
+
+/** What is kept, so leaving for a site and coming back finds the search as it was left. */
+type SavedSiteSearch = {
+  criteria: SiteSearchCriteria;
+  submitted: SiteSearchCriteria | null;
+  page: number;
+  pageSize: number;
+  sort: SiteSort | null;
+};
+
+/**
+ * The search kept for this tab, if any. Criteria are laid over the empty set, so a search saved
+ * before a criterion was added still restores, with the new one blank.
+ */
+const restoreSearch = (): SavedSiteSearch | null => {
+  const saved = readSessionState<Partial<SavedSiteSearch>>(SITE_SEARCH_STATE_KEY);
+  if (!saved) return null;
+  return {
+    criteria: { ...EMPTY_CRITERIA, ...saved.criteria },
+    submitted: saved.submitted ? { ...EMPTY_CRITERIA, ...saved.submitted } : null,
+    page: saved.page ?? 1,
+    pageSize: saved.pageSize ?? 20,
+    sort: saved.sort ?? null,
+  };
+};
+
 const SiteSearchPage: FC = () => {
   const { canDelete } = useAuthorization();
   const { display } = useNotification();
 
-  const [criteria, setCriteria] = useState<SiteSearchCriteria>(EMPTY_CRITERIA);
+  // The last search in this tab comes back with the page — through the breadcrumb, the side nav or
+  // Back — so a user who opened a site from the results can return to them. Reset forgets it.
+  const [restored] = useState(restoreSearch);
+  const [criteria, setCriteria] = useState<SiteSearchCriteria>(
+    restored?.criteria ?? EMPTY_CRITERIA,
+  );
   /**
    * The criteria the current results belong to — a snapshot taken when Search was pressed.
    *
@@ -57,11 +91,23 @@ const SiteSearchPage: FC = () => {
    * silently change what the visible results claim to be. `null` means no search has been run,
    * which is what keeps the results table off the screen entirely.
    */
-  const [submitted, setSubmitted] = useState<SiteSearchCriteria | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [submitted, setSubmitted] = useState<SiteSearchCriteria | null>(
+    restored?.submitted ?? null,
+  );
+  const [page, setPage] = useState(restored?.page ?? 1);
+  const [pageSize, setPageSize] = useState(restored?.pageSize ?? 20);
   /** The header the results are sorted by. Kept across new searches; cleared by Reset. */
-  const [sort, setSort] = useState<SiteSort | null>(null);
+  const [sort, setSort] = useState<SiteSort | null>(restored?.sort ?? null);
+
+  useEffect(() => {
+    writeSessionState(SITE_SEARCH_STATE_KEY, {
+      criteria,
+      submitted,
+      page,
+      pageSize,
+      sort,
+    } satisfies SavedSiteSearch);
+  }, [criteria, submitted, page, pageSize, sort]);
   const [pendingDelete, setPendingDelete] = useState<SiteSearchResult | null>(null);
   /**
    * Incremented by {@link reset}, to remount the one control that cannot be cleared by emptying the

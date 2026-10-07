@@ -1,0 +1,194 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type';
+
+// The status pills read beside the heading, as nr-frep's checklist pages place theirs: the heading
+// at its own width rather than the page's, and everything on the heading's centre line. The shared
+// PageTitle stretches the heading so other pages can push their actions to the far edge; this page
+// has none there, and a stretched row also stretched the pills to the heading's height.
+.structure-detail .page-title-col .title-container {
+  align-items: center;
+  flex-wrap: wrap;
+
+  h1 {
+    width: auto;
+  }
+}
+
+// Label and value close together, as nr-frep's record pages set them (0.25rem). ReadOnlyField's own
+// spacing is for forms, where it holds a value level with the input boxes beside it — a 2.5rem band
+// with the value centred, which on a page with no inputs only opens a gap under every label.
+.structure-detail .read-only-field {
+  gap: 0.25rem;
+}
+
+.structure-detail .read-only-field__value {
+  min-block-size: 0;
+}
+
+// A page of values, laid out in the four-column grid Site Detail and the search screens use, so the
+// structure reads like the site beside it. Steps to two columns, then one, at Carbon's lg and md.
+.structure-detail__header,
+.structure-detail__fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: $spacing-05;
+  align-items: start;
+
+  @media (max-width: 1055px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Page-level notice above the tabs (see OutstandingSummary). The subtitle is a sentence, so it gets
+// a line of its own under the title rather than wrapping around it.
+.structure-detail__outstanding-summary {
+  max-inline-size: 100%;
+
+  .cds--inline-notification__text-wrapper {
+    flex-wrap: wrap;
+  }
+
+  .cds--inline-notification__subtitle {
+    flex: 0 0 100%;
+    margin-block-start: 0.125rem;
+  }
+}
+
+// The tab label and its count badge on one line.
+.structure-detail__tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-03;
+}
+
+.structure-detail__tab-count {
+  flex: 0 0 auto;
+}
+
+.structure-detail__details {
+  padding-block: $spacing-06;
+}
+
+// What the structure is missing (see OutstandingPanel): reference material, not an alert, so no
+// notification chrome — a link-styled toggle over a plain list, as nr-frep's checklist tabs have.
+.structure-detail__outstanding {
+  margin-block-end: $spacing-06;
+}
+
+.structure-detail__outstanding-toggle {
+  @include type.type-style('body-compact-01');
+
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-02;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--cds-link-primary);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--cds-link-primary-hover);
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: 2px;
+  }
+}
+
+.structure-detail__outstanding-body {
+  margin-block-start: $spacing-03;
+}
+
+.structure-detail__outstanding-group + .structure-detail__outstanding-group {
+  margin-block-start: $spacing-04;
+}
+
+.structure-detail__outstanding-title {
+  @include type.type-style('body-compact-01');
+
+  font-weight: 600;
+  margin-block-end: 0.125rem;
+}
+
+.structure-detail__outstanding-list {
+  @include type.type-style('body-compact-01');
+
+  padding-inline-start: 1.125rem;
+  list-style: disc;
+}
+
+// Legacy's fieldsets, as titled sections down the tab.
+.structure-detail__section + .structure-detail__section {
+  margin-block-start: $spacing-07;
+}
+
+.structure-detail__section-title {
+  @include type.type-style('heading-compact-02');
+
+  margin-block-end: $spacing-05;
+}
+
+// A field that needs the full width — a free-text comment.
+.structure-detail__wide {
+  margin-block-start: $spacing-05;
+}
+
+.structure-detail__empty,
+.structure-detail__note {
+  @include type.type-style('body-compact-01');
+
+  color: var(--cds-text-secondary);
+}
+
+.structure-detail__note {
+  margin-block: $spacing-04;
+}
+
+// Short values kept on one line — an IDIR ID, a date and time, a rating — so they take the width
+// they need and the long column beside them (a comment, a load rating's reason) takes the rest. Without this a long comment claimed nearly the whole
+// row and squeezed the date into a column of single words.
+.structure-detail__nowrap {
+  white-space: nowrap;
+}
+
+// Long comments wrap rather than stretching the table across the page.
+.structure-detail__comment {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+// The load rating history — its checkbox and its table — set apart from the fields above it, and
+// the checkbox from the table below.
+.structure-detail__history {
+  margin-block-start: $spacing-07;
+}
+
+// On a wrapper rather than on Carbon's checkbox: Carbon's own `:last-of-type` rule outranks a margin
+// set on the checkbox itself.
+.structure-detail__history-toggle {
+  margin-block-end: $spacing-05;
+}
+
+// Legacy shows the current load rating in bold; here bold and tagged, so it does not rest on weight
+// alone.
+.structure-detail__current-rating td:first-child {
+  font-weight: 600;
+}
+
+.structure-detail__current-tag {
+  margin-inline-start: $spacing-03;
+}
+
+// Several structure links in one value, separated so they read as a list.
+.structure-detail__links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: $spacing-03;
+}

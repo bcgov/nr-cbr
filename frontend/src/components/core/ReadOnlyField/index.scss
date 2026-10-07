@@ -21,10 +21,11 @@
   color: var(--#{vars.$bcgov-prefix}-text-secondary);
 }
 
-// Body text, not the 14px of an input's own value: this is something to read, not something that
-// looks like it could be typed into.
+// Carbon's `body-compact-01` — 14px — as nr-frep's record headers set their values. Measured
+// against nr-frep rather than chosen: its tombstone values are plain text in a Carbon Tile, which
+// gives them this style, and a read-only page set larger reads as a different application.
 .read-only-field__value {
-  @include type.type-style('body-02');
+  @include type.type-style('body-compact-01');
 
   // A band the height of a Carbon `md` field, with the value centred in it — so a read-only cell
   // puts its text where the input beside it puts its own, and a row of mixed cells reads as one
