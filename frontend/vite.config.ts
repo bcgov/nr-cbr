@@ -231,7 +231,12 @@ export default defineConfig(({ mode }) => {
             // leaving the runner enough headroom to start them. Left uncapped locally, where
             // there are cores to spare.
             // (Vitest 4 dropped `minWorkers`; the floor is one worker regardless.)
-            ...(process.env.CI ? { maxWorkers: 2 } : {}),
+            //
+            // A group of its own when capped: Vitest 5 will not run two projects with different
+            // `maxWorkers` side by side, and fails the run before any test starts ("have different
+            // 'maxWorkers' but same 'sequence.groupOrder'"). The node project, in group 0, runs
+            // first; this one after it.
+            ...(process.env.CI ? { maxWorkers: 2, sequence: { groupOrder: 1 } } : {}),
           },
         },
       ],
