@@ -19,4 +19,7 @@ public interface CrossingStructureFileDetailRepository
   List<CrossingStructureFileDetailEntity> findByInspectionId(Long inspectionId);
 
   void deleteByInspectionId(Long inspectionId);
+
+  /** A structure's attachments, its own and its inspections' — the Documents &amp; Photos tab. */
+  List<CrossingStructureFileDetailEntity> findByCrossingStructureId(Long crossingStructureId);
 }

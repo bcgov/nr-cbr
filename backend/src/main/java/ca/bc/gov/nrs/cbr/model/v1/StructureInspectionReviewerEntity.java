@@ -36,4 +36,11 @@ public class StructureInspectionReviewerEntity {
 
   @Column(name = "USERID", length = 30)
   private String userid;
+
+  /** With {@link #lastName}, the Inspections tab's Reviewed By. */
+  @Column(name = "FIRST_NAME", length = 50)
+  private String firstName;
+
+  @Column(name = "LAST_NAME", length = 50)
+  private String lastName;
 }

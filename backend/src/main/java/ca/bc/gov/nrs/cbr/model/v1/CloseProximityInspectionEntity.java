@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -38,6 +39,14 @@ public class CloseProximityInspectionEntity {
 
   @Column(name = "CROSSING_SITE_ID", length = 14)
   private String crossingSiteId;
+
+  /** When the close proximity inspection was done — listed on the Inspections tab. */
+  @Column(name = "COMPLETION_DATE")
+  private LocalDate completionDate;
+
+  /** Who recorded it — the tab's IDIR ID. */
+  @Column(name = "ENTRY_USERID", length = 30)
+  private String entryUserid;
 
   /**
    * The structure this belongs to. Mapped for one reason: a structure with any of these cannot be
