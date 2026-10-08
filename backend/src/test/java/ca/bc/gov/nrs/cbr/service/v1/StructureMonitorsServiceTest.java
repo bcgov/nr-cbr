@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ca.bc.gov.nrs.cbr.exception.MonitorNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitorFrequencyCodeEntity;
@@ -70,7 +71,7 @@ class StructureMonitorsServiceTest {
   private PagedResponse<Monitor> monitors(View view) {
     entityManager.flush();
     entityManager.clear();
-    return service.monitors(7L, view, 0, 10);
+    return service.monitors(7L, view, 0, 10, false).page();
   }
 
   @Test
@@ -113,7 +114,7 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    PagedResponse<Monitor> second = service.monitors(7L, View.ALL, 1, 10);
+    PagedResponse<Monitor> second = service.monitors(7L, View.ALL, 1, 10, false).page();
 
     assertThat(second.content()).extracting(Monitor::number).containsExactly(2L, 1L);
     assertThat(second.totalElements()).isEqualTo(12);
@@ -144,9 +145,79 @@ class StructureMonitorsServiceTest {
   }
 
   @Test
+  @DisplayName("leaves out items from inspections on or before the install year, and counts them, "
+      + "as legacy does until its box is ticked")
+  void beforeInstallLeftOutAndCounted() {
+    entityManager.createQuery(
+        "UPDATE CrossingStructureEntity s SET s.yearBuilt = 2010 WHERE s.crossingStructureId = 7")
+        .executeUpdate();
+    givenInspection(10L, LocalDate.of(2005, 6, 1));
+    givenInspection(11L, LocalDate.of(2010, 1, 1));
+    givenInspection(12L, LocalDate.of(2015, 6, 1));
+    givenMonitor(1L, 10L, "REQ");
+    givenMonitor(2L, 11L, "REQ");
+    givenMonitor(3L, 12L, "REQ");
+    givenMonitor(4L, null, "REQ");
+    entityManager.flush();
+    entityManager.clear();
+
+    var shown = service.monitors(7L, View.ALL, 0, 10, false);
+    var all = service.monitors(7L, View.ALL, 0, 10, true);
+
+    // 1 January of the install year is not "after" it; no inspection is always listed.
+    assertThat(shown.page().content()).extracting(Monitor::id).containsExactlyInAnyOrder("3", "4");
+    assertThat(shown.page().totalElements()).isEqualTo(2);
+    assertThat(shown.beforeInstallCount()).isEqualTo(2);
+    assertThat(all.page().content()).hasSize(4);
+  }
+
+  @Test
+  @DisplayName("leaves nothing out when the structure has no install year, as legacy does")
+  void noInstallYear() {
+    givenInspection(10L, LocalDate.of(1990, 6, 1));
+    givenMonitor(1L, 10L, "REQ");
+    entityManager.flush();
+    entityManager.clear();
+
+    var listing = service.monitors(7L, View.ALL, 0, 10, false);
+
+    assertThat(listing.page().content()).hasSize(1);
+    assertThat(listing.beforeInstallCount()).isZero();
+  }
+
+  @Test
+  @DisplayName("deletes one item of the structure, leaving the others")
+  void deletes() {
+    givenMonitor(1L, null, "REQ");
+    givenMonitor(2L, null, "REQ");
+    entityManager.flush();
+    entityManager.clear();
+
+    service.delete(7L, 1L);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(service.monitors(7L, View.ALL, 0, 10, false).page().content())
+        .extracting(Monitor::id).containsExactly("2");
+  }
+
+  @Test
+  @DisplayName("refuses to delete an item under a structure it does not belong to, or none at all")
+  void deleteOnlyThroughItsStructure() {
+    givenMonitor(1L, null, "REQ");
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThatThrownBy(() -> service.delete(8L, 1L))
+        .isInstanceOf(MonitorNotFoundException.class);
+    assertThatThrownBy(() -> service.delete(7L, 99L))
+        .isInstanceOf(MonitorNotFoundException.class);
+  }
+
+  @Test
   @DisplayName("refuses a structure that does not exist")
   void missingStructure() {
-    assertThatThrownBy(() -> service.monitors(404L, View.ALL, 0, 10))
+    assertThatThrownBy(() -> service.monitors(404L, View.ALL, 0, 10, false).page())
         .isInstanceOf(StructureNotFoundException.class);
   }
 }

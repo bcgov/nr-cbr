@@ -1,3 +1,4 @@
+import type { PagedResponse } from '@/types/api';
 import type { FC } from 'react';
 
 import { formatShortDate } from '@/utils/date';
@@ -14,6 +15,16 @@ export type Audited = {
 
 /** Which items the Repairs and Monitoring tabs list — legacy's "Choose Viewing Option". */
 export type ItemView = 'OUTSTANDING' | 'ALL';
+
+/**
+ * A page of repairs or monitoring items, and how many the table leaves out because they predate
+ * the superstructure — the backend's `Listing`.
+ */
+export type ItemListing<T> = {
+  page: PagedResponse<T>;
+  /** In the view chosen; 0 when the structure has no install year. */
+  beforeInstallCount: number;
+};
 
 const STEPS: { key: keyof Audited; label: string }[] = [
   { key: 'suggested', label: 'Suggested' },

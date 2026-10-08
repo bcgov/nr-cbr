@@ -14,6 +14,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeOrderRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse.Listing;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse.Repair;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse.View;
 import ca.bc.gov.nrs.cbr.struct.v1.UserAudit;
@@ -66,7 +67,9 @@ public class StructureRepairsService {
   }
 
   /**
-   * A page of the structure's repairs, in legacy's order.
+   * A page of the structure's repairs, in legacy's order. Those raised by an inspection from before
+   * the superstructure went in are left out unless {@code includeBeforeInstall} — legacy's
+   * "Show Inspections before the Superstructure Install Date".
    *
    * @param view       outstanding only, or all
    * @param pageNumber zero-based
@@ -74,12 +77,14 @@ public class StructureRepairsService {
    * @throws StructureNotFoundException if there is no such structure
    */
   @Transactional(readOnly = true)
-  public PagedResponse<Repair> repairs(long structureId, View view, int pageNumber, int pageSize) {
-    if (!structures.existsById(structureId)) {
-      throw new StructureNotFoundException(structureId);
-    }
+  public Listing repairs(long structureId, View view, int pageNumber, int pageSize,
+      boolean includeBeforeInstall) {
+    InstallCutoff cutoff = InstallCutoff.of(structures.findById(structureId)
+        .orElseThrow(() -> new StructureNotFoundException(structureId)));
+    boolean outstandingOnly = view == View.OUTSTANDING;
     Page<StructureRepairEntity> page = repairs.findPageByStructure(
-        structureId, view == View.OUTSTANDING, OUTSTANDING_STATUSES,
+        structureId, outstandingOnly, OUTSTANDING_STATUSES,
+        includeBeforeInstall || cutoff.none(), cutoff.installed(),
         PageRequest.of(Math.max(pageNumber, 0), Math.clamp(pageSize, 1, MAX_PAGE_SIZE)));
     List<StructureRepairEntity> rows = page.getContent();
 
@@ -117,8 +122,13 @@ public class StructureRepairsService {
             units.get(repair.getStructureRepairTypeCode()),
             repair.getDescription()))
         .toList();
-    return new PagedResponse<>(content, page.getTotalElements(), page.getTotalPages(),
-        page.getNumber(), page.getSize());
+    return new Listing(
+        new PagedResponse<>(content, page.getTotalElements(), page.getTotalPages(),
+            page.getNumber(), page.getSize()),
+        cutoff.none()
+            ? 0
+            : repairs.countBeforeInstall(
+                structureId, outstandingOnly, OUTSTANDING_STATUSES, cutoff.installed()));
   }
 
   /** Each code on the page with its description (or other column), read in one query. */

@@ -1,5 +1,6 @@
 import { Tools } from '@carbon/icons-react';
 import {
+  Checkbox,
   InlineNotification,
   Pagination,
   RadioButton,
@@ -112,8 +113,17 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
   const [view, setView] = useState<RepairView>('OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  /** Legacy's "Show Inspections before the Superstructure Install Date". */
+  const [includeBeforeInstall, setIncludeBeforeInstall] = useState(false);
   // Carbon's Pagination is one-based; the backend is zero-based.
-  const loaded = useStructureRepairs(structureId, opened, view, page - 1, pageSize);
+  const loaded = useStructureRepairs(
+    structureId,
+    opened,
+    view,
+    page - 1,
+    pageSize,
+    includeBeforeInstall,
+  );
 
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-repairs-tab">
@@ -138,6 +148,23 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
           </RadioButtonGroup>
         </div>
 
+        {/* As legacy's, and as the inspection table's: items raised by an inspection from before
+            the superstructure went in are left out until asked for. Shown while there are any,
+            or while they are being shown. */}
+        {((loaded.data?.beforeInstallCount ?? 0) > 0 || includeBeforeInstall) && (
+          <div className="structure-detail__history-toggle">
+            <Checkbox
+              id="structure-show-early-repairs"
+              labelText={`Show repairs from before the superstructure was installed (${loaded.data?.beforeInstallCount ?? 0})`}
+              checked={includeBeforeInstall}
+              onChange={(_, { checked }) => {
+                setIncludeBeforeInstall(checked);
+                setPage(1);
+              }}
+            />
+          </div>
+        )}
+
         {loaded.isError && (
           <InlineNotification
             kind="error"
@@ -155,12 +182,12 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
         )}
         {loaded.data && (
           <>
-            <RepairsTable rows={loaded.data.content} view={view} />
+            <RepairsTable rows={loaded.data.page.content} view={view} />
             <Pagination
               page={page}
               pageSize={pageSize}
               pageSizes={PAGE_SIZES}
-              totalItems={loaded.data.totalElements}
+              totalItems={loaded.data.page.totalElements}
               onChange={({ page: nextPage, pageSize: nextPageSize }) => {
                 setPage(nextPage);
                 setPageSize(nextPageSize);

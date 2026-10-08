@@ -8,6 +8,7 @@ import type { MonitorView, StructureMonitor } from '@/pages/StructureDetail/moni
 import type { RepairView, StructureRepair } from '@/pages/StructureDetail/repairsResponse';
 import type { SpansAndPiersResponse } from '@/pages/StructureDetail/spansAndPiersResponse';
 import type { StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
+import type { ItemListing } from '@/pages/StructureDetail/UserAudits';
 import type {
   PagedResponse,
   StructureSearchCriteria,
@@ -183,18 +184,20 @@ export class StructureSearchService extends HttpClient {
    *
    * @param view outstanding only, or all
    * @param pageNumber zero-based, as the backend expects
+   * @param includeBeforeInstall also those raised before the superstructure went in
    */
   getStructureRepairs(
     structureId: string,
     view: RepairView,
     pageNumber: number,
     pageSize: number,
-  ): CancelablePromise<PagedResponse<StructureRepair>> {
-    return this.doRequest<PagedResponse<StructureRepair>>(this.config, {
+    includeBeforeInstall: boolean,
+  ): CancelablePromise<ItemListing<StructureRepair>> {
+    return this.doRequest<ItemListing<StructureRepair>>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/repairs',
       path: { structureId },
-      query: { view, pageNumber, pageSize },
+      query: { view, pageNumber, pageSize, includeBeforeInstall },
     });
   }
 
@@ -203,18 +206,29 @@ export class StructureSearchService extends HttpClient {
    *
    * @param view outstanding only, or all
    * @param pageNumber zero-based, as the backend expects
+   * @param includeBeforeInstall also those raised before the superstructure went in
    */
   getStructureMonitors(
     structureId: string,
     view: MonitorView,
     pageNumber: number,
     pageSize: number,
-  ): CancelablePromise<PagedResponse<StructureMonitor>> {
-    return this.doRequest<PagedResponse<StructureMonitor>>(this.config, {
+    includeBeforeInstall: boolean,
+  ): CancelablePromise<ItemListing<StructureMonitor>> {
+    return this.doRequest<ItemListing<StructureMonitor>>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/monitors',
       path: { structureId },
-      query: { view, pageNumber, pageSize },
+      query: { view, pageNumber, pageSize, includeBeforeInstall },
+    });
+  }
+
+  /** Deletes one monitoring item of a structure. 404 when the structure has no such item. */
+  deleteStructureMonitor(structureId: string, monitorId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/monitors/{monitorId}',
+      path: { structureId, monitorId },
     });
   }
 }

@@ -13,6 +13,16 @@ public final class StructureMonitorsResponse {
 
   private StructureMonitorsResponse() {}
 
+  /**
+   * A page of monitoring items, and how many the table leaves out because they predate the
+   * superstructure.
+   *
+   * @param beforeInstallCount in the view chosen, those raised by an inspection dated on or before
+   *                           1 January of the year the superstructure was installed — the ones
+   *                           listed only when asked for; 0 when no install year is recorded
+   */
+  public record Listing(PagedResponse<Monitor> page, long beforeInstallCount) {}
+
   /** Which items the tab lists — legacy's "Choose Viewing Option". */
   public enum View {
     /** Suggested or required. Legacy's default. */

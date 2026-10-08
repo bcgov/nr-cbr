@@ -198,14 +198,17 @@ public interface StructureApiEndpoint {
    * @param view        {@code OUTSTANDING} or {@code ALL} — legacy's "Choose Viewing Option"
    * @param pageNumber  zero-based
    * @param pageSize    held to between 1 and 100
+   * @param includeBeforeInstall legacy's "Show Inspections before the Superstructure Install Date"
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/repairs")
-  PagedResponse<StructureRepairsResponse.Repair> getRepairs(
+  StructureRepairsResponse.Listing getRepairs(
       @PathVariable("structureId") long structureId,
       @RequestParam(name = "view", defaultValue = "OUTSTANDING") StructureRepairsResponse.View view,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize);
+      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
+      @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
+      boolean includeBeforeInstall);
 
   /**
    * A page of the structure's monitoring items — legacy's Monitoring tab, paged here. Outstanding
@@ -217,13 +220,32 @@ public interface StructureApiEndpoint {
    * @param view        {@code OUTSTANDING} or {@code ALL} — legacy's "Choose Viewing Option"
    * @param pageNumber  zero-based
    * @param pageSize    held to between 1 and 100
+   * @param includeBeforeInstall legacy's "Show Inspections before the Superstructure Install Date"
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/monitors")
-  PagedResponse<StructureMonitorsResponse.Monitor> getMonitors(
+  StructureMonitorsResponse.Listing getMonitors(
       @PathVariable("structureId") long structureId,
       @RequestParam(name = "view", defaultValue = "OUTSTANDING")
       StructureMonitorsResponse.View view,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize);
+      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
+      @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
+      boolean includeBeforeInstall);
+
+  /**
+   * Deletes one monitoring item — legacy's delete icon on the Monitoring tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — legacy's {@code /deleteStructureMonitor},
+   * {@code REGIONAL_ENGINEER}. <b>204</b> on success; <b>404</b> when the structure has no such
+   * item.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the item belongs to
+   * @param monitorId   the item's {@code MONITOR_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{structureId}/monitors/{monitorId}")
+  ResponseEntity<Void> deleteMonitor(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("monitorId") long monitorId);
 }

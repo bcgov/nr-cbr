@@ -132,14 +132,23 @@ public class StructureApiController implements StructureApiEndpoint {
   }
 
   @Override
-  public PagedResponse<StructureRepairsResponse.Repair> getRepairs(
-      long structureId, StructureRepairsResponse.View view, int pageNumber, int pageSize) {
-    return repairsService.repairs(structureId, view, pageNumber, pageSize);
+  public StructureRepairsResponse.Listing getRepairs(long structureId,
+      StructureRepairsResponse.View view, int pageNumber, int pageSize,
+      boolean includeBeforeInstall) {
+    return repairsService.repairs(structureId, view, pageNumber, pageSize, includeBeforeInstall);
   }
 
   @Override
-  public PagedResponse<StructureMonitorsResponse.Monitor> getMonitors(
-      long structureId, StructureMonitorsResponse.View view, int pageNumber, int pageSize) {
-    return monitorsService.monitors(structureId, view, pageNumber, pageSize);
+  public StructureMonitorsResponse.Listing getMonitors(long structureId,
+      StructureMonitorsResponse.View view, int pageNumber, int pageSize,
+      boolean includeBeforeInstall) {
+    return monitorsService.monitors(
+        structureId, view, pageNumber, pageSize, includeBeforeInstall);
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteMonitor(long structureId, long monitorId) {
+    monitorsService.delete(structureId, monitorId);
+    return ResponseEntity.noContent().build();
   }
 }

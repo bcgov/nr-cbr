@@ -1,5 +1,7 @@
-import { View } from '@carbon/icons-react';
+import { TrashCan, View } from '@carbon/icons-react';
 import {
+  Button,
+  Checkbox,
   InlineNotification,
   Pagination,
   RadioButton,
@@ -14,6 +16,7 @@ import {
 } from '@carbon/react';
 import { useState } from 'react';
 
+import DestructiveModal from '@/components/core/DestructiveModal';
 import ExternalLink from '@/components/core/ExternalLink';
 
 import Card from './Card';
@@ -23,7 +26,9 @@ import UserAudits from './UserAudits';
 import type { MonitorView, StructureMonitor } from './monitorsResponse';
 import type { FC } from 'react';
 
-import { useStructureMonitors } from '@/hooks/useStructureSearch';
+import { useNotification } from '@/context/notification/useNotification';
+import { useAuthorization } from '@/hooks/useAuthorization';
+import { useDeleteStructureMonitor, useStructureMonitors } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
 
@@ -36,8 +41,16 @@ type Props = {
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZES = [10, 20, 50];
 
+type TableProps = {
+  rows: StructureMonitor[];
+  view: MonitorView;
+  /** Shows the Actions column — only to a user who may delete. */
+  canDelete: boolean;
+  onDelete: (monitor: StructureMonitor) => void;
+};
+
 /** The page of monitoring items, or a line saying there are none in this view. */
-const MonitorsTable: FC<{ rows: StructureMonitor[]; view: MonitorView }> = ({ rows, view }) => {
+const MonitorsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
   if (rows.length === 0) {
     return (
       <p className="structure-detail__empty">
@@ -58,6 +71,9 @@ const MonitorsTable: FC<{ rows: StructureMonitor[]; view: MonitorView }> = ({ ro
             <TableHeader className="structure-detail__nowrap">Inspection Date</TableHeader>
             <TableHeader>Description</TableHeader>
             <TableHeader>Monitoring Frequency</TableHeader>
+            {/* Only for a user who may delete, as Site Search's is: an action that cannot be
+                performed is not shown, and an empty column is noise. */}
+            {canDelete && <TableHeader>Actions</TableHeader>}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -82,6 +98,24 @@ const MonitorsTable: FC<{ rows: StructureMonitor[]; view: MonitorView }> = ({ ro
                   .filter(Boolean)
                   .join(' — ')}
               </TableCell>
+              {canDelete && (
+                <TableCell className="structure-detail__nowrap">
+                  {/* danger--ghost, as Site Search's delete: red at rest and on hover, so it reads
+                      as destructive before it is pressed. */}
+                  <Button
+                    kind="danger--ghost"
+                    size="sm"
+                    renderIcon={TrashCan}
+                    data-testid={`structure-monitor-delete-${monitor.id}`}
+                    onClick={() => onDelete(monitor)}
+                  >
+                    Delete{' '}
+                    <span className="cds--visually-hidden">
+                      monitoring item {number(monitor.number)}
+                    </span>
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -99,11 +133,25 @@ const MonitorsTable: FC<{ rows: StructureMonitor[]; view: MonitorView }> = ({ ro
  * choosing All on one does not change what the other lists.
  */
 const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
+  const { canDelete } = useAuthorization();
+  const { display } = useNotification();
+  const deleteMonitor = useDeleteStructureMonitor(structureId);
+  /** The item whose delete is being confirmed, if any. */
+  const [pendingDelete, setPendingDelete] = useState<StructureMonitor | null>(null);
   const [view, setView] = useState<MonitorView>('OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  /** Legacy's "Show Inspections before the Superstructure Install Date". */
+  const [includeBeforeInstall, setIncludeBeforeInstall] = useState(false);
   // Carbon's Pagination is one-based; the backend is zero-based.
-  const loaded = useStructureMonitors(structureId, opened, view, page - 1, pageSize);
+  const loaded = useStructureMonitors(
+    structureId,
+    opened,
+    view,
+    page - 1,
+    pageSize,
+    includeBeforeInstall,
+  );
 
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-monitoring-tab">
@@ -128,6 +176,23 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
           </RadioButtonGroup>
         </div>
 
+        {/* As legacy's, and as the inspection table's: items raised by an inspection from before
+            the superstructure went in are left out until asked for. Shown while there are any,
+            or while they are being shown. */}
+        {((loaded.data?.beforeInstallCount ?? 0) > 0 || includeBeforeInstall) && (
+          <div className="structure-detail__history-toggle">
+            <Checkbox
+              id="structure-show-early-monitors"
+              labelText={`Show monitoring items from before the superstructure was installed (${loaded.data?.beforeInstallCount ?? 0})`}
+              checked={includeBeforeInstall}
+              onChange={(_, { checked }) => {
+                setIncludeBeforeInstall(checked);
+                setPage(1);
+              }}
+            />
+          </div>
+        )}
+
         {loaded.isError && (
           <InlineNotification
             kind="error"
@@ -145,12 +210,17 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
         )}
         {loaded.data && (
           <>
-            <MonitorsTable rows={loaded.data.content} view={view} />
+            <MonitorsTable
+              rows={loaded.data.page.content}
+              view={view}
+              canDelete={canDelete}
+              onDelete={setPendingDelete}
+            />
             <Pagination
               page={page}
               pageSize={pageSize}
               pageSizes={PAGE_SIZES}
-              totalItems={loaded.data.totalElements}
+              totalItems={loaded.data.page.totalElements}
               onChange={({ page: nextPage, pageSize: nextPageSize }) => {
                 setPage(nextPage);
                 setPageSize(nextPageSize);
@@ -159,6 +229,46 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
           </>
         )}
       </Card>
+
+      {/* Legacy's window.confirm(), as the app's other deletes ask. */}
+      <DestructiveModal
+        open={pendingDelete !== null}
+        title="Delete monitoring item"
+        message={`Are you sure you would like to delete monitoring item ${number(
+          pendingDelete?.number,
+        )}? This cannot be undone.`}
+        confirmButtonText="Delete"
+        loading={deleteMonitor.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const monitor = pendingDelete;
+          if (monitor === null) return;
+          deleteMonitor.mutate(monitor.id, {
+            onSuccess: () => {
+              setPendingDelete(null);
+              display({
+                kind: 'success',
+                title: `Monitoring item ${number(monitor.number)} deleted`,
+                timeout: 4000,
+              });
+            },
+            onError: (error) => {
+              setPendingDelete(null);
+              // A toast, as Site Search reports a failed delete: nothing on screen changed, and the
+              // row is still where the user left it.
+              display({
+                kind: 'error',
+                title: 'The monitoring item was not deleted',
+                subtitle: apiErrorMessage(
+                  error,
+                  'Try again, or contact support if this continues.',
+                ),
+                timeout: 0,
+              });
+            },
+          });
+        }}
+      />
     </div>
   );
 };

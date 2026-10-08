@@ -164,4 +164,14 @@ class StructureApiEndpointTest {
     assertThat(monitors.getAnnotation(PreAuthorize.class).value())
         .isEqualTo(CbrAuthorities.READ);
   }
+  @Test
+  @DisplayName("a monitoring item is deleted by DELETE /{structureId}/monitors/{monitorId}, on "
+      + "DESTRUCTIVE")
+  void monitorDeleteIsMappedAndGated() {
+    Method delete = method("deleteMonitor");
+    assertThat(delete.getAnnotation(DeleteMapping.class).value())
+        .containsExactly("/{structureId}/monitors/{monitorId}");
+    assertThat(delete.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.DESTRUCTIVE);
+  }
 }

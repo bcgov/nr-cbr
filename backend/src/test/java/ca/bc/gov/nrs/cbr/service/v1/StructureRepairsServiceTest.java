@@ -72,7 +72,7 @@ class StructureRepairsServiceTest {
   private PagedResponse<Repair> repairs(View view) {
     entityManager.flush();
     entityManager.clear();
-    return service.repairs(7L, view, 0, 10);
+    return service.repairs(7L, view, 0, 10, false).page();
   }
 
   @Test
@@ -115,7 +115,7 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    PagedResponse<Repair> second = service.repairs(7L, View.ALL, 1, 10);
+    PagedResponse<Repair> second = service.repairs(7L, View.ALL, 1, 10, false).page();
 
     assertThat(second.content()).extracting(Repair::number).containsExactly(11L, 12L);
     assertThat(second.totalElements()).isEqualTo(12);
@@ -169,9 +169,50 @@ class StructureRepairsServiceTest {
   }
 
   @Test
+  @DisplayName("leaves out repairs from inspections on or before the install year, and counts "
+      + "them, as legacy does until its box is ticked")
+  void beforeInstallLeftOutAndCounted() {
+    entityManager.createQuery(
+        "UPDATE CrossingStructureEntity s SET s.yearBuilt = 2010 WHERE s.crossingStructureId = 7")
+        .executeUpdate();
+    givenInspection(10L, LocalDate.of(2005, 6, 1));
+    givenInspection(11L, LocalDate.of(2010, 1, 1));
+    givenInspection(12L, LocalDate.of(2015, 6, 1));
+    givenRepair(1L, 10L, "REQ", "P1");
+    givenRepair(2L, 11L, "REQ", "P1");
+    givenRepair(3L, 12L, "REQ", "P1");
+    givenRepair(4L, null, "REQ", "P1");
+    entityManager.flush();
+    entityManager.clear();
+
+    var shown = service.repairs(7L, View.ALL, 0, 10, false);
+    var all = service.repairs(7L, View.ALL, 0, 10, true);
+
+    // 1 January of the install year is not "after" it; no inspection is always listed.
+    assertThat(shown.page().content()).extracting(Repair::id).containsExactlyInAnyOrder("3", "4");
+    assertThat(shown.page().totalElements()).isEqualTo(2);
+    assertThat(shown.beforeInstallCount()).isEqualTo(2);
+    assertThat(all.page().content()).hasSize(4);
+  }
+
+  @Test
+  @DisplayName("leaves nothing out when the structure has no install year, as legacy does")
+  void noInstallYear() {
+    givenInspection(10L, LocalDate.of(1990, 6, 1));
+    givenRepair(1L, 10L, "REQ", "P1");
+    entityManager.flush();
+    entityManager.clear();
+
+    var listing = service.repairs(7L, View.ALL, 0, 10, false);
+
+    assertThat(listing.page().content()).hasSize(1);
+    assertThat(listing.beforeInstallCount()).isZero();
+  }
+
+  @Test
   @DisplayName("refuses a structure that does not exist")
   void missingStructure() {
-    assertThatThrownBy(() -> service.repairs(404L, View.ALL, 0, 10))
+    assertThatThrownBy(() -> service.repairs(404L, View.ALL, 0, 10, false).page())
         .isInstanceOf(StructureNotFoundException.class);
   }
 }

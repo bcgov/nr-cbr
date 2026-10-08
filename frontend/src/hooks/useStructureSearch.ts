@@ -101,11 +101,26 @@ export const useStructureRepairs = (
   view: RepairView,
   pageNumber: number,
   pageSize: number,
+  includeBeforeInstall: boolean,
 ) =>
   useQuery({
-    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs', view, pageNumber, pageSize],
+    queryKey: [
+      STRUCTURE_QUERY_KEY,
+      structureId,
+      'repairs',
+      view,
+      pageNumber,
+      pageSize,
+      includeBeforeInstall,
+    ],
     queryFn: () =>
-      API.structureSearch.getStructureRepairs(structureId as string, view, pageNumber, pageSize),
+      API.structureSearch.getStructureRepairs(
+        structureId as string,
+        view,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+      ),
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
@@ -122,14 +137,45 @@ export const useStructureMonitors = (
   view: MonitorView,
   pageNumber: number,
   pageSize: number,
+  includeBeforeInstall: boolean,
 ) =>
   useQuery({
-    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors', view, pageNumber, pageSize],
+    queryKey: [
+      STRUCTURE_QUERY_KEY,
+      structureId,
+      'monitors',
+      view,
+      pageNumber,
+      pageSize,
+      includeBeforeInstall,
+    ],
     queryFn: () =>
-      API.structureSearch.getStructureMonitors(structureId as string, view, pageNumber, pageSize),
+      API.structureSearch.getStructureMonitors(
+        structureId as string,
+        view,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+      ),
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
+
+/**
+ * Deletes one monitoring item, then refreshes the structure's monitoring table — every page and
+ * view of it, as the item may be on any of them.
+ */
+export const useDeleteStructureMonitor = (
+  structureId: string,
+): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (monitorId: string) =>
+      API.structureSearch.deleteStructureMonitor(structureId, monitorId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+  });
+};
 
 /** A structure's documents and photos, fetched only once their tab is opened (`enabled`). */
 export const useStructureDocuments = (structureId: string | undefined, enabled: boolean) =>

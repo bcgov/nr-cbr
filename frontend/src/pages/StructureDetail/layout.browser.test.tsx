@@ -1,14 +1,21 @@
 import { Theme } from '@carbon/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
-import { page, userEvent } from 'vitest/browser';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 
 import StructureDetailPage from './index';
 
 // The app's real stylesheet, Carbon included: these measure layout, which Carbon's sizes drive.
 import '@/styles/index.scss';
+
+const authorization = vi.hoisted(() => ({ canEdit: false, canDelete: false }));
+vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
+
+// A delete's outcome is a toast; asserted on what the page asked to show.
+const display = vi.hoisted(() => vi.fn());
+vi.mock('@/context/notification/useNotification', () => ({ useNotification: () => ({ display }) }));
 
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),

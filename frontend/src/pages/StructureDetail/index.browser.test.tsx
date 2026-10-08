@@ -1,12 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
-import { userEvent } from 'vitest/browser';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import StructureDetailPage from './index';
 
 import type { StructureDetailResponse } from './structureResponse';
+
+const authorization = vi.hoisted(() => ({ canEdit: false, canDelete: false }));
+vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
+
+// A delete's outcome is a toast; asserted on what the page asked to show.
+const display = vi.hoisted(() => vi.fn());
+vi.mock('@/context/notification/useNotification', () => ({ useNotification: () => ({ display }) }));
 
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
@@ -21,6 +28,7 @@ const api = vi.hoisted(() => ({
   getStructureInspections: vi.fn(),
   getStructureRepairs: vi.fn(),
   getStructureMonitors: vi.fn(),
+  deleteStructureMonitor: vi.fn(),
 }));
 vi.mock('@/services/APIs', () => ({ default: { structureSearch: api } }));
 
@@ -215,13 +223,20 @@ const inspectionsPage = (content: object[], overrides: object = {}) => ({
   ...overrides,
 });
 
-/** A page of the repairs table. */
-const repairsPage = (content: object[], totalElements = content.length) => ({
-  content,
-  totalElements,
-  totalPages: Math.max(1, Math.ceil(totalElements / 10)),
-  pageNumber: 0,
-  pageSize: 10,
+/** A page of the repairs or monitoring table, and how many predate the superstructure. */
+const repairsPage = (
+  content: object[],
+  totalElements = content.length,
+  beforeInstallCount = 0,
+) => ({
+  page: {
+    content,
+    totalElements,
+    totalPages: Math.max(1, Math.ceil(totalElements / 10)),
+    pageNumber: 0,
+    pageSize: 10,
+  },
+  beforeInstallCount,
 });
 
 /** Opens the Details tab; Information is the one selected on arrival. */
@@ -250,6 +265,10 @@ beforeEach(() => {
   api.getStructureRepairs.mockResolvedValue(repairsPage([]));
   api.getStructureMonitors.mockReset();
   api.getStructureMonitors.mockResolvedValue(repairsPage([]));
+  api.deleteStructureMonitor.mockReset();
+  api.deleteStructureMonitor.mockResolvedValue(undefined);
+  authorization.canDelete = false;
+  display.mockClear();
 });
 
 describe('StructureDetailPage — loading', () => {
@@ -1058,7 +1077,7 @@ describe('StructureDetailPage — Repairs', () => {
     await openRepairs();
 
     await vi.waitFor(() =>
-      expect(api.getStructureRepairs).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10),
+      expect(api.getStructureRepairs).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10, false),
     );
   });
 
@@ -1092,7 +1111,7 @@ describe('StructureDetailPage — Repairs', () => {
     );
 
     await vi.waitFor(() =>
-      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'ALL', 0, 10),
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'ALL', 0, 10, false),
     );
   });
 
@@ -1109,8 +1128,33 @@ describe('StructureDetailPage — Repairs', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Next page' }));
 
     await vi.waitFor(() =>
-      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 1, 10),
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 1, 10, false),
     );
+  });
+
+  it('asks for the repairs from before the superstructure went in when ticked', async () => {
+    api.getStructureRepairs.mockResolvedValue(repairsPage([], 0, 3));
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(
+      await screen.findByText('Show repairs from before the superstructure was installed (3)'),
+    );
+
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 0, 10, true),
+    );
+  });
+
+  it('offers no such box when nothing predates the superstructure', async () => {
+    await showing(bridge());
+
+    await openRepairs();
+    await screen.findByTestId('structure-section-repairs');
+
+    expect(
+      screen.queryByText(/Show repairs from before the superstructure was installed/),
+    ).not.toBeInTheDocument();
   });
 
   it('says when there are none in the view chosen', async () => {
@@ -1161,7 +1205,7 @@ describe('StructureDetailPage — Monitoring', () => {
     await openMonitoring();
 
     await vi.waitFor(() =>
-      expect(api.getStructureMonitors).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10),
+      expect(api.getStructureMonitors).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10, false),
     );
   });
 
@@ -1191,9 +1235,102 @@ describe('StructureDetailPage — Monitoring', () => {
     );
 
     await vi.waitFor(() =>
-      expect(api.getStructureMonitors).toHaveBeenLastCalledWith('7', 'ALL', 0, 10),
+      expect(api.getStructureMonitors).toHaveBeenLastCalledWith('7', 'ALL', 0, 10, false),
     );
     expect(api.getStructureRepairs).not.toHaveBeenCalled();
+  });
+
+  it('asks for the monitoring items from before the superstructure went in when ticked', async () => {
+    api.getStructureMonitors.mockResolvedValue(repairsPage([], 0, 3));
+    await showing(bridge());
+
+    await openMonitoring();
+    await userEvent.click(
+      await screen.findByText(
+        'Show monitoring items from before the superstructure was installed (3)',
+      ),
+    );
+
+    await vi.waitFor(() =>
+      expect(api.getStructureMonitors).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 0, 10, true),
+    );
+  });
+
+  it('offers no such box when nothing predates the superstructure', async () => {
+    await showing(bridge());
+
+    await openMonitoring();
+    await screen.findByTestId('structure-section-monitoring');
+
+    expect(
+      screen.queryByText(/Show monitoring items from before the superstructure was installed/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Delete in an Actions column only to a user who may delete', async () => {
+    // Legacy's delete icon sits behind /deleteStructureMonitor; an action that cannot be
+    // performed is not shown, nor is an empty column.
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    await screen.findByTestId('structure-monitor-2');
+
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('structure-monitor-delete-2')).not.toBeInTheDocument();
+  });
+
+  it('deletes an item once confirmed, and says so', async () => {
+    authorization.canDelete = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    const section = await screen.findByTestId('structure-section-monitoring');
+    expect(within(section).getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    // "Delete" beside the icon, naming what it deletes to a screen reader.
+    expect(screen.getByRole('button', { name: 'Delete monitoring item 2' })).toBe(
+      screen.getByTestId('structure-monitor-delete-2'),
+    );
+    await userEvent.click(screen.getByTestId('structure-monitor-delete-2'));
+    expect(api.deleteStructureMonitor).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() => expect(api.deleteStructureMonitor).toHaveBeenCalledWith('7', '2'));
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Monitoring item 2 deleted' }),
+      ),
+    );
+  });
+
+  it('deletes nothing when the confirmation is cancelled', async () => {
+    authorization.canDelete = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    await userEvent.click(await screen.findByTestId('structure-monitor-delete-2'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    expect(api.deleteStructureMonitor).not.toHaveBeenCalled();
+  });
+
+  it('says so when the delete fails', async () => {
+    authorization.canDelete = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    api.deleteStructureMonitor.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openMonitoring();
+    await userEvent.click(await screen.findByTestId('structure-monitor-delete-2'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: 'The monitoring item was not deleted' }),
+      ),
+    );
   });
 
   it('says when there are none in the view chosen', async () => {
