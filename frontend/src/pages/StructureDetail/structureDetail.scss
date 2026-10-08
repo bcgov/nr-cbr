@@ -316,13 +316,20 @@ $page-bottom: 2rem;
 // under them, the buttons bottom-right — as Structure Search's repair-responsibility dialog.
 .structure-detail__dialog-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 2fr);
+  // Number and status as wide as what they hold, the frequency the rest: shares of the row left
+  // "Suggested" a column far wider than the word, and a gap before the frequency.
+  grid-template-columns: max-content max-content minmax(0, 1fr);
   align-items: start;
-  gap: $spacing-05;
+  gap: $spacing-05 $spacing-07;
 
   @media (max-width: 671px) {
     grid-template-columns: 1fr;
   }
+}
+
+// Adding has no number to show: the status, then the frequency taking the rest.
+.structure-detail__dialog-fields--add {
+  grid-template-columns: max-content minmax(0, 1fr);
 }
 
 .structure-detail__dialog-wide {
@@ -336,10 +343,35 @@ $page-bottom: 2rem;
   margin-block-start: $spacing-07;
 }
 
+// Inside the monitoring dialog the read-only fields sit beside inputs, so they take ReadOnlyField's
+// form spacing back from the page's reading style above: the label as Carbon labels an input, and
+// the value in a band the height of the box beside it, centred, so the row reads as one line.
+.structure-detail .structure-detail__monitor-dialog .read-only-field {
+  gap: 0.5rem;
+}
+
+.structure-detail .structure-detail__monitor-dialog .read-only-field__label {
+  @include type.type-style('label-01');
+
+  font-weight: 400;
+  color: var(--cds-text-secondary);
+}
+
+.structure-detail .structure-detail__monitor-dialog .read-only-field__value {
+  min-block-size: 2.5rem;
+}
+
 // A little wider than Carbon's default dialog, so the two dropdowns and the description have room.
 // Wide screens only: below lg Carbon's own sizing already fills most of the screen.
 .structure-detail__monitor-dialog .cds--modal-container {
   @include breakpoint(lg) {
     inline-size: 60%;
   }
+}
+
+// A table's action, over it at its right.
+.structure-detail__table-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-end: $spacing-05;
 }

@@ -29,3 +29,9 @@ export type MonitorUpdateRequest = {
   frequencyComment: string;
   description: string;
 };
+
+/** A new monitoring item — the backend's `MonitorCreateRequest`. Always Suggested; numbered next. */
+export type MonitorCreateRequest = Omit<MonitorUpdateRequest, 'statusCode'>;
+
+/** The item just added — the backend's `MonitorCreatedResponse`. */
+export type MonitorCreatedResponse = { id: string; number: number };

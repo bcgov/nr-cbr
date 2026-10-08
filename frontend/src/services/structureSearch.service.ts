@@ -5,6 +5,8 @@ import type {
   InspectionsResponse,
 } from '@/pages/StructureDetail/inspectionsResponse';
 import type {
+  MonitorCreatedResponse,
+  MonitorCreateRequest,
   MonitorUpdateRequest,
   MonitorView,
   StructureMonitor,
@@ -224,6 +226,22 @@ export class StructureSearchService extends HttpClient {
       url: '/v1/structures/{structureId}/monitors',
       path: { structureId },
       query: { view, pageNumber, pageSize, includeBeforeInstall },
+    });
+  }
+
+  /**
+   * Adds a monitoring item to a structure, Suggested and numbered next. 400 with `fieldErrors` when
+   * a field is refused.
+   */
+  createStructureMonitor(
+    structureId: string,
+    request: MonitorCreateRequest,
+  ): CancelablePromise<MonitorCreatedResponse> {
+    return this.doRequest<MonitorCreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/monitors',
+      path: { structureId },
+      body: request,
     });
   }
 

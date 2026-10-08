@@ -11,6 +11,8 @@ import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureMonitorItemRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
@@ -128,6 +130,50 @@ public class StructureMonitorsService {
             ? 0
             : monitors.countBeforeInstall(
                 structureId, outstandingOnly, OUTSTANDING_STATUSES, cutoff.installed()));
+  }
+
+  /**
+   * Adds a monitoring item to the structure — legacy's Add Monitor
+   * ({@code StructureAction.monitor}, {@code CBR.INSERT_MONITOR}).
+   *
+   * <p>As legacy: the item is Suggested, stamped Suggested by the user; it takes the structure's
+   * next number, and its id from {@code STRUCTURE_MONITOR_ITEMS_SEQ} through the entity's
+   * generator; it belongs to no inspection.
+   * The description and frequency are checked as an edit checks them.
+   *
+   * @throws StructureNotFoundException if there is no such structure
+   * @throws FieldValidationException   with a message for each field at fault
+   */
+  @Transactional
+  public MonitorCreatedResponse create(long structureId, MonitorCreateRequest request) {
+    if (!structures.existsById(structureId)) {
+      throw new StructureNotFoundException(structureId);
+    }
+    String frequency = trimmed(request.frequencyCode());
+    String comment = OTHER_FREQUENCY.equals(frequency) ? trimmed(request.frequencyComment()) : null;
+    String description = trimmed(request.description());
+    validate(SUGGESTED, frequency, comment, description);
+
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    long number = monitors.findHighestNumber(structureId) + 1;
+    StructureMonitorItemEntity saved = monitors.save(StructureMonitorItemEntity.builder()
+        .crossingStructureId(structureId)
+        .monitorNumber(number)
+        .monitoringStatusCode(SUGGESTED)
+        .monitorFrequencyCode(frequency)
+        .monitorFrequencyCmt(comment)
+        .description(description)
+        .suggestedByUserid(user)
+        .suggestedByTimestamp(now)
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build());
+    log.info("Added monitoring item {} ({}) to structure {}", saved.getMonitorId(), number,
+        structureId);
+    return new MonitorCreatedResponse(String.valueOf(saved.getMonitorId()), number);
   }
 
   /**

@@ -23,8 +23,17 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 
 const code = (value: string) => ({ code: value, description: value });
 
-const api = vi.hoisted(() => ({ getStructure: vi.fn() }));
-vi.mock('@/services/APIs', () => ({ default: { structureSearch: api } }));
+const api = vi.hoisted(() => ({ getStructure: vi.fn(), getStructureMonitors: vi.fn() }));
+vi.mock('@/services/APIs', () => ({
+  default: {
+    structureSearch: api,
+    configuration: {
+      getMonitoringStatusCodes: () => Promise.resolve([{ code: 'SUG', description: 'Suggested' }]),
+      getMonitorFrequencyCodes: () =>
+        Promise.resolve([{ code: 'INS', description: 'Every Routine Inspection' }]),
+    },
+  },
+}));
 
 type Overrides = { details?: object; loadRating?: object; comments?: object[] };
 
@@ -327,5 +336,39 @@ describe('StructureDetailPage — layout', () => {
         expect(line.right).toBeLessThanOrEqual(banner.right);
       }
     }
+  });
+
+  it("lines the add dialog's first row up: labels on one line, values level with the box", async () => {
+    // The read-only Status sits beside the Frequency dropdown; read in the page's bold
+    // reading style they sat higher than the box and labelled louder than it.
+    authorization.canEdit = true;
+    api.getStructureMonitors.mockResolvedValue({
+      page: { content: [], totalElements: 0, totalPages: 1, pageNumber: 0, pageSize: 10 },
+      beforeInstallCount: 0,
+    });
+    await page.viewport(1400, 900);
+    await renderPage();
+    await userEvent.click(screen.getByTestId('structure-tab-monitoring'));
+    await userEvent.click(await screen.findByTestId('structure-monitor-add'));
+    const dialog = await screen.findByTestId('monitor-dialog');
+
+    const numberCell = within(dialog).getByText('Monitoring Status').closest('.read-only-field')!;
+    const numberLabel = numberCell.querySelector('.read-only-field__label')!;
+    const numberValue = numberCell
+      .querySelector('.read-only-field__value')!
+      .getBoundingClientRect();
+    const frequencyLabel = within(dialog).getByText('Monitoring Frequency').getBoundingClientRect();
+    const frequencyBox = within(dialog).getByTestId('monitor-frequency').getBoundingClientRect();
+
+    expect(numberLabel.getBoundingClientRect().top).toBeCloseTo(frequencyLabel.top, 0);
+    expect(numberValue.top + numberValue.height / 2).toBeCloseTo(
+      frequencyBox.top + frequencyBox.height / 2,
+      0,
+    );
+    expect(getComputedStyle(numberLabel).fontWeight).toBe('400');
+    // No wide empty column between the status and the frequency: the frequency starts a gap's
+    // width after the status's text.
+    const statusText = within(dialog).getByText('Suggested').getBoundingClientRect();
+    expect(frequencyBox.left - statusText.right).toBeLessThanOrEqual(48);
   });
 });

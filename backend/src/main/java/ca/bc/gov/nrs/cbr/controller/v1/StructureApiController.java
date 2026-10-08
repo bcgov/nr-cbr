@@ -10,6 +10,8 @@ import ca.bc.gov.nrs.cbr.service.v1.StructureRepairsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSpansAndPiersService;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
@@ -30,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -145,6 +148,13 @@ public class StructureApiController implements StructureApiEndpoint {
       boolean includeBeforeInstall) {
     return monitorsService.monitors(
         structureId, view, pageNumber, pageSize, includeBeforeInstall);
+  }
+
+  @Override
+  public ResponseEntity<MonitorCreatedResponse> createMonitor(
+      long structureId, MonitorCreateRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(monitorsService.create(structureId, request));
   }
 
   @Override

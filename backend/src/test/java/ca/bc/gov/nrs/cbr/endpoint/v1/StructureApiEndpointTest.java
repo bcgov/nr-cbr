@@ -16,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -182,6 +183,15 @@ class StructureApiEndpointTest {
     assertThat(update.getAnnotation(PutMapping.class).value())
         .containsExactly("/{structureId}/monitors/{monitorId}");
     assertThat(update.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.CONTENT_EDIT);
+  }
+  @Test
+  @DisplayName("a monitoring item is added by POST /{structureId}/monitors, on CONTENT_EDIT")
+  void monitorCreateIsMappedAndGated() {
+    Method create = method("createMonitor");
+    assertThat(create.getAnnotation(PostMapping.class).value())
+        .containsExactly("/{structureId}/monitors");
+    assertThat(create.getAnnotation(PreAuthorize.class).value())
         .isEqualTo(CbrAuthorities.CONTENT_EDIT);
   }
 }

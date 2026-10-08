@@ -28,6 +28,7 @@ const api = vi.hoisted(() => ({
   getStructureInspections: vi.fn(),
   getStructureRepairs: vi.fn(),
   getStructureMonitors: vi.fn(),
+  createStructureMonitor: vi.fn(),
   updateStructureMonitor: vi.fn(),
   deleteStructureMonitor: vi.fn(),
 }));
@@ -272,6 +273,8 @@ beforeEach(() => {
   api.getStructureRepairs.mockResolvedValue(repairsPage([]));
   api.getStructureMonitors.mockReset();
   api.getStructureMonitors.mockResolvedValue(repairsPage([]));
+  api.createStructureMonitor.mockReset();
+  api.createStructureMonitor.mockResolvedValue({ id: '30', number: 3 });
   api.updateStructureMonitor.mockReset();
   api.updateStructureMonitor.mockResolvedValue(undefined);
   configurationApi.getMonitoringStatusCodes.mockResolvedValue([
@@ -281,6 +284,7 @@ beforeEach(() => {
   ]);
   configurationApi.getMonitorFrequencyCodes.mockResolvedValue([
     { code: 'ANN', description: 'Annually' },
+    { code: 'INS', description: 'Each inspection' },
     { code: 'OTH', description: 'Other' },
   ]);
   authorization.canEdit = false;
@@ -1359,11 +1363,9 @@ describe('StructureDetailPage — Monitoring', () => {
     await showing(bridge());
     await openMonitoring();
     await userEvent.click(await screen.findByTestId('structure-monitor-edit-2'));
-    const dialog = await screen.findByTestId('edit-monitor-dialog');
+    const dialog = await screen.findByTestId('monitor-dialog');
     // Wait for the dropdowns' lists, which the dialog fetches as it opens.
-    await vi.waitFor(() =>
-      expect(within(dialog).getByTestId('edit-monitor-status')).toHaveValue('REQ'),
-    );
+    await vi.waitFor(() => expect(within(dialog).getByTestId('monitor-status')).toHaveValue('REQ'));
     return dialog;
   };
 
@@ -1385,14 +1387,14 @@ describe('StructureDetailPage — Monitoring', () => {
     const dialog = await openEdit();
 
     expect(dialog).toMatchTextContent('Edit monitoring item 2');
-    expect(within(dialog).getByTestId('edit-monitor-frequency')).toHaveValue('ANN');
-    expect(within(dialog).getByTestId('edit-monitor-description')).toHaveValue(
+    expect(within(dialog).getByTestId('monitor-frequency')).toHaveValue('ANN');
+    expect(within(dialog).getByTestId('monitor-description')).toHaveValue(
       'Watch the scour at the south abutment.',
     );
-    await userEvent.selectOptions(within(dialog).getByTestId('edit-monitor-status'), 'COM');
-    await userEvent.clear(within(dialog).getByTestId('edit-monitor-description'));
-    await userEvent.type(within(dialog).getByTestId('edit-monitor-description'), 'Scour gone.');
-    await userEvent.click(within(dialog).getByTestId('edit-monitor-save'));
+    await userEvent.selectOptions(within(dialog).getByTestId('monitor-status'), 'COM');
+    await userEvent.clear(within(dialog).getByTestId('monitor-description'));
+    await userEvent.type(within(dialog).getByTestId('monitor-description'), 'Scour gone.');
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
 
     await vi.waitFor(() =>
       expect(api.updateStructureMonitor).toHaveBeenCalledWith('7', '2', {
@@ -1402,9 +1404,7 @@ describe('StructureDetailPage — Monitoring', () => {
         description: 'Scour gone.',
       }),
     );
-    await vi.waitFor(() =>
-      expect(screen.queryByTestId('edit-monitor-dialog')).not.toBeInTheDocument(),
-    );
+    await vi.waitFor(() => expect(screen.queryByTestId('monitor-dialog')).not.toBeInTheDocument());
     expect(display).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'success', title: 'Monitoring item 2 saved' }),
     );
@@ -1413,8 +1413,8 @@ describe('StructureDetailPage — Monitoring', () => {
   it('asks for the comment when the frequency is Other, beside the box', async () => {
     const dialog = await openEdit({ frequencyComment: null });
 
-    await userEvent.selectOptions(within(dialog).getByTestId('edit-monitor-frequency'), 'OTH');
-    await userEvent.click(within(dialog).getByTestId('edit-monitor-save'));
+    await userEvent.selectOptions(within(dialog).getByTestId('monitor-frequency'), 'OTH');
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
 
     expect(dialog).toMatchTextContent(
       'Monitor Freq. Comment is required when the frequency is Other.',
@@ -1428,7 +1428,7 @@ describe('StructureDetailPage — Monitoring', () => {
     });
     const dialog = await openEdit();
 
-    await userEvent.click(within(dialog).getByTestId('edit-monitor-save'));
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
 
     await vi.waitFor(() =>
       expect(dialog).toMatchTextContent('Monitor Description can be at most 2000 characters.'),
@@ -1436,12 +1436,68 @@ describe('StructureDetailPage — Monitoring', () => {
     expect(display).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'error' }));
   });
 
+  it('offers Add monitoring item over the table only from Level 1 up', async () => {
+    await showing(bridge());
+
+    await openMonitoring();
+    await screen.findByTestId('structure-section-monitoring');
+
+    expect(screen.queryByTestId('structure-monitor-add')).not.toBeInTheDocument();
+  });
+
+  it('adds an item as Suggested, at the default frequency, and says which number it took', async () => {
+    authorization.canEdit = true;
+    await showing(bridge());
+    await openMonitoring();
+
+    await userEvent.click(await screen.findByTestId('structure-monitor-add'));
+    const dialog = await screen.findByTestId('monitor-dialog');
+    // Legacy's default frequency, once the list shows it; the status is locked.
+    await vi.waitFor(() =>
+      expect(within(dialog).getByTestId('monitor-frequency')).toHaveValue('INS'),
+    );
+    expect(dialog).toMatchTextContent('Add monitoring item');
+    // No number before saving: the server gives the next, and the toast names it.
+    expect(within(dialog).queryByText('Monitor Number')).not.toBeInTheDocument();
+    expect(dialog).toMatchTextContent('Suggested');
+    expect(within(dialog).queryByTestId('monitor-status')).not.toBeInTheDocument();
+    await userEvent.type(within(dialog).getByTestId('monitor-description'), 'New scour.');
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
+
+    await vi.waitFor(() =>
+      expect(api.createStructureMonitor).toHaveBeenCalledWith('7', {
+        frequencyCode: 'INS',
+        frequencyComment: '',
+        description: 'New scour.',
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Monitoring item 3 added' }),
+      ),
+    );
+    expect(screen.queryByTestId('monitor-dialog')).not.toBeInTheDocument();
+  });
+
+  it('adds nothing without a description, and says so beside the box', async () => {
+    authorization.canEdit = true;
+    await showing(bridge());
+    await openMonitoring();
+
+    await userEvent.click(await screen.findByTestId('structure-monitor-add'));
+    const dialog = await screen.findByTestId('monitor-dialog');
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
+
+    expect(dialog).toMatchTextContent('Monitor Description is required.');
+    expect(api.createStructureMonitor).not.toHaveBeenCalled();
+  });
+
   it('saves nothing when cancelled', async () => {
     const dialog = await openEdit();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
-    expect(screen.queryByTestId('edit-monitor-dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('monitor-dialog')).not.toBeInTheDocument();
     expect(api.updateStructureMonitor).not.toHaveBeenCalled();
   });
 

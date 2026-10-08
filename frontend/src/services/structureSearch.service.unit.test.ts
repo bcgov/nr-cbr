@@ -217,6 +217,21 @@ describe('StructureSearchService', () => {
     );
   });
 
+  it('adds a monitoring item to a structure', async () => {
+    const { service, request } = withMockedRequest();
+    const body = { frequencyCode: 'INS', frequencyComment: '', description: 'Scour.' };
+
+    await service.createStructureMonitor('7', body);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        url: '/api/v1/structures/7/monitors',
+        data: body,
+      }),
+    );
+  });
+
   it('saves an edit to one monitoring item', async () => {
     const { service, request } = withMockedRequest();
     const body = {

@@ -13,6 +13,8 @@ import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureMonitorItemEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
@@ -63,18 +65,24 @@ class StructureMonitorsServiceTest {
         .inspectionId(id).crossingStructureId(7L).inspectionDate(date).build());
   }
 
-  private void givenMonitor(long id, Long inspectionId, String status,
+  /**
+   * An item of structure 7, numbered {@code number}. Its id comes from the sequence, as an item's
+   * does in production; it is returned for the tests that act on the item.
+   */
+  private long givenMonitor(long number, Long inspectionId, String status,
       Consumer<StructureMonitorItemEntity.StructureMonitorItemEntityBuilder> change) {
     StructureMonitorItemEntity.StructureMonitorItemEntityBuilder monitor =
         StructureMonitorItemEntity.builder()
-            .monitorId(id).crossingStructureId(7L).inspectionId(inspectionId).monitorNumber(id)
-            .monitoringStatusCode(status).description("Item " + id);
+            .crossingStructureId(7L).inspectionId(inspectionId).monitorNumber(number)
+            .monitoringStatusCode(status).description("Item " + number);
     change.accept(monitor);
-    entityManager.persist(monitor.build());
+    StructureMonitorItemEntity built = monitor.build();
+    entityManager.persist(built);
+    return built.getMonitorId();
   }
 
-  private void givenMonitor(long id, Long inspectionId, String status) {
-    givenMonitor(id, inspectionId, status, monitor -> { });
+  private long givenMonitor(long number, Long inspectionId, String status) {
+    return givenMonitor(number, inspectionId, status, monitor -> { });
   }
 
   private PagedResponse<Monitor> monitors(View view) {
@@ -91,8 +99,8 @@ class StructureMonitorsServiceTest {
     givenMonitor(2L, null, "REQ");
     givenMonitor(3L, null, "COMP");
 
-    assertThat(monitors(View.OUTSTANDING).content()).extracting(Monitor::id)
-        .containsExactlyInAnyOrder("1", "2");
+    assertThat(monitors(View.OUTSTANDING).content()).extracting(Monitor::number)
+        .containsExactlyInAnyOrder(1L, 2L);
     assertThat(monitors(View.ALL).content()).hasSize(3);
   }
 
@@ -110,8 +118,8 @@ class StructureMonitorsServiceTest {
 
     // The status code sorts as text, so SUG comes before REQ descending. Within SUG: no inspection,
     // then 2023 by number descending, then 2020.
-    assertThat(monitors(View.ALL).content()).extracting(Monitor::id)
-        .containsExactly("4", "3", "2", "1", "5");
+    assertThat(monitors(View.ALL).content()).extracting(Monitor::number)
+        .containsExactly(4L, 3L, 2L, 1L, 5L);
   }
 
   @Test
@@ -174,7 +182,8 @@ class StructureMonitorsServiceTest {
     var all = service.monitors(7L, View.ALL, 0, 10, true);
 
     // 1 January of the install year is not "after" it; no inspection is always listed.
-    assertThat(shown.page().content()).extracting(Monitor::id).containsExactlyInAnyOrder("3", "4");
+    assertThat(shown.page().content()).extracting(Monitor::number)
+        .containsExactlyInAnyOrder(3L, 4L);
     assertThat(shown.page().totalElements()).isEqualTo(2);
     assertThat(shown.beforeInstallCount()).isEqualTo(2);
     assertThat(all.page().content()).hasSize(4);
@@ -216,14 +225,14 @@ class StructureMonitorsServiceTest {
   @DisplayName("saves an edit, stamping the status it now has with the user, keeping the others")
   void updates() {
     givenCodes();
-    givenMonitor(1L, null, "SUG", monitor -> monitor
+    long id = givenMonitor(1L, null, "SUG", monitor -> monitor
         .suggestedByUserid("IDIR\\A").suggestedByTimestamp(LocalDateTime.of(2023, 6, 2, 9, 0)));
     entityManager.flush();
     entityManager.clear();
 
-    service.update(7L, 1L, new MonitorUpdateRequest("REQ", "ANN", "ignored", "  Scour, south.  "));
+    service.update(7L, id, new MonitorUpdateRequest("REQ", "ANN", "ignored", "  Scour, south.  "));
 
-    StructureMonitorItemEntity monitor = stored(1L);
+    StructureMonitorItemEntity monitor = stored(id);
     assertThat(monitor.getMonitoringStatusCode()).isEqualTo("REQ");
     assertThat(monitor.getMonitorFrequencyCode()).isEqualTo("ANN");
     assertThat(monitor.getMonitorFrequencyCmt()).as("kept only with Other").isNull();
@@ -239,14 +248,14 @@ class StructureMonitorsServiceTest {
   @DisplayName("re-stamps the status on every save, even when it did not change, as legacy does")
   void restampsEverySave() {
     givenCodes();
-    givenMonitor(1L, null, "REQ", monitor -> monitor
+    long id = givenMonitor(1L, null, "REQ", monitor -> monitor
         .requiredByUserid("IDIR\\B").requiredByTimestamp(LocalDateTime.of(2020, 1, 1, 9, 0)));
     entityManager.flush();
     entityManager.clear();
 
-    service.update(7L, 1L, new MonitorUpdateRequest("REQ", null, null, "Typo fixed."));
+    service.update(7L, id, new MonitorUpdateRequest("REQ", null, null, "Typo fixed."));
 
-    StructureMonitorItemEntity monitor = stored(1L);
+    StructureMonitorItemEntity monitor = stored(id);
     assertThat(monitor.getRequiredByUserid()).isEqualTo("IDIR\\EDITOR");
     assertThat(monitor.getRequiredByTimestamp()).isAfter(LocalDateTime.of(2020, 1, 1, 9, 0));
   }
@@ -255,29 +264,29 @@ class StructureMonitorsServiceTest {
   @DisplayName("keeps the frequency comment with Other, and requires it there")
   void otherNeedsItsComment() {
     givenCodes();
-    givenMonitor(1L, null, "SUG");
+    long id = givenMonitor(1L, null, "SUG");
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.update(7L, 1L,
+    assertThatThrownBy(() -> service.update(7L, id,
         new MonitorUpdateRequest("SUG", "OTH", " ", "Scour.")))
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors()).containsOnlyKeys("frequencyComment"));
 
-    service.update(7L, 1L, new MonitorUpdateRequest("SUG", "OTH", "After freshet.", "Scour."));
+    service.update(7L, id, new MonitorUpdateRequest("SUG", "OTH", "After freshet.", "Scour."));
 
-    assertThat(stored(1L).getMonitorFrequencyCmt()).isEqualTo("After freshet.");
+    assertThat(stored(id).getMonitorFrequencyCmt()).isEqualTo("After freshet.");
   }
 
   @Test
   @DisplayName("refuses a missing description, an over-long one, and codes that do not exist")
   void refusesBadFields() {
     givenCodes();
-    givenMonitor(1L, null, "SUG");
+    long id = givenMonitor(1L, null, "SUG");
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.update(7L, 1L,
+    assertThatThrownBy(() -> service.update(7L, id,
         new MonitorUpdateRequest("NOPE", "NOPE", null, " ")))
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors())
@@ -285,7 +294,7 @@ class StructureMonitorsServiceTest {
                 .containsEntry("frequencyCode",
                     "Monitoring Frequency is not one of the listed frequencies.")
                 .containsEntry("description", "Monitor Description is required."));
-    assertThatThrownBy(() -> service.update(7L, 1L,
+    assertThatThrownBy(() -> service.update(7L, id,
         new MonitorUpdateRequest("SUG", null, null, "x".repeat(2001))))
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors()).containsEntry("description",
@@ -296,41 +305,102 @@ class StructureMonitorsServiceTest {
   @DisplayName("refuses to edit an item under a structure it does not belong to")
   void updateOnlyThroughItsStructure() {
     givenCodes();
-    givenMonitor(1L, null, "SUG");
+    long id = givenMonitor(1L, null, "SUG");
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.update(8L, 1L,
+    assertThatThrownBy(() -> service.update(8L, id,
         new MonitorUpdateRequest("SUG", null, null, "Scour.")))
         .isInstanceOf(MonitorNotFoundException.class);
   }
 
   @Test
+  @DisplayName("adds an item as Suggested, by the user, numbered after the structure's highest")
+  void creates() {
+    givenCodes();
+    givenMonitor(1L, null, "REQ");
+    givenMonitor(2L, null, "COM", monitor -> monitor.monitorNumber(5L));
+    entityManager.flush();
+    entityManager.clear();
+
+    MonitorCreatedResponse created =
+        service.create(7L, new MonitorCreateRequest("OTH", "After freshet.", " Scour. "));
+
+    assertThat(created.number()).isEqualTo(6L);
+    StructureMonitorItemEntity monitor = stored(Long.parseLong(created.id()));
+    assertThat(monitor.getCrossingStructureId()).isEqualTo(7L);
+    assertThat(monitor.getMonitoringStatusCode()).isEqualTo("SUG");
+    assertThat(monitor.getMonitorFrequencyCode()).isEqualTo("OTH");
+    assertThat(monitor.getMonitorFrequencyCmt()).isEqualTo("After freshet.");
+    assertThat(monitor.getDescription()).isEqualTo("Scour.");
+    assertThat(monitor.getInspectionId()).isNull();
+    assertThat(monitor.getSuggestedByUserid()).isEqualTo("IDIR\\EDITOR");
+    assertThat(monitor.getSuggestedByTimestamp()).isNotNull();
+    assertThat(monitor.getRequiredByUserid()).isNull();
+    assertThat(monitor.getEntryUserid()).isEqualTo("IDIR\\EDITOR");
+    assertThat(monitor.getUpdateUserid()).isEqualTo("IDIR\\EDITOR");
+  }
+
+  @Test
+  @DisplayName("numbers a structure's first item 1, and takes each id from the sequence")
+  void firstItemAndDistinctIds() {
+    givenCodes();
+    entityManager.flush();
+
+    MonitorCreatedResponse first = service.create(7L, new MonitorCreateRequest(null, null, "A."));
+    MonitorCreatedResponse second = service.create(7L, new MonitorCreateRequest(null, null, "B."));
+
+    assertThat(first.number()).isEqualTo(1L);
+    assertThat(second.number()).isEqualTo(2L);
+    assertThat(second.id()).isNotEqualTo(first.id());
+  }
+
+  @Test
+  @DisplayName("refuses an item with no description, and adds nothing")
+  void createRefusesBadFields() {
+    givenCodes();
+    entityManager.flush();
+
+    assertThatThrownBy(() -> service.create(7L, new MonitorCreateRequest("OTH", null, " ")))
+        .isInstanceOfSatisfying(FieldValidationException.class, failure ->
+            assertThat(failure.getFieldErrors())
+                .containsOnlyKeys("frequencyComment", "description"));
+    assertThat(service.monitors(7L, View.ALL, 0, 10, true).page().content()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("refuses to add an item to a structure that does not exist")
+  void createOnMissingStructure() {
+    assertThatThrownBy(() -> service.create(404L, new MonitorCreateRequest(null, null, "A.")))
+        .isInstanceOf(StructureNotFoundException.class);
+  }
+
+  @Test
   @DisplayName("deletes one item of the structure, leaving the others")
   void deletes() {
-    givenMonitor(1L, null, "REQ");
+    long id = givenMonitor(1L, null, "REQ");
     givenMonitor(2L, null, "REQ");
     entityManager.flush();
     entityManager.clear();
 
-    service.delete(7L, 1L);
+    service.delete(7L, id);
     entityManager.flush();
     entityManager.clear();
 
     assertThat(service.monitors(7L, View.ALL, 0, 10, false).page().content())
-        .extracting(Monitor::id).containsExactly("2");
+        .extracting(Monitor::number).containsExactly(2L);
   }
 
   @Test
   @DisplayName("refuses to delete an item under a structure it does not belong to, or none at all")
   void deleteOnlyThroughItsStructure() {
-    givenMonitor(1L, null, "REQ");
+    long id = givenMonitor(1L, null, "REQ");
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.delete(8L, 1L))
+    assertThatThrownBy(() -> service.delete(8L, id))
         .isInstanceOf(MonitorNotFoundException.class);
-    assertThatThrownBy(() -> service.delete(7L, 99L))
+    assertThatThrownBy(() -> service.delete(7L, id + 1_000))
         .isInstanceOf(MonitorNotFoundException.class);
   }
 

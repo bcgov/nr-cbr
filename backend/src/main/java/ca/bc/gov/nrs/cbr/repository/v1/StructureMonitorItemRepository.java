@@ -18,6 +18,17 @@ public interface StructureMonitorItemRepository
   void deleteByInspectionId(Long inspectionId);
 
   /**
+   * The structure's highest monitor number, or 0 when it has none — a new item takes the next, as
+   * legacy's {@code getNextMonitorNumber} gives it.
+   */
+  @Query("""
+      SELECT COALESCE(MAX(monitor.monitorNumber), 0)
+        FROM StructureMonitorItemEntity monitor
+       WHERE monitor.crossingStructureId = :structureId
+      """)
+  long findHighestNumber(@Param("structureId") Long structureId);
+
+  /**
    * A page of a structure's monitoring items — legacy's {@code FIND_MONITORS_BY_STRUCTURE_ID}, or
    * with {@code outstandingOnly} its {@code FIND_OUTSTANDING_STRC_MONITORS}: suggested or required.
    *

@@ -1,4 +1,4 @@
-import { Edit, TrashCan, View } from '@carbon/icons-react';
+import { Add, Edit, TrashCan, View } from '@carbon/icons-react';
 import {
   Button,
   Checkbox,
@@ -20,8 +20,8 @@ import DestructiveModal from '@/components/core/DestructiveModal';
 import ExternalLink from '@/components/core/ExternalLink';
 
 import Card from './Card';
-import EditMonitorModal from './EditMonitorModal';
 import { describe, number } from './format';
+import MonitorDialog from './MonitorDialog';
 import UserAudits from './UserAudits';
 
 import type { MonitorView, StructureMonitor } from './monitorsResponse';
@@ -158,8 +158,11 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit,
  */
 const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
   const { canEdit, canDelete } = useAuthorization();
-  /** The item being edited, if any; the dialog is mounted only then. */
-  const [editing, setEditing] = useState<StructureMonitor | null>(null);
+  /**
+   * The open dialog, if any: an item to edit, or `'new'` to add one. The dialog is mounted only
+   * while it is open.
+   */
+  const [editing, setEditing] = useState<StructureMonitor | 'new' | null>(null);
   const { display } = useNotification();
   const deleteMonitor = useDeleteStructureMonitor(structureId);
   /** The item whose delete is being confirmed, if any. */
@@ -219,6 +222,23 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
           </div>
         )}
 
+        {/* Over the table, at its right, after the options that decide what it lists. Tertiary —
+            outlined, as Site Detail's Add Structure — so it does not outrank the page's own
+            actions. Only for a user who may add, as legacy's Level 1 button. */}
+        {canEdit && (
+          <div className="structure-detail__table-actions">
+            <Button
+              kind="tertiary"
+              size="md"
+              renderIcon={Add}
+              data-testid="structure-monitor-add"
+              onClick={() => setEditing('new')}
+            >
+              Add monitoring item
+            </Button>
+          </div>
+        )}
+
         {loaded.isError && (
           <InlineNotification
             kind="error"
@@ -258,11 +278,11 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
         )}
       </Card>
 
-      {editing && (
-        <EditMonitorModal
-          key={editing.id}
+      {editing !== null && (
+        <MonitorDialog
+          key={editing === 'new' ? 'new' : editing.id}
           structureId={structureId}
-          monitor={editing}
+          monitor={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
         />
       )}
