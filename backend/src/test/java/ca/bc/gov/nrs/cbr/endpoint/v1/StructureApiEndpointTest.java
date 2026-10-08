@@ -174,4 +174,14 @@ class StructureApiEndpointTest {
     assertThat(delete.getAnnotation(PreAuthorize.class).value())
         .isEqualTo(CbrAuthorities.DESTRUCTIVE);
   }
+  @Test
+  @DisplayName("a monitoring item is edited by PUT /{structureId}/monitors/{monitorId}, on "
+      + "CONTENT_EDIT")
+  void monitorUpdateIsMappedAndGated() {
+    Method update = method("updateMonitor");
+    assertThat(update.getAnnotation(PutMapping.class).value())
+        .containsExactly("/{structureId}/monitors/{monitorId}");
+    assertThat(update.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.CONTENT_EDIT);
+  }
 }

@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { MonitorView } from '@/pages/StructureDetail/monitorsResponse';
+import type { MonitorUpdateRequest, MonitorView } from '@/pages/StructureDetail/monitorsResponse';
 import type { RepairView } from '@/pages/StructureDetail/repairsResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
 import type {
@@ -16,7 +16,7 @@ import type {
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
-import { apiErrorMessage } from '@/utils/apiError';
+import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 
 export const STRUCTURE_SEARCH_QUERY_KEY = 'structure-search';
 
@@ -160,6 +160,21 @@ export const useStructureMonitors = (
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
+
+/**
+ * Saves an edit to one monitoring item, then refreshes the structure's monitoring table. The
+ * fields the server refused come back as `fieldErrors`, keyed as the request is.
+ */
+export const useUpdateStructureMonitor = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ monitorId, request }: { monitorId: string; request: MonitorUpdateRequest }) =>
+      API.structureSearch.updateStructureMonitor(structureId, monitorId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
 
 /**
  * Deletes one monitoring item, then refreshes the structure's monitoring table — every page and

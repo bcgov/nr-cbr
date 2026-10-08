@@ -49,6 +49,8 @@ describe('ConfigurationService', () => {
     ['getStructureCurbTypeCodes', 'structure-curb-type-codes'],
     ['getCulvertTypeCodes', 'culvert-type-codes'],
     ['getSpecialEquipmentCodes', 'special-equipment-codes'],
+    ['getMonitoringStatusCodes', 'monitoring-status-codes'],
+    ['getMonitorFrequencyCodes', 'monitor-frequency-codes'],
   ] as const)('calls the %s endpoint', async (method, path) => {
     const { service, request } = withMockedRequest();
 

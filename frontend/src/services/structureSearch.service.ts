@@ -4,7 +4,11 @@ import type {
   InspectionScheduleResponse,
   InspectionsResponse,
 } from '@/pages/StructureDetail/inspectionsResponse';
-import type { MonitorView, StructureMonitor } from '@/pages/StructureDetail/monitorsResponse';
+import type {
+  MonitorUpdateRequest,
+  MonitorView,
+  StructureMonitor,
+} from '@/pages/StructureDetail/monitorsResponse';
 import type { RepairView, StructureRepair } from '@/pages/StructureDetail/repairsResponse';
 import type { SpansAndPiersResponse } from '@/pages/StructureDetail/spansAndPiersResponse';
 import type { StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
@@ -220,6 +224,23 @@ export class StructureSearchService extends HttpClient {
       url: '/v1/structures/{structureId}/monitors',
       path: { structureId },
       query: { view, pageNumber, pageSize, includeBeforeInstall },
+    });
+  }
+
+  /**
+   * Saves an edit to one monitoring item. 400 with `fieldErrors` when a field is refused; 404 when
+   * the structure has no such item.
+   */
+  updateStructureMonitor(
+    structureId: string,
+    monitorId: string,
+    request: MonitorUpdateRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/monitors/{monitorId}',
+      path: { structureId, monitorId },
+      body: request,
     });
   }
 

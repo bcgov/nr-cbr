@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
@@ -232,6 +233,23 @@ public interface StructureApiEndpoint {
       @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
       @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
       boolean includeBeforeInstall);
+
+  /**
+   * Saves an edit to one monitoring item — legacy's "Monitoring Item" dialog.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy offers Add Monitor;
+   * legacy itself checked nothing on an edit. <b>204</b> on success; <b>404</b> when the structure
+   * has no such item; <b>400</b> with {@code fieldErrors} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the item belongs to
+   * @param monitorId   the item's {@code MONITOR_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/monitors/{monitorId}")
+  ResponseEntity<Void> updateMonitor(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("monitorId") long monitorId,
+      @RequestBody MonitorUpdateRequest request);
 
   /**
    * Deletes one monitoring item — legacy's delete icon on the Monitoring tab.

@@ -10,6 +10,7 @@ import ca.bc.gov.nrs.cbr.service.v1.StructureRepairsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSpansAndPiersService;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
@@ -144,6 +145,13 @@ public class StructureApiController implements StructureApiEndpoint {
       boolean includeBeforeInstall) {
     return monitorsService.monitors(
         structureId, view, pageNumber, pageSize, includeBeforeInstall);
+  }
+
+  @Override
+  public ResponseEntity<Void> updateMonitor(
+      long structureId, long monitorId, MonitorUpdateRequest request) {
+    monitorsService.update(structureId, monitorId, request);
+    return ResponseEntity.noContent().build();
   }
 
   @Override

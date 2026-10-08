@@ -22,7 +22,7 @@ import lombok.ToString;
  * keep an eye on rather than repair.
  *
  * <p>Read by the structure page's Monitoring tab, and cleared by an inspection or structure delete.
- * The entry and update audit columns are not mapped; nothing reads them yet.
+ * The entry audit columns are not mapped: nothing here writes or reads them.
  */
 @Entity
 @Table(name = "STRUCTURE_MONITOR_ITEMS", schema = "THE")
@@ -31,7 +31,7 @@ import lombok.ToString;
 @EqualsAndHashCode(of = "monitorId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class StructureMonitorItemEntity {
 
   @Id
@@ -89,4 +89,11 @@ public class StructureMonitorItemEntity {
 
   @Column(name = "COMPLETED_BY_TIMESTAMP")
   private LocalDateTime completedByTimestamp;
+
+  /** Who last changed it — set on every edit. */
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 }

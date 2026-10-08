@@ -111,6 +111,18 @@ export const specialEquipmentCodesQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const monitoringStatusCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'monitoring-status-codes'],
+  queryFn: () => API.configuration.getMonitoringStatusCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const monitorFrequencyCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'monitor-frequency-codes'],
+  queryFn: () => API.configuration.getMonitorFrequencyCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 /**
  * The parameterless lookups each search screen draws on.
  *
@@ -208,6 +220,14 @@ export const useCulvertTypeCodes = (): UseQueryResult<CodeOption[]> =>
 
 export const useSpecialEquipmentCodes = (): UseQueryResult<CodeOption[]> =>
   useQuery(specialEquipmentCodesQuery);
+
+/** The Monitoring Status select on a monitoring item. */
+export const useMonitoringStatusCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(monitoringStatusCodesQuery);
+
+/** The Monitoring Frequency select on a monitoring item. */
+export const useMonitorFrequencyCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(monitorFrequencyCodesQuery);
 
 /**
  * The recreation districts for a project file — the Recreation District list on a recreation site.

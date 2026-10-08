@@ -1,4 +1,4 @@
-import { TrashCan, View } from '@carbon/icons-react';
+import { Edit, TrashCan, View } from '@carbon/icons-react';
 import {
   Button,
   Checkbox,
@@ -20,6 +20,7 @@ import DestructiveModal from '@/components/core/DestructiveModal';
 import ExternalLink from '@/components/core/ExternalLink';
 
 import Card from './Card';
+import EditMonitorModal from './EditMonitorModal';
 import { describe, number } from './format';
 import UserAudits from './UserAudits';
 
@@ -44,13 +45,18 @@ const PAGE_SIZES = [10, 20, 50];
 type TableProps = {
   rows: StructureMonitor[];
   view: MonitorView;
-  /** Shows the Actions column — only to a user who may delete. */
+  /** Offers Edit — Level 1 and up. */
+  canEdit: boolean;
+  /** Offers Delete — the destructive privilege. */
   canDelete: boolean;
+  onEdit: (monitor: StructureMonitor) => void;
   onDelete: (monitor: StructureMonitor) => void;
 };
 
 /** The page of monitoring items, or a line saying there are none in this view. */
-const MonitorsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
+const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, onDelete }) => {
+  // The Actions column only when there is an action to offer, as Site Search's.
+  const hasActions = canEdit || canDelete;
   if (rows.length === 0) {
     return (
       <p className="structure-detail__empty">
@@ -71,9 +77,9 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
             <TableHeader className="structure-detail__nowrap">Inspection Date</TableHeader>
             <TableHeader>Description</TableHeader>
             <TableHeader>Monitoring Frequency</TableHeader>
-            {/* Only for a user who may delete, as Site Search's is: an action that cannot be
+            {/* Only for a user who may act, as Site Search's is: an action that cannot be
                 performed is not shown, and an empty column is noise. */}
-            {canDelete && <TableHeader>Actions</TableHeader>}
+            {hasActions && <TableHeader>Actions</TableHeader>}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -98,22 +104,40 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
                   .filter(Boolean)
                   .join(' — ')}
               </TableCell>
-              {canDelete && (
+              {hasActions && (
                 <TableCell className="structure-detail__nowrap">
+                  {canEdit && (
+                    // Ghost, the link-blue of an action that changes nothing until saved; Delete
+                    // beside it is the red one.
+                    <Button
+                      kind="ghost"
+                      size="sm"
+                      renderIcon={Edit}
+                      data-testid={`structure-monitor-edit-${monitor.id}`}
+                      onClick={() => onEdit(monitor)}
+                    >
+                      Edit{' '}
+                      <span className="cds--visually-hidden">
+                        monitoring item {number(monitor.number)}
+                      </span>
+                    </Button>
+                  )}
                   {/* danger--ghost, as Site Search's delete: red at rest and on hover, so it reads
                       as destructive before it is pressed. */}
-                  <Button
-                    kind="danger--ghost"
-                    size="sm"
-                    renderIcon={TrashCan}
-                    data-testid={`structure-monitor-delete-${monitor.id}`}
-                    onClick={() => onDelete(monitor)}
-                  >
-                    Delete{' '}
-                    <span className="cds--visually-hidden">
-                      monitoring item {number(monitor.number)}
-                    </span>
-                  </Button>
+                  {canDelete && (
+                    <Button
+                      kind="danger--ghost"
+                      size="sm"
+                      renderIcon={TrashCan}
+                      data-testid={`structure-monitor-delete-${monitor.id}`}
+                      onClick={() => onDelete(monitor)}
+                    >
+                      Delete{' '}
+                      <span className="cds--visually-hidden">
+                        monitoring item {number(monitor.number)}
+                      </span>
+                    </Button>
+                  )}
                 </TableCell>
               )}
             </TableRow>
@@ -133,7 +157,9 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
  * choosing All on one does not change what the other lists.
  */
 const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
-  const { canDelete } = useAuthorization();
+  const { canEdit, canDelete } = useAuthorization();
+  /** The item being edited, if any; the dialog is mounted only then. */
+  const [editing, setEditing] = useState<StructureMonitor | null>(null);
   const { display } = useNotification();
   const deleteMonitor = useDeleteStructureMonitor(structureId);
   /** The item whose delete is being confirmed, if any. */
@@ -213,7 +239,9 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
             <MonitorsTable
               rows={loaded.data.page.content}
               view={view}
+              canEdit={canEdit}
               canDelete={canDelete}
+              onEdit={setEditing}
               onDelete={setPendingDelete}
             />
             <Pagination
@@ -229,6 +257,15 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
           </>
         )}
       </Card>
+
+      {editing && (
+        <EditMonitorModal
+          key={editing.id}
+          structureId={structureId}
+          monitor={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       {/* Legacy's window.confirm(), as the app's other deletes ask. */}
       <DestructiveModal

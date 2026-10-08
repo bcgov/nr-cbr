@@ -142,4 +142,14 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/special-equipment-codes")
   ResponseEntity<List<CodeOptionResponse>> getSpecialEquipmentCodes();
+
+  /** Monitoring statuses — the Monitoring Status select on a monitoring item. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/monitoring-status-codes")
+  ResponseEntity<List<CodeOptionResponse>> getMonitoringStatusCodes();
+
+  /** Monitoring frequencies — the Monitoring Frequency select on a monitoring item. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/monitor-frequency-codes")
+  ResponseEntity<List<CodeOptionResponse>> getMonitorFrequencyCodes();
 }

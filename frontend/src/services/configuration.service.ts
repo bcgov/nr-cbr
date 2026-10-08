@@ -107,6 +107,22 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Monitoring statuses, by description. */
+  getMonitoringStatusCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/monitoring-status-codes',
+    });
+  }
+
+  /** Monitoring frequencies, by description. */
+  getMonitorFrequencyCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/monitor-frequency-codes',
+    });
+  }
+
   /** Inspection types, by description. Retired codes are included. */
   getInspectionTypeCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {

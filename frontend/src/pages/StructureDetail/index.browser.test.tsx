@@ -28,9 +28,16 @@ const api = vi.hoisted(() => ({
   getStructureInspections: vi.fn(),
   getStructureRepairs: vi.fn(),
   getStructureMonitors: vi.fn(),
+  updateStructureMonitor: vi.fn(),
   deleteStructureMonitor: vi.fn(),
 }));
-vi.mock('@/services/APIs', () => ({ default: { structureSearch: api } }));
+const configurationApi = vi.hoisted(() => ({
+  getMonitoringStatusCodes: vi.fn(),
+  getMonitorFrequencyCodes: vi.fn(),
+}));
+vi.mock('@/services/APIs', () => ({
+  default: { structureSearch: api, configuration: configurationApi },
+}));
 
 const code = (value: string | null, description: string | null = value) => ({
   code: value,
@@ -265,6 +272,18 @@ beforeEach(() => {
   api.getStructureRepairs.mockResolvedValue(repairsPage([]));
   api.getStructureMonitors.mockReset();
   api.getStructureMonitors.mockResolvedValue(repairsPage([]));
+  api.updateStructureMonitor.mockReset();
+  api.updateStructureMonitor.mockResolvedValue(undefined);
+  configurationApi.getMonitoringStatusCodes.mockResolvedValue([
+    { code: 'COM', description: 'Completed' },
+    { code: 'REQ', description: 'Required' },
+    { code: 'SUG', description: 'Suggested' },
+  ]);
+  configurationApi.getMonitorFrequencyCodes.mockResolvedValue([
+    { code: 'ANN', description: 'Annually' },
+    { code: 'OTH', description: 'Other' },
+  ]);
+  authorization.canEdit = false;
   api.deleteStructureMonitor.mockReset();
   api.deleteStructureMonitor.mockResolvedValue(undefined);
   authorization.canDelete = false;
@@ -1331,6 +1350,99 @@ describe('StructureDetailPage — Monitoring', () => {
         expect.objectContaining({ kind: 'error', title: 'The monitoring item was not deleted' }),
       ),
     );
+  });
+
+  /** Opens the edit dialog for item 2, as a Level 1 user. */
+  const openEdit = async (overrides: object = {}) => {
+    authorization.canEdit = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2', overrides)]));
+    await showing(bridge());
+    await openMonitoring();
+    await userEvent.click(await screen.findByTestId('structure-monitor-edit-2'));
+    const dialog = await screen.findByTestId('edit-monitor-dialog');
+    // Wait for the dropdowns' lists, which the dialog fetches as it opens.
+    await vi.waitFor(() =>
+      expect(within(dialog).getByTestId('edit-monitor-status')).toHaveValue('REQ'),
+    );
+    return dialog;
+  };
+
+  it('offers Edit, in the Actions column, from Level 1 up', async () => {
+    authorization.canEdit = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    await screen.findByTestId('structure-monitor-2');
+
+    expect(screen.getByRole('button', { name: 'Edit monitoring item 2' })).toBe(
+      screen.getByTestId('structure-monitor-edit-2'),
+    );
+    expect(screen.queryByTestId('structure-monitor-delete-2')).not.toBeInTheDocument();
+  });
+
+  it('opens the item in a dialog, its number shown and not edited, and saves the edit', async () => {
+    const dialog = await openEdit();
+
+    expect(dialog).toMatchTextContent('Edit monitoring item 2');
+    expect(within(dialog).getByTestId('edit-monitor-frequency')).toHaveValue('ANN');
+    expect(within(dialog).getByTestId('edit-monitor-description')).toHaveValue(
+      'Watch the scour at the south abutment.',
+    );
+    await userEvent.selectOptions(within(dialog).getByTestId('edit-monitor-status'), 'COM');
+    await userEvent.clear(within(dialog).getByTestId('edit-monitor-description'));
+    await userEvent.type(within(dialog).getByTestId('edit-monitor-description'), 'Scour gone.');
+    await userEvent.click(within(dialog).getByTestId('edit-monitor-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateStructureMonitor).toHaveBeenCalledWith('7', '2', {
+        statusCode: 'COM',
+        frequencyCode: 'ANN',
+        frequencyComment: '',
+        description: 'Scour gone.',
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(screen.queryByTestId('edit-monitor-dialog')).not.toBeInTheDocument(),
+    );
+    expect(display).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'Monitoring item 2 saved' }),
+    );
+  });
+
+  it('asks for the comment when the frequency is Other, beside the box', async () => {
+    const dialog = await openEdit({ frequencyComment: null });
+
+    await userEvent.selectOptions(within(dialog).getByTestId('edit-monitor-frequency'), 'OTH');
+    await userEvent.click(within(dialog).getByTestId('edit-monitor-save'));
+
+    expect(dialog).toMatchTextContent(
+      'Monitor Freq. Comment is required when the frequency is Other.',
+    );
+    expect(api.updateStructureMonitor).not.toHaveBeenCalled();
+  });
+
+  it('shows what the server refused beside the field', async () => {
+    api.updateStructureMonitor.mockRejectedValue({
+      body: { fieldErrors: { description: 'Monitor Description can be at most 2000 characters.' } },
+    });
+    const dialog = await openEdit();
+
+    await userEvent.click(within(dialog).getByTestId('edit-monitor-save'));
+
+    await vi.waitFor(() =>
+      expect(dialog).toMatchTextContent('Monitor Description can be at most 2000 characters.'),
+    );
+    expect(display).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'error' }));
+  });
+
+  it('saves nothing when cancelled', async () => {
+    const dialog = await openEdit();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByTestId('edit-monitor-dialog')).not.toBeInTheDocument();
+    expect(api.updateStructureMonitor).not.toHaveBeenCalled();
   });
 
   it('says when there are none in the view chosen', async () => {

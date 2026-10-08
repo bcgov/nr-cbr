@@ -217,6 +217,26 @@ describe('StructureSearchService', () => {
     );
   });
 
+  it('saves an edit to one monitoring item', async () => {
+    const { service, request } = withMockedRequest();
+    const body = {
+      statusCode: 'REQ',
+      frequencyCode: 'ANN',
+      frequencyComment: '',
+      description: 'Scour.',
+    };
+
+    await service.updateStructureMonitor('7', '12', body);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'PUT',
+        url: '/api/v1/structures/7/monitors/12',
+        data: body,
+      }),
+    );
+  });
+
   it('deletes one monitoring item of a structure', async () => {
     const { service, request } = withMockedRequest();
 

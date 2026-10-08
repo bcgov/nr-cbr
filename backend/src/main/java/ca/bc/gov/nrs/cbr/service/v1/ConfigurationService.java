@@ -11,6 +11,8 @@ import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
@@ -85,6 +87,8 @@ public class ConfigurationService {
   private final StructureCurbTypeCodeRepository structureCurbTypeCodeRepository;
   private final EngineeredCulvertTypeCodeRepository engineeredCulvertTypeCodeRepository;
   private final SpecialEquipmentRequirementCodeRepository specialEquipmentRequirementCodeRepository;
+  private final MonitoringStatusCodeRepository monitoringStatusCodeRepository;
+  private final MonitorFrequencyCodeRepository monitorFrequencyCodeRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -99,7 +103,9 @@ public class ConfigurationService {
       SuperstructureTypeCodeRepository superstructureTypeCodeRepository,
       StructureCurbTypeCodeRepository structureCurbTypeCodeRepository,
       EngineeredCulvertTypeCodeRepository engineeredCulvertTypeCodeRepository,
-      SpecialEquipmentRequirementCodeRepository specialEquipmentRequirementCodeRepository) {
+      SpecialEquipmentRequirementCodeRepository specialEquipmentRequirementCodeRepository,
+      MonitoringStatusCodeRepository monitoringStatusCodeRepository,
+      MonitorFrequencyCodeRepository monitorFrequencyCodeRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -113,6 +119,8 @@ public class ConfigurationService {
     this.structureCurbTypeCodeRepository = structureCurbTypeCodeRepository;
     this.engineeredCulvertTypeCodeRepository = engineeredCulvertTypeCodeRepository;
     this.specialEquipmentRequirementCodeRepository = specialEquipmentRequirementCodeRepository;
+    this.monitoringStatusCodeRepository = monitoringStatusCodeRepository;
+    this.monitorFrequencyCodeRepository = monitorFrequencyCodeRepository;
   }
 
   /**
@@ -367,6 +375,24 @@ public class ConfigurationService {
         .map(entity ->
             new CodeOptionResponse(
                 entity.getSpecialEquipmentRequirementCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Monitoring statuses — {@code THE.MONITORING_STATUS_CODE}, by description. */
+  @Cacheable("monitoringStatusCodes")
+  public List<CodeOptionResponse> getMonitoringStatusCodes() {
+    return monitoringStatusCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getMonitoringStatusCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Monitoring frequencies — {@code THE.MONITOR_FREQUENCY_CODE}, by description. */
+  @Cacheable("monitorFrequencyCodes")
+  public List<CodeOptionResponse> getMonitorFrequencyCodes() {
+    return monitorFrequencyCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getMonitorFrequencyCode(), entity.getDescription()))
         .toList();
   }
 }

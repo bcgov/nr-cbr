@@ -1,5 +1,6 @@
 @use '@carbon/react/scss/spacing' as *;
 @use '@carbon/react/scss/type';
+@use '@carbon/react/scss/breakpoint' as *;
 
 // The status pills read beside the heading, as nr-frep's checklist pages place theirs: the heading
 // at its own width rather than the page's, and everything on the heading's centre line. The shared
@@ -309,4 +310,36 @@ $page-bottom: 2rem;
   display: inline-flex;
   flex-wrap: wrap;
   gap: $spacing-03;
+}
+
+// The monitoring item dialog: number, status and frequency side by side, the text boxes full width
+// under them, the buttons bottom-right — as Structure Search's repair-responsibility dialog.
+.structure-detail__dialog-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 2fr);
+  align-items: start;
+  gap: $spacing-05;
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.structure-detail__dialog-wide {
+  margin-block-start: $spacing-05;
+}
+
+.structure-detail__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-05;
+  margin-block-start: $spacing-07;
+}
+
+// A little wider than Carbon's default dialog, so the two dropdowns and the description have room.
+// Wide screens only: below lg Carbon's own sizing already fills most of the screen.
+.structure-detail__monitor-dialog .cds--modal-container {
+  @include breakpoint(lg) {
+    inline-size: 60%;
+  }
 }

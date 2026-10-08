@@ -49,3 +49,20 @@ export function apiErrorMessage(err: unknown, fallback = 'Unknown error'): strin
 
   return fallback;
 }
+
+/**
+ * The per-field messages of a refused save — the `fieldErrors` map a 400 carries, keyed by the
+ * request's own field names. Empty when the error carries none, so a caller can merge it into its
+ * own error map unconditionally.
+ */
+export const apiFieldErrors = (error: unknown): Record<string, string> => {
+  const body = (error as { body?: unknown } | null)?.body;
+  if (body === null || typeof body !== 'object') return {};
+  const raw = (body as Record<string, unknown>).fieldErrors;
+  if (raw === null || typeof raw !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+};
