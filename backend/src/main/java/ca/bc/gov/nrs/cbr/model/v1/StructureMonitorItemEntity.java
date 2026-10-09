@@ -5,9 +5,12 @@ import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -22,7 +25,7 @@ import lombok.ToString;
  * keep an eye on rather than repair.
  *
  * <p>Read by the structure page's Monitoring tab, and cleared by an inspection or structure delete.
- * The entry and update audit columns are not mapped; nothing reads them yet.
+ * Its own entry and update audit columns are mapped: this application adds and edits items.
  */
 @Entity
 @Table(name = "STRUCTURE_MONITOR_ITEMS", schema = "THE")
@@ -31,10 +34,18 @@ import lombok.ToString;
 @EqualsAndHashCode(of = "monitorId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class StructureMonitorItemEntity {
 
+  /**
+   * From {@code THE.STRUCTURE_MONITOR_ITEMS_SEQ}, as legacy's {@code INSERT_MONITOR} takes it.
+   * {@code allocationSize = 1} because the sequence increments by 1 and legacy draws from it too:
+   * Hibernate's default of 50 would hand out ids it assumes are reserved and collide with legacy's.
+   */
   @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "structureMonitorItemsSeq")
+  @SequenceGenerator(name = "structureMonitorItemsSeq",
+      sequenceName = "THE.STRUCTURE_MONITOR_ITEMS_SEQ", allocationSize = 1)
   @Column(name = "MONITOR_ID")
   private Long monitorId;
 
@@ -89,4 +100,18 @@ public class StructureMonitorItemEntity {
 
   @Column(name = "COMPLETED_BY_TIMESTAMP")
   private LocalDateTime completedByTimestamp;
+
+  /** Who added it, and when — set once, on insert. */
+  @Column(name = "ENTRY_USERID", length = 30)
+  private String entryUserid;
+
+  @Column(name = "ENTRY_TIMESTAMP")
+  private LocalDateTime entryTimestamp;
+
+  /** Who last changed it — set on insert and on every edit. */
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 }

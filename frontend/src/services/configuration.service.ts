@@ -107,6 +107,46 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Monitoring statuses, by description. */
+  getMonitoringStatusCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/monitoring-status-codes',
+    });
+  }
+
+  /** Monitoring frequencies, by description. */
+  getMonitorFrequencyCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/monitor-frequency-codes',
+    });
+  }
+
+  /** Repair statuses, current ones by description. */
+  getRepairStatusCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/repair-status-codes',
+    });
+  }
+
+  /** Repair priorities, current ones. */
+  getRepairPriorityCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/repair-priority-codes',
+    });
+  }
+
+  /** Repair groups, current ones by code — the checkboxes that narrow the Repair Type list. */
+  getRepairGroupCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/repair-group-codes',
+    });
+  }
+
   /** Inspection types, by description. Retired codes are included. */
   getInspectionTypeCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {

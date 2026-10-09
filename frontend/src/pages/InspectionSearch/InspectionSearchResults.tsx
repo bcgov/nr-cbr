@@ -227,14 +227,19 @@ const InspectionSearchResults: FC<Props> = ({
                           // danger--ghost rather than ghost with a recoloured icon: Carbon's danger
                           // kinds carry the whole interaction, so the control reads as destructive
                           // before it is pressed, not only in the dialog that follows.
+                          // "Delete" in words beside the icon, as every Actions column in the app
+                          // shows it; the inspection it deletes is read out to a screen reader.
                           kind="danger--ghost"
                           size="sm"
-                          hasIconOnly
                           renderIcon={TrashCan}
-                          iconDescription={`Delete offline inspection ${inspection.id}`}
                           data-testid={`inspection-delete-${inspection.id}`}
                           onClick={() => onDelete(inspection)}
-                        />
+                        >
+                          Delete{' '}
+                          <span className="cds--visually-hidden">
+                            offline inspection {inspection.id}
+                          </span>
+                        </Button>
                       )}
                     </TableCell>
                   )}

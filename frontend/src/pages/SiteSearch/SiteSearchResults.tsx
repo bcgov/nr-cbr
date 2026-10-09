@@ -173,14 +173,16 @@ const SiteSearchResults: FC<Props> = ({
                         // kinds carry the whole interaction — red icon at rest, red fill on hover
                         // and focus — so the control reads as destructive before it is pressed, not
                         // only in the confirmation dialog that follows.
+                        // "Delete" in words beside the icon, as every Actions column in the app
+                        // shows it; the site it deletes is read out to a screen reader.
                         kind="danger--ghost"
                         size="sm"
-                        hasIconOnly
                         renderIcon={TrashCan}
-                        iconDescription={`Delete site ${site.id}`}
                         data-testid={`site-delete-${site.id}`}
                         onClick={() => onDelete(site)}
-                      />
+                      >
+                        Delete <span className="cds--visually-hidden">site {site.id}</span>
+                      </Button>
                     </TableCell>
                   )}
                 </TableRow>

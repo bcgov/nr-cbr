@@ -1,7 +1,15 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { MonitorView } from '@/pages/StructureDetail/monitorsResponse';
-import type { RepairView } from '@/pages/StructureDetail/repairsResponse';
+import type {
+  MonitorCreateRequest,
+  MonitorUpdateRequest,
+  MonitorView,
+} from '@/pages/StructureDetail/monitorsResponse';
+import type {
+  RepairCreateRequest,
+  RepairUpdateRequest,
+  RepairView,
+} from '@/pages/StructureDetail/repairsResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
 import type {
   PagedResponse,
@@ -16,7 +24,7 @@ import type {
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
-import { apiErrorMessage } from '@/utils/apiError';
+import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 
 export const STRUCTURE_SEARCH_QUERY_KEY = 'structure-search';
 
@@ -101,11 +109,26 @@ export const useStructureRepairs = (
   view: RepairView,
   pageNumber: number,
   pageSize: number,
+  includeBeforeInstall: boolean,
 ) =>
   useQuery({
-    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs', view, pageNumber, pageSize],
+    queryKey: [
+      STRUCTURE_QUERY_KEY,
+      structureId,
+      'repairs',
+      view,
+      pageNumber,
+      pageSize,
+      includeBeforeInstall,
+    ],
     queryFn: () =>
-      API.structureSearch.getStructureRepairs(structureId as string, view, pageNumber, pageSize),
+      API.structureSearch.getStructureRepairs(
+        structureId as string,
+        view,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+      ),
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
@@ -122,14 +145,132 @@ export const useStructureMonitors = (
   view: MonitorView,
   pageNumber: number,
   pageSize: number,
+  includeBeforeInstall: boolean,
 ) =>
   useQuery({
-    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors', view, pageNumber, pageSize],
+    queryKey: [
+      STRUCTURE_QUERY_KEY,
+      structureId,
+      'monitors',
+      view,
+      pageNumber,
+      pageSize,
+      includeBeforeInstall,
+    ],
     queryFn: () =>
-      API.structureSearch.getStructureMonitors(structureId as string, view, pageNumber, pageSize),
+      API.structureSearch.getStructureMonitors(
+        structureId as string,
+        view,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+      ),
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
+
+/**
+ * Adds a monitoring item, then refreshes the structure's monitoring table. The fields the server
+ * refused come back as `fieldErrors`, keyed as the request is.
+ */
+export const useCreateStructureMonitor = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: MonitorCreateRequest) =>
+      API.structureSearch.createStructureMonitor(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * Saves an edit to one monitoring item, then refreshes the structure's monitoring table. The
+ * fields the server refused come back as `fieldErrors`, keyed as the request is.
+ */
+export const useUpdateStructureMonitor = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ monitorId, request }: { monitorId: string; request: MonitorUpdateRequest }) =>
+      API.structureSearch.updateStructureMonitor(structureId, monitorId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * The repair types that apply to a structure, each with its group — the Repair Item dialog's type
+ * list. Fetched once per structure while the dialog is open; the types change with the structure's
+ * type, which the dialog does not edit.
+ */
+export const useStructureRepairTypes = (structureId: string) =>
+  useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repair-types'],
+    queryFn: () => API.structureSearch.getStructureRepairTypes(structureId),
+  });
+
+/**
+ * Adds a repair, then refreshes the structure's repairs table. The fields the server refused come
+ * back as `fieldErrors`, keyed as the request is.
+ */
+export const useCreateStructureRepair = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: RepairCreateRequest) =>
+      API.structureSearch.createStructureRepair(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * Saves an edit to one repair, then refreshes the structure's repairs table. The fields the server
+ * refused come back as `fieldErrors`, keyed as the request is.
+ */
+export const useUpdateStructureRepair = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ repairId, request }: { repairId: string; request: RepairUpdateRequest }) =>
+      API.structureSearch.updateStructureRepair(structureId, repairId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * Deletes one repair, then refreshes the structure's repairs table — every page and view of it,
+ * as the repair may be on any of them.
+ */
+export const useDeleteStructureRepair = (
+  structureId: string,
+): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (repairId: string) =>
+      API.structureSearch.deleteStructureRepair(structureId, repairId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
+  });
+};
+
+/**
+ * Deletes one monitoring item, then refreshes the structure's monitoring table — every page and
+ * view of it, as the item may be on any of them.
+ */
+export const useDeleteStructureMonitor = (
+  structureId: string,
+): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (monitorId: string) =>
+      API.structureSearch.deleteStructureMonitor(structureId, monitorId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+  });
+};
 
 /** A structure's documents and photos, fetched only once their tab is opened (`enabled`). */
 export const useStructureDocuments = (structureId: string | undefined, enabled: boolean) =>

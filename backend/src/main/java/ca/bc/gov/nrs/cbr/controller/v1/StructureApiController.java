@@ -10,7 +10,14 @@ import ca.bc.gov.nrs.cbr.service.v1.StructureRepairsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSpansAndPiersService;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
@@ -26,9 +33,11 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -132,14 +141,62 @@ public class StructureApiController implements StructureApiEndpoint {
   }
 
   @Override
-  public PagedResponse<StructureRepairsResponse.Repair> getRepairs(
-      long structureId, StructureRepairsResponse.View view, int pageNumber, int pageSize) {
-    return repairsService.repairs(structureId, view, pageNumber, pageSize);
+  public StructureRepairsResponse.Listing getRepairs(long structureId,
+      StructureRepairsResponse.View view, int pageNumber, int pageSize,
+      boolean includeBeforeInstall) {
+    return repairsService.repairs(structureId, view, pageNumber, pageSize, includeBeforeInstall);
   }
 
   @Override
-  public PagedResponse<StructureMonitorsResponse.Monitor> getMonitors(
-      long structureId, StructureMonitorsResponse.View view, int pageNumber, int pageSize) {
-    return monitorsService.monitors(structureId, view, pageNumber, pageSize);
+  public List<RepairTypeOption> getRepairTypes(long structureId) {
+    return repairsService.repairTypes(structureId);
+  }
+
+  @Override
+  public ResponseEntity<RepairCreatedResponse> createRepair(
+      long structureId, RepairCreateRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(repairsService.create(structureId, request));
+  }
+
+  @Override
+  public ResponseEntity<Void> updateRepair(
+      long structureId, long repairId, RepairUpdateRequest request) {
+    repairsService.update(structureId, repairId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteRepair(long structureId, long repairId) {
+    repairsService.delete(structureId, repairId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public StructureMonitorsResponse.Listing getMonitors(long structureId,
+      StructureMonitorsResponse.View view, int pageNumber, int pageSize,
+      boolean includeBeforeInstall) {
+    return monitorsService.monitors(
+        structureId, view, pageNumber, pageSize, includeBeforeInstall);
+  }
+
+  @Override
+  public ResponseEntity<MonitorCreatedResponse> createMonitor(
+      long structureId, MonitorCreateRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(monitorsService.create(structureId, request));
+  }
+
+  @Override
+  public ResponseEntity<Void> updateMonitor(
+      long structureId, long monitorId, MonitorUpdateRequest request) {
+    monitorsService.update(structureId, monitorId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteMonitor(long structureId, long monitorId) {
+    monitorsService.delete(structureId, monitorId);
+    return ResponseEntity.noContent().build();
   }
 }

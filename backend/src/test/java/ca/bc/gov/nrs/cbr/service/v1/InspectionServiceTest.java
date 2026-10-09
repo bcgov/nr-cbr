@@ -126,9 +126,9 @@ class InspectionServiceTest {
     givenInspection(INSPECTION, LocalDate.of(2026, 6, 15), "OFL");
 
     entityManager.persist(StructureMonitorItemEntity.builder()
-        .monitorId(nextId++).inspectionId(INSPECTION).build());
+        .inspectionId(INSPECTION).build());
     entityManager.persist(StructureRepairEntity.builder()
-        .repairId(nextId++).inspectionId(INSPECTION).build());
+        .inspectionId(INSPECTION).build());
     entityManager.persist(StructureInspectionItemEntity.builder()
         .structureInspectionItemId(nextId++).inspectionId(INSPECTION).build());
     entityManager.persist(StructureLoadRatingEntity.builder()

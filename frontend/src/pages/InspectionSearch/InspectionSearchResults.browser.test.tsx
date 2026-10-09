@@ -137,6 +137,17 @@ describe('InspectionSearchResults', () => {
     expect(screen.getByTestId('inspection-delete-4002')).toBeInTheDocument();
   });
 
+  it('says Delete beside the icon, as every Actions column does, naming what it deletes', () => {
+    renderTable([inspection({ id: '4002', inspectionReportStatusCode: 'OFL' })], {
+      canDelete: true,
+    });
+
+    expect(screen.getByRole('button', { name: 'Delete offline inspection 4002' })).toBe(
+      screen.getByTestId('inspection-delete-4002'),
+    );
+    expect(screen.getByTestId('inspection-delete-4002').querySelector('svg')).not.toBeNull();
+  });
+
   it('hides the Actions column entirely from a role that cannot delete', () => {
     // The legacy rule: an action you cannot perform is never rendered, not disabled.
     renderTable([inspection({ id: '4002', inspectionReportStatusCode: 'OFL' })], {

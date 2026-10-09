@@ -1,14 +1,21 @@
 import { Theme } from '@carbon/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
-import { page, userEvent } from 'vitest/browser';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 
 import StructureDetailPage from './index';
 
 // The app's real stylesheet, Carbon included: these measure layout, which Carbon's sizes drive.
 import '@/styles/index.scss';
+
+const authorization = vi.hoisted(() => ({ canEdit: false, canDelete: false }));
+vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
+
+// A delete's outcome is a toast; asserted on what the page asked to show.
+const display = vi.hoisted(() => vi.fn());
+vi.mock('@/context/notification/useNotification', () => ({ useNotification: () => ({ display }) }));
 
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
@@ -16,8 +23,21 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 
 const code = (value: string) => ({ code: value, description: value });
 
-const api = vi.hoisted(() => ({ getStructure: vi.fn() }));
-vi.mock('@/services/APIs', () => ({ default: { structureSearch: api } }));
+const api = vi.hoisted(() => ({
+  getStructure: vi.fn(),
+  getStructureMonitors: vi.fn(),
+  getStructureRepairs: vi.fn(),
+}));
+vi.mock('@/services/APIs', () => ({
+  default: {
+    structureSearch: api,
+    configuration: {
+      getMonitoringStatusCodes: () => Promise.resolve([{ code: 'SUG', description: 'Suggested' }]),
+      getMonitorFrequencyCodes: () =>
+        Promise.resolve([{ code: 'INS', description: 'Every Routine Inspection' }]),
+    },
+  },
+}));
 
 type Overrides = { details?: object; loadRating?: object; comments?: object[] };
 
@@ -320,5 +340,100 @@ describe('StructureDetailPage — layout', () => {
         expect(line.right).toBeLessThanOrEqual(banner.right);
       }
     }
+  });
+
+  it("lines the add dialog's first row up: labels on one line, values level with the box", async () => {
+    // The read-only Status sits beside the Frequency dropdown; read in the page's bold
+    // reading style they sat higher than the box and labelled louder than it.
+    authorization.canEdit = true;
+    api.getStructureMonitors.mockResolvedValue({
+      page: { content: [], totalElements: 0, totalPages: 1, pageNumber: 0, pageSize: 10 },
+      beforeInstallCount: 0,
+    });
+    await page.viewport(1400, 900);
+    await renderPage();
+    await userEvent.click(screen.getByTestId('structure-tab-monitoring'));
+    await userEvent.click(await screen.findByTestId('structure-monitor-add'));
+    const dialog = await screen.findByTestId('monitor-dialog');
+
+    const numberCell = within(dialog).getByText('Monitoring Status').closest('.read-only-field')!;
+    const numberLabel = numberCell.querySelector('.read-only-field__label')!;
+    const numberValue = numberCell
+      .querySelector('.read-only-field__value')!
+      .getBoundingClientRect();
+    const frequencyLabel = within(dialog).getByText('Monitoring Frequency').getBoundingClientRect();
+    const frequencyBox = within(dialog).getByTestId('monitor-frequency').getBoundingClientRect();
+
+    expect(numberLabel.getBoundingClientRect().top).toBeCloseTo(frequencyLabel.top, 0);
+    expect(numberValue.top + numberValue.height / 2).toBeCloseTo(
+      frequencyBox.top + frequencyBox.height / 2,
+      0,
+    );
+    expect(getComputedStyle(numberLabel).fontWeight).toBe('400');
+    // No wide empty column between the status and the frequency: the frequency starts a gap's
+    // width after the status's text.
+    const statusText = within(dialog).getByText('Suggested').getBoundingClientRect();
+    expect(frequencyBox.left - statusText.right).toBeLessThanOrEqual(48);
+  });
+
+  /** The repairs tab with one long repair, Edit and Delete both offered — a Level 2 user. */
+  const showRepairs = async (width: number) => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    api.getStructureRepairs.mockResolvedValue({
+      page: {
+        content: [
+          {
+            id: '3',
+            number: 3,
+            status: { code: 'REQ', description: 'Required' },
+            type: { code: 'DECK', description: 'Deck planks, timber, full width replacement' },
+            suggested: { userId: 'IDIR\\ASMITHSON', date: '2023-06-02' },
+            required: { userId: 'IDIR\\BJONESWORTH', date: '2023-06-05' },
+            completed: null,
+            inspectionId: '41',
+            inspectionDate: '2023-06-01',
+            priority: { code: 'P1', description: 'Urgent - within 30 days' },
+            completedDate: null,
+            estimate: 4000,
+            actualCost: null,
+            quantity: 12,
+            unit: 'm2',
+            description: 'Replace worn planks across the north span.',
+          },
+        ],
+        totalElements: 1,
+        totalPages: 1,
+        pageNumber: 0,
+        pageSize: 10,
+      },
+      beforeInstallCount: 0,
+    });
+    await page.viewport(width, 900);
+    await renderPage();
+    await userEvent.click(screen.getByTestId('structure-tab-repairs'));
+    const edit = await screen.findByTestId('structure-repair-edit-3');
+    const del = screen.getByTestId('structure-repair-delete-3');
+    const scroller = del.closest('.structure-detail__table-scroll')!;
+    // Nothing needs a sideways scroll to reach, Actions included.
+    expect(scroller.scrollWidth).toBeLessThanOrEqual(scroller.clientWidth);
+    expect(del.getBoundingClientRect().right).toBeLessThanOrEqual(
+      scroller.getBoundingClientRect().right,
+    );
+    return { edit: edit.getBoundingClientRect(), del: del.getBoundingClientRect() };
+  };
+
+  it('fits the repairs table inside its card at 1400px, Edit stacked over Delete', async () => {
+    // Eleven columns: User Audits, Repair Type and Priority wrap, and the actions stack.
+    const { edit, del } = await showRepairs(1400);
+
+    expect(del.top).toBeGreaterThan(edit.bottom - 1);
+  });
+
+  it('puts Edit and Delete side by side where the table has the room', async () => {
+    const { edit, del } = await showRepairs(1800);
+
+    expect(del.top).toBeCloseTo(edit.top, 0);
+    expect(del.left).toBeGreaterThan(edit.right - 1);
   });
 });

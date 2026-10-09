@@ -5,9 +5,12 @@ import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,7 +25,7 @@ import lombok.ToString;
  * {@code THE.STRUCTURE_REPAIR} — A repair raised by an inspection.
  *
  * <p>Read by the structure page's Repairs tab, and cleared by an inspection or structure delete.
- * The entry and update audit columns are not mapped; nothing reads them yet.
+ * Its own entry and update audit columns are mapped: this application edits repairs.
  */
 @Entity
 @Table(name = "STRUCTURE_REPAIR", schema = "THE")
@@ -31,10 +34,18 @@ import lombok.ToString;
 @EqualsAndHashCode(of = "repairId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class StructureRepairEntity {
 
+  /**
+   * From {@code THE.STRUCTURE_REPAIR_SEQ}, as legacy's {@code INSERT_REPAIR} takes it.
+   * {@code allocationSize = 1} because the sequence increments by 1 and legacy draws from it too:
+   * Hibernate's default of 50 would hand out ids it assumes are reserved and collide with legacy's.
+   */
   @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "structureRepairSeq")
+  @SequenceGenerator(name = "structureRepairSeq", sequenceName = "THE.STRUCTURE_REPAIR_SEQ",
+      allocationSize = 1)
   @Column(name = "REPAIR_ID")
   private Long repairId;
 
@@ -106,4 +117,16 @@ public class StructureRepairEntity {
 
   @Column(name = "COMPLETED_BY_TIMESTAMP")
   private LocalDateTime completedByTimestamp;
+
+  @Column(name = "ENTRY_USERID", length = 30)
+  private String entryUserid;
+
+  @Column(name = "ENTRY_TIMESTAMP")
+  private LocalDateTime entryTimestamp;
+
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 }

@@ -1,5 +1,6 @@
 @use '@carbon/react/scss/spacing' as *;
 @use '@carbon/react/scss/type';
+@use '@carbon/react/scss/breakpoint' as *;
 
 // The status pills read beside the heading, as nr-frep's checklist pages place theirs: the heading
 // at its own width rather than the page's, and everything on the heading's centre line. The shared
@@ -309,4 +310,155 @@ $page-bottom: 2rem;
   display: inline-flex;
   flex-wrap: wrap;
   gap: $spacing-03;
+}
+
+// The monitoring item dialog: number, status and frequency side by side, the text boxes full width
+// under them, the buttons bottom-right — as Structure Search's repair-responsibility dialog.
+.structure-detail__dialog-fields {
+  display: grid;
+  // Number and status as wide as what they hold, the frequency the rest: shares of the row left
+  // "Suggested" a column far wider than the word, and a gap before the frequency.
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: start;
+  gap: $spacing-05 $spacing-07;
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Adding has no number to show: the status, then the frequency taking the rest.
+.structure-detail__dialog-fields--add {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+// The repair dialog: three equal columns — number, status, priority; completed date and the two
+// costs; type, quantity — then the group checkboxes and the description full width.
+.structure-detail__repair-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: $spacing-05 $spacing-07;
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// The Repair Type select spans two of the three columns: its descriptions are long.
+.structure-detail__repair-type {
+  grid-column: span 2;
+
+  @media (max-width: 671px) {
+    grid-column: auto;
+  }
+}
+
+// The repairs table's Actions: Edit and Delete side by side when the table has the room, Edit over
+// Delete when it has not. The table's room, not the screen's: the side nav and the card's padding
+// take a share of the screen, so a query on the scroller measures what the eleven columns get.
+// 1440px is the scroller width the table needs with the buttons side by side.
+.structure-detail__repairs-scroll {
+  container-type: inline-size;
+
+  // Half Carbon's cell padding: twelve columns at 1rem a side is ~380px of a 1400px screen, and the
+  // columns are already as narrow as their words. The app sets no font, so the same table is ~80px
+  // wider on Linux than on a Mac; the room saved here is what lets it fit both.
+  .cds--data-table th,
+  .cds--data-table td {
+    padding-inline: $spacing-03;
+  }
+}
+
+.structure-detail__repair-actions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-02;
+
+  @container (max-width: 1439px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+// The group checkboxes in a row, wrapping on a narrow screen.
+.structure-detail__repair-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-03 $spacing-07;
+
+  .cds--form-item {
+    flex: 0 0 auto;
+  }
+}
+
+// The quantity's unit, beside the box, as legacy's read-only units box.
+.structure-detail__quantity {
+  display: flex;
+  align-items: flex-end;
+  gap: $spacing-03;
+
+  > :first-child {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+}
+
+.structure-detail__unit {
+  @include type.type-style('body-compact-01');
+
+  // The box's height, so the unit sits level with its text.
+  display: flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+  color: var(--cds-text-secondary);
+  white-space: nowrap;
+}
+
+.structure-detail__dialog-wide {
+  margin-block-start: $spacing-05;
+}
+
+.structure-detail__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-05;
+  margin-block-start: $spacing-07;
+}
+
+// Inside the monitoring dialog the read-only fields sit beside inputs, so they take ReadOnlyField's
+// form spacing back from the page's reading style above: the label as Carbon labels an input, and
+// the value in a band the height of the box beside it, centred, so the row reads as one line.
+.structure-detail .structure-detail__monitor-dialog .read-only-field,
+.structure-detail .structure-detail__repair-dialog .read-only-field {
+  gap: 0.5rem;
+}
+
+.structure-detail .structure-detail__monitor-dialog .read-only-field__label,
+.structure-detail .structure-detail__repair-dialog .read-only-field__label {
+  @include type.type-style('label-01');
+
+  font-weight: 400;
+  color: var(--cds-text-secondary);
+}
+
+.structure-detail .structure-detail__monitor-dialog .read-only-field__value,
+.structure-detail .structure-detail__repair-dialog .read-only-field__value {
+  min-block-size: 2.5rem;
+}
+
+// A little wider than Carbon's default dialog, so the two dropdowns and the description have room.
+// Wide screens only: below lg Carbon's own sizing already fills most of the screen.
+.structure-detail__monitor-dialog .cds--modal-container,
+.structure-detail__repair-dialog .cds--modal-container {
+  @include breakpoint(lg) {
+    inline-size: 60%;
+  }
+}
+
+// A table's action, over it at its right.
+.structure-detail__table-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-end: $spacing-05;
 }

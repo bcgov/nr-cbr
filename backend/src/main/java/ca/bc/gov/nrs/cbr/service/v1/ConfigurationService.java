@@ -11,6 +11,11 @@ import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RepairPriorityCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RepairStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
@@ -85,6 +90,11 @@ public class ConfigurationService {
   private final StructureCurbTypeCodeRepository structureCurbTypeCodeRepository;
   private final EngineeredCulvertTypeCodeRepository engineeredCulvertTypeCodeRepository;
   private final SpecialEquipmentRequirementCodeRepository specialEquipmentRequirementCodeRepository;
+  private final MonitoringStatusCodeRepository monitoringStatusCodeRepository;
+  private final MonitorFrequencyCodeRepository monitorFrequencyCodeRepository;
+  private final RepairStatusCodeRepository repairStatusCodeRepository;
+  private final RepairPriorityCodeRepository repairPriorityCodeRepository;
+  private final StructureRepairGroupCodeRepository structureRepairGroupCodeRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -99,7 +109,12 @@ public class ConfigurationService {
       SuperstructureTypeCodeRepository superstructureTypeCodeRepository,
       StructureCurbTypeCodeRepository structureCurbTypeCodeRepository,
       EngineeredCulvertTypeCodeRepository engineeredCulvertTypeCodeRepository,
-      SpecialEquipmentRequirementCodeRepository specialEquipmentRequirementCodeRepository) {
+      SpecialEquipmentRequirementCodeRepository specialEquipmentRequirementCodeRepository,
+      MonitoringStatusCodeRepository monitoringStatusCodeRepository,
+      MonitorFrequencyCodeRepository monitorFrequencyCodeRepository,
+      RepairStatusCodeRepository repairStatusCodeRepository,
+      RepairPriorityCodeRepository repairPriorityCodeRepository,
+      StructureRepairGroupCodeRepository structureRepairGroupCodeRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -113,6 +128,11 @@ public class ConfigurationService {
     this.structureCurbTypeCodeRepository = structureCurbTypeCodeRepository;
     this.engineeredCulvertTypeCodeRepository = engineeredCulvertTypeCodeRepository;
     this.specialEquipmentRequirementCodeRepository = specialEquipmentRequirementCodeRepository;
+    this.monitoringStatusCodeRepository = monitoringStatusCodeRepository;
+    this.monitorFrequencyCodeRepository = monitorFrequencyCodeRepository;
+    this.repairStatusCodeRepository = repairStatusCodeRepository;
+    this.repairPriorityCodeRepository = repairPriorityCodeRepository;
+    this.structureRepairGroupCodeRepository = structureRepairGroupCodeRepository;
   }
 
   /**
@@ -367,6 +387,55 @@ public class ConfigurationService {
         .map(entity ->
             new CodeOptionResponse(
                 entity.getSpecialEquipmentRequirementCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Monitoring statuses — {@code THE.MONITORING_STATUS_CODE}, by description. */
+  @Cacheable("monitoringStatusCodes")
+  public List<CodeOptionResponse> getMonitoringStatusCodes() {
+    return monitoringStatusCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getMonitoringStatusCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Monitoring frequencies — {@code THE.MONITOR_FREQUENCY_CODE}, by description. */
+  @Cacheable("monitorFrequencyCodes")
+  public List<CodeOptionResponse> getMonitorFrequencyCodes() {
+    return monitorFrequencyCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getMonitorFrequencyCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * Repair statuses — {@code THE.REPAIR_STATUS_CODE}, current ones by description. All of them:
+   * the dialog leaves out Required and Not Required for anyone but a P.Eng, as legacy does, and
+   * the save refuses them.
+   */
+  @Cacheable("repairStatusCodes")
+  public List<CodeOptionResponse> getRepairStatusCodes() {
+    return repairStatusCodeRepository.findAllCurrent().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getRepairStatusCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Repair priorities — {@code THE.REPAIR_PRIORITY_CODE}, current ones. */
+  @Cacheable("repairPriorityCodes")
+  public List<CodeOptionResponse> getRepairPriorityCodes() {
+    return repairPriorityCodeRepository.findAllCurrent().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getRepairPriorityCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Repair groups — {@code THE.STRUCTURE_REPAIR_GROUP_CODE}, current ones by code. */
+  @Cacheable("repairGroupCodes")
+  public List<CodeOptionResponse> getRepairGroupCodes() {
+    return structureRepairGroupCodeRepository.findAllCurrent().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getStructureRepairGroupCode(), entity.getDescription()))
         .toList();
   }
 }

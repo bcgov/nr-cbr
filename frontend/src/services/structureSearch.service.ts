@@ -4,10 +4,24 @@ import type {
   InspectionScheduleResponse,
   InspectionsResponse,
 } from '@/pages/StructureDetail/inspectionsResponse';
-import type { MonitorView, StructureMonitor } from '@/pages/StructureDetail/monitorsResponse';
-import type { RepairView, StructureRepair } from '@/pages/StructureDetail/repairsResponse';
+import type {
+  MonitorCreatedResponse,
+  MonitorCreateRequest,
+  MonitorUpdateRequest,
+  MonitorView,
+  StructureMonitor,
+} from '@/pages/StructureDetail/monitorsResponse';
+import type {
+  RepairCreatedResponse,
+  RepairCreateRequest,
+  RepairTypeOption,
+  RepairUpdateRequest,
+  RepairView,
+  StructureRepair,
+} from '@/pages/StructureDetail/repairsResponse';
 import type { SpansAndPiersResponse } from '@/pages/StructureDetail/spansAndPiersResponse';
 import type { StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
+import type { ItemListing } from '@/pages/StructureDetail/UserAudits';
 import type {
   PagedResponse,
   StructureSearchCriteria,
@@ -183,18 +197,20 @@ export class StructureSearchService extends HttpClient {
    *
    * @param view outstanding only, or all
    * @param pageNumber zero-based, as the backend expects
+   * @param includeBeforeInstall also those raised before the superstructure went in
    */
   getStructureRepairs(
     structureId: string,
     view: RepairView,
     pageNumber: number,
     pageSize: number,
-  ): CancelablePromise<PagedResponse<StructureRepair>> {
-    return this.doRequest<PagedResponse<StructureRepair>>(this.config, {
+    includeBeforeInstall: boolean,
+  ): CancelablePromise<ItemListing<StructureRepair>> {
+    return this.doRequest<ItemListing<StructureRepair>>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/repairs',
       path: { structureId },
-      query: { view, pageNumber, pageSize },
+      query: { view, pageNumber, pageSize, includeBeforeInstall },
     });
   }
 
@@ -203,18 +219,116 @@ export class StructureSearchService extends HttpClient {
    *
    * @param view outstanding only, or all
    * @param pageNumber zero-based, as the backend expects
+   * @param includeBeforeInstall also those raised before the superstructure went in
    */
   getStructureMonitors(
     structureId: string,
     view: MonitorView,
     pageNumber: number,
     pageSize: number,
-  ): CancelablePromise<PagedResponse<StructureMonitor>> {
-    return this.doRequest<PagedResponse<StructureMonitor>>(this.config, {
+    includeBeforeInstall: boolean,
+  ): CancelablePromise<ItemListing<StructureMonitor>> {
+    return this.doRequest<ItemListing<StructureMonitor>>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/monitors',
       path: { structureId },
-      query: { view, pageNumber, pageSize },
+      query: { view, pageNumber, pageSize, includeBeforeInstall },
+    });
+  }
+
+  /**
+   * Adds a monitoring item to a structure, Suggested and numbered next. 400 with `fieldErrors` when
+   * a field is refused.
+   */
+  createStructureMonitor(
+    structureId: string,
+    request: MonitorCreateRequest,
+  ): CancelablePromise<MonitorCreatedResponse> {
+    return this.doRequest<MonitorCreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/monitors',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /**
+   * Saves an edit to one monitoring item. 400 with `fieldErrors` when a field is refused; 404 when
+   * the structure has no such item.
+   */
+  updateStructureMonitor(
+    structureId: string,
+    monitorId: string,
+    request: MonitorUpdateRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/monitors/{monitorId}',
+      path: { structureId, monitorId },
+      body: request,
+    });
+  }
+
+  /**
+   * The repair types that apply to a structure, one entry per group each falls in, in legacy's
+   * order: by group, then the type's order.
+   */
+  getStructureRepairTypes(structureId: string): CancelablePromise<RepairTypeOption[]> {
+    return this.doRequest<RepairTypeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/repair-types',
+      path: { structureId },
+    });
+  }
+
+  /**
+   * Adds a repair to a structure, Suggested and numbered next. 400 with `fieldErrors` when a field
+   * is refused.
+   */
+  createStructureRepair(
+    structureId: string,
+    request: RepairCreateRequest,
+  ): CancelablePromise<RepairCreatedResponse> {
+    return this.doRequest<RepairCreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/repairs',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /**
+   * Saves an edit to one repair. 400 with `fieldErrors` when a field is refused; 404 when the
+   * structure has no such repair.
+   */
+  updateStructureRepair(
+    structureId: string,
+    repairId: string,
+    request: RepairUpdateRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/repairs/{repairId}',
+      path: { structureId, repairId },
+      body: request,
+    });
+  }
+
+  /** Deletes one repair of a structure. 404 when the structure has no such repair. */
+  deleteStructureRepair(structureId: string, repairId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/repairs/{repairId}',
+      path: { structureId, repairId },
+    });
+  }
+
+  /** Deletes one monitoring item of a structure. 404 when the structure has no such item. */
+  deleteStructureMonitor(structureId: string, monitorId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/monitors/{monitorId}',
+      path: { structureId, monitorId },
     });
   }
 }

@@ -13,6 +13,15 @@ public final class StructureRepairsResponse {
 
   private StructureRepairsResponse() {}
 
+  /**
+   * A page of repairs, and how many the table leaves out because they predate the superstructure.
+   *
+   * @param beforeInstallCount in the view chosen, those raised by an inspection dated on or before
+   *                           1 January of the year the superstructure was installed — the ones
+   *                           listed only when asked for; 0 when no install year is recorded
+   */
+  public record Listing(PagedResponse<Repair> page, long beforeInstallCount) {}
+
   /** Which repairs the tab lists — legacy's "Choose Viewing Option". */
   public enum View {
     /** Suggested, required or carried forward, and not carried forward again. Legacy's default. */

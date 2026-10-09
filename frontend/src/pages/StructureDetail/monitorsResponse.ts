@@ -19,3 +19,19 @@ export type StructureMonitor = Audited & {
   /** Free text alongside the frequency. */
   frequencyComment: string | null;
 };
+
+/** An edit to a monitoring item — the backend's `MonitorUpdateRequest`. The number is not edited. */
+export type MonitorUpdateRequest = {
+  statusCode: string;
+  /** Blank for none. */
+  frequencyCode: string;
+  /** Kept only with Other (`OTH`), where it is required. */
+  frequencyComment: string;
+  description: string;
+};
+
+/** A new monitoring item — the backend's `MonitorCreateRequest`. Always Suggested; numbered next. */
+export type MonitorCreateRequest = Omit<MonitorUpdateRequest, 'statusCode'>;
+
+/** The item just added — the backend's `MonitorCreatedResponse`. */
+export type MonitorCreatedResponse = { id: string; number: number };

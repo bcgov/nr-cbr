@@ -1,7 +1,14 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
@@ -17,6 +24,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,6 +32,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -198,14 +207,77 @@ public interface StructureApiEndpoint {
    * @param view        {@code OUTSTANDING} or {@code ALL} — legacy's "Choose Viewing Option"
    * @param pageNumber  zero-based
    * @param pageSize    held to between 1 and 100
+   * @param includeBeforeInstall legacy's "Show Inspections before the Superstructure Install Date"
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/repairs")
-  PagedResponse<StructureRepairsResponse.Repair> getRepairs(
+  StructureRepairsResponse.Listing getRepairs(
       @PathVariable("structureId") long structureId,
       @RequestParam(name = "view", defaultValue = "OUTSTANDING") StructureRepairsResponse.View view,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize);
+      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
+      @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
+      boolean includeBeforeInstall);
+
+  /**
+   * The repair types that apply to the structure, each with its group — the Repair Item dialog's
+   * Repair Type list, which its group checkboxes narrow.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/repair-types")
+  List<RepairTypeOption> getRepairTypes(@PathVariable("structureId") long structureId);
+
+  /**
+   * Adds a repair to the structure — legacy's Add Repair. Always Suggested; the structure's next
+   * number.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy's button.
+   * <b>201</b> with the new repair's id and number; <b>404</b> when there is no such structure;
+   * <b>400</b> with {@code fieldErrors} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PostMapping("/{structureId}/repairs")
+  ResponseEntity<RepairCreatedResponse> createRepair(
+      @PathVariable("structureId") long structureId,
+      @RequestBody RepairCreateRequest request);
+
+  /**
+   * Saves an edit to one repair — legacy's "Repair Item" dialog.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy offers the edit
+   * link; legacy itself checked nothing on an edit. <b>204</b> on success; <b>404</b> when the
+   * structure has no such repair; <b>400</b> with {@code fieldErrors} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the repair belongs to
+   * @param repairId    the repair's {@code REPAIR_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/repairs/{repairId}")
+  ResponseEntity<Void> updateRepair(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("repairId") long repairId,
+      @RequestBody RepairUpdateRequest request);
+
+  /**
+   * Deletes one repair — legacy's delete icon on the Repairs tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — legacy's {@code /deleteStructureRepair}.
+   * <b>204</b> on success; <b>404</b> when the structure has no such repair.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the repair belongs to
+   * @param repairId    the repair's {@code REPAIR_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{structureId}/repairs/{repairId}")
+  ResponseEntity<Void> deleteRepair(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("repairId") long repairId);
 
   /**
    * A page of the structure's monitoring items — legacy's Monitoring tab, paged here. Outstanding
@@ -217,13 +289,65 @@ public interface StructureApiEndpoint {
    * @param view        {@code OUTSTANDING} or {@code ALL} — legacy's "Choose Viewing Option"
    * @param pageNumber  zero-based
    * @param pageSize    held to between 1 and 100
+   * @param includeBeforeInstall legacy's "Show Inspections before the Superstructure Install Date"
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/monitors")
-  PagedResponse<StructureMonitorsResponse.Monitor> getMonitors(
+  StructureMonitorsResponse.Listing getMonitors(
       @PathVariable("structureId") long structureId,
       @RequestParam(name = "view", defaultValue = "OUTSTANDING")
       StructureMonitorsResponse.View view,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize);
+      @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
+      @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
+      boolean includeBeforeInstall);
+
+  /**
+   * Adds a monitoring item to the structure — legacy's Add Monitor. Always Suggested; the
+   * structure's next number.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy's button.
+   * <b>201</b> with the new item's id and number; <b>404</b> when there is no such structure;
+   * <b>400</b> with {@code fieldErrors} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PostMapping("/{structureId}/monitors")
+  ResponseEntity<MonitorCreatedResponse> createMonitor(
+      @PathVariable("structureId") long structureId,
+      @RequestBody MonitorCreateRequest request);
+
+  /**
+   * Saves an edit to one monitoring item — legacy's "Monitoring Item" dialog.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy offers Add Monitor;
+   * legacy itself checked nothing on an edit. <b>204</b> on success; <b>404</b> when the structure
+   * has no such item; <b>400</b> with {@code fieldErrors} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the item belongs to
+   * @param monitorId   the item's {@code MONITOR_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/monitors/{monitorId}")
+  ResponseEntity<Void> updateMonitor(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("monitorId") long monitorId,
+      @RequestBody MonitorUpdateRequest request);
+
+  /**
+   * Deletes one monitoring item — legacy's delete icon on the Monitoring tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — legacy's {@code /deleteStructureMonitor},
+   * {@code REGIONAL_ENGINEER}. <b>204</b> on success; <b>404</b> when the structure has no such
+   * item.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the item belongs to
+   * @param monitorId   the item's {@code MONITOR_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{structureId}/monitors/{monitorId}")
+  ResponseEntity<Void> deleteMonitor(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("monitorId") long monitorId);
 }

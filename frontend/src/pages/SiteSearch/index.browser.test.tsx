@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { userEvent } from 'vitest/browser';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import SiteSearchPage from './index';
 
@@ -637,7 +637,9 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     expect(screen.getByTestId('site-search-siteTypeCode')).toMatchTextContent(
       'From the type lookup',
     );
-    expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('From the district lookup');
+    expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent(
+      'From the district lookup',
+    );
   });
 
   it('leaves Management Area empty until a district is chosen', async () => {
@@ -825,10 +827,20 @@ describe('SiteSearchPage — deleting a site', () => {
     expect(siteSearchApi.deleteSite).not.toHaveBeenCalled();
   });
 
+  it('says Delete beside the icon, as every Actions column does, naming what it deletes', async () => {
+    siteSearchApi.searchSites.mockResolvedValue(oneResult());
+    renderPage(true);
+    await searchAndWait();
+
+    const button = screen.getByTestId('site-delete-SITE-1');
+    expect(screen.getByRole('button', { name: 'Delete site SITE-1' })).toBe(button);
+    expect(button.querySelector('svg')).not.toBeNull();
+  });
+
   it('deletes the site that was chosen', async () => {
     await openDeleteConfirmation();
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(siteSearchApi.deleteSite).toHaveBeenCalledWith('SITE-1');
@@ -841,7 +853,7 @@ describe('SiteSearchPage — deleting a site', () => {
     await openDeleteConfirmation();
     const searchesBefore = siteSearchApi.searchSites.mock.calls.length;
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(siteSearchApi.searchSites.mock.calls.length).toBeGreaterThan(searchesBefore);
@@ -856,7 +868,7 @@ describe('SiteSearchPage — deleting a site', () => {
     });
     await openDeleteConfirmation();
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(display).toHaveBeenCalledWith(
@@ -876,7 +888,7 @@ describe('SiteSearchPage — deleting a site', () => {
     siteSearchApi.deleteSite.mockRejectedValue(new Error('network'));
     await openDeleteConfirmation();
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(display).toHaveBeenCalled());
     expect(screen.queryByTestId('site-delete-error')).toBeNull();
@@ -888,7 +900,7 @@ describe('SiteSearchPage — deleting a site', () => {
     siteSearchApi.deleteSite.mockRejectedValue({ body: null });
     await openDeleteConfirmation();
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(display).toHaveBeenCalledWith(
@@ -901,7 +913,7 @@ describe('SiteSearchPage — deleting a site', () => {
     siteSearchApi.deleteSite.mockResolvedValue(undefined);
     await openDeleteConfirmation();
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(display).toHaveBeenCalledWith(

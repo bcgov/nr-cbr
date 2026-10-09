@@ -1,12 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
-import { userEvent } from 'vitest/browser';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import StructureDetailPage from './index';
 
 import type { StructureDetailResponse } from './structureResponse';
+
+const authorization = vi.hoisted(() => ({ canEdit: false, canDelete: false, isPeng: false }));
+vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
+
+// A delete's outcome is a toast; asserted on what the page asked to show.
+const display = vi.hoisted(() => vi.fn());
+vi.mock('@/context/notification/useNotification', () => ({ useNotification: () => ({ display }) }));
 
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
@@ -20,9 +27,25 @@ const api = vi.hoisted(() => ({
   getInspectionSchedule: vi.fn(),
   getStructureInspections: vi.fn(),
   getStructureRepairs: vi.fn(),
+  deleteStructureRepair: vi.fn(),
+  getStructureRepairTypes: vi.fn(),
+  createStructureRepair: vi.fn(),
+  updateStructureRepair: vi.fn(),
   getStructureMonitors: vi.fn(),
+  createStructureMonitor: vi.fn(),
+  updateStructureMonitor: vi.fn(),
+  deleteStructureMonitor: vi.fn(),
 }));
-vi.mock('@/services/APIs', () => ({ default: { structureSearch: api } }));
+const configurationApi = vi.hoisted(() => ({
+  getMonitoringStatusCodes: vi.fn(),
+  getMonitorFrequencyCodes: vi.fn(),
+  getRepairStatusCodes: vi.fn(),
+  getRepairPriorityCodes: vi.fn(),
+  getRepairGroupCodes: vi.fn(),
+}));
+vi.mock('@/services/APIs', () => ({
+  default: { structureSearch: api, configuration: configurationApi },
+}));
 
 const code = (value: string | null, description: string | null = value) => ({
   code: value,
@@ -215,13 +238,20 @@ const inspectionsPage = (content: object[], overrides: object = {}) => ({
   ...overrides,
 });
 
-/** A page of the repairs table. */
-const repairsPage = (content: object[], totalElements = content.length) => ({
-  content,
-  totalElements,
-  totalPages: Math.max(1, Math.ceil(totalElements / 10)),
-  pageNumber: 0,
-  pageSize: 10,
+/** A page of the repairs or monitoring table, and how many predate the superstructure. */
+const repairsPage = (
+  content: object[],
+  totalElements = content.length,
+  beforeInstallCount = 0,
+) => ({
+  page: {
+    content,
+    totalElements,
+    totalPages: Math.max(1, Math.ceil(totalElements / 10)),
+    pageNumber: 0,
+    pageSize: 10,
+  },
+  beforeInstallCount,
 });
 
 /** Opens the Details tab; Information is the one selected on arrival. */
@@ -248,8 +278,57 @@ beforeEach(() => {
   api.getStructureInspections.mockResolvedValue(inspectionsPage([]));
   api.getStructureRepairs.mockReset();
   api.getStructureRepairs.mockResolvedValue(repairsPage([]));
+  api.deleteStructureRepair.mockReset();
+  api.deleteStructureRepair.mockResolvedValue(undefined);
   api.getStructureMonitors.mockReset();
   api.getStructureMonitors.mockResolvedValue(repairsPage([]));
+  api.createStructureMonitor.mockReset();
+  api.createStructureMonitor.mockResolvedValue({ id: '30', number: 3 });
+  api.updateStructureMonitor.mockReset();
+  api.updateStructureMonitor.mockResolvedValue(undefined);
+  configurationApi.getMonitoringStatusCodes.mockResolvedValue([
+    { code: 'COM', description: 'Completed' },
+    { code: 'REQ', description: 'Required' },
+    { code: 'SUG', description: 'Suggested' },
+  ]);
+  configurationApi.getMonitorFrequencyCodes.mockResolvedValue([
+    { code: 'ANN', description: 'Annually' },
+    { code: 'INS', description: 'Each inspection' },
+    { code: 'OTH', description: 'Other' },
+  ]);
+  authorization.canEdit = false;
+  api.deleteStructureMonitor.mockReset();
+  api.deleteStructureMonitor.mockResolvedValue(undefined);
+  authorization.canDelete = false;
+  authorization.isPeng = false;
+  api.getStructureRepairTypes.mockReset();
+  api.getStructureRepairTypes.mockResolvedValue([
+    { code: 'RAIL', description: 'Railing', unit: 'm', groupCode: 'APPR' },
+    { code: 'DECK', description: 'Deck planks', unit: 'm²', groupCode: 'STRU' },
+    { code: 'RAIL', description: 'Railing', unit: 'm', groupCode: 'STRU' },
+    { code: '800A', description: 'Other', unit: null, groupCode: 'MISC' },
+  ]);
+  api.createStructureRepair.mockReset();
+  api.createStructureRepair.mockResolvedValue({ id: '40', number: 4 });
+  api.updateStructureRepair.mockReset();
+  api.updateStructureRepair.mockResolvedValue(undefined);
+  configurationApi.getRepairStatusCodes.mockResolvedValue([
+    { code: 'CF', description: 'Carried Forward' },
+    { code: 'COM', description: 'Completed' },
+    { code: 'NRQ', description: 'Not Required' },
+    { code: 'REQ', description: 'Required' },
+    { code: 'SUG', description: 'Suggested' },
+  ]);
+  configurationApi.getRepairPriorityCodes.mockResolvedValue([
+    { code: 'H', description: 'High' },
+    { code: 'P1', description: 'Urgent' },
+  ]);
+  configurationApi.getRepairGroupCodes.mockResolvedValue([
+    { code: 'APPR', description: 'Approach' },
+    { code: 'MISC', description: 'Miscellaneous' },
+    { code: 'STRU', description: 'Superstructure' },
+  ]);
+  display.mockClear();
 });
 
 describe('StructureDetailPage — loading', () => {
@@ -1058,7 +1137,7 @@ describe('StructureDetailPage — Repairs', () => {
     await openRepairs();
 
     await vi.waitFor(() =>
-      expect(api.getStructureRepairs).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10),
+      expect(api.getStructureRepairs).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10, false),
     );
   });
 
@@ -1076,7 +1155,9 @@ describe('StructureDetailPage — Repairs', () => {
     expect(row).not.toMatchTextContent('Completed:');
     expect(row).toMatchTextContent('Urgent');
     expect(row).toMatchTextContent('$4,000');
-    expect(row).toMatchTextContent('12 m2');
+    expect(row).toMatchTextContent('12');
+    // The number only, as legacy's column; the unit is in the dialog.
+    expect(row).not.toMatchTextContent('m2');
     expect(row).toMatchTextContent('Replace worn planks.');
     expect(
       within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' }),
@@ -1092,7 +1173,7 @@ describe('StructureDetailPage — Repairs', () => {
     );
 
     await vi.waitFor(() =>
-      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'ALL', 0, 10),
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'ALL', 0, 10, false),
     );
   });
 
@@ -1109,7 +1190,93 @@ describe('StructureDetailPage — Repairs', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Next page' }));
 
     await vi.waitFor(() =>
-      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 1, 10),
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 1, 10, false),
+    );
+  });
+
+  it('asks for the repairs from before the superstructure went in when ticked', async () => {
+    api.getStructureRepairs.mockResolvedValue(repairsPage([], 0, 3));
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(
+      await screen.findByText('Show repairs from before the superstructure was installed (3)'),
+    );
+
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 0, 10, true),
+    );
+  });
+
+  it('offers no such box when nothing predates the superstructure', async () => {
+    await showing(bridge());
+
+    await openRepairs();
+    await screen.findByTestId('structure-section-repairs');
+
+    expect(
+      screen.queryByText(/Show repairs from before the superstructure was installed/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Delete in an Actions column only to a user who may delete', async () => {
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    await showing(bridge());
+
+    await openRepairs();
+    const section = await screen.findByTestId('structure-section-repairs');
+    await within(section).findByTestId('structure-repair-3');
+
+    expect(within(section).queryByText('Actions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('structure-repair-delete-3')).not.toBeInTheDocument();
+  });
+
+  it('deletes a repair once confirmed, and says so', async () => {
+    authorization.canDelete = true;
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    await showing(bridge());
+
+    await openRepairs();
+    const button = await screen.findByTestId('structure-repair-delete-3');
+    expect(screen.getByRole('button', { name: 'Delete repair 3' })).toBe(button);
+    await userEvent.click(button);
+    expect(api.deleteStructureRepair).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() => expect(api.deleteStructureRepair).toHaveBeenCalledWith('7', '3'));
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Repair 3 deleted' }),
+      ),
+    );
+  });
+
+  it('deletes nothing when the confirmation is cancelled', async () => {
+    authorization.canDelete = true;
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(await screen.findByTestId('structure-repair-delete-3'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    expect(api.deleteStructureRepair).not.toHaveBeenCalled();
+  });
+
+  it('says so when the delete fails', async () => {
+    authorization.canDelete = true;
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    api.deleteStructureRepair.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(await screen.findByTestId('structure-repair-delete-3'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: 'The repair was not deleted' }),
+      ),
     );
   });
 
@@ -1132,6 +1299,286 @@ describe('StructureDetailPage — Repairs', () => {
     expect(await screen.findByTestId('structure-repairs-error')).toMatchTextContent(
       'Repairs could not be loaded',
     );
+  });
+  describe('Add', () => {
+    it('offers Add repair over the table only from Level 1 up', async () => {
+      await showing(bridge());
+
+      await openRepairs();
+      await screen.findByTestId('structure-section-repairs');
+
+      expect(screen.queryByTestId('structure-repair-add')).not.toBeInTheDocument();
+    });
+
+    it('adds a repair as Suggested, and says which number it took', async () => {
+      authorization.canEdit = true;
+      await showing(bridge());
+      await openRepairs();
+
+      await userEvent.click(await screen.findByTestId('structure-repair-add'));
+      const dialog = await screen.findByTestId('repair-dialog');
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('repair-type').querySelectorAll('option')).toHaveLength(
+          4,
+        ),
+      );
+      expect(dialog).toMatchTextContent('Add repair');
+      // No number before saving, a locked status, and nothing only a completed repair has.
+      expect(within(dialog).queryByText('Repair Number')).not.toBeInTheDocument();
+      expect(dialog).toMatchTextContent('Suggested');
+      expect(within(dialog).queryByTestId('repair-status')).not.toBeInTheDocument();
+      expect(within(dialog).queryByTestId('repair-completed-date')).not.toBeInTheDocument();
+      expect(within(dialog).queryByTestId('repair-actualCost')).not.toBeInTheDocument();
+
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), 'DECK');
+      await userEvent.type(within(dialog).getByTestId('repair-estimate'), '2500');
+      await userEvent.type(within(dialog).getByTestId('repair-quantity'), '8');
+      await userEvent.type(within(dialog).getByTestId('repair-description'), 'New planks.');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(api.createStructureRepair).toHaveBeenCalledWith('7', {
+          priorityCode: 'H',
+          estimate: 2500,
+          typeCode: 'DECK',
+          quantity: 8,
+          description: 'New planks.',
+        }),
+      );
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'success', title: 'Repair 4 added' }),
+        ),
+      );
+      expect(screen.queryByTestId('repair-dialog')).not.toBeInTheDocument();
+    });
+
+    it('adds nothing without a priority and a type, and says so beside each', async () => {
+      authorization.canEdit = true;
+      await showing(bridge());
+      await openRepairs();
+
+      await userEvent.click(await screen.findByTestId('structure-repair-add'));
+      const dialog = await screen.findByTestId('repair-dialog');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      expect(dialog).toMatchTextContent('Repair Priority is required.');
+      expect(dialog).toMatchTextContent('Repair Type is required.');
+      expect(api.createStructureRepair).not.toHaveBeenCalled();
+    });
+
+    it('says so when the add fails for no field', async () => {
+      authorization.canEdit = true;
+      api.createStructureRepair.mockRejectedValue(new Error('boom'));
+      await showing(bridge());
+      await openRepairs();
+
+      await userEvent.click(await screen.findByTestId('structure-repair-add'));
+      const dialog = await screen.findByTestId('repair-dialog');
+      await vi.waitFor(() =>
+        expect(
+          within(dialog).getByTestId('repair-priority').querySelectorAll('option'),
+        ).toHaveLength(3),
+      );
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('repair-type').querySelectorAll('option')).toHaveLength(
+          4,
+        ),
+      );
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), 'DECK');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'error', title: 'The repair was not added' }),
+        ),
+      );
+      expect(screen.getByTestId('repair-dialog')).toBeInTheDocument();
+    });
+  });
+
+  describe('Edit', () => {
+    const openEdit = async (overrides: object = {}) => {
+      authorization.canEdit = true;
+      api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3', overrides)]));
+      await showing(bridge());
+      await openRepairs();
+      await userEvent.click(await screen.findByTestId('structure-repair-edit-3'));
+      const dialog = await screen.findByTestId('repair-dialog');
+      // Wait for the lists, which the dialog fetches as it opens.
+      await vi.waitFor(() => expect(within(dialog).getByTestId('repair-type')).toHaveValue('DECK'));
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('repair-priority')).toHaveValue('P1'),
+      );
+      return dialog;
+    };
+
+    it('offers Edit, in the Actions column, from Level 1 up', async () => {
+      authorization.canEdit = true;
+      api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+      await showing(bridge());
+
+      await openRepairs();
+      await screen.findByTestId('structure-repair-3');
+
+      expect(screen.getByRole('button', { name: 'Edit repair 3' })).toBe(
+        screen.getByTestId('structure-repair-edit-3'),
+      );
+      expect(screen.queryByTestId('structure-repair-delete-3')).not.toBeInTheDocument();
+    });
+
+    it('opens the repair with its number shown and not edited, and saves the edit', async () => {
+      authorization.isPeng = true;
+      const dialog = await openEdit();
+
+      expect(dialog).toMatchTextContent('Edit repair 3');
+      expect(within(dialog).getByTestId('repair-status')).toHaveValue('REQ');
+      expect(within(dialog).getByTestId('repair-estimate')).toHaveValue('4000');
+      expect(within(dialog).getByTestId('repair-quantity')).toHaveValue('12');
+      expect(within(dialog).getByTestId('repair-unit')).toMatchTextContent('m²');
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
+      await userEvent.clear(within(dialog).getByTestId('repair-estimate'));
+      await userEvent.clear(within(dialog).getByTestId('repair-description'));
+      await userEvent.type(within(dialog).getByTestId('repair-description'), 'Replace all.');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateStructureRepair).toHaveBeenCalledWith('7', '3', {
+          statusCode: 'REQ',
+          priorityCode: 'H',
+          completedDate: null,
+          estimate: null,
+          actualCost: null,
+          typeCode: 'DECK',
+          quantity: 12,
+          description: 'Replace all.',
+        }),
+      );
+      await vi.waitFor(() => expect(screen.queryByTestId('repair-dialog')).not.toBeInTheDocument());
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Repair 3 saved' }),
+      );
+    });
+
+    it('offers Required and Not Required to a P.Eng only, as legacy does', async () => {
+      const dialog = await openEdit();
+      const offered = () =>
+        Array.from(
+          (within(dialog).getByTestId('repair-status') as HTMLSelectElement).options,
+          (option) => option.value,
+        );
+
+      // The stored Required is not this user's to keep: the status opens unchosen.
+      expect(within(dialog).getByTestId('repair-status')).toHaveValue('');
+      expect(offered()).toEqual(['', 'CF', 'COM', 'SUG']);
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+      expect(dialog).toMatchTextContent('Repair Status is required.');
+      expect(api.updateStructureRepair).not.toHaveBeenCalled();
+    });
+
+    it('opens the completed date and actual cost only for Completed, and needs the date', async () => {
+      const dialog = await openEdit({ status: { code: 'SUG', description: 'Suggested' } });
+
+      expect(within(dialog).getByTestId('repair-completed-date')).toBeDisabled();
+      expect(within(dialog).getByTestId('repair-actualCost')).toBeDisabled();
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-status'), 'COM');
+      expect(within(dialog).getByTestId('repair-actualCost')).toBeEnabled();
+      await userEvent.type(within(dialog).getByTestId('repair-actualCost'), '3800');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      expect(dialog).toMatchTextContent(
+        'Repair Completed Date is required when the status is Completed.',
+      );
+      expect(api.updateStructureRepair).not.toHaveBeenCalled();
+
+      await userEvent.type(within(dialog).getByTestId('repair-completed-date'), '2026/09/01');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateStructureRepair).toHaveBeenCalledWith(
+          '7',
+          '3',
+          expect.objectContaining({
+            statusCode: 'COM',
+            completedDate: '2026-09-01',
+            actualCost: 3800,
+          }),
+        ),
+      );
+    });
+
+    it('clears the completed date and actual cost when the status moves off Completed', async () => {
+      const dialog = await openEdit({
+        status: { code: 'COM', description: 'Completed' },
+        completedDate: '2026-09-01',
+        actualCost: 3800,
+      });
+
+      expect(within(dialog).getByTestId('repair-completed-date')).toHaveValue('2026/09/01');
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-status'), 'SUG');
+
+      expect(within(dialog).getByTestId('repair-completed-date')).toHaveValue('');
+      expect(within(dialog).getByTestId('repair-actualCost')).toHaveValue('');
+    });
+
+    it('narrows the types to the ticked groups, each type once, every type when none', async () => {
+      const dialog = await openEdit();
+      const offered = () =>
+        Array.from(
+          (within(dialog).getByTestId('repair-type') as HTMLSelectElement).options,
+          (option) => option.value,
+        );
+
+      expect(offered()).toEqual(['', 'RAIL', 'DECK', '800A']);
+      await userEvent.click(within(dialog).getByLabelText('Superstructure'));
+      expect(offered()).toEqual(['', 'DECK', 'RAIL']);
+      expect(within(dialog).getByTestId('repair-type')).toHaveValue('DECK');
+
+      // A type the ticked groups do not hold is cleared, as legacy's list replaced it.
+      await userEvent.click(within(dialog).getByLabelText('Superstructure'));
+      await userEvent.click(within(dialog).getByLabelText('Approach'));
+      expect(offered()).toEqual(['', 'RAIL']);
+      expect(within(dialog).getByTestId('repair-type')).toHaveValue('');
+    });
+
+    it('needs a description for the type 800A, and whole amounts', async () => {
+      const dialog = await openEdit({ description: null });
+
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), '800A');
+      await userEvent.clear(within(dialog).getByTestId('repair-quantity'));
+      await userEvent.type(within(dialog).getByTestId('repair-quantity'), '1.5');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      expect(dialog).toMatchTextContent('Repair Description is required for this Repair Type.');
+      expect(dialog).toMatchTextContent('Qty must be a whole number from 0 to 999,999.');
+      expect(api.updateStructureRepair).not.toHaveBeenCalled();
+    });
+
+    it('shows what the server refused beside the field', async () => {
+      authorization.isPeng = true;
+      api.updateStructureRepair.mockRejectedValue({
+        body: { fieldErrors: { typeCode: 'Repair Type is not one of the listed types.' } },
+      });
+      const dialog = await openEdit();
+
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(dialog).toMatchTextContent('Repair Type is not one of the listed types.'),
+      );
+      expect(display).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'error' }));
+    });
+
+    it('saves nothing when cancelled', async () => {
+      const dialog = await openEdit();
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByTestId('repair-dialog')).not.toBeInTheDocument();
+      expect(api.updateStructureRepair).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -1161,7 +1608,7 @@ describe('StructureDetailPage — Monitoring', () => {
     await openMonitoring();
 
     await vi.waitFor(() =>
-      expect(api.getStructureMonitors).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10),
+      expect(api.getStructureMonitors).toHaveBeenCalledWith('7', 'OUTSTANDING', 0, 10, false),
     );
   });
 
@@ -1191,9 +1638,247 @@ describe('StructureDetailPage — Monitoring', () => {
     );
 
     await vi.waitFor(() =>
-      expect(api.getStructureMonitors).toHaveBeenLastCalledWith('7', 'ALL', 0, 10),
+      expect(api.getStructureMonitors).toHaveBeenLastCalledWith('7', 'ALL', 0, 10, false),
     );
     expect(api.getStructureRepairs).not.toHaveBeenCalled();
+  });
+
+  it('asks for the monitoring items from before the superstructure went in when ticked', async () => {
+    api.getStructureMonitors.mockResolvedValue(repairsPage([], 0, 3));
+    await showing(bridge());
+
+    await openMonitoring();
+    await userEvent.click(
+      await screen.findByText(
+        'Show monitoring items from before the superstructure was installed (3)',
+      ),
+    );
+
+    await vi.waitFor(() =>
+      expect(api.getStructureMonitors).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 0, 10, true),
+    );
+  });
+
+  it('offers no such box when nothing predates the superstructure', async () => {
+    await showing(bridge());
+
+    await openMonitoring();
+    await screen.findByTestId('structure-section-monitoring');
+
+    expect(
+      screen.queryByText(/Show monitoring items from before the superstructure was installed/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Delete in an Actions column only to a user who may delete', async () => {
+    // Legacy's delete icon sits behind /deleteStructureMonitor; an action that cannot be
+    // performed is not shown, nor is an empty column.
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    await screen.findByTestId('structure-monitor-2');
+
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('structure-monitor-delete-2')).not.toBeInTheDocument();
+  });
+
+  it('deletes an item once confirmed, and says so', async () => {
+    authorization.canDelete = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    const section = await screen.findByTestId('structure-section-monitoring');
+    expect(within(section).getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    // "Delete" beside the icon, naming what it deletes to a screen reader.
+    expect(screen.getByRole('button', { name: 'Delete monitoring item 2' })).toBe(
+      screen.getByTestId('structure-monitor-delete-2'),
+    );
+    await userEvent.click(screen.getByTestId('structure-monitor-delete-2'));
+    expect(api.deleteStructureMonitor).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() => expect(api.deleteStructureMonitor).toHaveBeenCalledWith('7', '2'));
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Monitoring item 2 deleted' }),
+      ),
+    );
+  });
+
+  it('deletes nothing when the confirmation is cancelled', async () => {
+    authorization.canDelete = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    await userEvent.click(await screen.findByTestId('structure-monitor-delete-2'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    expect(api.deleteStructureMonitor).not.toHaveBeenCalled();
+  });
+
+  it('says so when the delete fails', async () => {
+    authorization.canDelete = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    api.deleteStructureMonitor.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openMonitoring();
+    await userEvent.click(await screen.findByTestId('structure-monitor-delete-2'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: 'The monitoring item was not deleted' }),
+      ),
+    );
+  });
+
+  /** Opens the edit dialog for item 2, as a Level 1 user. */
+  const openEdit = async (overrides: object = {}) => {
+    authorization.canEdit = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2', overrides)]));
+    await showing(bridge());
+    await openMonitoring();
+    await userEvent.click(await screen.findByTestId('structure-monitor-edit-2'));
+    const dialog = await screen.findByTestId('monitor-dialog');
+    // Wait for the dropdowns' lists, which the dialog fetches as it opens.
+    await vi.waitFor(() => expect(within(dialog).getByTestId('monitor-status')).toHaveValue('REQ'));
+    return dialog;
+  };
+
+  it('offers Edit, in the Actions column, from Level 1 up', async () => {
+    authorization.canEdit = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    await screen.findByTestId('structure-monitor-2');
+
+    expect(screen.getByRole('button', { name: 'Edit monitoring item 2' })).toBe(
+      screen.getByTestId('structure-monitor-edit-2'),
+    );
+    expect(screen.queryByTestId('structure-monitor-delete-2')).not.toBeInTheDocument();
+  });
+
+  it('opens the item in a dialog, its number shown and not edited, and saves the edit', async () => {
+    const dialog = await openEdit();
+
+    expect(dialog).toMatchTextContent('Edit monitoring item 2');
+    expect(within(dialog).getByTestId('monitor-frequency')).toHaveValue('ANN');
+    expect(within(dialog).getByTestId('monitor-description')).toHaveValue(
+      'Watch the scour at the south abutment.',
+    );
+    await userEvent.selectOptions(within(dialog).getByTestId('monitor-status'), 'COM');
+    await userEvent.clear(within(dialog).getByTestId('monitor-description'));
+    await userEvent.type(within(dialog).getByTestId('monitor-description'), 'Scour gone.');
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateStructureMonitor).toHaveBeenCalledWith('7', '2', {
+        statusCode: 'COM',
+        frequencyCode: 'ANN',
+        frequencyComment: '',
+        description: 'Scour gone.',
+      }),
+    );
+    await vi.waitFor(() => expect(screen.queryByTestId('monitor-dialog')).not.toBeInTheDocument());
+    expect(display).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'Monitoring item 2 saved' }),
+    );
+  });
+
+  it('asks for the comment when the frequency is Other, beside the box', async () => {
+    const dialog = await openEdit({ frequencyComment: null });
+
+    await userEvent.selectOptions(within(dialog).getByTestId('monitor-frequency'), 'OTH');
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
+
+    expect(dialog).toMatchTextContent(
+      'Monitor Freq. Comment is required when the frequency is Other.',
+    );
+    expect(api.updateStructureMonitor).not.toHaveBeenCalled();
+  });
+
+  it('shows what the server refused beside the field', async () => {
+    api.updateStructureMonitor.mockRejectedValue({
+      body: { fieldErrors: { description: 'Monitor Description can be at most 2000 characters.' } },
+    });
+    const dialog = await openEdit();
+
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
+
+    await vi.waitFor(() =>
+      expect(dialog).toMatchTextContent('Monitor Description can be at most 2000 characters.'),
+    );
+    expect(display).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'error' }));
+  });
+
+  it('offers Add monitoring item over the table only from Level 1 up', async () => {
+    await showing(bridge());
+
+    await openMonitoring();
+    await screen.findByTestId('structure-section-monitoring');
+
+    expect(screen.queryByTestId('structure-monitor-add')).not.toBeInTheDocument();
+  });
+
+  it('adds an item as Suggested, at the default frequency, and says which number it took', async () => {
+    authorization.canEdit = true;
+    await showing(bridge());
+    await openMonitoring();
+
+    await userEvent.click(await screen.findByTestId('structure-monitor-add'));
+    const dialog = await screen.findByTestId('monitor-dialog');
+    // Legacy's default frequency, once the list shows it; the status is locked.
+    await vi.waitFor(() =>
+      expect(within(dialog).getByTestId('monitor-frequency')).toHaveValue('INS'),
+    );
+    expect(dialog).toMatchTextContent('Add monitoring item');
+    // No number before saving: the server gives the next, and the toast names it.
+    expect(within(dialog).queryByText('Monitor Number')).not.toBeInTheDocument();
+    expect(dialog).toMatchTextContent('Suggested');
+    expect(within(dialog).queryByTestId('monitor-status')).not.toBeInTheDocument();
+    await userEvent.type(within(dialog).getByTestId('monitor-description'), 'New scour.');
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
+
+    await vi.waitFor(() =>
+      expect(api.createStructureMonitor).toHaveBeenCalledWith('7', {
+        frequencyCode: 'INS',
+        frequencyComment: '',
+        description: 'New scour.',
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Monitoring item 3 added' }),
+      ),
+    );
+    expect(screen.queryByTestId('monitor-dialog')).not.toBeInTheDocument();
+  });
+
+  it('adds nothing without a description, and says so beside the box', async () => {
+    authorization.canEdit = true;
+    await showing(bridge());
+    await openMonitoring();
+
+    await userEvent.click(await screen.findByTestId('structure-monitor-add'));
+    const dialog = await screen.findByTestId('monitor-dialog');
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
+
+    expect(dialog).toMatchTextContent('Monitor Description is required.');
+    expect(api.createStructureMonitor).not.toHaveBeenCalled();
+  });
+
+  it('saves nothing when cancelled', async () => {
+    const dialog = await openEdit();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByTestId('monitor-dialog')).not.toBeInTheDocument();
+    expect(api.updateStructureMonitor).not.toHaveBeenCalled();
   });
 
   it('says when there are none in the view chosen', async () => {

@@ -466,7 +466,7 @@ class StructureSearchServiceTest {
       entityManager.persist(StructureInspectionEntity.builder()
           .inspectionId(100L).crossingStructureId(2L).build());
       entityManager.persist(StructureRepairEntity.builder()
-          .repairId(100L).crossingStructureId(2L).build());
+          .crossingStructureId(2L).build());
 
       Map<String, List<String>> blockers = page(criteria()).content().stream().collect(
           Collectors.toMap(StructureSearchResult::structureName,

@@ -7,15 +7,21 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import jakarta.validation.Valid;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Arrays;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -82,16 +88,6 @@ class StructureApiEndpointTest {
   }
 
   @Test
-  @DisplayName("delete is DELETE /api/v1/structures/{structureId}, gated on DESTRUCTIVE")
-  void deleteIsMappedAndGated() {
-    Method delete = method("deleteStructure");
-    assertThat(delete.getAnnotation(DeleteMapping.class).value())
-        .containsExactly("/{structureId}");
-    assertThat(delete.getAnnotation(PreAuthorize.class).value())
-        .isEqualTo(CbrAuthorities.DESTRUCTIVE);
-  }
-
-  @Test
   @DisplayName("repair responsibility is PUT /repair-responsibility, gated on CONTENT_EDIT")
   void repairResponsibilityIsMappedAndGated() {
     Method update = method("updateRepairResponsibility");
@@ -103,65 +99,62 @@ class StructureApiEndpointTest {
     assertThat(update.getParameters()[0].isAnnotationPresent(Valid.class)).isTrue();
   }
 
-  @Test
-  @DisplayName("one structure is GET /api/v1/structures/{structureId}, gated on READ")
-  void getIsMappedAndGated() {
-    Method get = method("getStructure");
-    assertThat(get.getAnnotation(GetMapping.class).value()).containsExactly("/{structureId}");
-    assertThat(get.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  /** Each endpoint of one structure: its method, verb, path and gate. */
+  static Stream<Arguments> structureEndpoints() {
+    return Stream.of(
+        Arguments.of("deleteStructure", "DELETE", "/{structureId}", CbrAuthorities.DESTRUCTIVE),
+        Arguments.of("getStructure", "GET", "/{structureId}", CbrAuthorities.READ),
+        Arguments.of("getSpansAndPiers", "GET", "/{structureId}/spans-and-piers",
+            CbrAuthorities.READ),
+        Arguments.of("getDocuments", "GET", "/{structureId}/documents", CbrAuthorities.READ),
+        Arguments.of("getDocumentFile", "GET", "/{structureId}/documents/{fileId}/file",
+            CbrAuthorities.READ),
+        Arguments.of("getInspectionSchedule", "GET", "/{structureId}/inspection-schedule",
+            CbrAuthorities.READ),
+        Arguments.of("getInspections", "GET", "/{structureId}/inspections", CbrAuthorities.READ),
+        Arguments.of("getRepairs", "GET", "/{structureId}/repairs", CbrAuthorities.READ),
+        Arguments.of("getRepairTypes", "GET", "/{structureId}/repair-types",
+            CbrAuthorities.READ),
+        Arguments.of("createRepair", "POST", "/{structureId}/repairs",
+            CbrAuthorities.CONTENT_EDIT),
+        Arguments.of("updateRepair", "PUT", "/{structureId}/repairs/{repairId}",
+            CbrAuthorities.CONTENT_EDIT),
+        Arguments.of("deleteRepair", "DELETE", "/{structureId}/repairs/{repairId}",
+            CbrAuthorities.DESTRUCTIVE),
+        Arguments.of("getMonitors", "GET", "/{structureId}/monitors", CbrAuthorities.READ),
+        Arguments.of("createMonitor", "POST", "/{structureId}/monitors",
+            CbrAuthorities.CONTENT_EDIT),
+        Arguments.of("updateMonitor", "PUT", "/{structureId}/monitors/{monitorId}",
+            CbrAuthorities.CONTENT_EDIT),
+        Arguments.of("deleteMonitor", "DELETE", "/{structureId}/monitors/{monitorId}",
+            CbrAuthorities.DESTRUCTIVE));
   }
 
-  @Test
-  @DisplayName("spans and piers are GET /api/v1/structures/{structureId}/spans-and-piers, on READ")
-  void spansAndPiersAreMappedAndGated() {
-    Method get = method("getSpansAndPiers");
-    assertThat(get.getAnnotation(GetMapping.class).value())
-        .containsExactly("/{structureId}/spans-and-piers");
-    assertThat(get.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  @ParameterizedTest(name = "{0} is {1} {2}")
+  @MethodSource("structureEndpoints")
+  @DisplayName("each endpoint of one structure is mapped and gated: read on READ, add and edit on "
+      + "CONTENT_EDIT (Level 1), delete on DESTRUCTIVE (Level 2)")
+  void structureEndpointIsMappedAndGated(String name, String verb, String path, String gate) {
+    Method endpoint = method(name);
+    assertThat(mapping(endpoint, verb)).containsExactly(path);
+    assertThat(endpoint.getAnnotation(PreAuthorize.class).value()).isEqualTo(gate);
   }
 
-  @Test
-  @DisplayName("documents and their files are GETs under /{structureId}/documents, on READ")
-  void documentsAreMappedAndGated() {
-    Method list = method("getDocuments");
-    assertThat(list.getAnnotation(GetMapping.class).value())
-        .containsExactly("/{structureId}/documents");
-    assertThat(list.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
-
-    Method file = method("getDocumentFile");
-    assertThat(file.getAnnotation(GetMapping.class).value())
-        .containsExactly("/{structureId}/documents/{fileId}/file");
-    assertThat(file.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
-  }
-  @Test
-  @DisplayName("the Inspections tab's schedule and table are GETs, on READ")
-  void inspectionsAreMappedAndGated() {
-    Method schedule = method("getInspectionSchedule");
-    assertThat(schedule.getAnnotation(GetMapping.class).value())
-        .containsExactly("/{structureId}/inspection-schedule");
-    assertThat(schedule.getAnnotation(PreAuthorize.class).value())
-        .isEqualTo(CbrAuthorities.READ);
-
-    Method table = method("getInspections");
-    assertThat(table.getAnnotation(GetMapping.class).value())
-        .containsExactly("/{structureId}/inspections");
-    assertThat(table.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
-  }
-  @Test
-  @DisplayName("the Repairs tab's page is GET /{structureId}/repairs, on READ")
-  void repairsAreMappedAndGated() {
-    Method repairs = method("getRepairs");
-    assertThat(repairs.getAnnotation(GetMapping.class).value())
-        .containsExactly("/{structureId}/repairs");
-    assertThat(repairs.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
-  }
-  @Test
-  @DisplayName("the Monitoring tab's page is GET /{structureId}/monitors, on READ")
-  void monitorsAreMappedAndGated() {
-    Method monitors = method("getMonitors");
-    assertThat(monitors.getAnnotation(GetMapping.class).value())
-        .containsExactly("/{structureId}/monitors");
-    assertThat(monitors.getAnnotation(PreAuthorize.class).value())
-        .isEqualTo(CbrAuthorities.READ);
+  /** The paths of the endpoint's mapping for the verb, or none when it is mapped to another. */
+  private static String[] mapping(Method endpoint, String verb) {
+    Annotation found = switch (verb) {
+      case "GET" -> endpoint.getAnnotation(GetMapping.class);
+      case "POST" -> endpoint.getAnnotation(PostMapping.class);
+      case "PUT" -> endpoint.getAnnotation(PutMapping.class);
+      case "DELETE" -> endpoint.getAnnotation(DeleteMapping.class);
+      default -> throw new IllegalArgumentException(verb);
+    };
+    return switch (found) {
+      case GetMapping get -> get.value();
+      case PostMapping post -> post.value();
+      case PutMapping put -> put.value();
+      case DeleteMapping delete -> delete.value();
+      case null, default -> new String[0];
+    };
   }
 }

@@ -615,7 +615,7 @@ describe('InspectionSearchPage — deleting an offline inspection', () => {
   it('deletes on confirm and says so', async () => {
     await openDeleteConfirmation();
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(searchApi.deleteInspection).toHaveBeenCalledWith(offlineRow.id));
     await waitFor(() => {
@@ -631,7 +631,7 @@ describe('InspectionSearchPage — deleting an offline inspection', () => {
     await openDeleteConfirmation();
     const searchesBefore = searchApi.searchInspections.mock.calls.length;
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(searchApi.searchInspections.mock.calls.length).toBeGreaterThan(searchesBefore);
@@ -646,7 +646,7 @@ describe('InspectionSearchPage — deleting an offline inspection', () => {
     });
     await openDeleteConfirmation();
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(display).toHaveBeenCalledWith(
@@ -663,7 +663,7 @@ describe('InspectionSearchPage — deleting an offline inspection', () => {
     searchApi.deleteInspection.mockRejectedValue({ body: null });
     await openDeleteConfirmation();
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {
       expect(display).toHaveBeenCalledWith(

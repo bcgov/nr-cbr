@@ -111,6 +111,36 @@ export const specialEquipmentCodesQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const monitoringStatusCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'monitoring-status-codes'],
+  queryFn: () => API.configuration.getMonitoringStatusCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const monitorFrequencyCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'monitor-frequency-codes'],
+  queryFn: () => API.configuration.getMonitorFrequencyCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const repairStatusCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'repair-status-codes'],
+  queryFn: () => API.configuration.getRepairStatusCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const repairPriorityCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'repair-priority-codes'],
+  queryFn: () => API.configuration.getRepairPriorityCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const repairGroupCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'repair-group-codes'],
+  queryFn: () => API.configuration.getRepairGroupCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 /**
  * The parameterless lookups each search screen draws on.
  *
@@ -208,6 +238,14 @@ export const useCulvertTypeCodes = (): UseQueryResult<CodeOption[]> =>
 
 export const useSpecialEquipmentCodes = (): UseQueryResult<CodeOption[]> =>
   useQuery(specialEquipmentCodesQuery);
+
+/** The Monitoring Status select on a monitoring item. */
+export const useMonitoringStatusCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(monitoringStatusCodesQuery);
+
+/** The Monitoring Frequency select on a monitoring item. */
+export const useMonitorFrequencyCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(monitorFrequencyCodesQuery);
 
 /**
  * The recreation districts for a project file — the Recreation District list on a recreation site.
@@ -338,3 +376,15 @@ export const usePrefetchConfiguration = (enabled: boolean): void => {
     void queryClient.query(specialEquipmentCodesQuery).catch(ignoreWarmUpFailure);
   }, [enabled, queryClient]);
 };
+
+/** The Repair Status select on a repair. */
+export const useRepairStatusCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(repairStatusCodesQuery);
+
+/** The Repair Priority select on a repair. */
+export const useRepairPriorityCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(repairPriorityCodesQuery);
+
+/** The group checkboxes that narrow a repair's Repair Type list. */
+export const useRepairGroupCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(repairGroupCodesQuery);

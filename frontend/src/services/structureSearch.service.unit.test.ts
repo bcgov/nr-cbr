@@ -194,12 +194,12 @@ describe('StructureSearchService', () => {
   it("reads a page of a structure's repairs", async () => {
     const { service, request } = withMockedRequest();
 
-    await service.getStructureRepairs('7', 'ALL', 2, 10);
+    await service.getStructureRepairs('7', 'ALL', 2, 10, true);
 
     expect(request).toHaveBeenCalledWith(
       expect.objectContaining({
         method: 'GET',
-        url: '/api/v1/structures/7/repairs?view=ALL&pageNumber=2&pageSize=10',
+        url: '/api/v1/structures/7/repairs?view=ALL&pageNumber=2&pageSize=10&includeBeforeInstall=true',
       }),
     );
   });
@@ -207,13 +207,68 @@ describe('StructureSearchService', () => {
   it("reads a page of a structure's monitoring items", async () => {
     const { service, request } = withMockedRequest();
 
-    await service.getStructureMonitors('7', 'OUTSTANDING', 0, 10);
+    await service.getStructureMonitors('7', 'OUTSTANDING', 0, 10, false);
 
     expect(request).toHaveBeenCalledWith(
       expect.objectContaining({
         method: 'GET',
-        url: '/api/v1/structures/7/monitors?view=OUTSTANDING&pageNumber=0&pageSize=10',
+        url: '/api/v1/structures/7/monitors?view=OUTSTANDING&pageNumber=0&pageSize=10&includeBeforeInstall=false',
       }),
+    );
+  });
+
+  it('adds a monitoring item to a structure', async () => {
+    const { service, request } = withMockedRequest();
+    const body = { frequencyCode: 'INS', frequencyComment: '', description: 'Scour.' };
+
+    await service.createStructureMonitor('7', body);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        url: '/api/v1/structures/7/monitors',
+        data: body,
+      }),
+    );
+  });
+
+  it('saves an edit to one monitoring item', async () => {
+    const { service, request } = withMockedRequest();
+    const body = {
+      statusCode: 'REQ',
+      frequencyCode: 'ANN',
+      frequencyComment: '',
+      description: 'Scour.',
+    };
+
+    await service.updateStructureMonitor('7', '12', body);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'PUT',
+        url: '/api/v1/structures/7/monitors/12',
+        data: body,
+      }),
+    );
+  });
+
+  it('deletes one repair of a structure', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.deleteStructureRepair('7', '12');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'DELETE', url: '/api/v1/structures/7/repairs/12' }),
+    );
+  });
+
+  it('deletes one monitoring item of a structure', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.deleteStructureMonitor('7', '12');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'DELETE', url: '/api/v1/structures/7/monitors/12' }),
     );
   });
 });

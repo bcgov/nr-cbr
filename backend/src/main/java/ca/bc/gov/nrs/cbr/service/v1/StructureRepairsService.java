@@ -1,6 +1,9 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
+import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
+import ca.bc.gov.nrs.cbr.exception.RepairNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
+import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
@@ -12,17 +15,32 @@ import ca.bc.gov.nrs.cbr.repository.v1.RepairStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeOrderRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeXrefRepository;
+import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse.Listing;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse.Repair;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse.View;
 import ca.bc.gov.nrs.cbr.struct.v1.UserAudit;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,15 +50,31 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The structure page's Repairs tab — legacy's {@code repairTab.jsp}, a page at a time.
  *
- * <p>Read-only for now; legacy's Add, Edit (Level 1) and Delete come with the page's editing.
- * Legacy inner-joins the priority and status codes, so a repair whose code has no row would vanish
- * there; here it stays, its code shown without a description.
+ * <p>Lists, adds, edits and deletes repairs. Legacy inner-joins the priority
+ * and status codes, so a repair whose code has no row would vanish there; here it stays, its code
+ * shown without a description.
  */
 @Service
 public class StructureRepairsService {
 
+  private static final Logger log = LoggerFactory.getLogger(StructureRepairsService.class);
+
   /** Suggested, required, carried forward — legacy's outstanding statuses. */
   private static final List<String> OUTSTANDING_STATUSES = List.of("SUG", "REQ", "CF");
+  private static final String SUGGESTED = "SUG";
+  private static final String REQUIRED = "REQ";
+  private static final String COMPLETED = "COM";
+  private static final String NOT_CARRIED_FORWARD = "N";
+  /** The status field's name in a refusal — the request's, which is the form's. */
+  private static final String STATUS_FIELD = "statusCode";
+  /** Required and Not Required: the statuses legacy offers only a P.Eng. */
+  private static final Set<String> ENGINEER_STATUSES = Set.of(REQUIRED, "NRQ");
+  /** The type whose repair must be described — legacy's {@code Repair.validate}. */
+  private static final String DESCRIBED_TYPE = "800A";
+  /** The description column, in bytes. */
+  private static final int TEXT_MAX = 2000;
+  /** {@code ESTIMATE} and {@code ACTUAL_COST} are {@code NUMBER(6)}: at most six digits. */
+  private static final long AMOUNT_MAX = 999_999L;
   private static final int MAX_PAGE_SIZE = 100;
 
   private final CrossingStructureRepository structures;
@@ -49,6 +83,8 @@ public class StructureRepairsService {
   private final RepairStatusCodeRepository statuses;
   private final StructureRepairTypeCodeRepository types;
   private final StructureRepairTypeOrderRepository typeUnits;
+  private final StructureRepairTypeXrefRepository typeXref;
+  private final LoggedUserHelper loggedUser;
 
   public StructureRepairsService(
       CrossingStructureRepository structures,
@@ -56,17 +92,23 @@ public class StructureRepairsService {
       RepairPriorityCodeRepository priorities,
       RepairStatusCodeRepository statuses,
       StructureRepairTypeCodeRepository types,
-      StructureRepairTypeOrderRepository typeUnits) {
+      StructureRepairTypeOrderRepository typeUnits,
+      StructureRepairTypeXrefRepository typeXref,
+      LoggedUserHelper loggedUser) {
     this.structures = structures;
     this.repairs = repairs;
     this.priorities = priorities;
     this.statuses = statuses;
     this.types = types;
     this.typeUnits = typeUnits;
+    this.typeXref = typeXref;
+    this.loggedUser = loggedUser;
   }
 
   /**
-   * A page of the structure's repairs, in legacy's order.
+   * A page of the structure's repairs, in legacy's order. Those raised by an inspection from before
+   * the superstructure went in are left out unless {@code includeBeforeInstall} — legacy's
+   * "Show Inspections before the Superstructure Install Date".
    *
    * @param view       outstanding only, or all
    * @param pageNumber zero-based
@@ -74,12 +116,14 @@ public class StructureRepairsService {
    * @throws StructureNotFoundException if there is no such structure
    */
   @Transactional(readOnly = true)
-  public PagedResponse<Repair> repairs(long structureId, View view, int pageNumber, int pageSize) {
-    if (!structures.existsById(structureId)) {
-      throw new StructureNotFoundException(structureId);
-    }
+  public Listing repairs(long structureId, View view, int pageNumber, int pageSize,
+      boolean includeBeforeInstall) {
+    InstallCutoff cutoff = InstallCutoff.of(structures.findById(structureId)
+        .orElseThrow(() -> new StructureNotFoundException(structureId)));
+    boolean outstandingOnly = view == View.OUTSTANDING;
     Page<StructureRepairEntity> page = repairs.findPageByStructure(
-        structureId, view == View.OUTSTANDING, OUTSTANDING_STATUSES,
+        structureId, outstandingOnly, OUTSTANDING_STATUSES,
+        includeBeforeInstall || cutoff.none(), cutoff.installed(),
         PageRequest.of(Math.max(pageNumber, 0), Math.clamp(pageSize, 1, MAX_PAGE_SIZE)));
     List<StructureRepairEntity> rows = page.getContent();
 
@@ -117,8 +161,221 @@ public class StructureRepairsService {
             units.get(repair.getStructureRepairTypeCode()),
             repair.getDescription()))
         .toList();
-    return new PagedResponse<>(content, page.getTotalElements(), page.getTotalPages(),
-        page.getNumber(), page.getSize());
+    return new Listing(
+        new PagedResponse<>(content, page.getTotalElements(), page.getTotalPages(),
+            page.getNumber(), page.getSize()),
+        cutoff.none()
+            ? 0
+            : repairs.countBeforeInstall(
+                structureId, outstandingOnly, OUTSTANDING_STATUSES, cutoff.installed()));
+  }
+
+  /**
+   * The repair types that apply to the structure, each with its group — the Repair Item dialog's
+   * Repair Type list before its group checkboxes narrow it. In legacy's order: by group, then the
+   * type's order. A type in two groups appears once in each.
+   *
+   * @throws StructureNotFoundException if there is no such structure
+   */
+  @Transactional(readOnly = true)
+  public List<RepairTypeOption> repairTypes(long structureId) {
+    CrossingStructureEntity structure = structures.findById(structureId)
+        .orElseThrow(() -> new StructureNotFoundException(structureId));
+    if (structure.getStructureTypeClassCode() == null) {
+      return List.of();
+    }
+    return typeXref.findTypesForStructureTypeClass(structure.getStructureTypeClassCode()).stream()
+        .distinct()
+        .toList();
+  }
+
+  /**
+   * Adds a repair to the structure — legacy's Add Repair ({@code StructureAction.repair},
+   * {@code CBR.INSERT_REPAIR}).
+   *
+   * <p>As legacy: the repair is Suggested, stamped Suggested by the user, not carried forward, and
+   * belongs to no inspection; it takes the structure's next number (over every repair, those an
+   * inspection raised included) and its id from {@code STRUCTURE_REPAIR_SEQ} through the entity's
+   * generator. The priority, type, amounts and description are checked as an edit checks them.
+   *
+   * @throws StructureNotFoundException if there is no such structure
+   * @throws FieldValidationException   with a message for each field at fault
+   */
+  @Transactional
+  public RepairCreatedResponse create(long structureId, RepairCreateRequest request) {
+    if (!structures.existsById(structureId)) {
+      throw new StructureNotFoundException(structureId);
+    }
+    String priority = trimmed(request.priorityCode());
+    String type = trimmed(request.typeCode());
+    String description = trimmed(request.description());
+    validate(new RepairUpdateRequest(SUGGESTED, priority, null, request.estimate(), null, type,
+        request.quantity(), description));
+
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    long number = repairs.findHighestNumber(structureId) + 1;
+    StructureRepairEntity saved = repairs.save(StructureRepairEntity.builder()
+        .crossingStructureId(structureId)
+        .repairNumber(number)
+        .repairStatusCode(SUGGESTED)
+        .repairPriorityCode(priority)
+        .estimate(request.estimate())
+        .structureRepairTypeCode(type)
+        .repairQuantity(request.quantity())
+        .description(description)
+        .carriedForwardInd(NOT_CARRIED_FORWARD)
+        .suggestedByUserid(user)
+        .suggestedByTimestamp(now)
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build());
+    log.info("Added repair {} ({}) to structure {}", saved.getRepairId(), number, structureId);
+    return new RepairCreatedResponse(String.valueOf(saved.getRepairId()), number);
+  }
+
+  /**
+   * Saves an edit to one repair — legacy's "Repair Item" dialog ({@code StructureAction.repair},
+   * {@code CBR.UPDATE_REPAIR}).
+   *
+   * <p>As legacy: the status, priority and type are required; a completed repair needs its
+   * completed date; the description is required for the type {@code 800A}; Required and Not
+   * Required are a P.Eng's to set. Legacy's dialog clears the completed date and actual cost
+   * unless the status is Completed, and so does this, on the server. The number is not changed.
+   *
+   * <p>Beyond legacy: the amounts and quantity are whole numbers from 0 to 999,999, and a blank one
+   * stays blank, where legacy saved 0.
+   *
+   * <p>As legacy's procedure, the audit for the status the repair now has — Suggested, Required or
+   * Completed by — is stamped with the user and the time on every save; the other two are kept.
+   * Unlike legacy, the carried-forward flag is kept: legacy reset it, which returned a repair
+   * already carried forward to the outstanding list beside its copy.
+   *
+   * @throws RepairNotFoundException  if the structure has no such repair
+   * @throws FieldValidationException with a message for each field at fault
+   */
+  @Transactional
+  public void update(long structureId, long repairId, RepairUpdateRequest request) {
+    StructureRepairEntity repair = repairs.findById(repairId)
+        .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
+        .orElseThrow(() -> new RepairNotFoundException(structureId, repairId));
+
+    String status = trimmed(request.statusCode());
+    boolean completed = COMPLETED.equals(status);
+    String priority = trimmed(request.priorityCode());
+    String type = trimmed(request.typeCode());
+    String description = trimmed(request.description());
+    LocalDate completedDate = completed ? request.completedDate() : null;
+    Long actualCost = completed ? request.actualCost() : null;
+    validate(new RepairUpdateRequest(status, priority, completedDate, request.estimate(),
+        actualCost, type, request.quantity(), description));
+
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    StructureRepairEntity.StructureRepairEntityBuilder updated = repair.toBuilder()
+        .repairStatusCode(status)
+        .repairPriorityCode(priority)
+        .completedDate(completedDate)
+        .estimate(request.estimate())
+        .actualCost(actualCost)
+        .structureRepairTypeCode(type)
+        .repairQuantity(request.quantity())
+        .description(description)
+        .updateUserid(user)
+        .updateTimestamp(now);
+    switch (status) {
+      case SUGGESTED -> updated.suggestedByUserid(user).suggestedByTimestamp(now);
+      case REQUIRED -> updated.requiredByUserid(user).requiredByTimestamp(now);
+      case COMPLETED -> updated.completedByUserid(user).completedByTimestamp(now);
+      default -> { /* Not Required and Carried Forward have no audit, as legacy's ELSE NULL. */ }
+    }
+    repairs.save(updated.build());
+    log.info("Updated repair {} ({}) of structure {} to status {}", repairId,
+        repair.getRepairNumber(), structureId, status);
+  }
+
+  /** Checks a repair as it will be stored: trimmed, cleared of what its status does not keep. */
+  private void validate(RepairUpdateRequest repair) {
+    String priority = repair.priorityCode();
+    String type = repair.typeCode();
+    Map<String, String> errors = new LinkedHashMap<>();
+    checkStatus(errors, repair.statusCode());
+    if (priority == null) {
+      errors.put("priorityCode", "Repair Priority is required.");
+    } else if (!priorities.existsById(priority)) {
+      errors.put("priorityCode", "Repair Priority is not one of the listed priorities.");
+    }
+    if (COMPLETED.equals(repair.statusCode()) && repair.completedDate() == null) {
+      errors.put("completedDate",
+          "Repair Completed Date is required when the status is Completed.");
+    }
+    checkAmount(errors, "estimate", "Repair Estimate Cost", repair.estimate());
+    checkAmount(errors, "actualCost", "Repair Actual Cost", repair.actualCost());
+    if (type == null) {
+      errors.put("typeCode", "Repair Type is required.");
+    } else if (!types.existsById(type)) {
+      errors.put("typeCode", "Repair Type is not one of the listed types.");
+    }
+    checkAmount(errors, "quantity", "Qty", repair.quantity());
+    checkDescription(errors, repair.description(), type);
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Repair cannot be saved", errors);
+    }
+  }
+
+  private void checkStatus(Map<String, String> errors, String status) {
+    if (status == null) {
+      errors.put(STATUS_FIELD, "Repair Status is required.");
+    } else if (!statuses.existsById(status)) {
+      errors.put(STATUS_FIELD, "Repair Status is not one of the listed statuses.");
+    } else if (ENGINEER_STATUSES.contains(status) && !loggedUser.isPeng()) {
+      errors.put(STATUS_FIELD,
+          "Only a professional engineer can set Repair Status to Required or Not Required.");
+    }
+  }
+
+  private static void checkDescription(Map<String, String> errors, String description,
+      String type) {
+    if (description == null) {
+      if (DESCRIBED_TYPE.equals(type)) {
+        errors.put("description", "Repair Description is required for this Repair Type.");
+      }
+    } else if (description.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
+      // Bytes, because the column is declared in bytes and an accented character costs two.
+      errors.put("description",
+          "Repair Description can be at most " + TEXT_MAX + " characters.");
+    }
+  }
+
+  private static void checkAmount(Map<String, String> errors, String field, String label,
+      Long value) {
+    if (value != null && (value < 0 || value > AMOUNT_MAX)) {
+      errors.put(field, label + " must be a whole number from 0 to 999,999.");
+    }
+  }
+
+  /** The value without surrounding spaces, or null when nothing is left. */
+  private static String trimmed(String value) {
+    return value == null || value.isBlank() ? null : value.trim();
+  }
+
+  /**
+   * Deletes one repair — legacy's delete icon on the Repairs tab ({@code CBR.DELETE_REPAIR}, a
+   * plain delete). As legacy, any repair of the structure may go: carried forward or not, raised by
+   * an inspection or not. Nothing else references the row.
+   *
+   * @throws RepairNotFoundException if the structure has no such repair
+   */
+  @Transactional
+  public void delete(long structureId, long repairId) {
+    StructureRepairEntity repair = repairs.findById(repairId)
+        .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
+        .orElseThrow(() -> new RepairNotFoundException(structureId, repairId));
+    repairs.delete(repair);
+    log.info("Deleted repair {} ({}) of structure {}", repairId, repair.getRepairNumber(),
+        structureId);
   }
 
   /** Each code on the page with its description (or other column), read in one query. */
