@@ -14,6 +14,8 @@ import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
@@ -148,6 +150,13 @@ public class StructureApiController implements StructureApiEndpoint {
   @Override
   public List<RepairTypeOption> getRepairTypes(long structureId) {
     return repairsService.repairTypes(structureId);
+  }
+
+  @Override
+  public ResponseEntity<RepairCreatedResponse> createRepair(
+      long structureId, RepairCreateRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(repairsService.create(structureId, request));
   }
 
   @Override

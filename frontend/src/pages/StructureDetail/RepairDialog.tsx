@@ -28,17 +28,26 @@ import {
   useRepairPriorityCodes,
   useRepairStatusCodes,
 } from '@/hooks/useConfiguration';
-import { useStructureRepairTypes, useUpdateStructureRepair } from '@/hooks/useStructureSearch';
+import {
+  useCreateStructureRepair,
+  useStructureRepairTypes,
+  useUpdateStructureRepair,
+} from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { byteLength, overLimitError } from '@/utils/textLimits';
 
 type Props = {
   structureId: string;
-  /** The repair being edited. The dialog is mounted only while it is open, so it opens fresh. */
-  repair: StructureRepair;
+  /**
+   * The repair being edited, or null to add one. The dialog is mounted only while it is open, so it
+   * opens fresh each time.
+   */
+  repair: StructureRepair | null;
   onClose: () => void;
 };
 
+/** The status every new repair starts in — legacy locks it on Add. */
+const SUGGESTED = 'SUG';
 /** The status that has a completed date and an actual cost. */
 const COMPLETED = 'COM';
 /** Required and Not Required: legacy offers them to a P.Eng only, and the server agrees. */
@@ -139,9 +148,13 @@ const typesFor = (options: RepairTypeOption[], groups: ReadonlySet<string>) => {
 };
 
 /**
- * Legacy's "Repair Item" dialog, for editing a repair.
+ * Legacy's "Repair Item" dialog, for adding a repair or editing one.
  *
- * <p>As legacy: the number shown and not changed; Required and Not Required offered to a P.Eng only
+ * <p>Adding, as legacy: the status is Suggested and cannot be changed, so the completed date and
+ * actual cost are not offered; the number is the structure's next, given when saved and not shown
+ * before.
+ *
+ * <p>Editing, as legacy: the number shown and not changed; Required and Not Required offered to a P.Eng only
  * (a repair already in one opens with no status chosen for anyone else, who must pick another);
  * the completed date and actual cost open only for Completed, and are cleared when the status moves
  * off it; the group checkboxes narrow the Repair Type list, every type showing while none is ticked.
@@ -155,29 +168,32 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
   const priorities = useRepairPriorityCodes();
   const groups = useRepairGroupCodes();
   const types = useStructureRepairTypes(structureId);
+  const adding = repair === null;
+  const create = useCreateStructureRepair(structureId);
   const update = useUpdateStructureRepair(structureId);
+  const saving = create.isPending || update.isPending;
   const { display } = useNotification();
 
   const offeredStatuses = (statuses.data ?? []).filter(
     (option) => isPeng || !ENGINEER_STATUSES.has(option.code),
   );
-  const storedStatus = repair.status.code ?? '';
+  const storedStatus = repair?.status.code ?? SUGGESTED;
 
   const [values, setValues] = useState<Values>({
     // A status this user may not set opens blank, as legacy's list opens without it.
     statusCode: !isPeng && ENGINEER_STATUSES.has(storedStatus) ? '' : storedStatus,
-    priorityCode: repair.priority.code ?? '',
-    completedDate: toBox(repair.completedDate),
-    estimate: number(repair.estimate),
-    actualCost: number(repair.actualCost),
-    typeCode: repair.type.code ?? '',
-    quantity: number(repair.quantity),
-    description: repair.description ?? '',
+    priorityCode: repair?.priority.code ?? '',
+    completedDate: toBox(repair?.completedDate ?? null),
+    estimate: number(repair?.estimate),
+    actualCost: number(repair?.actualCost),
+    typeCode: repair?.type.code ?? '',
+    quantity: number(repair?.quantity),
+    description: repair?.description ?? '',
   });
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
   /** The form's own errors, set on Save and cleared field by field as each is changed. */
   const [errors, setErrors] = useState<Errors>({});
-  const shown: Errors = { ...update.fieldErrors, ...errors };
+  const shown: Errors = { ...(adding ? create.fieldErrors : update.fieldErrors), ...errors };
   const completed = values.statusCode === COMPLETED;
   // Only a whole date (or none) goes back to the picker: flatpickr parses the value it is handed,
   // and handing it each half-typed keystroke would rewrite the box under the user's cursor.
@@ -190,7 +206,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
     const listed = typesFor(types.data ?? [], ticked);
     // The stored type stays choosable while nothing narrows the list, even when the structure's
     // types no longer include it — legacy showed it blank, and a save then asked for it again.
-    const stored = repair.type.code;
+    const stored = repair?.type.code;
     if (stored && ticked.size === 0 && !listed.some((option) => option.code === stored)) {
       return [
         { code: stored, description: repair.type.description, unit: repair.unit, groupCode: '' },
@@ -198,17 +214,17 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
       ];
     }
     return listed;
-  }, [types.data, ticked, repair.type, repair.unit]);
+  }, [types.data, ticked, repair]);
   const unit = typeOptions.find((option) => option.code === values.typeCode)?.unit ?? '';
 
   // A stored priority no longer current is still the repair's, so it stays in the list.
   const priorityOptions = useMemo(() => {
     const listed = priorities.data ?? [];
-    const stored = repair.priority.code;
-    return stored && !listed.some((option) => option.code === stored)
-      ? [{ code: stored, description: repair.priority.description ?? stored }, ...listed]
+    const stored = repair?.priority;
+    return stored?.code && !listed.some((option) => option.code === stored.code)
+      ? [{ code: stored.code, description: stored.description ?? stored.code }, ...listed]
       : listed;
-  }, [priorities.data, repair.priority]);
+  }, [priorities.data, repair]);
 
   const change = (field: Field, value: string) => {
     setValues((current) => {
@@ -247,6 +263,35 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
       quantity: toAmount(values.quantity),
       description: values.description,
     };
+    const failed = (error: unknown) => {
+      // Field refusals show beside their fields; anything else is a toast.
+      if (Object.keys(apiFieldErrors(error)).length > 0) return;
+      display({
+        kind: 'error',
+        title: adding ? 'The repair was not added' : 'The repair was not saved',
+        subtitle: apiErrorMessage(error, 'Try again, or contact support if this continues.'),
+        timeout: 0,
+      });
+    };
+    if (repair === null) {
+      create.mutate(
+        {
+          priorityCode: request.priorityCode,
+          estimate: request.estimate,
+          typeCode: request.typeCode,
+          quantity: request.quantity,
+          description: request.description,
+        },
+        {
+          onSuccess: (created) => {
+            display({ kind: 'success', title: `Repair ${created.number} added`, timeout: 4000 });
+            onClose();
+          },
+          onError: failed,
+        },
+      );
+      return;
+    }
     update.mutate(
       { repairId: repair.id, request },
       {
@@ -258,16 +303,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
           });
           onClose();
         },
-        onError: (error) => {
-          // Field refusals show beside their fields; anything else is a toast.
-          if (Object.keys(apiFieldErrors(error)).length > 0) return;
-          display({
-            kind: 'error',
-            title: 'The repair was not saved',
-            subtitle: apiErrorMessage(error, 'Try again, or contact support if this continues.'),
-            timeout: 0,
-          });
-        },
+        onError: failed,
       },
     );
   };
@@ -293,7 +329,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
   return (
     <Modal
       open
-      modalHeading={`Edit repair ${number(repair.number)}`}
+      modalHeading={repair === null ? 'Add repair' : `Edit repair ${number(repair.number)}`}
       // Passive, with the buttons drawn below, as the app's other form dialogs close.
       passiveModal
       preventCloseOnClickOutside
@@ -302,22 +338,29 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
       className="structure-detail__repair-dialog"
     >
       <div className="structure-detail__repair-fields">
-        <ReadOnlyField label="Repair Number" value={number(repair.number)} />
-        <Select
-          id="repair-status"
-          data-testid="repair-status"
-          labelText={requiredLabel('Repair Status', true)}
-          value={values.statusCode}
-          disabled={statuses.isLoading}
-          invalid={Boolean(shown.statusCode)}
-          invalidText={shown.statusCode}
-          onChange={(event) => change('statusCode', event.target.value)}
-        >
-          <SelectItem value="" text="Choose a status" />
-          {offeredStatuses.map((option) => (
-            <SelectItem key={option.code} value={option.code} text={option.description} />
-          ))}
-        </Select>
+        {/* Edit shows the number; Add has none to show — the server gives the structure's next on
+            save, and the toast names it. */}
+        {repair !== null && <ReadOnlyField label="Repair Number" value={number(repair.number)} />}
+        {repair === null ? (
+          // Locked on Add, as legacy locks it: a new repair is a suggestion until someone requires it.
+          <ReadOnlyField label="Repair Status" value="Suggested" />
+        ) : (
+          <Select
+            id="repair-status"
+            data-testid="repair-status"
+            labelText={requiredLabel('Repair Status', true)}
+            value={values.statusCode}
+            disabled={statuses.isLoading}
+            invalid={Boolean(shown.statusCode)}
+            invalidText={shown.statusCode}
+            onChange={(event) => change('statusCode', event.target.value)}
+          >
+            <SelectItem value="" text="Choose a status" />
+            {offeredStatuses.map((option) => (
+              <SelectItem key={option.code} value={option.code} text={option.description} />
+            ))}
+          </Select>
+        )}
         <Select
           id="repair-priority"
           data-testid="repair-priority"
@@ -334,33 +377,38 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
           ))}
         </Select>
 
-        <DatePicker
-          datePickerType="single"
-          dateFormat={DATE_FORMAT}
-          value={pickerDate.current}
-          // The shared fix in `_overrides.scss`: Carbon hard-codes a single picker to 18rem.
-          className="cbr-date-picker"
-          onChange={(dates: Date[]) =>
-            change('completedDate', dates[0] ? fromCalendar(dates[0]) : '')
-          }
-        >
-          <DatePickerInput
-            id="repair-completed-date"
-            data-testid="repair-completed-date"
-            // One span, because Carbon lays a date picker's label out as flex: the asterisk on its
-            // own would be a flex item, lifted off the text's baseline.
-            labelText={<span>{requiredLabel('Repair Completed Date', completed)}</span>}
-            placeholder="yyyy/mm/dd"
-            disabled={!completed}
-            invalid={Boolean(shown.completedDate)}
-            invalidText={shown.completedDate}
-            onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              change('completedDate', event.target.value)
-            }
-          />
-        </DatePicker>
+        {/* Not on Add: a new repair is Suggested, and only a completed one has these. */}
+        {repair !== null && (
+          <>
+            <DatePicker
+              datePickerType="single"
+              dateFormat={DATE_FORMAT}
+              value={pickerDate.current}
+              // The shared fix in `_overrides.scss`: Carbon hard-codes a single picker to 18rem.
+              className="cbr-date-picker"
+              onChange={(dates: Date[]) =>
+                change('completedDate', dates[0] ? fromCalendar(dates[0]) : '')
+              }
+            >
+              <DatePickerInput
+                id="repair-completed-date"
+                data-testid="repair-completed-date"
+                // One span, because Carbon lays a date picker's label out as flex: the asterisk on its
+                // own would be a flex item, lifted off the text's baseline.
+                labelText={<span>{requiredLabel('Repair Completed Date', completed)}</span>}
+                placeholder="yyyy/mm/dd"
+                disabled={!completed}
+                invalid={Boolean(shown.completedDate)}
+                invalidText={shown.completedDate}
+                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                  change('completedDate', event.target.value)
+                }
+              />
+            </DatePicker>
+          </>
+        )}
         {amount('estimate', 'Repair Estimate Cost ($)')}
-        {amount('actualCost', 'Repair Actual Cost ($)', !completed)}
+        {repair !== null && amount('actualCost', 'Repair Actual Cost ($)', !completed)}
       </div>
 
       {/* Spaced by a wrapper: Carbon's fieldset rule resets its own margin. */}
@@ -429,17 +477,11 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
       </div>
 
       <div className="structure-detail__dialog-actions">
-        <Button kind="tertiary" size="md" onClick={onClose} disabled={update.isPending}>
+        <Button kind="tertiary" size="md" onClick={onClose} disabled={saving}>
           Cancel
         </Button>
-        <Button
-          kind="primary"
-          size="md"
-          onClick={save}
-          disabled={update.isPending}
-          data-testid="repair-save"
-        >
-          Save
+        <Button kind="primary" size="md" onClick={save} disabled={saving} data-testid="repair-save">
+          {adding ? 'Add' : 'Save'}
         </Button>
       </div>
     </Modal>

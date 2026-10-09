@@ -55,3 +55,12 @@ export type RepairTypeOption = {
   unit: string | null;
   groupCode: string;
 };
+
+/** A new repair — the backend's `RepairCreateRequest`. Always Suggested; numbered next. */
+export type RepairCreateRequest = Pick<
+  RepairUpdateRequest,
+  'priorityCode' | 'estimate' | 'typeCode' | 'quantity' | 'description'
+>;
+
+/** The repair just added — the backend's `RepairCreatedResponse`. */
+export type RepairCreatedResponse = { id: string; number: number };

@@ -5,6 +5,8 @@ import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
@@ -228,6 +230,22 @@ public interface StructureApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/repair-types")
   List<RepairTypeOption> getRepairTypes(@PathVariable("structureId") long structureId);
+
+  /**
+   * Adds a repair to the structure — legacy's Add Repair. Always Suggested; the structure's next
+   * number.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy's button.
+   * <b>201</b> with the new repair's id and number; <b>404</b> when there is no such structure;
+   * <b>400</b> with {@code fieldErrors} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PostMapping("/{structureId}/repairs")
+  ResponseEntity<RepairCreatedResponse> createRepair(
+      @PathVariable("structureId") long structureId,
+      @RequestBody RepairCreateRequest request);
 
   /**
    * Saves an edit to one repair — legacy's "Repair Item" dialog.

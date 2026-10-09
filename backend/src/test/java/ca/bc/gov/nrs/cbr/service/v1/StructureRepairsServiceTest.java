@@ -17,6 +17,8 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeOrderEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeXrefEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
@@ -70,17 +72,20 @@ class StructureRepairsServiceTest {
         .inspectionId(id).crossingStructureId(7L).inspectionDate(date).build());
   }
 
-  private void givenRepair(long id, Long inspectionId, String status, String priority,
+  /** A repair numbered {@code number}; its id, from the sequence, is returned. */
+  private long givenRepair(long number, Long inspectionId, String status, String priority,
       Consumer<StructureRepairEntity.StructureRepairEntityBuilder> change) {
     StructureRepairEntity.StructureRepairEntityBuilder repair = StructureRepairEntity.builder()
-        .repairId(id).crossingStructureId(7L).inspectionId(inspectionId).repairNumber(id)
+        .crossingStructureId(7L).inspectionId(inspectionId).repairNumber(number)
         .repairStatusCode(status).repairPriorityCode(priority).carriedForwardInd("N");
     change.accept(repair);
-    entityManager.persist(repair.build());
+    StructureRepairEntity built = repair.build();
+    entityManager.persist(built);
+    return built.getRepairId();
   }
 
-  private void givenRepair(long id, Long inspectionId, String status, String priority) {
-    givenRepair(id, inspectionId, status, priority, repair -> { });
+  private long givenRepair(long number, Long inspectionId, String status, String priority) {
+    return givenRepair(number, inspectionId, status, priority, repair -> { });
   }
 
   private PagedResponse<Repair> repairs(View view) {
@@ -99,8 +104,8 @@ class StructureRepairsServiceTest {
     givenRepair(4L, null, "COMP", "P1");
     givenRepair(5L, null, "REQ", "P1", repair -> repair.carriedForwardInd("Y"));
 
-    assertThat(repairs(View.OUTSTANDING).content()).extracting(Repair::id)
-        .containsExactlyInAnyOrder("1", "2", "3");
+    assertThat(repairs(View.OUTSTANDING).content()).extracting(Repair::number)
+        .containsExactlyInAnyOrder(1L, 2L, 3L);
     assertThat(repairs(View.ALL).content()).hasSize(5);
   }
 
@@ -116,8 +121,8 @@ class StructureRepairsServiceTest {
     givenRepair(4L, 11L, "SUG", "P1");
     givenRepair(5L, null, "REQ", "P3");
 
-    assertThat(repairs(View.ALL).content()).extracting(Repair::id)
-        .containsExactly("5", "4", "3", "2", "1");
+    assertThat(repairs(View.ALL).content()).extracting(Repair::number)
+        .containsExactly(5L, 4L, 3L, 2L, 1L);
   }
 
   @Test
@@ -203,7 +208,8 @@ class StructureRepairsServiceTest {
     var all = service.repairs(7L, View.ALL, 0, 10, true);
 
     // 1 January of the install year is not "after" it; no inspection is always listed.
-    assertThat(shown.page().content()).extracting(Repair::id).containsExactlyInAnyOrder("3", "4");
+    assertThat(shown.page().content()).extracting(Repair::number)
+        .containsExactlyInAnyOrder(3L, 4L);
     assertThat(shown.page().totalElements()).isEqualTo(2);
     assertThat(shown.beforeInstallCount()).isEqualTo(2);
     assertThat(all.page().content()).hasSize(4);
@@ -227,29 +233,29 @@ class StructureRepairsServiceTest {
   @DisplayName("deletes one repair of the structure, carried forward or not, leaving the others")
   void deletes() {
     givenInspection(10L, LocalDate.of(2023, 6, 1));
-    givenRepair(1L, 10L, "CF", "P1", repair -> repair.carriedForwardInd("Y"));
+    long carried = givenRepair(1L, 10L, "CF", "P1", repair -> repair.carriedForwardInd("Y"));
     givenRepair(2L, null, "REQ", "P1");
     entityManager.flush();
     entityManager.clear();
 
-    service.delete(7L, 1L);
+    service.delete(7L, carried);
     entityManager.flush();
     entityManager.clear();
 
     assertThat(service.repairs(7L, View.ALL, 0, 10, true).page().content())
-        .extracting(Repair::id).containsExactly("2");
+        .extracting(Repair::number).containsExactly(2L);
   }
 
   @Test
   @DisplayName("refuses to delete a repair under a structure it does not belong to, or none at all")
   void deleteOnlyThroughItsStructure() {
-    givenRepair(1L, null, "REQ", "P1");
+    long id = givenRepair(1L, null, "REQ", "P1");
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.delete(8L, 1L))
+    assertThatThrownBy(() -> service.delete(8L, id))
         .isInstanceOf(RepairNotFoundException.class);
-    assertThatThrownBy(() -> service.delete(7L, 99L))
+    assertThatThrownBy(() -> service.delete(7L, id + 1000))
         .isInstanceOf(RepairNotFoundException.class);
   }
 
@@ -279,11 +285,11 @@ class StructureRepairsServiceTest {
     return entityManager.find(StructureRepairEntity.class, id);
   }
 
-  private Map<String, String> refused(RepairUpdateRequest request) {
+  private Map<String, String> refused(long id, RepairUpdateRequest request) {
     entityManager.flush();
     entityManager.clear();
     try {
-      service.update(7L, 1L, request);
+      service.update(7L, id, request);
     } catch (FieldValidationException refused) {
       return refused.getFieldErrors();
     }
@@ -295,14 +301,14 @@ class StructureRepairsServiceTest {
       + "number and the carried-forward flag")
   void updates() {
     givenCodes();
-    givenRepair(1L, null, "SUG", "L", repair -> repair.carriedForwardInd("Y")
+    long id = givenRepair(1L, null, "SUG", "L", repair -> repair.carriedForwardInd("Y")
         .suggestedByUserid("IDIR\\A").suggestedByTimestamp(LocalDateTime.of(2020, 1, 1, 9, 0)));
     entityManager.flush();
     entityManager.clear();
 
-    service.update(7L, 1L, edit("COM", LocalDate.of(2026, 9, 1), 3800L));
+    service.update(7L, id, edit("COM", LocalDate.of(2026, 9, 1), 3800L));
 
-    StructureRepairEntity repair = stored(1L);
+    StructureRepairEntity repair = stored(id);
     assertThat(repair.getRepairStatusCode()).isEqualTo("COM");
     assertThat(repair.getRepairPriorityCode()).isEqualTo("H");
     assertThat(repair.getCompletedDate()).isEqualTo(LocalDate.of(2026, 9, 1));
@@ -324,28 +330,28 @@ class StructureRepairsServiceTest {
   @DisplayName("re-stamps the status's audit on every save, even when the status is unchanged")
   void restampsEverySave() {
     givenCodes();
-    givenRepair(1L, null, "SUG", "H", repair -> repair
+    long id = givenRepair(1L, null, "SUG", "H", repair -> repair
         .suggestedByUserid("IDIR\\A").suggestedByTimestamp(LocalDateTime.of(2020, 1, 1, 9, 0)));
     entityManager.flush();
     entityManager.clear();
 
-    service.update(7L, 1L, edit("SUG", null, null));
+    service.update(7L, id, edit("SUG", null, null));
 
-    assertThat(stored(1L).getSuggestedByUserid()).isEqualTo("IDIR\\EDITOR");
+    assertThat(stored(id).getSuggestedByUserid()).isEqualTo("IDIR\\EDITOR");
   }
 
   @Test
   @DisplayName("clears the completed date and actual cost unless the status is Completed")
   void completedFieldsOnlyWhenCompleted() {
     givenCodes();
-    givenRepair(1L, null, "COM", "H", repair -> repair
+    long id = givenRepair(1L, null, "COM", "H", repair -> repair
         .completedDate(LocalDate.of(2020, 1, 1)).actualCost(100L));
     entityManager.flush();
     entityManager.clear();
 
-    service.update(7L, 1L, edit("CF", LocalDate.of(2026, 9, 1), 3800L));
+    service.update(7L, id, edit("CF", LocalDate.of(2026, 9, 1), 3800L));
 
-    StructureRepairEntity repair = stored(1L);
+    StructureRepairEntity repair = stored(id);
     assertThat(repair.getCompletedDate()).isNull();
     assertThat(repair.getActualCost()).isNull();
   }
@@ -354,14 +360,15 @@ class StructureRepairsServiceTest {
   @DisplayName("keeps a blank estimate and quantity blank, where legacy saved 0")
   void blanksStayBlank() {
     givenCodes();
-    givenRepair(1L, null, "SUG", "H", repair -> repair.estimate(10L).repairQuantity(3L));
+    long id = givenRepair(1L, null, "SUG", "H",
+        repair -> repair.estimate(10L).repairQuantity(3L));
     entityManager.flush();
     entityManager.clear();
 
-    service.update(7L, 1L,
+    service.update(7L, id,
         new RepairUpdateRequest("SUG", "H", null, null, null, "DECK", null, null));
 
-    StructureRepairEntity repair = stored(1L);
+    StructureRepairEntity repair = stored(id);
     assertThat(repair.getEstimate()).isNull();
     assertThat(repair.getRepairQuantity()).isNull();
     assertThat(repair.getDescription()).isNull();
@@ -371,9 +378,9 @@ class StructureRepairsServiceTest {
   @DisplayName("needs a completed date when the status is Completed")
   void completedNeedsDate() {
     givenCodes();
-    givenRepair(1L, null, "SUG", "H");
+    long id = givenRepair(1L, null, "SUG", "H");
 
-    assertThat(refused(edit("COM", null, 10L))).containsExactly(Map.entry("completedDate",
+    assertThat(refused(id, edit("COM", null, 10L))).containsExactly(Map.entry("completedDate",
         "Repair Completed Date is required when the status is Completed."));
   }
 
@@ -381,14 +388,14 @@ class StructureRepairsServiceTest {
   @DisplayName("lets only a P.Eng set Required or Not Required, as legacy's list does")
   void engineerStatuses() {
     givenCodes();
-    givenRepair(1L, null, "SUG", "H");
+    long id = givenRepair(1L, null, "SUG", "H");
 
-    assertThat(refused(edit("REQ", null, null))).containsOnlyKeys("statusCode");
-    assertThat(refused(edit("NRQ", null, null))).containsOnlyKeys("statusCode");
+    assertThat(refused(id, edit("REQ", null, null))).containsOnlyKeys("statusCode");
+    assertThat(refused(id, edit("NRQ", null, null))).containsOnlyKeys("statusCode");
 
     when(loggedUser.isPeng()).thenReturn(true);
-    service.update(7L, 1L, edit("REQ", null, null));
-    StructureRepairEntity repair = stored(1L);
+    service.update(7L, id, edit("REQ", null, null));
+    StructureRepairEntity repair = stored(id);
     assertThat(repair.getRepairStatusCode()).isEqualTo("REQ");
     assertThat(repair.getRequiredByUserid()).isEqualTo("IDIR\\EDITOR");
   }
@@ -398,19 +405,20 @@ class StructureRepairsServiceTest {
       + "amounts in range")
   void refusesEachField() {
     givenCodes();
-    givenRepair(1L, null, "SUG", "H");
+    long id = givenRepair(1L, null, "SUG", "H");
 
-    assertThat(refused(new RepairUpdateRequest(" ", "", null, -1L, null, null, 1_000_000L, null)))
+    assertThat(refused(id,
+        new RepairUpdateRequest(" ", "", null, -1L, null, null, 1_000_000L, null)))
         .containsExactly(
             Map.entry("statusCode", "Repair Status is required."),
             Map.entry("priorityCode", "Repair Priority is required."),
             Map.entry("estimate", "Repair Estimate Cost must be a whole number from 0 to 999,999."),
             Map.entry("typeCode", "Repair Type is required."),
             Map.entry("quantity", "Qty must be a whole number from 0 to 999,999."));
-    assertThat(refused(new RepairUpdateRequest("XX", "XX", LocalDate.of(2026, 1, 1), 0L,
+    assertThat(refused(id, new RepairUpdateRequest("XX", "XX", LocalDate.of(2026, 1, 1), 0L,
         1_000_000L, "XX", 0L, null)))
         .containsOnlyKeys("statusCode", "priorityCode", "typeCode");
-    assertThat(refused(new RepairUpdateRequest("COM", "H", LocalDate.of(2026, 1, 1), 0L,
+    assertThat(refused(id, new RepairUpdateRequest("COM", "H", LocalDate.of(2026, 1, 1), 0L,
         1_000_000L, "DECK", 0L, null)))
         .containsOnlyKeys("actualCost");
   }
@@ -419,12 +427,13 @@ class StructureRepairsServiceTest {
   @DisplayName("needs a description for the type 800A, and at most 2000 bytes of one")
   void description() {
     givenCodes();
-    givenRepair(1L, null, "SUG", "H");
+    long id = givenRepair(1L, null, "SUG", "H");
 
-    assertThat(refused(new RepairUpdateRequest("SUG", "H", null, null, null, "800A", null, " ")))
+    assertThat(refused(id,
+        new RepairUpdateRequest("SUG", "H", null, null, null, "800A", null, " ")))
         .containsExactly(Map.entry("description",
             "Repair Description is required for this Repair Type."));
-    assertThat(refused(new RepairUpdateRequest("SUG", "H", null, null, null, "DECK", null,
+    assertThat(refused(id, new RepairUpdateRequest("SUG", "H", null, null, null, "DECK", null,
         "é".repeat(1001)))).containsOnlyKeys("description");
   }
 
@@ -432,13 +441,13 @@ class StructureRepairsServiceTest {
   @DisplayName("refuses to edit a repair under a structure it does not belong to, or none at all")
   void updateOnlyThroughItsStructure() {
     givenCodes();
-    givenRepair(1L, null, "SUG", "H");
+    long id = givenRepair(1L, null, "SUG", "H");
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.update(8L, 1L, edit("SUG", null, null)))
+    assertThatThrownBy(() -> service.update(8L, id, edit("SUG", null, null)))
         .isInstanceOf(RepairNotFoundException.class);
-    assertThatThrownBy(() -> service.update(7L, 99L, edit("SUG", null, null)))
+    assertThatThrownBy(() -> service.update(7L, id + 1000, edit("SUG", null, null)))
         .isInstanceOf(RepairNotFoundException.class);
   }
 
@@ -481,6 +490,71 @@ class StructureRepairsServiceTest {
         new RepairTypeOption("RAIL", "Railing", "m", "STRU"),
         new RepairTypeOption("DECK", "Deck planks", "m²", "STRU"),
         new RepairTypeOption("PIER", "Pier cap", null, "SUBS"));
+  }
+
+  @Test
+  @DisplayName("adds a repair as legacy does: Suggested by the user, the structure's next number "
+      + "over every repair, not carried forward, of no inspection")
+  void creates() {
+    givenCodes();
+    givenInspection(10L, LocalDate.of(2023, 6, 1));
+    givenRepair(4L, 10L, "REQ", "H");
+    givenRepair(2L, null, "SUG", "H");
+    entityManager.flush();
+    entityManager.clear();
+
+    RepairCreatedResponse created = service.create(7L,
+        new RepairCreateRequest(" H ", 4000L, "DECK", 12L, "  Replace planks.  "));
+
+    assertThat(created.number()).isEqualTo(5L);
+    StructureRepairEntity repair = stored(Long.parseLong(created.id()));
+    assertThat(repair.getCrossingStructureId()).isEqualTo(7L);
+    assertThat(repair.getRepairNumber()).isEqualTo(5L);
+    assertThat(repair.getRepairStatusCode()).isEqualTo("SUG");
+    assertThat(repair.getRepairPriorityCode()).isEqualTo("H");
+    assertThat(repair.getEstimate()).isEqualTo(4000L);
+    assertThat(repair.getStructureRepairTypeCode()).isEqualTo("DECK");
+    assertThat(repair.getRepairQuantity()).isEqualTo(12L);
+    assertThat(repair.getDescription()).isEqualTo("Replace planks.");
+    assertThat(repair.getCarriedForwardInd()).isEqualTo("N");
+    assertThat(repair.getInspectionId()).isNull();
+    assertThat(repair.getCompletedDate()).isNull();
+    assertThat(repair.getActualCost()).isNull();
+    assertThat(repair.getSuggestedByUserid()).isEqualTo("IDIR\\EDITOR");
+    assertThat(repair.getSuggestedByTimestamp()).isNotNull();
+    assertThat(repair.getRequiredByUserid()).isNull();
+    assertThat(repair.getEntryUserid()).isEqualTo("IDIR\\EDITOR");
+    assertThat(repair.getUpdateUserid()).isEqualTo("IDIR\\EDITOR");
+  }
+
+  @Test
+  @DisplayName("numbers a structure's first repair 1")
+  void firstNumber() {
+    givenCodes();
+
+    assertThat(service.create(7L, new RepairCreateRequest("H", null, "DECK", null, null))
+        .number()).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("adds nothing with a field at fault, and names each")
+  void createRefused() {
+    givenCodes();
+
+    assertThatThrownBy(() -> service.create(7L,
+        new RepairCreateRequest(null, -5L, "800A", null, null)))
+        .isInstanceOfSatisfying(FieldValidationException.class, refused ->
+            assertThat(refused.getFieldErrors())
+                .containsOnlyKeys("priorityCode", "estimate", "description"));
+    assertThat(service.repairs(7L, View.ALL, 0, 10, true).page().content()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("adds nothing to a structure that does not exist")
+  void createMissingStructure() {
+    assertThatThrownBy(() -> service.create(404L,
+        new RepairCreateRequest("H", null, "DECK", null, null)))
+        .isInstanceOf(StructureNotFoundException.class);
   }
 
   @Test

@@ -128,7 +128,7 @@ class InspectionServiceTest {
     entityManager.persist(StructureMonitorItemEntity.builder()
         .inspectionId(INSPECTION).build());
     entityManager.persist(StructureRepairEntity.builder()
-        .repairId(nextId++).inspectionId(INSPECTION).build());
+        .inspectionId(INSPECTION).build());
     entityManager.persist(StructureInspectionItemEntity.builder()
         .structureInspectionItemId(nextId++).inspectionId(INSPECTION).build());
     entityManager.persist(StructureLoadRatingEntity.builder()

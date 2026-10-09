@@ -17,6 +17,17 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
   void deleteByInspectionId(Long inspectionId);
 
   /**
+   * The structure's highest repair number, inspection-raised repairs included, or 0 when it has
+   * none — a new repair takes the next, as legacy's {@code FIND_NEXT_REPAIR_NUMBER} gives it.
+   */
+  @Query("""
+      SELECT COALESCE(MAX(repair.repairNumber), 0)
+        FROM StructureRepairEntity repair
+       WHERE repair.crossingStructureId = :structureId
+      """)
+  long findHighestNumber(@Param("structureId") Long structureId);
+
+  /**
    * A page of a structure's repairs — legacy's {@code FIND_REPAIRS_BY_STRUCTURE_ID}, or with
    * {@code outstandingOnly} its {@code FIND_OUTSTANDING_STRC_REPAIRS}: suggested, required or
    * carried-forward repairs that have not themselves been carried forward.

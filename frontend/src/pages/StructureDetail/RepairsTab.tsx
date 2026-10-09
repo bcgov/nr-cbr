@@ -1,4 +1,4 @@
-import { Edit, Tools, TrashCan } from '@carbon/icons-react';
+import { Add, Edit, Tools, TrashCan } from '@carbon/icons-react';
 import {
   Button,
   Checkbox,
@@ -112,11 +112,8 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, 
               </TableCell>
               <TableCell className="structure-detail__nowrap">{money(repair.estimate)}</TableCell>
               <TableCell className="structure-detail__nowrap">{money(repair.actualCost)}</TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {[number(repair.quantity), repair.quantity === null ? '' : repair.unit]
-                  .filter(Boolean)
-                  .join(' ')}
-              </TableCell>
+              {/* The number only, as legacy's column: the unit is shown beside Qty in the dialog. */}
+              <TableCell className="structure-detail__nowrap">{number(repair.quantity)}</TableCell>
               <TableCell className="structure-detail__comment">{repair.description}</TableCell>
               {hasActions && (
                 <TableCell className="structure-detail__nowrap">
@@ -164,7 +161,7 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, 
 /**
  * Legacy's Repairs tab (`repairTab.jsp`): the structure's repairs, outstanding ones by default or
  * all of them, a page at a time from the server. Edit (Level 1 and up) and Delete (Level 2 and
- * up) from each row's Actions; legacy's Add comes next.
+ * up) from each row's Actions; Add (Level 1 and up) over the table.
  */
 const RepairsTab: FC<Props> = ({ structureId, opened }) => {
   const { canEdit, canDelete } = useAuthorization();
@@ -172,8 +169,8 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
   const deleteRepair = useDeleteStructureRepair(structureId);
   /** The repair whose delete is being confirmed, if any. */
   const [pendingDelete, setPendingDelete] = useState<StructureRepair | null>(null);
-  /** The repair being edited, if any. */
-  const [editing, setEditing] = useState<StructureRepair | null>(null);
+  /** The repair being edited, `'new'` while one is being added, or null. */
+  const [editing, setEditing] = useState<StructureRepair | 'new' | null>(null);
   const [view, setView] = useState<RepairView>('OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -229,6 +226,22 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
           </div>
         )}
 
+        {/* Over the table, at its right, after the options that decide what it lists — as the
+            Monitoring tab's Add. Only for a user who may add, as legacy's Level 1 button. */}
+        {canEdit && (
+          <div className="structure-detail__table-actions">
+            <Button
+              kind="tertiary"
+              size="md"
+              renderIcon={Add}
+              data-testid="structure-repair-add"
+              onClick={() => setEditing('new')}
+            >
+              Add repair
+            </Button>
+          </div>
+        )}
+
         {loaded.isError && (
           <InlineNotification
             kind="error"
@@ -270,9 +283,9 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
 
       {editing !== null && (
         <RepairDialog
-          key={editing.id}
+          key={editing === 'new' ? 'new' : editing.id}
           structureId={structureId}
-          repair={editing}
+          repair={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
         />
       )}

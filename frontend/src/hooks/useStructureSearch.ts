@@ -5,7 +5,11 @@ import type {
   MonitorUpdateRequest,
   MonitorView,
 } from '@/pages/StructureDetail/monitorsResponse';
-import type { RepairUpdateRequest, RepairView } from '@/pages/StructureDetail/repairsResponse';
+import type {
+  RepairCreateRequest,
+  RepairUpdateRequest,
+  RepairView,
+} from '@/pages/StructureDetail/repairsResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
 import type {
   PagedResponse,
@@ -205,6 +209,21 @@ export const useStructureRepairTypes = (structureId: string) =>
     queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repair-types'],
     queryFn: () => API.structureSearch.getStructureRepairTypes(structureId),
   });
+
+/**
+ * Adds a repair, then refreshes the structure's repairs table. The fields the server refused come
+ * back as `fieldErrors`, keyed as the request is.
+ */
+export const useCreateStructureRepair = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: RepairCreateRequest) =>
+      API.structureSearch.createStructureRepair(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
 
 /**
  * Saves an edit to one repair, then refreshes the structure's repairs table. The fields the server

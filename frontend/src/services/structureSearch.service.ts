@@ -12,6 +12,8 @@ import type {
   StructureMonitor,
 } from '@/pages/StructureDetail/monitorsResponse';
 import type {
+  RepairCreatedResponse,
+  RepairCreateRequest,
   RepairTypeOption,
   RepairUpdateRequest,
   RepairView,
@@ -276,6 +278,22 @@ export class StructureSearchService extends HttpClient {
       method: 'GET',
       url: '/v1/structures/{structureId}/repair-types',
       path: { structureId },
+    });
+  }
+
+  /**
+   * Adds a repair to a structure, Suggested and numbered next. 400 with `fieldErrors` when a field
+   * is refused.
+   */
+  createStructureRepair(
+    structureId: string,
+    request: RepairCreateRequest,
+  ): CancelablePromise<RepairCreatedResponse> {
+    return this.doRequest<RepairCreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/repairs',
+      path: { structureId },
+      body: request,
     });
   }
 

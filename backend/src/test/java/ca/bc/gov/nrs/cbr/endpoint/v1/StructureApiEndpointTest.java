@@ -167,6 +167,16 @@ class StructureApiEndpointTest {
   }
 
   @Test
+  @DisplayName("a repair is added by POST /{structureId}/repairs, on CONTENT_EDIT")
+  void repairCreateIsMappedAndGated() {
+    Method create = method("createRepair");
+    assertThat(create.getAnnotation(PostMapping.class).value())
+        .containsExactly("/{structureId}/repairs");
+    assertThat(create.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.CONTENT_EDIT);
+  }
+
+  @Test
   @DisplayName("a repair is edited by PUT /{structureId}/repairs/{repairId}, on CONTENT_EDIT")
   void repairUpdateIsMappedAndGated() {
     Method update = method("updateRepair");

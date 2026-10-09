@@ -18,6 +18,8 @@ import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeOrderRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeXrefRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
@@ -48,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The structure page's Repairs tab — legacy's {@code repairTab.jsp}, a page at a time.
  *
- * <p>Lists, edits and deletes repairs; legacy's Add comes next. Legacy inner-joins the priority
+ * <p>Lists, adds, edits and deletes repairs. Legacy inner-joins the priority
  * and status codes, so a repair whose code has no row would vanish there; here it stays, its code
  * shown without a description.
  */
@@ -62,6 +64,7 @@ public class StructureRepairsService {
   private static final String SUGGESTED = "SUG";
   private static final String REQUIRED = "REQ";
   private static final String COMPLETED = "COM";
+  private static final String NOT_CARRIED_FORWARD = "N";
   /** Required and Not Required: the statuses legacy offers only a P.Eng. */
   private static final Set<String> ENGINEER_STATUSES = Set.of(REQUIRED, "NRQ");
   /** The type whose repair must be described — legacy's {@code Repair.validate}. */
@@ -185,6 +188,53 @@ public class StructureRepairsService {
   }
 
   /**
+   * Adds a repair to the structure — legacy's Add Repair ({@code StructureAction.repair},
+   * {@code CBR.INSERT_REPAIR}).
+   *
+   * <p>As legacy: the repair is Suggested, stamped Suggested by the user, not carried forward, and
+   * belongs to no inspection; it takes the structure's next number (over every repair, those an
+   * inspection raised included) and its id from {@code STRUCTURE_REPAIR_SEQ} through the entity's
+   * generator. The priority, type, amounts and description are checked as an edit checks them.
+   *
+   * @throws StructureNotFoundException if there is no such structure
+   * @throws FieldValidationException   with a message for each field at fault
+   */
+  @Transactional
+  public RepairCreatedResponse create(long structureId, RepairCreateRequest request) {
+    if (!structures.existsById(structureId)) {
+      throw new StructureNotFoundException(structureId);
+    }
+    String priority = trimmed(request.priorityCode());
+    String type = trimmed(request.typeCode());
+    String description = trimmed(request.description());
+    validate(new RepairUpdateRequest(SUGGESTED, priority, null, request.estimate(), null, type,
+        request.quantity(), description));
+
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    long number = repairs.findHighestNumber(structureId) + 1;
+    StructureRepairEntity saved = repairs.save(StructureRepairEntity.builder()
+        .crossingStructureId(structureId)
+        .repairNumber(number)
+        .repairStatusCode(SUGGESTED)
+        .repairPriorityCode(priority)
+        .estimate(request.estimate())
+        .structureRepairTypeCode(type)
+        .repairQuantity(request.quantity())
+        .description(description)
+        .carriedForwardInd(NOT_CARRIED_FORWARD)
+        .suggestedByUserid(user)
+        .suggestedByTimestamp(now)
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build());
+    log.info("Added repair {} ({}) to structure {}", saved.getRepairId(), number, structureId);
+    return new RepairCreatedResponse(String.valueOf(saved.getRepairId()), number);
+  }
+
+  /**
    * Saves an edit to one repair — legacy's "Repair Item" dialog ({@code StructureAction.repair},
    * {@code CBR.UPDATE_REPAIR}).
    *
@@ -217,7 +267,8 @@ public class StructureRepairsService {
     String description = trimmed(request.description());
     LocalDate completedDate = completed ? request.completedDate() : null;
     Long actualCost = completed ? request.actualCost() : null;
-    validate(request, status, priority, type, description, completedDate, actualCost);
+    validate(new RepairUpdateRequest(status, priority, completedDate, request.estimate(),
+        actualCost, type, request.quantity(), description));
 
     String user = loggedUser.getLoggedUserId();
     LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
@@ -243,9 +294,36 @@ public class StructureRepairsService {
         repair.getRepairNumber(), structureId, status);
   }
 
-  private void validate(RepairUpdateRequest request, String status, String priority, String type,
-      String description, LocalDate completedDate, Long actualCost) {
+  /** Checks a repair as it will be stored: trimmed, cleared of what its status does not keep. */
+  private void validate(RepairUpdateRequest repair) {
+    String priority = repair.priorityCode();
+    String type = repair.typeCode();
     Map<String, String> errors = new LinkedHashMap<>();
+    checkStatus(errors, repair.statusCode());
+    if (priority == null) {
+      errors.put("priorityCode", "Repair Priority is required.");
+    } else if (!priorities.existsById(priority)) {
+      errors.put("priorityCode", "Repair Priority is not one of the listed priorities.");
+    }
+    if (COMPLETED.equals(repair.statusCode()) && repair.completedDate() == null) {
+      errors.put("completedDate",
+          "Repair Completed Date is required when the status is Completed.");
+    }
+    checkAmount(errors, "estimate", "Repair Estimate Cost", repair.estimate());
+    checkAmount(errors, "actualCost", "Repair Actual Cost", repair.actualCost());
+    if (type == null) {
+      errors.put("typeCode", "Repair Type is required.");
+    } else if (!types.existsById(type)) {
+      errors.put("typeCode", "Repair Type is not one of the listed types.");
+    }
+    checkAmount(errors, "quantity", "Qty", repair.quantity());
+    checkDescription(errors, repair.description(), type);
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Repair cannot be saved", errors);
+    }
+  }
+
+  private void checkStatus(Map<String, String> errors, String status) {
     if (status == null) {
       errors.put("statusCode", "Repair Status is required.");
     } else if (!statuses.existsById(status)) {
@@ -254,33 +332,18 @@ public class StructureRepairsService {
       errors.put("statusCode",
           "Only a professional engineer can set Repair Status to Required or Not Required.");
     }
-    if (priority == null) {
-      errors.put("priorityCode", "Repair Priority is required.");
-    } else if (!priorities.existsById(priority)) {
-      errors.put("priorityCode", "Repair Priority is not one of the listed priorities.");
-    }
-    if (COMPLETED.equals(status) && completedDate == null) {
-      errors.put("completedDate",
-          "Repair Completed Date is required when the status is Completed.");
-    }
-    checkAmount(errors, "estimate", "Repair Estimate Cost", request.estimate());
-    checkAmount(errors, "actualCost", "Repair Actual Cost", actualCost);
-    if (type == null) {
-      errors.put("typeCode", "Repair Type is required.");
-    } else if (!types.existsById(type)) {
-      errors.put("typeCode", "Repair Type is not one of the listed types.");
-    }
-    checkAmount(errors, "quantity", "Qty", request.quantity());
-    if (description == null && DESCRIBED_TYPE.equals(type)) {
-      errors.put("description", "Repair Description is required for this Repair Type.");
-    } else if (description != null
-        && description.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
+  }
+
+  private static void checkDescription(Map<String, String> errors, String description,
+      String type) {
+    if (description == null) {
+      if (DESCRIBED_TYPE.equals(type)) {
+        errors.put("description", "Repair Description is required for this Repair Type.");
+      }
+    } else if (description.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
       // Bytes, because the column is declared in bytes and an accented character costs two.
       errors.put("description",
           "Repair Description can be at most " + TEXT_MAX + " characters.");
-    }
-    if (!errors.isEmpty()) {
-      throw new FieldValidationException("Repair cannot be saved", errors);
     }
   }
 

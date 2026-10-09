@@ -274,7 +274,7 @@ class StructureServiceTest {
     entityManager.persist(CrossingStructureFileDetailEntity.builder()
         .fileId(1L).crossingStructureId(1L).build());
     entityManager.persist(StructureRepairEntity.builder()
-        .repairId(1L).crossingStructureId(1L).build());
+        .crossingStructureId(1L).build());
     entityManager.persist(StructureMonitorItemEntity.builder()
         .crossingStructureId(1L).build());
     entityManager.flush();

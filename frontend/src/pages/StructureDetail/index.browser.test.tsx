@@ -29,6 +29,7 @@ const api = vi.hoisted(() => ({
   getStructureRepairs: vi.fn(),
   deleteStructureRepair: vi.fn(),
   getStructureRepairTypes: vi.fn(),
+  createStructureRepair: vi.fn(),
   updateStructureRepair: vi.fn(),
   getStructureMonitors: vi.fn(),
   createStructureMonitor: vi.fn(),
@@ -307,6 +308,8 @@ beforeEach(() => {
     { code: 'RAIL', description: 'Railing', unit: 'm', groupCode: 'STRU' },
     { code: '800A', description: 'Other', unit: null, groupCode: 'MISC' },
   ]);
+  api.createStructureRepair.mockReset();
+  api.createStructureRepair.mockResolvedValue({ id: '40', number: 4 });
   api.updateStructureRepair.mockReset();
   api.updateStructureRepair.mockResolvedValue(undefined);
   configurationApi.getRepairStatusCodes.mockResolvedValue([
@@ -1152,7 +1155,9 @@ describe('StructureDetailPage — Repairs', () => {
     expect(row).not.toMatchTextContent('Completed:');
     expect(row).toMatchTextContent('Urgent');
     expect(row).toMatchTextContent('$4,000');
-    expect(row).toMatchTextContent('12 m2');
+    expect(row).toMatchTextContent('12');
+    // The number only, as legacy's column; the unit is in the dialog.
+    expect(row).not.toMatchTextContent('m2');
     expect(row).toMatchTextContent('Replace worn planks.');
     expect(
       within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' }),
@@ -1295,6 +1300,105 @@ describe('StructureDetailPage — Repairs', () => {
       'Repairs could not be loaded',
     );
   });
+  describe('Add', () => {
+    it('offers Add repair over the table only from Level 1 up', async () => {
+      await showing(bridge());
+
+      await openRepairs();
+      await screen.findByTestId('structure-section-repairs');
+
+      expect(screen.queryByTestId('structure-repair-add')).not.toBeInTheDocument();
+    });
+
+    it('adds a repair as Suggested, and says which number it took', async () => {
+      authorization.canEdit = true;
+      await showing(bridge());
+      await openRepairs();
+
+      await userEvent.click(await screen.findByTestId('structure-repair-add'));
+      const dialog = await screen.findByTestId('repair-dialog');
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('repair-type').querySelectorAll('option')).toHaveLength(
+          4,
+        ),
+      );
+      expect(dialog).toMatchTextContent('Add repair');
+      // No number before saving, a locked status, and nothing only a completed repair has.
+      expect(within(dialog).queryByText('Repair Number')).not.toBeInTheDocument();
+      expect(dialog).toMatchTextContent('Suggested');
+      expect(within(dialog).queryByTestId('repair-status')).not.toBeInTheDocument();
+      expect(within(dialog).queryByTestId('repair-completed-date')).not.toBeInTheDocument();
+      expect(within(dialog).queryByTestId('repair-actualCost')).not.toBeInTheDocument();
+
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), 'DECK');
+      await userEvent.type(within(dialog).getByTestId('repair-estimate'), '2500');
+      await userEvent.type(within(dialog).getByTestId('repair-quantity'), '8');
+      await userEvent.type(within(dialog).getByTestId('repair-description'), 'New planks.');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(api.createStructureRepair).toHaveBeenCalledWith('7', {
+          priorityCode: 'H',
+          estimate: 2500,
+          typeCode: 'DECK',
+          quantity: 8,
+          description: 'New planks.',
+        }),
+      );
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'success', title: 'Repair 4 added' }),
+        ),
+      );
+      expect(screen.queryByTestId('repair-dialog')).not.toBeInTheDocument();
+    });
+
+    it('adds nothing without a priority and a type, and says so beside each', async () => {
+      authorization.canEdit = true;
+      await showing(bridge());
+      await openRepairs();
+
+      await userEvent.click(await screen.findByTestId('structure-repair-add'));
+      const dialog = await screen.findByTestId('repair-dialog');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      expect(dialog).toMatchTextContent('Repair Priority is required.');
+      expect(dialog).toMatchTextContent('Repair Type is required.');
+      expect(api.createStructureRepair).not.toHaveBeenCalled();
+    });
+
+    it('says so when the add fails for no field', async () => {
+      authorization.canEdit = true;
+      api.createStructureRepair.mockRejectedValue(new Error('boom'));
+      await showing(bridge());
+      await openRepairs();
+
+      await userEvent.click(await screen.findByTestId('structure-repair-add'));
+      const dialog = await screen.findByTestId('repair-dialog');
+      await vi.waitFor(() =>
+        expect(
+          within(dialog).getByTestId('repair-priority').querySelectorAll('option'),
+        ).toHaveLength(3),
+      );
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('repair-type').querySelectorAll('option')).toHaveLength(
+          4,
+        ),
+      );
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), 'DECK');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'error', title: 'The repair was not added' }),
+        ),
+      );
+      expect(screen.getByTestId('repair-dialog')).toBeInTheDocument();
+    });
+  });
+
   describe('Edit', () => {
     const openEdit = async (overrides: object = {}) => {
       authorization.canEdit = true;
