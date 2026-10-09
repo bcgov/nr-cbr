@@ -65,6 +65,8 @@ public class StructureRepairsService {
   private static final String REQUIRED = "REQ";
   private static final String COMPLETED = "COM";
   private static final String NOT_CARRIED_FORWARD = "N";
+  /** The status field's name in a refusal — the request's, which is the form's. */
+  private static final String STATUS_FIELD = "statusCode";
   /** Required and Not Required: the statuses legacy offers only a P.Eng. */
   private static final Set<String> ENGINEER_STATUSES = Set.of(REQUIRED, "NRQ");
   /** The type whose repair must be described — legacy's {@code Repair.validate}. */
@@ -325,11 +327,11 @@ public class StructureRepairsService {
 
   private void checkStatus(Map<String, String> errors, String status) {
     if (status == null) {
-      errors.put("statusCode", "Repair Status is required.");
+      errors.put(STATUS_FIELD, "Repair Status is required.");
     } else if (!statuses.existsById(status)) {
-      errors.put("statusCode", "Repair Status is not one of the listed statuses.");
+      errors.put(STATUS_FIELD, "Repair Status is not one of the listed statuses.");
     } else if (ENGINEER_STATUSES.contains(status) && !loggedUser.isPeng()) {
-      errors.put("statusCode",
+      errors.put(STATUS_FIELD,
           "Only a professional engineer can set Repair Status to Required or Not Required.");
     }
   }

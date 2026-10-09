@@ -268,8 +268,8 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.update(7L, id,
-        new MonitorUpdateRequest("SUG", "OTH", " ", "Scour.")))
+    MonitorUpdateRequest request = new MonitorUpdateRequest("SUG", "OTH", " ", "Scour.");
+    assertThatThrownBy(() -> service.update(7L, id, request))
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors()).containsOnlyKeys("frequencyComment"));
 
@@ -286,16 +286,17 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.update(7L, id,
-        new MonitorUpdateRequest("NOPE", "NOPE", null, " ")))
+    MonitorUpdateRequest unknown = new MonitorUpdateRequest("NOPE", "NOPE", null, " ");
+    assertThatThrownBy(() -> service.update(7L, id, unknown))
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors())
                 .containsEntry("statusCode", "Monitoring Status is not one of the listed statuses.")
                 .containsEntry("frequencyCode",
                     "Monitoring Frequency is not one of the listed frequencies.")
                 .containsEntry("description", "Monitor Description is required."));
-    assertThatThrownBy(() -> service.update(7L, id,
-        new MonitorUpdateRequest("SUG", null, null, "x".repeat(2001))))
+    MonitorUpdateRequest tooLong =
+        new MonitorUpdateRequest("SUG", null, null, "x".repeat(2001));
+    assertThatThrownBy(() -> service.update(7L, id, tooLong))
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors()).containsEntry("description",
                 "Monitor Description can be at most 2000 characters."));
@@ -309,8 +310,8 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.update(8L, id,
-        new MonitorUpdateRequest("SUG", null, null, "Scour.")))
+    MonitorUpdateRequest request = new MonitorUpdateRequest("SUG", null, null, "Scour.");
+    assertThatThrownBy(() -> service.update(8L, id, request))
         .isInstanceOf(MonitorNotFoundException.class);
   }
 
@@ -361,7 +362,8 @@ class StructureMonitorsServiceTest {
     givenCodes();
     entityManager.flush();
 
-    assertThatThrownBy(() -> service.create(7L, new MonitorCreateRequest("OTH", null, " ")))
+    MonitorCreateRequest request = new MonitorCreateRequest("OTH", null, " ");
+    assertThatThrownBy(() -> service.create(7L, request))
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors())
                 .containsOnlyKeys("frequencyComment", "description"));
@@ -371,7 +373,8 @@ class StructureMonitorsServiceTest {
   @Test
   @DisplayName("refuses to add an item to a structure that does not exist")
   void createOnMissingStructure() {
-    assertThatThrownBy(() -> service.create(404L, new MonitorCreateRequest(null, null, "A.")))
+    MonitorCreateRequest request = new MonitorCreateRequest(null, null, "A.");
+    assertThatThrownBy(() -> service.create(404L, request))
         .isInstanceOf(StructureNotFoundException.class);
   }
 
@@ -407,7 +410,7 @@ class StructureMonitorsServiceTest {
   @Test
   @DisplayName("refuses a structure that does not exist")
   void missingStructure() {
-    assertThatThrownBy(() -> service.monitors(404L, View.ALL, 0, 10, false).page())
+    assertThatThrownBy(() -> service.monitors(404L, View.ALL, 0, 10, false))
         .isInstanceOf(StructureNotFoundException.class);
   }
 }

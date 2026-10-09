@@ -445,9 +445,10 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThatThrownBy(() -> service.update(8L, id, edit("SUG", null, null)))
+    RepairUpdateRequest request = edit("SUG", null, null);
+    assertThatThrownBy(() -> service.update(8L, id, request))
         .isInstanceOf(RepairNotFoundException.class);
-    assertThatThrownBy(() -> service.update(7L, id + 1000, edit("SUG", null, null)))
+    assertThatThrownBy(() -> service.update(7L, id + 1000, request))
         .isInstanceOf(RepairNotFoundException.class);
   }
 
@@ -541,8 +542,8 @@ class StructureRepairsServiceTest {
   void createRefused() {
     givenCodes();
 
-    assertThatThrownBy(() -> service.create(7L,
-        new RepairCreateRequest(null, -5L, "800A", null, null)))
+    RepairCreateRequest request = new RepairCreateRequest(null, -5L, "800A", null, null);
+    assertThatThrownBy(() -> service.create(7L, request))
         .isInstanceOfSatisfying(FieldValidationException.class, refused ->
             assertThat(refused.getFieldErrors())
                 .containsOnlyKeys("priorityCode", "estimate", "description"));
@@ -552,15 +553,15 @@ class StructureRepairsServiceTest {
   @Test
   @DisplayName("adds nothing to a structure that does not exist")
   void createMissingStructure() {
-    assertThatThrownBy(() -> service.create(404L,
-        new RepairCreateRequest("H", null, "DECK", null, null)))
+    RepairCreateRequest request = new RepairCreateRequest("H", null, "DECK", null, null);
+    assertThatThrownBy(() -> service.create(404L, request))
         .isInstanceOf(StructureNotFoundException.class);
   }
 
   @Test
   @DisplayName("refuses a structure that does not exist")
   void missingStructure() {
-    assertThatThrownBy(() -> service.repairs(404L, View.ALL, 0, 10, false).page())
+    assertThatThrownBy(() -> service.repairs(404L, View.ALL, 0, 10, false))
         .isInstanceOf(StructureNotFoundException.class);
   }
 }
