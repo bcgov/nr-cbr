@@ -245,6 +245,7 @@ const StructureDetailPage: FC = () => {
                         <InspectionsTab
                           structureId={structure.id}
                           opened={openedTabs.has('inspections')}
+                          complete={outstandingTotal === 0}
                         />
                       )}
                       {key === 'repairs' && (

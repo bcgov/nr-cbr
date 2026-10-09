@@ -1,6 +1,8 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type { DocumentsResponse } from '@/pages/StructureDetail/documentsResponse';
 import type {
+  CloseProximityInspectionRequest,
+  InspectionScheduleRequest,
   InspectionScheduleResponse,
   InspectionsResponse,
 } from '@/pages/StructureDetail/inspectionsResponse';
@@ -20,7 +22,11 @@ import type {
   StructureRepair,
 } from '@/pages/StructureDetail/repairsResponse';
 import type { SpansAndPiersResponse } from '@/pages/StructureDetail/spansAndPiersResponse';
-import type { StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
+import type {
+  CreatedResponse,
+  CommentRequest,
+  StructureDetailResponse,
+} from '@/pages/StructureDetail/structureResponse';
 import type { ItemListing } from '@/pages/StructureDetail/UserAudits';
 import type {
   PagedResponse,
@@ -169,6 +175,71 @@ export class StructureSearchService extends HttpClient {
       method: 'GET',
       url: '/v1/structures/{structureId}/inspection-schedule',
       path: { structureId },
+    });
+  }
+
+  /**
+   * Records a completed close proximity inspection — P.Eng only. 400 with `fieldErrors` when the
+   * date is refused; 409 when the structure stands on no site.
+   */
+  addCloseProximityInspection(
+    structureId: string,
+    request: CloseProximityInspectionRequest,
+  ): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/close-proximity-inspections',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /**
+   * Adds a planned-inspection comment to a structure. 400 with `fieldErrors` when the text is
+   * refused; 404 when there is no such structure.
+   */
+  addPlannedInspectionComment(
+    structureId: string,
+    request: CommentRequest,
+  ): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/planned-inspection-comments',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /**
+   * Changes a comment's text, either kind. 400 with `fieldErrors` when the text is refused; 404
+   * when the structure has no such comment.
+   */
+  updateStructureComment(
+    structureId: string,
+    commentId: string,
+    request: CommentRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/comments/{commentId}',
+      path: { structureId, commentId },
+      body: request,
+    });
+  }
+
+  /**
+   * Saves the structure's inspection schedule. 400 with `fieldErrors` when a field is refused; 404
+   * when there is no such structure.
+   */
+  updateInspectionSchedule(
+    structureId: string,
+    request: InspectionScheduleRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/inspection-schedule',
+      path: { structureId },
+      body: request,
     });
   }
 

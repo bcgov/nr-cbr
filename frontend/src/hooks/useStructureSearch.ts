@@ -1,6 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
+  CloseProximityInspectionRequest,
+  InspectionScheduleRequest,
+} from '@/pages/StructureDetail/inspectionsResponse';
+import type {
   MonitorCreateRequest,
   MonitorUpdateRequest,
   MonitorView,
@@ -10,6 +14,7 @@ import type {
   RepairUpdateRequest,
   RepairView,
 } from '@/pages/StructureDetail/repairsResponse';
+import type { CommentRequest } from '@/pages/StructureDetail/structureResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
 import type {
   PagedResponse,
@@ -63,6 +68,81 @@ export const useStructureInspectionSchedule = (structureId: string | undefined, 
     queryFn: () => API.structureSearch.getInspectionSchedule(structureId as string),
     enabled: enabled && Boolean(structureId),
   });
+
+/**
+ * Records a completed close proximity inspection, then refreshes the Inspections tab's list. A
+ * refused date comes back as `fieldErrors.completedDate`.
+ */
+export const useAddCloseProximityInspection = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: CloseProximityInspectionRequest) =>
+      API.structureSearch.addCloseProximityInspection(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'inspection-schedule'],
+      }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * Adds a planned-inspection comment, then refreshes the Inspections tab's comments. The text the
+ * server refused comes back as `fieldErrors.comment`.
+ */
+export const useAddPlannedInspectionComment = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: CommentRequest) =>
+      API.structureSearch.addPlannedInspectionComment(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'inspection-schedule'],
+      }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * Changes a comment's text, then refreshes both lists it may be in — the Inspections tab's planned
+ * ones and the Details tab's general ones (the structure itself). The text the server refused comes
+ * back as `fieldErrors.comment`.
+ */
+export const useUpdateStructureComment = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ commentId, request }: { commentId: string; request: CommentRequest }) =>
+      API.structureSearch.updateStructureComment(structureId, commentId, request),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [STRUCTURE_QUERY_KEY, structureId, 'inspection-schedule'],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: [STRUCTURE_QUERY_KEY, structureId],
+          exact: true,
+        }),
+      ]),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * Saves the structure's inspection schedule, then refreshes it. The fields the server refused come
+ * back as `fieldErrors`, keyed as the request is.
+ */
+export const useUpdateInspectionSchedule = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: InspectionScheduleRequest) =>
+      API.structureSearch.updateInspectionSchedule(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'inspection-schedule'],
+      }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
 
 /**
  * A page of a structure's inspections, fetched only once the tab is opened. The previous page stays

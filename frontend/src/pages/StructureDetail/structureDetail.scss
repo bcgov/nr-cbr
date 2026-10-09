@@ -136,12 +136,38 @@ $page-bottom: 2rem;
   }
 }
 
+// The card's header: its title at the left and its own action, if any, at the right — nr-fspts'
+// tile header. The action drops under the title on a narrow screen rather than squeezing it.
+.structure-detail__card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-03 $spacing-05;
+  margin-block-end: $spacing-06;
+}
+
+// More than one action in a card's header, side by side, wrapping on a narrow screen.
+.structure-detail__card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-03;
+}
+
+// A line under a card's header saying why its action is not available yet.
+.structure-detail__card-note {
+  @include type.type-style('body-compact-01');
+
+  margin: (-$spacing-03) 0 $spacing-05;
+  color: var(--cds-text-secondary);
+}
+
 // The card's heading: an icon then the title, larger and regular weight.
 .structure-detail__card-title {
   display: flex;
   align-items: center;
   gap: $spacing-03;
-  margin-block-end: $spacing-06;
+  margin: 0;
   font-size: 1.25rem;
   font-weight: 400;
   line-height: 1.4;
@@ -332,6 +358,68 @@ $page-bottom: 2rem;
   grid-template-columns: max-content minmax(0, 1fr);
 }
 
+// A card edited in place — nr-fspts' Plan details edit (`fsp-info__edit`): its groups stacked, and
+// its fields grey (field-01) so they read as fields on the white card rather than vanishing into it.
+.structure-detail__edit {
+  --cds-field: var(--cds-field-01);
+  --cds-field-hover: var(--cds-field-hover-01);
+  --cds-border-subtle: var(--cds-border-subtle-01);
+
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-06;
+}
+
+// "All fields are required unless marked optional." — nr-fspts' primary subtitle, tucked up to the
+// fields under it.
+.structure-detail__edit-intro {
+  @include type.type-style('body-compact-01');
+
+  margin: 0 0 (-$spacing-03);
+  color: var(--cds-text-primary);
+}
+
+// A row of fields, each in a cell sized to what it holds; they wrap on a narrow screen.
+.structure-detail__edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: $spacing-05 $spacing-06;
+}
+
+// A sized cell. Carbon's inputs fill 100%, so the cell sets the width; the date picker's own
+// hard-coded widths are overridden so it honours the cell too (nr-fspts' `fsp-info__edit-cell`).
+// One width for every cell, wide enough for the longest label on one line, so the rows line up in
+// columns.
+.structure-detail__edit-cell {
+  flex: 0 0 auto;
+  inline-size: 24rem;
+  max-inline-size: 100%;
+
+  .cds--text-input,
+  .cds--select,
+  .cds--date-picker,
+  .cds--date-picker-container,
+  .cds--date-picker-input__wrapper {
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  .cds--date-picker.cds--date-picker--single .cds--date-picker__input {
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+}
+
+
+// Cancel / Save changes — small, at the right, under the fields (nr-fspts' `fsp-info__form-actions`).
+.structure-detail__edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: $spacing-03;
+}
+
 // The repair dialog: three equal columns — number, status, priority; completed date and the two
 // costs; type, quantity — then the group checkboxes and the description full width.
 .structure-detail__repair-fields {
@@ -450,7 +538,8 @@ $page-bottom: 2rem;
 // A little wider than Carbon's default dialog, so the two dropdowns and the description have room.
 // Wide screens only: below lg Carbon's own sizing already fills most of the screen.
 .structure-detail__monitor-dialog .cds--modal-container,
-.structure-detail__repair-dialog .cds--modal-container {
+.structure-detail__repair-dialog .cds--modal-container,
+.structure-detail__comment-dialog .cds--modal-container {
   @include breakpoint(lg) {
     inline-size: 60%;
   }

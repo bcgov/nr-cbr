@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -59,6 +60,32 @@ public interface CrossingStructureRepository
       @Param("ids") Collection<Long> ids,
       @Param("user") String user,
       @Param("now") LocalDateTime now);
+
+  /**
+   * Writes the structure's inspection schedule — the Inspections tab's Inspection Schedule card —
+   * with who changed it and when (the database's clock). Only these columns: legacy's whole-row
+   * save also blanked columns the page never showed (cbr-structure-edit.local.md §8).
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.closeProximityInd = :closeProximityInd,
+             structure.specialEquipmentRqmtCode = :equipmentCode,
+             structure.nextPlannedClsProxInspDt = :nextCloseProximityDate,
+             structure.nextPlannedInspectionDate = :nextRoutineDate,
+             structure.routineInspectionFrequency = :routineFrequency,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updateInspectionSchedule(
+      @Param("id") Long id,
+      @Param("closeProximityInd") String closeProximityInd,
+      @Param("equipmentCode") String equipmentCode,
+      @Param("nextCloseProximityDate") LocalDate nextCloseProximityDate,
+      @Param("nextRoutineDate") LocalDate nextRoutineDate,
+      @Param("routineFrequency") String routineFrequency,
+      @Param("user") String user);
 
   /**
    * Marks structures updated by a repair-responsibility change, as legacy's {@code structure.save}

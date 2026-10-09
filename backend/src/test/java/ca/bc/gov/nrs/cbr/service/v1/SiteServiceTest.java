@@ -90,7 +90,7 @@ class SiteServiceTest {
 
   private void givenCloseProximityInspection(long id, String siteId) {
     entityManager.persist(CloseProximityInspectionEntity.builder()
-        .closeProximityInspectionId(id).crossingSiteId(siteId).build());
+        .crossingSiteId(siteId).build());
   }
 
   /**

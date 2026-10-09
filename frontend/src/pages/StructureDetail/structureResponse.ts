@@ -115,6 +115,12 @@ export type StructureComment = {
   timestamp: string | null;
 };
 
+/** A comment's text, to add or change one — the backend's `CommentRequest`. */
+export type CommentRequest = { comment: string };
+
+/** The comment just added — the backend's `CreatedResponse`. */
+export type CreatedResponse = { id: string };
+
 /**
  * One row of the load rating history: a manual rating, or an inspection whose report was reviewed.
  */

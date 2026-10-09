@@ -1,8 +1,6 @@
 import {
   Button,
   Checkbox,
-  DatePicker,
-  DatePickerInput,
   FormGroup,
   Modal,
   Select,
@@ -10,12 +8,14 @@ import {
   TextArea,
   TextInput,
 } from '@carbon/react';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import FieldWithCounter from '@/components/core/FieldWithCounter';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
 import { requiredLabel } from '@/utils/requiredLabel';
 
+import { toBox, toIso } from './dateBox';
+import DateField from './DateField';
 import { number } from './format';
 
 import type { RepairTypeOption, RepairUpdateRequest, StructureRepair } from './repairsResponse';
@@ -58,9 +58,6 @@ const DESCRIBED_TYPE = '800A';
 const TEXT_MAX = 2000;
 /** The amount and quantity boxes: whole numbers, six digits at most, as legacy's boxes. */
 const AMOUNT_MAX = 999_999;
-/** Legacy's date format, `yyyy/MM/dd`, in flatpickr's tokens. */
-const DATE_FORMAT = 'Y/m/d';
-const DATE_PATTERN = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/;
 
 /** The form's values as typed: the numbers and the date are text until saved. */
 type Values = {
@@ -76,26 +73,6 @@ type Values = {
 
 type Field = keyof Values;
 type Errors = Partial<Record<Field, string>>;
-
-const pad = (value: number) => String(value).padStart(2, '0');
-
-/** `2026-09-01` as the box shows it, `2026/09/01`. */
-const toBox = (iso: string | null): string => (iso ? iso.replaceAll('-', '/') : '');
-
-/** A typed `yyyy/mm/dd` as the server takes it, or null when it is not a real day. */
-const toIso = (typed: string): string | null => {
-  const match = DATE_PATTERN.exec(typed.trim());
-  if (!match) return null;
-  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-    return null;
-  }
-  return `${year}-${pad(month)}-${pad(day)}`;
-};
-
-const fromCalendar = (date: Date): string =>
-  `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}`;
 
 /** A typed amount as a number, null when blank, or NaN when it is not a whole number in range. */
 const toAmount = (typed: string): number | null => {
@@ -195,12 +172,6 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
   const [errors, setErrors] = useState<Errors>({});
   const shown: Errors = { ...(adding ? create.fieldErrors : update.fieldErrors), ...errors };
   const completed = values.statusCode === COMPLETED;
-  // Only a whole date (or none) goes back to the picker: flatpickr parses the value it is handed,
-  // and handing it each half-typed keystroke would rewrite the box under the user's cursor.
-  const pickerDate = useRef('');
-  if (!values.completedDate || toIso(values.completedDate) !== null) {
-    pickerDate.current = values.completedDate;
-  }
 
   const typeOptions = useMemo(() => {
     const listed = typesFor(types.data ?? [], ticked);
@@ -380,31 +351,14 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
         {/* Not on Add: a new repair is Suggested, and only a completed one has these. */}
         {repair !== null && (
           <>
-            <DatePicker
-              datePickerType="single"
-              dateFormat={DATE_FORMAT}
-              value={pickerDate.current}
-              // The shared fix in `_overrides.scss`: Carbon hard-codes a single picker to 18rem.
-              className="cbr-date-picker"
-              onChange={(dates: Date[]) =>
-                change('completedDate', dates[0] ? fromCalendar(dates[0]) : '')
-              }
-            >
-              <DatePickerInput
-                id="repair-completed-date"
-                data-testid="repair-completed-date"
-                // One span, because Carbon lays a date picker's label out as flex: the asterisk on its
-                // own would be a flex item, lifted off the text's baseline.
-                labelText={<span>{requiredLabel('Repair Completed Date', completed)}</span>}
-                placeholder="yyyy/mm/dd"
-                disabled={!completed}
-                invalid={Boolean(shown.completedDate)}
-                invalidText={shown.completedDate}
-                onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  change('completedDate', event.target.value)
-                }
-              />
-            </DatePicker>
+            <DateField
+              id="repair-completed-date"
+              labelText={requiredLabel('Repair Completed Date', completed)}
+              value={values.completedDate}
+              disabled={!completed}
+              invalidText={shown.completedDate}
+              onChange={(value) => change('completedDate', value)}
+            />
           </>
         )}
         {amount('estimate', 'Repair Estimate Cost ($)')}
