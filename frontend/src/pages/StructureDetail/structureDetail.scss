@@ -360,6 +360,14 @@ $page-bottom: 2rem;
 // 1440px is the scroller width the table needs with the buttons side by side.
 .structure-detail__repairs-scroll {
   container-type: inline-size;
+
+  // Half Carbon's cell padding: twelve columns at 1rem a side is ~380px of a 1400px screen, and the
+  // columns are already as narrow as their words. The app sets no font, so the same table is ~80px
+  // wider on Linux than on a Mac; the room saved here is what lets it fit both.
+  .cds--data-table th,
+  .cds--data-table td {
+    padding-inline: $spacing-03;
+  }
 }
 
 .structure-detail__repair-actions {

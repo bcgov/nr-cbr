@@ -414,9 +414,6 @@ describe('StructureDetailPage — layout', () => {
     await userEvent.click(screen.getByTestId('structure-tab-repairs'));
     const edit = await screen.findByTestId('structure-repair-edit-3');
     const del = screen.getByTestId('structure-repair-delete-3');
-    // Measured in the app's font: until IBM Plex has loaded the fallback sets the text, and its
-    // wider glyphs can push a table that fits past its card.
-    await document.fonts.ready;
     const scroller = del.closest('.structure-detail__table-scroll')!;
     // Nothing needs a sideways scroll to reach, Actions included.
     expect(scroller.scrollWidth).toBeLessThanOrEqual(scroller.clientWidth);
