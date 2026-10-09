@@ -11,7 +11,12 @@ import type {
   MonitorView,
   StructureMonitor,
 } from '@/pages/StructureDetail/monitorsResponse';
-import type { RepairView, StructureRepair } from '@/pages/StructureDetail/repairsResponse';
+import type {
+  RepairTypeOption,
+  RepairUpdateRequest,
+  RepairView,
+  StructureRepair,
+} from '@/pages/StructureDetail/repairsResponse';
 import type { SpansAndPiersResponse } from '@/pages/StructureDetail/spansAndPiersResponse';
 import type { StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
 import type { ItemListing } from '@/pages/StructureDetail/UserAudits';
@@ -258,6 +263,35 @@ export class StructureSearchService extends HttpClient {
       method: 'PUT',
       url: '/v1/structures/{structureId}/monitors/{monitorId}',
       path: { structureId, monitorId },
+      body: request,
+    });
+  }
+
+  /**
+   * The repair types that apply to a structure, one entry per group each falls in, in legacy's
+   * order: by group, then the type's order.
+   */
+  getStructureRepairTypes(structureId: string): CancelablePromise<RepairTypeOption[]> {
+    return this.doRequest<RepairTypeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/{structureId}/repair-types',
+      path: { structureId },
+    });
+  }
+
+  /**
+   * Saves an edit to one repair. 400 with `fieldErrors` when a field is refused; 404 when the
+   * structure has no such repair.
+   */
+  updateStructureRepair(
+    structureId: string,
+    repairId: string,
+    request: RepairUpdateRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/repairs/{repairId}',
+      path: { structureId, repairId },
       body: request,
     });
   }

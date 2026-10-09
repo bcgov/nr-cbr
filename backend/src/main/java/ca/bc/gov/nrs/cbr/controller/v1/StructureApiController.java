@@ -14,6 +14,8 @@ import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
@@ -29,6 +31,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -140,6 +143,18 @@ public class StructureApiController implements StructureApiEndpoint {
       StructureRepairsResponse.View view, int pageNumber, int pageSize,
       boolean includeBeforeInstall) {
     return repairsService.repairs(structureId, view, pageNumber, pageSize, includeBeforeInstall);
+  }
+
+  @Override
+  public List<RepairTypeOption> getRepairTypes(long structureId) {
+    return repairsService.repairTypes(structureId);
+  }
+
+  @Override
+  public ResponseEntity<Void> updateRepair(
+      long structureId, long repairId, RepairUpdateRequest request) {
+    repairsService.update(structureId, repairId, request);
+    return ResponseEntity.noContent().build();
   }
 
   @Override

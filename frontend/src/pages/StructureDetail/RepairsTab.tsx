@@ -1,4 +1,4 @@
-import { Tools, TrashCan } from '@carbon/icons-react';
+import { Edit, Tools, TrashCan } from '@carbon/icons-react';
 import {
   Button,
   Checkbox,
@@ -21,6 +21,7 @@ import ExternalLink from '@/components/core/ExternalLink';
 
 import Card from './Card';
 import { describe, money, number } from './format';
+import RepairDialog from './RepairDialog';
 import UserAudits from './UserAudits';
 
 import type { RepairView, StructureRepair } from './repairsResponse';
@@ -45,12 +46,17 @@ const PAGE_SIZES = [10, 20, 50];
 type TableProps = {
   rows: StructureRepair[];
   view: RepairView;
+  /** Offers Edit — Level 1 and up. */
+  canEdit: boolean;
   /** Offers Delete — the destructive privilege. */
   canDelete: boolean;
+  onEdit: (repair: StructureRepair) => void;
   onDelete: (repair: StructureRepair) => void;
 };
 
-const RepairsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
+const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, onDelete }) => {
+  // The Actions column only when there is an action to offer, as Site Search's.
+  const hasActions = canEdit || canDelete;
   if (rows.length === 0) {
     return (
       <p className="structure-detail__empty">
@@ -59,25 +65,26 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
     );
   }
   return (
-    // Eleven columns: the table scrolls inside its card rather than widening the page.
-    <div className="structure-detail__table-scroll">
+    // Eleven columns: the headings wrap, and the short values keep one line, so the table and its
+    // Actions fit the card; anything wider scrolls inside the card rather than widening the page.
+    <div className="structure-detail__table-scroll structure-detail__repairs-scroll">
       <Table size="md" useZebraStyles aria-label="Repairs">
         <TableHead>
           <TableRow>
-            <TableHeader className="structure-detail__nowrap">Repair Number</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Status</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Repair Type</TableHeader>
-            <TableHeader className="structure-detail__nowrap">User Audits</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Inspection Date</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Priority</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Completed Date</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Estimate ($)</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Actual ($)</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Quantity</TableHeader>
+            <TableHeader>Repair Number</TableHeader>
+            <TableHeader>Status</TableHeader>
+            <TableHeader>Repair Type</TableHeader>
+            <TableHeader>User Audits</TableHeader>
+            <TableHeader>Inspection Date</TableHeader>
+            <TableHeader>Priority</TableHeader>
+            <TableHeader>Completed Date</TableHeader>
+            <TableHeader>Estimate ($)</TableHeader>
+            <TableHeader>Actual ($)</TableHeader>
+            <TableHeader>Quantity</TableHeader>
             <TableHeader>Description</TableHeader>
             {/* Only for a user who may act, as the other tables' Actions columns: an action that
                 cannot be performed is not shown, and an empty column is noise. */}
-            {canDelete && <TableHeader>Actions</TableHeader>}
+            {hasActions && <TableHeader>Actions</TableHeader>}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -85,8 +92,10 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
             <TableRow key={repair.id} data-testid={`structure-repair-${repair.id}`}>
               <TableCell className="structure-detail__nowrap">{number(repair.number)}</TableCell>
               <TableCell className="structure-detail__nowrap">{describe(repair.status)}</TableCell>
-              <TableCell className="structure-detail__nowrap">{describe(repair.type)}</TableCell>
-              <TableCell className="structure-detail__nowrap">
+              <TableCell>{describe(repair.type)}</TableCell>
+              {/* Wraps, as Repair Type and Priority do: three columns let go of their single line so
+                  the table, Actions included, fits its card. */}
+              <TableCell>
                 <UserAudits item={repair} />
               </TableCell>
               <TableCell className="structure-detail__nowrap">
@@ -97,9 +106,7 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
                   </ExternalLink>
                 ) : null}
               </TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {describe(repair.priority)}
-              </TableCell>
+              <TableCell>{describe(repair.priority)}</TableCell>
               <TableCell className="structure-detail__nowrap">
                 {formatShortDate(repair.completedDate)}
               </TableCell>
@@ -111,19 +118,39 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
                   .join(' ')}
               </TableCell>
               <TableCell className="structure-detail__comment">{repair.description}</TableCell>
-              {canDelete && (
+              {hasActions && (
                 <TableCell className="structure-detail__nowrap">
-                  {/* danger--ghost, as every Delete in the app: red at rest and on hover. */}
-                  <Button
-                    kind="danger--ghost"
-                    size="sm"
-                    renderIcon={TrashCan}
-                    data-testid={`structure-repair-delete-${repair.id}`}
-                    onClick={() => onDelete(repair)}
-                  >
-                    Delete{' '}
-                    <span className="cds--visually-hidden">repair {number(repair.number)}</span>
-                  </Button>
+                  {/* Side by side when the table has room, stacked when it has not — eleven
+                      columns and both buttons in a row need a wide screen. */}
+                  <div className="structure-detail__repair-actions">
+                    {canEdit && (
+                      // Ghost, the link-blue of an action that changes nothing until saved; Delete
+                      // under it is the red one.
+                      <Button
+                        kind="ghost"
+                        size="sm"
+                        renderIcon={Edit}
+                        data-testid={`structure-repair-edit-${repair.id}`}
+                        onClick={() => onEdit(repair)}
+                      >
+                        Edit{' '}
+                        <span className="cds--visually-hidden">repair {number(repair.number)}</span>
+                      </Button>
+                    )}
+                    {/* danger--ghost, as every Delete in the app: red at rest and on hover. */}
+                    {canDelete && (
+                      <Button
+                        kind="danger--ghost"
+                        size="sm"
+                        renderIcon={TrashCan}
+                        data-testid={`structure-repair-delete-${repair.id}`}
+                        onClick={() => onDelete(repair)}
+                      >
+                        Delete{' '}
+                        <span className="cds--visually-hidden">repair {number(repair.number)}</span>
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               )}
             </TableRow>
@@ -136,15 +163,17 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
 
 /**
  * Legacy's Repairs tab (`repairTab.jsp`): the structure's repairs, outstanding ones by default or
- * all of them, a page at a time from the server. Read-only for now; legacy's Add, Edit (Level 1)
- * and Delete come with the page's editing.
+ * all of them, a page at a time from the server. Edit (Level 1 and up) and Delete (Level 2 and
+ * up) from each row's Actions; legacy's Add comes next.
  */
 const RepairsTab: FC<Props> = ({ structureId, opened }) => {
-  const { canDelete } = useAuthorization();
+  const { canEdit, canDelete } = useAuthorization();
   const { display } = useNotification();
   const deleteRepair = useDeleteStructureRepair(structureId);
   /** The repair whose delete is being confirmed, if any. */
   const [pendingDelete, setPendingDelete] = useState<StructureRepair | null>(null);
+  /** The repair being edited, if any. */
+  const [editing, setEditing] = useState<StructureRepair | null>(null);
   const [view, setView] = useState<RepairView>('OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -220,7 +249,9 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
             <RepairsTable
               rows={loaded.data.page.content}
               view={view}
+              canEdit={canEdit}
               canDelete={canDelete}
+              onEdit={setEditing}
               onDelete={setPendingDelete}
             />
             <Pagination
@@ -236,6 +267,15 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
           </>
         )}
       </Card>
+
+      {editing !== null && (
+        <RepairDialog
+          key={editing.id}
+          structureId={structureId}
+          repair={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       {/* Legacy's window.confirm(), as the app's other deletes ask. */}
       <DestructiveModal

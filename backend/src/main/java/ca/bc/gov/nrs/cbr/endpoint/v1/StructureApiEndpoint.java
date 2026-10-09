@@ -5,6 +5,8 @@ import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
@@ -20,6 +22,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -213,6 +216,35 @@ public interface StructureApiEndpoint {
       @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
       @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
       boolean includeBeforeInstall);
+
+  /**
+   * The repair types that apply to the structure, each with its group — the Repair Item dialog's
+   * Repair Type list, which its group checkboxes narrow.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{structureId}/repair-types")
+  List<RepairTypeOption> getRepairTypes(@PathVariable("structureId") long structureId);
+
+  /**
+   * Saves an edit to one repair — legacy's "Repair Item" dialog.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy offers the edit
+   * link; legacy itself checked nothing on an edit. <b>204</b> on success; <b>404</b> when the
+   * structure has no such repair; <b>400</b> with {@code fieldErrors} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the repair belongs to
+   * @param repairId    the repair's {@code REPAIR_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/repairs/{repairId}")
+  ResponseEntity<Void> updateRepair(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("repairId") long repairId,
+      @RequestBody RepairUpdateRequest request);
 
   /**
    * Deletes one repair — legacy's delete icon on the Repairs tab.

@@ -112,4 +112,19 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   public ResponseEntity<List<CodeOptionResponse>> getMonitorFrequencyCodes() {
     return ResponseEntity.ok(configurationService.getMonitorFrequencyCodes());
   }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getRepairStatusCodes() {
+    return ResponseEntity.ok(configurationService.getRepairStatusCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getRepairPriorityCodes() {
+    return ResponseEntity.ok(configurationService.getRepairPriorityCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getRepairGroupCodes() {
+    return ResponseEntity.ok(configurationService.getRepairGroupCodes());
+  }
 }

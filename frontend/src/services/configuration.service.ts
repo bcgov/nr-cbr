@@ -123,6 +123,30 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Repair statuses, current ones by description. */
+  getRepairStatusCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/repair-status-codes',
+    });
+  }
+
+  /** Repair priorities, current ones. */
+  getRepairPriorityCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/repair-priority-codes',
+    });
+  }
+
+  /** Repair groups, current ones by code — the checkboxes that narrow the Repair Type list. */
+  getRepairGroupCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/repair-group-codes',
+    });
+  }
+
   /** Inspection types, by description. Retired codes are included. */
   getInspectionTypeCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {

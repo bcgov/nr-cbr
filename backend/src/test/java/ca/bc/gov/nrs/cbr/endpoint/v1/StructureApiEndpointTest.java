@@ -167,6 +167,25 @@ class StructureApiEndpointTest {
   }
 
   @Test
+  @DisplayName("a repair is edited by PUT /{structureId}/repairs/{repairId}, on CONTENT_EDIT")
+  void repairUpdateIsMappedAndGated() {
+    Method update = method("updateRepair");
+    assertThat(update.getAnnotation(PutMapping.class).value())
+        .containsExactly("/{structureId}/repairs/{repairId}");
+    assertThat(update.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.CONTENT_EDIT);
+  }
+
+  @Test
+  @DisplayName("the repair types for a structure are GET /{structureId}/repair-types, on READ")
+  void repairTypesAreMappedAndGated() {
+    Method types = method("getRepairTypes");
+    assertThat(types.getAnnotation(GetMapping.class).value())
+        .containsExactly("/{structureId}/repair-types");
+    assertThat(types.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
+
+  @Test
   @DisplayName("the Monitoring tab's page is GET /{structureId}/monitors, on READ")
   void monitorsAreMappedAndGated() {
     Method monitors = method("getMonitors");

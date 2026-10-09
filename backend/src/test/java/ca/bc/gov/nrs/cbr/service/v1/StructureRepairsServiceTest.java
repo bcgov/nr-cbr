@@ -2,7 +2,9 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
+import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
 import ca.bc.gov.nrs.cbr.exception.RepairNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
@@ -12,7 +14,11 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeOrderEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeXrefEntity;
+import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse.Repair;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse.View;
@@ -21,6 +27,7 @@ import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** The Repairs tab's data, against the database: a filtered, ordered page and its decodes. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
@@ -40,11 +48,16 @@ class StructureRepairsServiceTest {
   @Autowired
   private EntityManager entityManager;
 
+  @MockitoBean
+  private LoggedUserHelper loggedUser;
+
   @BeforeEach
   void setUp() {
+    when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\EDITOR");
     for (String entity : List.of("StructureRepairEntity", "StructureInspectionEntity",
         "RepairPriorityCodeEntity", "RepairStatusCodeEntity", "StructureRepairTypeCodeEntity",
-        "StructureRepairTypeOrderEntity", "CrossingStructureEntity")) {
+        "StructureRepairTypeOrderEntity", "StructureRepairTypeXrefEntity",
+        "CrossingStructureEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
     }
     entityManager.persist(CrossingStructureEntity.builder()
@@ -238,6 +251,236 @@ class StructureRepairsServiceTest {
         .isInstanceOf(RepairNotFoundException.class);
     assertThatThrownBy(() -> service.delete(7L, 99L))
         .isInstanceOf(RepairNotFoundException.class);
+  }
+
+  /** The codes an edit is checked against. */
+  private void givenCodes() {
+    for (String status : List.of("SUG", "REQ", "COM", "NRQ", "CF")) {
+      entityManager.persist(RepairStatusCodeEntity.builder()
+          .repairStatusCode(status).description(status).build());
+    }
+    entityManager.persist(RepairPriorityCodeEntity.builder()
+        .repairPriorityCode("H").description("High").build());
+    for (String type : List.of("DECK", "800A")) {
+      entityManager.persist(StructureRepairTypeCodeEntity.builder()
+          .structureRepairTypeCode(type).description(type).build());
+    }
+  }
+
+  private static RepairUpdateRequest edit(String status, LocalDate completedDate,
+      Long actualCost) {
+    return new RepairUpdateRequest(status, "H", completedDate, 4000L, actualCost, "DECK", 12L,
+        "  Replace planks.  ");
+  }
+
+  private StructureRepairEntity stored(long id) {
+    entityManager.flush();
+    entityManager.clear();
+    return entityManager.find(StructureRepairEntity.class, id);
+  }
+
+  private Map<String, String> refused(RepairUpdateRequest request) {
+    entityManager.flush();
+    entityManager.clear();
+    try {
+      service.update(7L, 1L, request);
+    } catch (FieldValidationException refused) {
+      return refused.getFieldErrors();
+    }
+    throw new AssertionError("the edit was saved");
+  }
+
+  @Test
+  @DisplayName("saves an edit, stamps the audit for its status and the update, and keeps the "
+      + "number and the carried-forward flag")
+  void updates() {
+    givenCodes();
+    givenRepair(1L, null, "SUG", "L", repair -> repair.carriedForwardInd("Y")
+        .suggestedByUserid("IDIR\\A").suggestedByTimestamp(LocalDateTime.of(2020, 1, 1, 9, 0)));
+    entityManager.flush();
+    entityManager.clear();
+
+    service.update(7L, 1L, edit("COM", LocalDate.of(2026, 9, 1), 3800L));
+
+    StructureRepairEntity repair = stored(1L);
+    assertThat(repair.getRepairStatusCode()).isEqualTo("COM");
+    assertThat(repair.getRepairPriorityCode()).isEqualTo("H");
+    assertThat(repair.getCompletedDate()).isEqualTo(LocalDate.of(2026, 9, 1));
+    assertThat(repair.getActualCost()).isEqualTo(3800L);
+    assertThat(repair.getEstimate()).isEqualTo(4000L);
+    assertThat(repair.getStructureRepairTypeCode()).isEqualTo("DECK");
+    assertThat(repair.getRepairQuantity()).isEqualTo(12L);
+    assertThat(repair.getDescription()).isEqualTo("Replace planks.");
+    assertThat(repair.getRepairNumber()).isEqualTo(1L);
+    assertThat(repair.getCarriedForwardInd()).isEqualTo("Y");
+    assertThat(repair.getCompletedByUserid()).isEqualTo("IDIR\\EDITOR");
+    assertThat(repair.getCompletedByTimestamp()).isNotNull();
+    assertThat(repair.getSuggestedByUserid()).isEqualTo("IDIR\\A");
+    assertThat(repair.getUpdateUserid()).isEqualTo("IDIR\\EDITOR");
+    assertThat(repair.getUpdateTimestamp()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("re-stamps the status's audit on every save, even when the status is unchanged")
+  void restampsEverySave() {
+    givenCodes();
+    givenRepair(1L, null, "SUG", "H", repair -> repair
+        .suggestedByUserid("IDIR\\A").suggestedByTimestamp(LocalDateTime.of(2020, 1, 1, 9, 0)));
+    entityManager.flush();
+    entityManager.clear();
+
+    service.update(7L, 1L, edit("SUG", null, null));
+
+    assertThat(stored(1L).getSuggestedByUserid()).isEqualTo("IDIR\\EDITOR");
+  }
+
+  @Test
+  @DisplayName("clears the completed date and actual cost unless the status is Completed")
+  void completedFieldsOnlyWhenCompleted() {
+    givenCodes();
+    givenRepair(1L, null, "COM", "H", repair -> repair
+        .completedDate(LocalDate.of(2020, 1, 1)).actualCost(100L));
+    entityManager.flush();
+    entityManager.clear();
+
+    service.update(7L, 1L, edit("CF", LocalDate.of(2026, 9, 1), 3800L));
+
+    StructureRepairEntity repair = stored(1L);
+    assertThat(repair.getCompletedDate()).isNull();
+    assertThat(repair.getActualCost()).isNull();
+  }
+
+  @Test
+  @DisplayName("keeps a blank estimate and quantity blank, where legacy saved 0")
+  void blanksStayBlank() {
+    givenCodes();
+    givenRepair(1L, null, "SUG", "H", repair -> repair.estimate(10L).repairQuantity(3L));
+    entityManager.flush();
+    entityManager.clear();
+
+    service.update(7L, 1L,
+        new RepairUpdateRequest("SUG", "H", null, null, null, "DECK", null, null));
+
+    StructureRepairEntity repair = stored(1L);
+    assertThat(repair.getEstimate()).isNull();
+    assertThat(repair.getRepairQuantity()).isNull();
+    assertThat(repair.getDescription()).isNull();
+  }
+
+  @Test
+  @DisplayName("needs a completed date when the status is Completed")
+  void completedNeedsDate() {
+    givenCodes();
+    givenRepair(1L, null, "SUG", "H");
+
+    assertThat(refused(edit("COM", null, 10L))).containsExactly(Map.entry("completedDate",
+        "Repair Completed Date is required when the status is Completed."));
+  }
+
+  @Test
+  @DisplayName("lets only a P.Eng set Required or Not Required, as legacy's list does")
+  void engineerStatuses() {
+    givenCodes();
+    givenRepair(1L, null, "SUG", "H");
+
+    assertThat(refused(edit("REQ", null, null))).containsOnlyKeys("statusCode");
+    assertThat(refused(edit("NRQ", null, null))).containsOnlyKeys("statusCode");
+
+    when(loggedUser.isPeng()).thenReturn(true);
+    service.update(7L, 1L, edit("REQ", null, null));
+    StructureRepairEntity repair = stored(1L);
+    assertThat(repair.getRepairStatusCode()).isEqualTo("REQ");
+    assertThat(repair.getRequiredByUserid()).isEqualTo("IDIR\\EDITOR");
+  }
+
+  @Test
+  @DisplayName("names each field at fault: status, priority and type required and listed, "
+      + "amounts in range")
+  void refusesEachField() {
+    givenCodes();
+    givenRepair(1L, null, "SUG", "H");
+
+    assertThat(refused(new RepairUpdateRequest(" ", "", null, -1L, null, null, 1_000_000L, null)))
+        .containsExactly(
+            Map.entry("statusCode", "Repair Status is required."),
+            Map.entry("priorityCode", "Repair Priority is required."),
+            Map.entry("estimate", "Repair Estimate Cost must be a whole number from 0 to 999,999."),
+            Map.entry("typeCode", "Repair Type is required."),
+            Map.entry("quantity", "Qty must be a whole number from 0 to 999,999."));
+    assertThat(refused(new RepairUpdateRequest("XX", "XX", LocalDate.of(2026, 1, 1), 0L,
+        1_000_000L, "XX", 0L, null)))
+        .containsOnlyKeys("statusCode", "priorityCode", "typeCode");
+    assertThat(refused(new RepairUpdateRequest("COM", "H", LocalDate.of(2026, 1, 1), 0L,
+        1_000_000L, "DECK", 0L, null)))
+        .containsOnlyKeys("actualCost");
+  }
+
+  @Test
+  @DisplayName("needs a description for the type 800A, and at most 2000 bytes of one")
+  void description() {
+    givenCodes();
+    givenRepair(1L, null, "SUG", "H");
+
+    assertThat(refused(new RepairUpdateRequest("SUG", "H", null, null, null, "800A", null, " ")))
+        .containsExactly(Map.entry("description",
+            "Repair Description is required for this Repair Type."));
+    assertThat(refused(new RepairUpdateRequest("SUG", "H", null, null, null, "DECK", null,
+        "é".repeat(1001)))).containsOnlyKeys("description");
+  }
+
+  @Test
+  @DisplayName("refuses to edit a repair under a structure it does not belong to, or none at all")
+  void updateOnlyThroughItsStructure() {
+    givenCodes();
+    givenRepair(1L, null, "SUG", "H");
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThatThrownBy(() -> service.update(8L, 1L, edit("SUG", null, null)))
+        .isInstanceOf(RepairNotFoundException.class);
+    assertThatThrownBy(() -> service.update(7L, 99L, edit("SUG", null, null)))
+        .isInstanceOf(RepairNotFoundException.class);
+  }
+
+  private void givenType(String code, String description, Integer order, String unit) {
+    entityManager.persist(StructureRepairTypeCodeEntity.builder()
+        .structureRepairTypeCode(code).description(description).build());
+    if (order != null) {
+      entityManager.persist(StructureRepairTypeOrderEntity.builder()
+          .structureRepairTypeCode(code).structureRepairTypeOrder(order)
+          .structureRepairUnit(unit).build());
+    }
+  }
+
+  private void givenXref(String typeClass, String type, String group, String repairClass) {
+    entityManager.persist(new StructureRepairTypeXrefEntity(
+        new StructureRepairTypeXrefEntity.Key(typeClass, type, group, repairClass)));
+  }
+
+  @Test
+  @DisplayName("lists the structure's repair types as legacy does: its type class only, by group "
+      + "then order, once per group, leaving out a type with no order row")
+  void repairTypes() {
+    givenType("DECK", "Deck planks", 2, "m²");
+    givenType("RAIL", "Railing", 1, "m");
+    givenType("PIER", "Pier cap", 1, null);
+    givenType("LOST", "No order", null, null);
+    givenType("CULV", "Culvert pipe", 1, "m");
+    givenXref("TB", "DECK", "STRU", "RM");
+    givenXref("TB", "DECK", "STRU", "SA");
+    givenXref("TB", "RAIL", "STRU", "RM");
+    givenXref("TB", "RAIL", "APPR", "RM");
+    givenXref("TB", "PIER", "SUBS", "ST");
+    givenXref("TB", "LOST", "MISC", "RM");
+    givenXref("CUL", "CULV", "CHNL", "RM");
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(service.repairTypes(7L)).containsExactly(
+        new RepairTypeOption("RAIL", "Railing", "m", "APPR"),
+        new RepairTypeOption("RAIL", "Railing", "m", "STRU"),
+        new RepairTypeOption("DECK", "Deck planks", "m²", "STRU"),
+        new RepairTypeOption("PIER", "Pier cap", null, "SUBS"));
   }
 
   @Test

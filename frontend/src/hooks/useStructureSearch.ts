@@ -5,7 +5,7 @@ import type {
   MonitorUpdateRequest,
   MonitorView,
 } from '@/pages/StructureDetail/monitorsResponse';
-import type { RepairView } from '@/pages/StructureDetail/repairsResponse';
+import type { RepairUpdateRequest, RepairView } from '@/pages/StructureDetail/repairsResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
 import type {
   PagedResponse,
@@ -191,6 +191,32 @@ export const useUpdateStructureMonitor = (structureId: string) => {
       API.structureSearch.updateStructureMonitor(structureId, monitorId, request),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * The repair types that apply to a structure, each with its group — the Repair Item dialog's type
+ * list. Fetched once per structure while the dialog is open; the types change with the structure's
+ * type, which the dialog does not edit.
+ */
+export const useStructureRepairTypes = (structureId: string) =>
+  useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repair-types'],
+    queryFn: () => API.structureSearch.getStructureRepairTypes(structureId),
+  });
+
+/**
+ * Saves an edit to one repair, then refreshes the structure's repairs table. The fields the server
+ * refused come back as `fieldErrors`, keyed as the request is.
+ */
+export const useUpdateStructureRepair = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ repairId, request }: { repairId: string; request: RepairUpdateRequest }) =>
+      API.structureSearch.updateStructureRepair(structureId, repairId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };

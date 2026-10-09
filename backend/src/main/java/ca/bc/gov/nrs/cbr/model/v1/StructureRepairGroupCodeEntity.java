@@ -14,25 +14,25 @@ import lombok.ToString;
 import org.hibernate.annotations.Immutable;
 
 /**
- * {@code THE.REPAIR_PRIORITY_CODE} — How urgent a repair is.
+ * {@code THE.STRUCTURE_REPAIR_GROUP_CODE} — The part of a structure a repair type belongs to:
+ * approach, channel, miscellaneous, superstructure, substructure.
  *
- * <p>Decodes a stored code on the structure page's Repairs tab; the current codes fill the Repair
- * Item dialog's select.
+ * <p>The Repair Item dialog's checkboxes, which narrow its type list.
  */
 @Entity
 @Immutable
-@Table(name = "REPAIR_PRIORITY_CODE", schema = "THE")
+@Table(name = "STRUCTURE_REPAIR_GROUP_CODE", schema = "THE")
 @Getter
 @ToString
-@EqualsAndHashCode(of = "repairPriorityCode")
+@EqualsAndHashCode(of = "structureRepairGroupCode")
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RepairPriorityCodeEntity {
+public class StructureRepairGroupCodeEntity {
 
   @Id
-  @Column(name = "REPAIR_PRIORITY_CODE", length = 10)
-  private String repairPriorityCode;
+  @Column(name = "STRUCTURE_REPAIR_GROUP_CODE", length = 10)
+  private String structureRepairGroupCode;
 
   @Column(name = "DESCRIPTION", length = 120)
   private String description;

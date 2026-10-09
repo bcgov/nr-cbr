@@ -152,4 +152,19 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/monitor-frequency-codes")
   ResponseEntity<List<CodeOptionResponse>> getMonitorFrequencyCodes();
+
+  /** Repair statuses — the Repair Status select on a repair. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/repair-status-codes")
+  ResponseEntity<List<CodeOptionResponse>> getRepairStatusCodes();
+
+  /** Repair priorities — the Repair Priority select on a repair. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/repair-priority-codes")
+  ResponseEntity<List<CodeOptionResponse>> getRepairPriorityCodes();
+
+  /** Repair groups — the checkboxes that narrow a repair's Repair Type list. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/repair-group-codes")
+  ResponseEntity<List<CodeOptionResponse>> getRepairGroupCodes();
 }

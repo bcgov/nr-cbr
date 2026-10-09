@@ -22,7 +22,7 @@ import lombok.ToString;
  * {@code THE.STRUCTURE_REPAIR} — A repair raised by an inspection.
  *
  * <p>Read by the structure page's Repairs tab, and cleared by an inspection or structure delete.
- * The entry and update audit columns are not mapped; nothing reads them yet.
+ * Its own entry and update audit columns are mapped: this application edits repairs.
  */
 @Entity
 @Table(name = "STRUCTURE_REPAIR", schema = "THE")
@@ -31,7 +31,7 @@ import lombok.ToString;
 @EqualsAndHashCode(of = "repairId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class StructureRepairEntity {
 
   @Id
@@ -106,4 +106,16 @@ public class StructureRepairEntity {
 
   @Column(name = "COMPLETED_BY_TIMESTAMP")
   private LocalDateTime completedByTimestamp;
+
+  @Column(name = "ENTRY_USERID", length = 30)
+  private String entryUserid;
+
+  @Column(name = "ENTRY_TIMESTAMP")
+  private LocalDateTime entryTimestamp;
+
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 }

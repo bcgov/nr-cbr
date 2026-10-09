@@ -8,7 +8,7 @@ import StructureDetailPage from './index';
 
 import type { StructureDetailResponse } from './structureResponse';
 
-const authorization = vi.hoisted(() => ({ canEdit: false, canDelete: false }));
+const authorization = vi.hoisted(() => ({ canEdit: false, canDelete: false, isPeng: false }));
 vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
 
 // A delete's outcome is a toast; asserted on what the page asked to show.
@@ -28,6 +28,8 @@ const api = vi.hoisted(() => ({
   getStructureInspections: vi.fn(),
   getStructureRepairs: vi.fn(),
   deleteStructureRepair: vi.fn(),
+  getStructureRepairTypes: vi.fn(),
+  updateStructureRepair: vi.fn(),
   getStructureMonitors: vi.fn(),
   createStructureMonitor: vi.fn(),
   updateStructureMonitor: vi.fn(),
@@ -36,6 +38,9 @@ const api = vi.hoisted(() => ({
 const configurationApi = vi.hoisted(() => ({
   getMonitoringStatusCodes: vi.fn(),
   getMonitorFrequencyCodes: vi.fn(),
+  getRepairStatusCodes: vi.fn(),
+  getRepairPriorityCodes: vi.fn(),
+  getRepairGroupCodes: vi.fn(),
 }));
 vi.mock('@/services/APIs', () => ({
   default: { structureSearch: api, configuration: configurationApi },
@@ -294,6 +299,32 @@ beforeEach(() => {
   api.deleteStructureMonitor.mockReset();
   api.deleteStructureMonitor.mockResolvedValue(undefined);
   authorization.canDelete = false;
+  authorization.isPeng = false;
+  api.getStructureRepairTypes.mockReset();
+  api.getStructureRepairTypes.mockResolvedValue([
+    { code: 'RAIL', description: 'Railing', unit: 'm', groupCode: 'APPR' },
+    { code: 'DECK', description: 'Deck planks', unit: 'm²', groupCode: 'STRU' },
+    { code: 'RAIL', description: 'Railing', unit: 'm', groupCode: 'STRU' },
+    { code: '800A', description: 'Other', unit: null, groupCode: 'MISC' },
+  ]);
+  api.updateStructureRepair.mockReset();
+  api.updateStructureRepair.mockResolvedValue(undefined);
+  configurationApi.getRepairStatusCodes.mockResolvedValue([
+    { code: 'CF', description: 'Carried Forward' },
+    { code: 'COM', description: 'Completed' },
+    { code: 'NRQ', description: 'Not Required' },
+    { code: 'REQ', description: 'Required' },
+    { code: 'SUG', description: 'Suggested' },
+  ]);
+  configurationApi.getRepairPriorityCodes.mockResolvedValue([
+    { code: 'H', description: 'High' },
+    { code: 'P1', description: 'Urgent' },
+  ]);
+  configurationApi.getRepairGroupCodes.mockResolvedValue([
+    { code: 'APPR', description: 'Approach' },
+    { code: 'MISC', description: 'Miscellaneous' },
+    { code: 'STRU', description: 'Superstructure' },
+  ]);
   display.mockClear();
 });
 
@@ -1263,6 +1294,187 @@ describe('StructureDetailPage — Repairs', () => {
     expect(await screen.findByTestId('structure-repairs-error')).toMatchTextContent(
       'Repairs could not be loaded',
     );
+  });
+  describe('Edit', () => {
+    const openEdit = async (overrides: object = {}) => {
+      authorization.canEdit = true;
+      api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3', overrides)]));
+      await showing(bridge());
+      await openRepairs();
+      await userEvent.click(await screen.findByTestId('structure-repair-edit-3'));
+      const dialog = await screen.findByTestId('repair-dialog');
+      // Wait for the lists, which the dialog fetches as it opens.
+      await vi.waitFor(() => expect(within(dialog).getByTestId('repair-type')).toHaveValue('DECK'));
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('repair-priority')).toHaveValue('P1'),
+      );
+      return dialog;
+    };
+
+    it('offers Edit, in the Actions column, from Level 1 up', async () => {
+      authorization.canEdit = true;
+      api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+      await showing(bridge());
+
+      await openRepairs();
+      await screen.findByTestId('structure-repair-3');
+
+      expect(screen.getByRole('button', { name: 'Edit repair 3' })).toBe(
+        screen.getByTestId('structure-repair-edit-3'),
+      );
+      expect(screen.queryByTestId('structure-repair-delete-3')).not.toBeInTheDocument();
+    });
+
+    it('opens the repair with its number shown and not edited, and saves the edit', async () => {
+      authorization.isPeng = true;
+      const dialog = await openEdit();
+
+      expect(dialog).toMatchTextContent('Edit repair 3');
+      expect(within(dialog).getByTestId('repair-status')).toHaveValue('REQ');
+      expect(within(dialog).getByTestId('repair-estimate')).toHaveValue('4000');
+      expect(within(dialog).getByTestId('repair-quantity')).toHaveValue('12');
+      expect(within(dialog).getByTestId('repair-unit')).toMatchTextContent('m²');
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
+      await userEvent.clear(within(dialog).getByTestId('repair-estimate'));
+      await userEvent.clear(within(dialog).getByTestId('repair-description'));
+      await userEvent.type(within(dialog).getByTestId('repair-description'), 'Replace all.');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateStructureRepair).toHaveBeenCalledWith('7', '3', {
+          statusCode: 'REQ',
+          priorityCode: 'H',
+          completedDate: null,
+          estimate: null,
+          actualCost: null,
+          typeCode: 'DECK',
+          quantity: 12,
+          description: 'Replace all.',
+        }),
+      );
+      await vi.waitFor(() => expect(screen.queryByTestId('repair-dialog')).not.toBeInTheDocument());
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Repair 3 saved' }),
+      );
+    });
+
+    it('offers Required and Not Required to a P.Eng only, as legacy does', async () => {
+      const dialog = await openEdit();
+      const offered = () =>
+        Array.from(
+          (within(dialog).getByTestId('repair-status') as HTMLSelectElement).options,
+          (option) => option.value,
+        );
+
+      // The stored Required is not this user's to keep: the status opens unchosen.
+      expect(within(dialog).getByTestId('repair-status')).toHaveValue('');
+      expect(offered()).toEqual(['', 'CF', 'COM', 'SUG']);
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+      expect(dialog).toMatchTextContent('Repair Status is required.');
+      expect(api.updateStructureRepair).not.toHaveBeenCalled();
+    });
+
+    it('opens the completed date and actual cost only for Completed, and needs the date', async () => {
+      const dialog = await openEdit({ status: { code: 'SUG', description: 'Suggested' } });
+
+      expect(within(dialog).getByTestId('repair-completed-date')).toBeDisabled();
+      expect(within(dialog).getByTestId('repair-actualCost')).toBeDisabled();
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-status'), 'COM');
+      expect(within(dialog).getByTestId('repair-actualCost')).toBeEnabled();
+      await userEvent.type(within(dialog).getByTestId('repair-actualCost'), '3800');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      expect(dialog).toMatchTextContent(
+        'Repair Completed Date is required when the status is Completed.',
+      );
+      expect(api.updateStructureRepair).not.toHaveBeenCalled();
+
+      await userEvent.type(within(dialog).getByTestId('repair-completed-date'), '2026/09/01');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateStructureRepair).toHaveBeenCalledWith(
+          '7',
+          '3',
+          expect.objectContaining({
+            statusCode: 'COM',
+            completedDate: '2026-09-01',
+            actualCost: 3800,
+          }),
+        ),
+      );
+    });
+
+    it('clears the completed date and actual cost when the status moves off Completed', async () => {
+      const dialog = await openEdit({
+        status: { code: 'COM', description: 'Completed' },
+        completedDate: '2026-09-01',
+        actualCost: 3800,
+      });
+
+      expect(within(dialog).getByTestId('repair-completed-date')).toHaveValue('2026/09/01');
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-status'), 'SUG');
+
+      expect(within(dialog).getByTestId('repair-completed-date')).toHaveValue('');
+      expect(within(dialog).getByTestId('repair-actualCost')).toHaveValue('');
+    });
+
+    it('narrows the types to the ticked groups, each type once, every type when none', async () => {
+      const dialog = await openEdit();
+      const offered = () =>
+        Array.from(
+          (within(dialog).getByTestId('repair-type') as HTMLSelectElement).options,
+          (option) => option.value,
+        );
+
+      expect(offered()).toEqual(['', 'RAIL', 'DECK', '800A']);
+      await userEvent.click(within(dialog).getByLabelText('Superstructure'));
+      expect(offered()).toEqual(['', 'DECK', 'RAIL']);
+      expect(within(dialog).getByTestId('repair-type')).toHaveValue('DECK');
+
+      // A type the ticked groups do not hold is cleared, as legacy's list replaced it.
+      await userEvent.click(within(dialog).getByLabelText('Superstructure'));
+      await userEvent.click(within(dialog).getByLabelText('Approach'));
+      expect(offered()).toEqual(['', 'RAIL']);
+      expect(within(dialog).getByTestId('repair-type')).toHaveValue('');
+    });
+
+    it('needs a description for the type 800A, and whole amounts', async () => {
+      const dialog = await openEdit({ description: null });
+
+      await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), '800A');
+      await userEvent.clear(within(dialog).getByTestId('repair-quantity'));
+      await userEvent.type(within(dialog).getByTestId('repair-quantity'), '1.5');
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      expect(dialog).toMatchTextContent('Repair Description is required for this Repair Type.');
+      expect(dialog).toMatchTextContent('Qty must be a whole number from 0 to 999,999.');
+      expect(api.updateStructureRepair).not.toHaveBeenCalled();
+    });
+
+    it('shows what the server refused beside the field', async () => {
+      authorization.isPeng = true;
+      api.updateStructureRepair.mockRejectedValue({
+        body: { fieldErrors: { typeCode: 'Repair Type is not one of the listed types.' } },
+      });
+      const dialog = await openEdit();
+
+      await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+      await vi.waitFor(() =>
+        expect(dialog).toMatchTextContent('Repair Type is not one of the listed types.'),
+      );
+      expect(display).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'error' }));
+    });
+
+    it('saves nothing when cancelled', async () => {
+      const dialog = await openEdit();
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByTestId('repair-dialog')).not.toBeInTheDocument();
+      expect(api.updateStructureRepair).not.toHaveBeenCalled();
+    });
   });
 });
 

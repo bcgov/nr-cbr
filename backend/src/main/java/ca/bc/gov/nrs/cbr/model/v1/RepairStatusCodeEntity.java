@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -16,7 +17,8 @@ import org.hibernate.annotations.Immutable;
  * {@code THE.REPAIR_STATUS_CODE} — Where a repair stands: suggested, required, completed or
  * carried forward.
  *
- * <p>Read only to decode a stored code on the structure page's Repairs tab.
+ * <p>Decodes a stored code on the structure page's Repairs tab; the current codes fill the Repair
+ * Item dialog's select.
  */
 @Entity
 @Immutable
@@ -35,4 +37,10 @@ public class RepairStatusCodeEntity {
 
   @Column(name = "DESCRIPTION", length = 120)
   private String description;
+
+  @Column(name = "EFFECTIVE_DATE")
+  private LocalDateTime effectiveDate;
+
+  @Column(name = "EXPIRY_DATE")
+  private LocalDateTime expiryDate;
 }

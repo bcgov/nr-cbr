@@ -123,6 +123,24 @@ export const monitorFrequencyCodesQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const repairStatusCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'repair-status-codes'],
+  queryFn: () => API.configuration.getRepairStatusCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const repairPriorityCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'repair-priority-codes'],
+  queryFn: () => API.configuration.getRepairPriorityCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const repairGroupCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'repair-group-codes'],
+  queryFn: () => API.configuration.getRepairGroupCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 /**
  * The parameterless lookups each search screen draws on.
  *
@@ -358,3 +376,15 @@ export const usePrefetchConfiguration = (enabled: boolean): void => {
     void queryClient.query(specialEquipmentCodesQuery).catch(ignoreWarmUpFailure);
   }, [enabled, queryClient]);
 };
+
+/** The Repair Status select on a repair. */
+export const useRepairStatusCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(repairStatusCodesQuery);
+
+/** The Repair Priority select on a repair. */
+export const useRepairPriorityCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(repairPriorityCodesQuery);
+
+/** The group checkboxes that narrow a repair's Repair Type list. */
+export const useRepairGroupCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(repairGroupCodesQuery);

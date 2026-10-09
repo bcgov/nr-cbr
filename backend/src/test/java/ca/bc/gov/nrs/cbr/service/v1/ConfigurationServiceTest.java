@@ -24,6 +24,9 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SuperstructureTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitorFrequencyCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureRepairGroupCodeEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
@@ -33,6 +36,9 @@ import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RepairPriorityCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RepairStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
@@ -85,6 +91,11 @@ class ConfigurationServiceTest {
       mock(MonitoringStatusCodeRepository.class);
   private final MonitorFrequencyCodeRepository monitorFrequencies =
       mock(MonitorFrequencyCodeRepository.class);
+  private final RepairStatusCodeRepository repairStatuses = mock(RepairStatusCodeRepository.class);
+  private final RepairPriorityCodeRepository repairPriorities =
+      mock(RepairPriorityCodeRepository.class);
+  private final StructureRepairGroupCodeRepository repairGroups =
+      mock(StructureRepairGroupCodeRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes,
@@ -101,7 +112,10 @@ class ConfigurationServiceTest {
       culvertTypes,
       specialEquipment,
       monitoringStatuses,
-      monitorFrequencies);
+      monitorFrequencies,
+      repairStatuses,
+      repairPriorities,
+      repairGroups);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -335,5 +349,25 @@ class ConfigurationServiceTest {
         .containsExactly(new CodeOptionResponse("REQ", "Required"));
     assertThat(service.getMonitorFrequencyCodes())
         .containsExactly(new CodeOptionResponse("ANN", "Annually"));
+  }
+
+  @Test
+  @DisplayName("lists the repair statuses, priorities and groups the dialog offers")
+  void repairCodes() {
+    when(repairStatuses.findAllCurrent()).thenReturn(List.of(
+        RepairStatusCodeEntity.builder().repairStatusCode("COM").description("Completed")
+            .build()));
+    when(repairPriorities.findAllCurrent()).thenReturn(List.of(
+        RepairPriorityCodeEntity.builder().repairPriorityCode("H").description("High").build()));
+    when(repairGroups.findAllCurrent()).thenReturn(List.of(
+        StructureRepairGroupCodeEntity.builder().structureRepairGroupCode("APPR")
+            .description("Approach").build()));
+
+    assertThat(service.getRepairStatusCodes())
+        .containsExactly(new CodeOptionResponse("COM", "Completed"));
+    assertThat(service.getRepairPriorityCodes())
+        .containsExactly(new CodeOptionResponse("H", "High"));
+    assertThat(service.getRepairGroupCodes())
+        .containsExactly(new CodeOptionResponse("APPR", "Approach"));
   }
 }
