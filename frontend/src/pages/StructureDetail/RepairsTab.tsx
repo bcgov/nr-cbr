@@ -1,5 +1,6 @@
-import { Tools } from '@carbon/icons-react';
+import { Tools, TrashCan } from '@carbon/icons-react';
 import {
+  Button,
   Checkbox,
   InlineNotification,
   Pagination,
@@ -15,6 +16,7 @@ import {
 } from '@carbon/react';
 import { useState } from 'react';
 
+import DestructiveModal from '@/components/core/DestructiveModal';
 import ExternalLink from '@/components/core/ExternalLink';
 
 import Card from './Card';
@@ -24,7 +26,9 @@ import UserAudits from './UserAudits';
 import type { RepairView, StructureRepair } from './repairsResponse';
 import type { FC } from 'react';
 
-import { useStructureRepairs } from '@/hooks/useStructureSearch';
+import { useNotification } from '@/context/notification/useNotification';
+import { useAuthorization } from '@/hooks/useAuthorization';
+import { useDeleteStructureRepair, useStructureRepairs } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
 
@@ -38,7 +42,15 @@ const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZES = [10, 20, 50];
 
 /** The page of repairs, or a line saying there are none in this view. */
-const RepairsTable: FC<{ rows: StructureRepair[]; view: RepairView }> = ({ rows, view }) => {
+type TableProps = {
+  rows: StructureRepair[];
+  view: RepairView;
+  /** Offers Delete — the destructive privilege. */
+  canDelete: boolean;
+  onDelete: (repair: StructureRepair) => void;
+};
+
+const RepairsTable: FC<TableProps> = ({ rows, view, canDelete, onDelete }) => {
   if (rows.length === 0) {
     return (
       <p className="structure-detail__empty">
@@ -63,6 +75,9 @@ const RepairsTable: FC<{ rows: StructureRepair[]; view: RepairView }> = ({ rows,
             <TableHeader className="structure-detail__nowrap">Actual ($)</TableHeader>
             <TableHeader className="structure-detail__nowrap">Quantity</TableHeader>
             <TableHeader>Description</TableHeader>
+            {/* Only for a user who may act, as the other tables' Actions columns: an action that
+                cannot be performed is not shown, and an empty column is noise. */}
+            {canDelete && <TableHeader>Actions</TableHeader>}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -96,6 +111,21 @@ const RepairsTable: FC<{ rows: StructureRepair[]; view: RepairView }> = ({ rows,
                   .join(' ')}
               </TableCell>
               <TableCell className="structure-detail__comment">{repair.description}</TableCell>
+              {canDelete && (
+                <TableCell className="structure-detail__nowrap">
+                  {/* danger--ghost, as every Delete in the app: red at rest and on hover. */}
+                  <Button
+                    kind="danger--ghost"
+                    size="sm"
+                    renderIcon={TrashCan}
+                    data-testid={`structure-repair-delete-${repair.id}`}
+                    onClick={() => onDelete(repair)}
+                  >
+                    Delete{' '}
+                    <span className="cds--visually-hidden">repair {number(repair.number)}</span>
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -110,6 +140,11 @@ const RepairsTable: FC<{ rows: StructureRepair[]; view: RepairView }> = ({ rows,
  * and Delete come with the page's editing.
  */
 const RepairsTab: FC<Props> = ({ structureId, opened }) => {
+  const { canDelete } = useAuthorization();
+  const { display } = useNotification();
+  const deleteRepair = useDeleteStructureRepair(structureId);
+  /** The repair whose delete is being confirmed, if any. */
+  const [pendingDelete, setPendingDelete] = useState<StructureRepair | null>(null);
   const [view, setView] = useState<RepairView>('OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -182,7 +217,12 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
         )}
         {loaded.data && (
           <>
-            <RepairsTable rows={loaded.data.page.content} view={view} />
+            <RepairsTable
+              rows={loaded.data.page.content}
+              view={view}
+              canDelete={canDelete}
+              onDelete={setPendingDelete}
+            />
             <Pagination
               page={page}
               pageSize={pageSize}
@@ -196,6 +236,45 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
           </>
         )}
       </Card>
+
+      {/* Legacy's window.confirm(), as the app's other deletes ask. */}
+      <DestructiveModal
+        open={pendingDelete !== null}
+        title="Delete repair"
+        message={`Are you sure you would like to delete repair ${number(
+          pendingDelete?.number,
+        )}? This cannot be undone.`}
+        confirmButtonText="Delete"
+        loading={deleteRepair.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const repair = pendingDelete;
+          if (repair === null) return;
+          deleteRepair.mutate(repair.id, {
+            onSuccess: () => {
+              setPendingDelete(null);
+              display({
+                kind: 'success',
+                title: `Repair ${number(repair.number)} deleted`,
+                timeout: 4000,
+              });
+            },
+            onError: (error) => {
+              setPendingDelete(null);
+              // A toast, as the app's other deletes report a failure: the row is still there.
+              display({
+                kind: 'error',
+                title: 'The repair was not deleted',
+                subtitle: apiErrorMessage(
+                  error,
+                  'Try again, or contact support if this continues.',
+                ),
+                timeout: 0,
+              });
+            },
+          });
+        }}
+      />
     </div>
   );
 };

@@ -196,6 +196,22 @@ export const useUpdateStructureMonitor = (structureId: string) => {
 };
 
 /**
+ * Deletes one repair, then refreshes the structure's repairs table — every page and view of it,
+ * as the repair may be on any of them.
+ */
+export const useDeleteStructureRepair = (
+  structureId: string,
+): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (repairId: string) =>
+      API.structureSearch.deleteStructureRepair(structureId, repairId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
+  });
+};
+
+/**
  * Deletes one monitoring item, then refreshes the structure's monitoring table — every page and
  * view of it, as the item may be on any of them.
  */

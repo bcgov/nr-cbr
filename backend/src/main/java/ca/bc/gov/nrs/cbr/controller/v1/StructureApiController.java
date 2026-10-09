@@ -143,6 +143,12 @@ public class StructureApiController implements StructureApiEndpoint {
   }
 
   @Override
+  public ResponseEntity<Void> deleteRepair(long structureId, long repairId) {
+    repairsService.delete(structureId, repairId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
   public StructureMonitorsResponse.Listing getMonitors(long structureId,
       StructureMonitorsResponse.View view, int pageNumber, int pageSize,
       boolean includeBeforeInstall) {

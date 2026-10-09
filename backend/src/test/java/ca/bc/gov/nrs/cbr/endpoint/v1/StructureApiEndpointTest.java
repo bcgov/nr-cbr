@@ -157,6 +157,16 @@ class StructureApiEndpointTest {
     assertThat(repairs.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
   }
   @Test
+  @DisplayName("a repair is deleted by DELETE /{structureId}/repairs/{repairId}, on DESTRUCTIVE")
+  void repairDeleteIsMappedAndGated() {
+    Method delete = method("deleteRepair");
+    assertThat(delete.getAnnotation(DeleteMapping.class).value())
+        .containsExactly("/{structureId}/repairs/{repairId}");
+    assertThat(delete.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.DESTRUCTIVE);
+  }
+
+  @Test
   @DisplayName("the Monitoring tab's page is GET /{structureId}/monitors, on READ")
   void monitorsAreMappedAndGated() {
     Method monitors = method("getMonitors");

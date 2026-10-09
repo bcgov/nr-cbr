@@ -262,6 +262,15 @@ export class StructureSearchService extends HttpClient {
     });
   }
 
+  /** Deletes one repair of a structure. 404 when the structure has no such repair. */
+  deleteStructureRepair(structureId: string, repairId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/repairs/{repairId}',
+      path: { structureId, repairId },
+    });
+  }
+
   /** Deletes one monitoring item of a structure. 404 when the structure has no such item. */
   deleteStructureMonitor(structureId: string, monitorId: string): CancelablePromise<void> {
     return this.doRequest<void>(this.config, {

@@ -215,6 +215,21 @@ public interface StructureApiEndpoint {
       boolean includeBeforeInstall);
 
   /**
+   * Deletes one repair — legacy's delete icon on the Repairs tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — legacy's {@code /deleteStructureRepair}.
+   * <b>204</b> on success; <b>404</b> when the structure has no such repair.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the repair belongs to
+   * @param repairId    the repair's {@code REPAIR_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{structureId}/repairs/{repairId}")
+  ResponseEntity<Void> deleteRepair(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("repairId") long repairId);
+
+  /**
    * A page of the structure's monitoring items — legacy's Monitoring tab, paged here. Outstanding
    * items by default, as legacy opens; {@code view=ALL} for every one.
    *

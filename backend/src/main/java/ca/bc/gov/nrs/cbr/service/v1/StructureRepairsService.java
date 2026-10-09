@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
+import ca.bc.gov.nrs.cbr.exception.RepairNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
@@ -24,6 +25,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -39,6 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class StructureRepairsService {
+
+  private static final Logger log = LoggerFactory.getLogger(StructureRepairsService.class);
 
   /** Suggested, required, carried forward — legacy's outstanding statuses. */
   private static final List<String> OUTSTANDING_STATUSES = List.of("SUG", "REQ", "CF");
@@ -129,6 +134,23 @@ public class StructureRepairsService {
             ? 0
             : repairs.countBeforeInstall(
                 structureId, outstandingOnly, OUTSTANDING_STATUSES, cutoff.installed()));
+  }
+
+  /**
+   * Deletes one repair — legacy's delete icon on the Repairs tab ({@code CBR.DELETE_REPAIR}, a
+   * plain delete). As legacy, any repair of the structure may go: carried forward or not, raised by
+   * an inspection or not. Nothing else references the row.
+   *
+   * @throws RepairNotFoundException if the structure has no such repair
+   */
+  @Transactional
+  public void delete(long structureId, long repairId) {
+    StructureRepairEntity repair = repairs.findById(repairId)
+        .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
+        .orElseThrow(() -> new RepairNotFoundException(structureId, repairId));
+    repairs.delete(repair);
+    log.info("Deleted repair {} ({}) of structure {}", repairId, repair.getRepairNumber(),
+        structureId);
   }
 
   /** Each code on the page with its description (or other column), read in one query. */

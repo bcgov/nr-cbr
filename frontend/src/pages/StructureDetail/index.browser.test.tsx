@@ -27,6 +27,7 @@ const api = vi.hoisted(() => ({
   getInspectionSchedule: vi.fn(),
   getStructureInspections: vi.fn(),
   getStructureRepairs: vi.fn(),
+  deleteStructureRepair: vi.fn(),
   getStructureMonitors: vi.fn(),
   createStructureMonitor: vi.fn(),
   updateStructureMonitor: vi.fn(),
@@ -271,6 +272,8 @@ beforeEach(() => {
   api.getStructureInspections.mockResolvedValue(inspectionsPage([]));
   api.getStructureRepairs.mockReset();
   api.getStructureRepairs.mockResolvedValue(repairsPage([]));
+  api.deleteStructureRepair.mockReset();
+  api.deleteStructureRepair.mockResolvedValue(undefined);
   api.getStructureMonitors.mockReset();
   api.getStructureMonitors.mockResolvedValue(repairsPage([]));
   api.createStructureMonitor.mockReset();
@@ -1178,6 +1181,67 @@ describe('StructureDetailPage — Repairs', () => {
     expect(
       screen.queryByText(/Show repairs from before the superstructure was installed/),
     ).not.toBeInTheDocument();
+  });
+
+  it('offers Delete in an Actions column only to a user who may delete', async () => {
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    await showing(bridge());
+
+    await openRepairs();
+    const section = await screen.findByTestId('structure-section-repairs');
+    await within(section).findByTestId('structure-repair-3');
+
+    expect(within(section).queryByText('Actions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('structure-repair-delete-3')).not.toBeInTheDocument();
+  });
+
+  it('deletes a repair once confirmed, and says so', async () => {
+    authorization.canDelete = true;
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    await showing(bridge());
+
+    await openRepairs();
+    const button = await screen.findByTestId('structure-repair-delete-3');
+    expect(screen.getByRole('button', { name: 'Delete repair 3' })).toBe(button);
+    await userEvent.click(button);
+    expect(api.deleteStructureRepair).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() => expect(api.deleteStructureRepair).toHaveBeenCalledWith('7', '3'));
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Repair 3 deleted' }),
+      ),
+    );
+  });
+
+  it('deletes nothing when the confirmation is cancelled', async () => {
+    authorization.canDelete = true;
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(await screen.findByTestId('structure-repair-delete-3'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    expect(api.deleteStructureRepair).not.toHaveBeenCalled();
+  });
+
+  it('says so when the delete fails', async () => {
+    authorization.canDelete = true;
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    api.deleteStructureRepair.mockRejectedValue(new Error('boom'));
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(await screen.findByTestId('structure-repair-delete-3'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: 'The repair was not deleted' }),
+      ),
+    );
   });
 
   it('says when there are none in the view chosen', async () => {

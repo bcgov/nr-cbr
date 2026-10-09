@@ -252,6 +252,16 @@ describe('StructureSearchService', () => {
     );
   });
 
+  it('deletes one repair of a structure', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.deleteStructureRepair('7', '12');
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'DELETE', url: '/api/v1/structures/7/repairs/12' }),
+    );
+  });
+
   it('deletes one monitoring item of a structure', async () => {
     const { service, request } = withMockedRequest();
 

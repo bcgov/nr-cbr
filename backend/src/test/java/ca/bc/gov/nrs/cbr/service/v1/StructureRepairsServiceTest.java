@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ca.bc.gov.nrs.cbr.exception.RepairNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
@@ -207,6 +208,36 @@ class StructureRepairsServiceTest {
 
     assertThat(listing.page().content()).hasSize(1);
     assertThat(listing.beforeInstallCount()).isZero();
+  }
+
+  @Test
+  @DisplayName("deletes one repair of the structure, carried forward or not, leaving the others")
+  void deletes() {
+    givenInspection(10L, LocalDate.of(2023, 6, 1));
+    givenRepair(1L, 10L, "CF", "P1", repair -> repair.carriedForwardInd("Y"));
+    givenRepair(2L, null, "REQ", "P1");
+    entityManager.flush();
+    entityManager.clear();
+
+    service.delete(7L, 1L);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(service.repairs(7L, View.ALL, 0, 10, true).page().content())
+        .extracting(Repair::id).containsExactly("2");
+  }
+
+  @Test
+  @DisplayName("refuses to delete a repair under a structure it does not belong to, or none at all")
+  void deleteOnlyThroughItsStructure() {
+    givenRepair(1L, null, "REQ", "P1");
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThatThrownBy(() -> service.delete(8L, 1L))
+        .isInstanceOf(RepairNotFoundException.class);
+    assertThatThrownBy(() -> service.delete(7L, 99L))
+        .isInstanceOf(RepairNotFoundException.class);
   }
 
   @Test
