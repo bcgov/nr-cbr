@@ -1,11 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { configure, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SiteDetailPage from './index';
 
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
+
+// The road lookup waits ROAD_SECTION_DEBOUNCE_MS (300ms) after the last keystroke before it asks,
+// so a message it decides arrives a debounce and a render after the typing. Testing Library's
+// default 1s wait covers that on a laptop but not on a loaded CI runner.
+configure({ asyncUtilTimeout: 3000 });
 
 const authorization = vi.hoisted(() => ({ canEdit: false, canDelete: false }));
 vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
