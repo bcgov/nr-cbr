@@ -188,7 +188,7 @@ class StructureServiceTest {
     entityManager.persist(ForestServiceBridgeSpanEntity.builder()
         .forestServiceBridgeSpanId(id * 10).forestServiceBridgeId(id * 10).build());
     entityManager.persist(StructureCommentEntity.builder()
-        .structureCommentId(id * 10).crossingStructureId(id).build());
+        .crossingStructureId(id).build());
     entityManager.persist(CrossingStructureNameHistEntity.builder()
         .oldCrossingStructureName("OLD" + id).changeTimestamp(LAST_YEAR)
         .crossingStructureId(id).build());
@@ -290,7 +290,7 @@ class StructureServiceTest {
     givenStructure(2L, "Y");
     givenStructure(3L, "Y");
     entityManager.persist(CloseProximityInspectionEntity.builder()
-        .closeProximityInspectionId(1L).crossingStructureId(1L).build());
+        .crossingStructureId(1L).build());
     entityManager.persist(StructureReplacementXrefEntity.builder()
         .replacedStructureNumber(2L).replacesStructureNumber(3L).build());
     entityManager.flush();

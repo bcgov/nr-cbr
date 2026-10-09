@@ -1,6 +1,8 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
+import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
+import ca.bc.gov.nrs.cbr.model.v1.CloseProximityInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SpecialEquipmentRequirementCodeEntity;
@@ -14,6 +16,9 @@ import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCommentRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionReviewerRepository;
+import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.CloseProximityInspectionRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.Comment;
@@ -22,27 +27,34 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse.CloseProx
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse.Inspection;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * The structure page's Inspections tab — legacy's {@code inspectionTab.jsp}: its schedule and
  * comments above, then a page of the structure's inspections.
  *
- * <p>Read-only for now; legacy's Add Routine and Add Unplanned Inspection buttons, the
- * planned-inspection comment Add and the completed close proximity Add come with the page's
- * editing.
+ * <p>The schedule is edited here, and completed close proximity inspections recorded; legacy's Add
+ * Routine and Add Unplanned Inspection buttons come later.
  */
 @Service
 public class StructureInspectionsService {
 
+  private static final Logger log = LoggerFactory.getLogger(StructureInspectionsService.class);
   private static final String YES = "Y";
   /** A planned-inspection comment, as against a general one. */
   private static final String PLANNED_INSPECTION_COMMENT = "Y";
@@ -51,6 +63,11 @@ public class StructureInspectionsService {
   /** Legacy's {@code NVL(YEAR_BUILT, 1900)}: with no year installed, what predates 1900 hides. */
   private static final int NO_YEAR_BUILT = 1900;
   private static final int MAX_PAGE_SIZE = 100;
+  /** Reviewed, and its expired predecessor accepted — legacy's {@code getLatestInspection}. */
+  private static final List<String> REVIEWED_STATUSES = List.of("RVD", "ACC");
+  private static final int MIN_FREQUENCY = 1;
+  private static final int MAX_FREQUENCY = 6;
+  private static final String NO = "N";
 
   private final CrossingStructureRepository structures;
   private final StructureCommentRepository comments;
@@ -59,6 +76,7 @@ public class StructureInspectionsService {
   private final StructureInspectionRepository inspections;
   private final StrctreInspectionTypeCodeRepository inspectionTypes;
   private final StructureInspectionReviewerRepository reviewers;
+  private final LoggedUserHelper loggedUser;
 
   public StructureInspectionsService(
       CrossingStructureRepository structures,
@@ -67,7 +85,8 @@ public class StructureInspectionsService {
       SpecialEquipmentRequirementCodeRepository equipment,
       StructureInspectionRepository inspections,
       StrctreInspectionTypeCodeRepository inspectionTypes,
-      StructureInspectionReviewerRepository reviewers) {
+      StructureInspectionReviewerRepository reviewers,
+      LoggedUserHelper loggedUser) {
     this.structures = structures;
     this.comments = comments;
     this.closeProximity = closeProximity;
@@ -75,6 +94,7 @@ public class StructureInspectionsService {
     this.inspections = inspections;
     this.inspectionTypes = inspectionTypes;
     this.reviewers = reviewers;
+    this.loggedUser = loggedUser;
   }
 
   /**
@@ -113,7 +133,134 @@ public class StructureInspectionsService {
         structure.getNextPlannedClsProxInspDt(),
         structure.getNextPlannedInspectionDate(),
         frequency(structure.getRoutineInspectionFrequency()),
-        completed);
+        completed,
+        inspections.findLatestReviewedInspectionDate(structureId, REVIEWED_STATUSES)
+            .orElse(null));
+  }
+
+  /**
+   * Saves the structure's inspection schedule — legacy's fields above the inspection table, saved
+   * there with the whole page and here on their own.
+   *
+   * <p>As legacy, by role: Level 2 and up set close proximity, the next planned routine inspection
+   * and the frequency; Level 1 sets the frequency alone, the rest kept as stored. A new frequency
+   * moves a Level 1 user's next planned routine inspection to the latest reviewed or accepted
+   * inspection plus that many years, as legacy's page did on changing it; with no such inspection
+   * the date stays and the frequency is still saved (legacy lost it). A Level 2 user's date is
+   * taken as sent — the page does the same arithmetic, and they may change its answer.
+   *
+   * <p>While no close proximity inspection is required, its equipment and date are kept as stored,
+   * as legacy kept them in its hidden fields. The next planned routine inspection is required once
+   * it has a value, as legacy's; the frequency always, from 1 to 6.
+   *
+   * @throws StructureNotFoundException if there is no such structure
+   * @throws FieldValidationException with a message for each field at fault
+   */
+  @Transactional
+  public void updateSchedule(long structureId, InspectionScheduleRequest request) {
+    CrossingStructureEntity structure = structures.findById(structureId)
+        .orElseThrow(() -> new StructureNotFoundException(structureId));
+    Map<String, String> errors = new LinkedHashMap<>();
+    Integer frequency = request.routineFrequencyYears();
+    if (frequency == null) {
+      errors.put("routineFrequencyYears", "Routine Inspection Frequency is required.");
+    } else if (frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY) {
+      errors.put("routineFrequencyYears", "Routine Inspection Frequency must be from 1 to 6.");
+    }
+
+    boolean required;
+    String equipmentCode = structure.getSpecialEquipmentRqmtCode();
+    LocalDate nextCloseProximity = structure.getNextPlannedClsProxInspDt();
+    LocalDate nextRoutine;
+    if (loggedUser.canDestroy()) {
+      required = request.closeProximityRequired();
+      if (required) {
+        equipmentCode = trimmed(request.closeProximityEquipmentCode());
+        nextCloseProximity = request.nextCloseProximityDate();
+      }
+      if (required && equipmentCode != null && !equipment.existsById(equipmentCode)) {
+        errors.put("closeProximityEquipmentCode", "Close Proximity Special Equipment "
+            + "Requirements is not one of the listed requirements.");
+      }
+      nextRoutine = request.nextRoutineDate();
+      if (nextRoutine == null && structure.getNextPlannedInspectionDate() != null) {
+        errors.put("nextRoutineDate", "Next Planned Routine Inspection is required.");
+      }
+    } else {
+      required = YES.equals(structure.getCloseProximityInd());
+      nextRoutine = recalculated(structure, frequency);
+    }
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Inspection schedule cannot be saved", errors);
+    }
+
+    structures.updateInspectionSchedule(structureId, required ? YES : NO, equipmentCode,
+        nextCloseProximity, nextRoutine, String.valueOf(frequency),
+        loggedUser.getLoggedUserId());
+    log.info("Updated the inspection schedule of structure {}", structureId);
+  }
+
+  /**
+   * Records a completed close proximity inspection — legacy's P.Eng add on the Inspections tab
+   * ({@code addCloseProximityInspectionDate}, {@code CBR.INSERT_CLOSE_PROX_INSP}): the date, the
+   * site the structure stands on now, and who recorded it and when; its id from
+   * {@code CLOSE_PROXIMITY_INSPECTION_SEQ} through the entity's generator. Nothing else changes —
+   * the next planned close proximity inspection is the schedule's, as legacy leaves it.
+   *
+   * <p>The date is required, where legacy saved a row without one when it could not read it.
+   *
+   * @return the new row's id
+   * @throws StructureNotFoundException if there is no such structure
+   * @throws FieldValidationException   when there is no date
+   * @throws ResponseStatusException    409 when the structure stands on no site, which the row
+   *     needs
+   */
+  @Transactional
+  public String addCloseProximityInspection(long structureId,
+      CloseProximityInspectionRequest request) {
+    CrossingStructureEntity structure = structures.findById(structureId)
+        .orElseThrow(() -> new StructureNotFoundException(structureId));
+    if (request.completedDate() == null) {
+      throw new FieldValidationException("Close proximity inspection cannot be saved",
+          Map.of("completedDate", "Date is required."));
+    }
+    if (structure.getCrossingSiteId() == null) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Structure " + structureId
+          + " stands on no site, so a close proximity inspection cannot be recorded for it.");
+    }
+    CloseProximityInspectionEntity saved = closeProximity.save(
+        CloseProximityInspectionEntity.builder()
+            .crossingStructureId(structureId)
+            .crossingSiteId(structure.getCrossingSiteId())
+            .completionDate(request.completedDate())
+            .entryUserid(loggedUser.getLoggedUserId())
+            .entryTimestamp(LocalDateTime.now(ZoneId.systemDefault()))
+            .build());
+    log.info("Recorded close proximity inspection {} of structure {} on {}",
+        saved.getCloseProximityInspectionId(), structureId, request.completedDate());
+    return String.valueOf(saved.getCloseProximityInspectionId());
+  }
+
+  /**
+   * The next planned routine inspection after a Level 1 user's frequency change: the latest
+   * reviewed or accepted inspection plus the new frequency, or the stored date when the frequency
+   * is unchanged or there is no such inspection.
+   */
+  private LocalDate recalculated(CrossingStructureEntity structure, Integer frequency) {
+    LocalDate stored = structure.getNextPlannedInspectionDate();
+    Integer storedFrequency = frequency(structure.getRoutineInspectionFrequency());
+    if (frequency == null || frequency.equals(storedFrequency)) {
+      return stored;
+    }
+    return inspections
+        .findLatestReviewedInspectionDate(structure.getCrossingStructureId(), REVIEWED_STATUSES)
+        .map(latest -> latest.plusYears(frequency))
+        .orElse(stored);
+  }
+
+  /** The value without surrounding spaces, or null when nothing is left. */
+  private static String trimmed(String value) {
+    return value == null || value.isBlank() ? null : value.trim();
   }
 
   /**

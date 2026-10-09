@@ -336,15 +336,15 @@ class StructureDetailServiceTest {
       givenStructure(7L, "B100", "SITE-1", s -> { });
       givenBridge(70L, 7L);
       entityManager.persist(StructureCommentEntity.builder()
-          .structureCommentId(1L).crossingStructureId(7L).structureComment("Installed.")
+          .crossingStructureId(7L).structureComment("Installed.")
           .plannedInspectionCmtInd("N").updateUserid("IDIR\\A")
           .updateTimestamp(LocalDateTime.of(2000, 9, 1, 9, 0)).build());
       entityManager.persist(StructureCommentEntity.builder()
-          .structureCommentId(2L).crossingStructureId(7L).structureComment("Deck replaced.")
+          .crossingStructureId(7L).structureComment("Deck replaced.")
           .plannedInspectionCmtInd("N").updateUserid("IDIR\\B")
           .updateTimestamp(LocalDateTime.of(2024, 6, 3, 14, 5)).build());
       entityManager.persist(StructureCommentEntity.builder()
-          .structureCommentId(3L).crossingStructureId(7L).structureComment("Bring a ladder.")
+          .crossingStructureId(7L).structureComment("Bring a ladder.")
           .plannedInspectionCmtInd("Y").updateUserid("IDIR\\C")
           .updateTimestamp(LocalDateTime.of(2025, 1, 1, 9, 0)).build());
 

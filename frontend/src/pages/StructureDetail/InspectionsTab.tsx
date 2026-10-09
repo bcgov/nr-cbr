@@ -1,5 +1,6 @@
-import { Calendar, CheckmarkOutline, Inspection as InspectionIcon } from '@carbon/icons-react';
+import { Add, CheckmarkOutline, Inspection as InspectionIcon } from '@carbon/icons-react';
 import {
+  Button,
   Checkbox,
   InlineNotification,
   Pagination,
@@ -13,17 +14,22 @@ import {
   Tag,
 } from '@carbon/react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import ExternalLink from '@/components/core/ExternalLink';
-import ReadOnlyField from '@/components/core/ReadOnlyField';
 
 import Card from './Card';
+import CloseProximityDialog from './CloseProximityDialog';
+import CommentDialog from './CommentDialog';
 import CommentsCard from './CommentsCard';
-import { describe, number, yesNo } from './format';
+import { describe } from './format';
+import ScheduleCard from './ScheduleCard';
 
 import type { InspectionScheduleResponse, StructureInspection } from './inspectionsResponse';
+import type { StructureComment } from './structureResponse';
 import type { FC } from 'react';
 
+import { useAuthorization } from '@/hooks/useAuthorization';
 import {
   useStructureInspectionSchedule,
   useStructureInspections,
@@ -36,50 +42,42 @@ type Props = {
   structureId: string;
   /** True once the tab has been opened; nothing is fetched before. */
   opened: boolean;
+  /** True when the structure has nothing outstanding — legacy's `isComplete()`. */
+  complete: boolean;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZES = [10, 20, 50];
 
-/** When the structure is next to be inspected, and how often — legacy's fields above its table. */
-const ScheduleCard: FC<{ schedule: InspectionScheduleResponse }> = ({ schedule }) => (
-  <Card title="Inspection Schedule" icon={Calendar} testId="structure-section-schedule">
-    <div className="structure-detail__fields">
-      <ReadOnlyField
-        label="Close Proximity Inspection Required?"
-        value={yesNo(schedule.closeProximityRequired)}
-      />
-      {/* Legacy shows these two only when a close proximity inspection is required. */}
-      {schedule.closeProximityRequired && (
-        <>
-          <ReadOnlyField
-            label="Close Proximity Special Equipment Requirements"
-            value={describe(schedule.closeProximityEquipment)}
-          />
-          <ReadOnlyField
-            label="Next Planned Close Proximity Inspection"
-            value={formatShortDate(schedule.nextCloseProximityDate)}
-          />
-        </>
-      )}
-      <ReadOnlyField
-        label="Next Planned Routine Inspection"
-        value={formatShortDate(schedule.nextRoutineDate)}
-      />
-      <ReadOnlyField
-        label="Routine Inspection Frequency (years)"
-        value={number(schedule.routineFrequencyYears)}
-      />
-    </div>
-  </Card>
-);
-
-/** The close proximity inspections already done. */
-const CloseProximityCard: FC<{ schedule: InspectionScheduleResponse }> = ({ schedule }) => (
+/**
+ * The close proximity inspections already done, with "Add close proximity inspection" in the header
+ * for a P.Eng — legacy's `/pEngAccess` on its add. Rows are neither edited nor deleted, as legacy's.
+ */
+const CloseProximityCard: FC<{
+  schedule: InspectionScheduleResponse;
+  /** Offered to a P.Eng only. */
+  onAdd?: () => void;
+  /** Held while another card on the tab is being edited, as nr-fspts' sections are. */
+  addDisabled: boolean;
+}> = ({ schedule, onAdd, addDisabled }) => (
   <Card
     title="Completed Close Proximity Inspections"
     icon={CheckmarkOutline}
     testId="structure-section-close-proximity"
+    action={
+      onAdd && (
+        <Button
+          kind="tertiary"
+          size="sm"
+          renderIcon={Add}
+          disabled={addDisabled}
+          data-testid="close-proximity-add"
+          onClick={onAdd}
+        >
+          Add close proximity inspection
+        </Button>
+      )
+    }
   >
     {schedule.completedCloseProximity.length === 0 ? (
       <p className="structure-detail__empty">No close proximity inspections have been recorded.</p>
@@ -174,7 +172,20 @@ const InspectionsTable: FC<{ rows: StructureInspection[] }> = ({ rows }) => {
  * The structure's inspections, newest first, a page at a time from the server. Those from before
  * the superstructure went in are left out unless asked for, as legacy's table leaves them.
  */
-const InspectionsCard: FC<Props> = ({ structureId, opened }) => {
+/**
+ * The structure's inspections, with legacy's Add Routine Inspection (Level 1) and Add Unplanned
+ * Inspection (Level 0) in the header. As legacy, both wait until the structure is complete; they
+ * open a new inspection, saved only from there — a placeholder page until the form is built.
+ */
+const InspectionsCard: FC<{
+  structureId: string;
+  opened: boolean;
+  complete: boolean;
+  /** Held while another card on the tab is being edited, as nr-fspts' sections are. */
+  addDisabled: boolean;
+}> = ({ structureId, opened, complete, addDisabled }) => {
+  const { canEdit, canWriteInspection } = useAuthorization();
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [includeBeforeInstall, setIncludeBeforeInstall] = useState(false);
@@ -204,8 +215,49 @@ const InspectionsCard: FC<Props> = ({ structureId, opened }) => {
   const rows = response?.page.content ?? [];
   const hidden = response?.beforeInstallCount ?? 0;
 
+  const addInspection = (type: 'ROUT' | 'UNP') =>
+    navigate(`/inspection/new?structureId=${encodeURIComponent(structureId)}&type=${type}`);
+  const actions = (canEdit || canWriteInspection) && (
+    <div className="structure-detail__card-actions">
+      {canEdit && (
+        <Button
+          kind="tertiary"
+          size="sm"
+          renderIcon={Add}
+          disabled={!complete || addDisabled}
+          data-testid="inspection-add-routine"
+          onClick={() => addInspection('ROUT')}
+        >
+          Add routine inspection
+        </Button>
+      )}
+      <Button
+        kind="tertiary"
+        size="sm"
+        renderIcon={Add}
+        disabled={!complete || addDisabled}
+        data-testid="inspection-add-unplanned"
+        onClick={() => addInspection('UNP')}
+      >
+        Add unplanned inspection
+      </Button>
+    </div>
+  );
+
   return (
-    <Card title="Inspections" icon={InspectionIcon} testId="structure-section-inspections">
+    <Card
+      title="Inspections"
+      icon={InspectionIcon}
+      testId="structure-section-inspections"
+      action={actions}
+    >
+      {/* Why the buttons wait, where a disabled button alone would not say. */}
+      {actions && !complete && (
+        <p className="structure-detail__card-note" data-testid="inspection-add-note">
+          A new inspection can be added once the structure has nothing outstanding — see the Details
+          tab.
+        </p>
+      )}
       {(hidden > 0 || includeBeforeInstall) && (
         <div className="structure-detail__history-toggle">
           <Checkbox
@@ -245,12 +297,21 @@ const InspectionsCard: FC<Props> = ({ structureId, opened }) => {
 /**
  * Legacy's Inspections tab (`inspectionTab.jsp`): the schedule, the completed close proximity
  * inspections, the inspections themselves, then the planned-inspection comments — last here, where
- * legacy has them first, as the Details tab ends on its comments. Read-only for now;
- * legacy's Add Routine and Add Unplanned Inspection, and its comment and close proximity Adds, come
- * with the page's editing.
+ * legacy has them first, as the Details tab ends on its comments. Each card carries its own edit,
+ * as nr-fspts' sections: the schedule's Edit, the completed close proximity inspections' Add, and
+ * the planned-inspection comments' Add and Edit, and the inspections' Add Routine and Add Unplanned
+ * Inspection, which open the (placeholder) new-inspection page.
  */
-const InspectionsTab: FC<Props> = ({ structureId, opened }) => {
+const InspectionsTab: FC<Props> = ({ structureId, opened, complete }) => {
   const schedule = useStructureInspectionSchedule(structureId, opened);
+  /** The card being edited, if any — one at a time, as nr-fspts' sections. */
+  const [editing, setEditing] = useState<'schedule' | null>(null);
+  /** The planned-inspection comment in the dialog: one being edited, `'new'` to add, or null. */
+  const [comment, setComment] = useState<StructureComment | 'new' | null>(null);
+  // Add is Level 2 (legacy's /level2Access on its add box); edit is anyone who can save (Level 1).
+  const { canEdit, canDelete: canAddComment, isPeng } = useAuthorization();
+  /** True while the close proximity dialog is open. */
+  const [addingCloseProximity, setAddingCloseProximity] = useState(false);
 
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-inspections-tab">
@@ -271,17 +332,50 @@ const InspectionsTab: FC<Props> = ({ structureId, opened }) => {
       )}
       {schedule.data && (
         <>
-          <ScheduleCard schedule={schedule.data} />
-          <CloseProximityCard schedule={schedule.data} />
+          <ScheduleCard
+            structureId={structureId}
+            schedule={schedule.data}
+            editing={editing === 'schedule'}
+            otherEditing={editing !== null && editing !== 'schedule'}
+            onEdit={() => setEditing('schedule')}
+            onDone={() => setEditing(null)}
+          />
+          <CloseProximityCard
+            schedule={schedule.data}
+            onAdd={isPeng ? () => setAddingCloseProximity(true) : undefined}
+            addDisabled={editing !== null}
+          />
         </>
       )}
-      <InspectionsCard structureId={structureId} opened={opened} />
+      <InspectionsCard
+        structureId={structureId}
+        opened={opened}
+        complete={complete}
+        addDisabled={editing !== null}
+      />
       {/* Last, as the Details tab ends on its comments. */}
       {schedule.data && (
         <CommentsCard
           comments={schedule.data.plannedInspectionComments}
           title="Planned Inspection Comments"
           testId="structure-section-planned-comments"
+          onAdd={canAddComment ? () => setComment('new') : undefined}
+          onEdit={canEdit ? setComment : undefined}
+          addDisabled={editing !== null}
+        />
+      )}
+      {addingCloseProximity && (
+        <CloseProximityDialog
+          structureId={structureId}
+          onClose={() => setAddingCloseProximity(false)}
+        />
+      )}
+      {comment !== null && (
+        <CommentDialog
+          key={comment === 'new' ? 'new' : comment.id}
+          structureId={structureId}
+          comment={comment === 'new' ? null : comment}
+          onClose={() => setComment(null)}
         />
       )}
     </div>

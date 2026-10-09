@@ -9,6 +9,7 @@ import GlobalErrorPage from '@/pages/GlobalError';
 import InspectionDetailPage from '@/pages/InspectionDetail';
 import InspectionSearchPage from '@/pages/InspectionSearch';
 import LandingPage from '@/pages/Landing';
+import NewInspectionPage from '@/pages/NewInspection';
 import NotFoundPage from '@/pages/NotFound';
 import RoleErrorPage from '@/pages/RoleError';
 import SiteDetailPage from '@/pages/SiteDetail';
@@ -273,6 +274,24 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         // Legacy gate: /showInspectionSearch, which sits at the GENERAL floor alongside
         // /showSiteSearch — every role that can read holds it.
         roles: [...ROLE_CAPABILITIES.read],
+      },
+      {
+        // Reached from a structure's Inspections tab — Add Routine / Add Unplanned Inspection —
+        // with `?structureId=&type=ROUT|UNP`. A placeholder for now — see the page. Ranked above
+        // `:inspectionId` by react-router, a static segment winning over a parameter.
+        path: 'new',
+        id: 'New Inspection',
+        element: (
+          <ProtectedRoute>
+            <Layout>
+              <NewInspectionPage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: false,
+        // Legacy gate: /level0Access for Unplanned, /level1Access for Routine — the floor here is
+        // Level 0; the tab offers Routine from Level 1 only.
+        roles: [...ROLE_CAPABILITIES.inspectionWrite],
       },
       {
         // Reached from an inspection in Inspection Search or on a structure's Inspections tab, not

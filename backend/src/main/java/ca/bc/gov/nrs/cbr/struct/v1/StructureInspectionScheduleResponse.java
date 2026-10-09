@@ -20,6 +20,8 @@ import java.util.List;
  * @param nextRoutineDate             the next planned routine inspection
  * @param routineFrequencyYears       years between routine inspections, 1 to 6
  * @param completedCloseProximity     newest first
+ * @param latestReviewedInspectionDate the latest reviewed or accepted inspection's date, from
+ *     which a new frequency sets the next planned routine inspection; null when there is none
  */
 public record StructureInspectionScheduleResponse(
     List<Comment> plannedInspectionComments,
@@ -28,7 +30,8 @@ public record StructureInspectionScheduleResponse(
     LocalDate nextCloseProximityDate,
     LocalDate nextRoutineDate,
     Integer routineFrequencyYears,
-    List<CloseProximityInspection> completedCloseProximity) {
+    List<CloseProximityInspection> completedCloseProximity,
+    LocalDate latestReviewedInspectionDate) {
 
   /** A close proximity inspection that was done, and who recorded it. */
   public record CloseProximityInspection(String id, LocalDate completed, String userId) {}

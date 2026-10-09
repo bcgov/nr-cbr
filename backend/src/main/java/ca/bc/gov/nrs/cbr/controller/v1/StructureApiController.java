@@ -1,15 +1,20 @@
 package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.StructureApiEndpoint;
+import ca.bc.gov.nrs.cbr.service.v1.StructureCommentsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureDetailService;
-import ca.bc.gov.nrs.cbr.service.v1.StructureDocumentsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureDocumentsService.DocumentFile;
+import ca.bc.gov.nrs.cbr.service.v1.StructureDocumentsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInspectionsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureMonitorsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureRepairsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSpansAndPiersService;
+import ca.bc.gov.nrs.cbr.struct.v1.CloseProximityInspectionRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.CommentRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
@@ -25,13 +30,13 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
-import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse;
-import ca.bc.gov.nrs.cbr.struct.v1.StructureSpansAndPiersResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureSpansAndPiersResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.data.domain.Sort;
@@ -53,6 +58,7 @@ public class StructureApiController implements StructureApiEndpoint {
   private final StructureInspectionsService inspectionsService;
   private final StructureRepairsService repairsService;
   private final StructureMonitorsService monitorsService;
+  private final StructureCommentsService commentsService;
 
   public StructureApiController(
       StructureSearchService structureSearchService,
@@ -62,7 +68,8 @@ public class StructureApiController implements StructureApiEndpoint {
       StructureDocumentsService documentsService,
       StructureInspectionsService inspectionsService,
       StructureRepairsService repairsService,
-      StructureMonitorsService monitorsService) {
+      StructureMonitorsService monitorsService,
+      StructureCommentsService commentsService) {
     this.structureSearchService = structureSearchService;
     this.structureService = structureService;
     this.structureDetailService = structureDetailService;
@@ -71,6 +78,7 @@ public class StructureApiController implements StructureApiEndpoint {
     this.inspectionsService = inspectionsService;
     this.repairsService = repairsService;
     this.monitorsService = monitorsService;
+    this.commentsService = commentsService;
   }
 
   @Override
@@ -131,6 +139,34 @@ public class StructureApiController implements StructureApiEndpoint {
   @Override
   public StructureInspectionScheduleResponse getInspectionSchedule(long structureId) {
     return inspectionsService.schedule(structureId);
+  }
+
+  @Override
+  public ResponseEntity<CreatedResponse> addCloseProximityInspection(
+      long structureId, CloseProximityInspectionRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(new CreatedResponse(
+        inspectionsService.addCloseProximityInspection(structureId, request)));
+  }
+
+  @Override
+  public ResponseEntity<CreatedResponse> addPlannedInspectionComment(
+      long structureId, CommentRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(commentsService.addPlannedInspectionComment(structureId, request));
+  }
+
+  @Override
+  public ResponseEntity<Void> updateComment(
+      long structureId, long commentId, CommentRequest request) {
+    commentsService.update(structureId, commentId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> updateInspectionSchedule(
+      long structureId, InspectionScheduleRequest request) {
+    inspectionsService.updateSchedule(structureId, request);
+    return ResponseEntity.noContent().build();
   }
 
   @Override

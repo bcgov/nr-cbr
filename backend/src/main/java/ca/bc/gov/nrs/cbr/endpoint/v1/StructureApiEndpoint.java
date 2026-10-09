@@ -1,6 +1,10 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.CloseProximityInspectionRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.CommentRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
@@ -16,13 +20,13 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
-import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse;
-import ca.bc.gov.nrs.cbr.struct.v1.StructureSpansAndPiersResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureSpansAndPiersResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.data.domain.Sort;
@@ -176,6 +180,73 @@ public interface StructureApiEndpoint {
   @GetMapping("/{structureId}/inspection-schedule")
   StructureInspectionScheduleResponse getInspectionSchedule(
       @PathVariable("structureId") long structureId);
+
+  /**
+   * Saves the structure's inspection schedule — the Inspections tab's Inspection Schedule card.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy's page Save; what a
+   * Level 1 user may change within it (the frequency alone) the service decides. <b>204</b> on
+   * success; <b>404</b> when there is no such structure; <b>400</b> with {@code fieldErrors} when a
+   * field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/inspection-schedule")
+  ResponseEntity<Void> updateInspectionSchedule(
+      @PathVariable("structureId") long structureId,
+      @RequestBody InspectionScheduleRequest request);
+
+  /**
+   * Records a completed close proximity inspection — the Inspections tab's Completed Close
+   * Proximity Inspections.
+   *
+   * <p>Gated on {@link CbrAuthorities#APPROVE} — P.Eng only, legacy's {@code /pEngAccess} on the
+   * add. <b>201</b> with the new row's id; <b>404</b> when there is no such structure; <b>400</b>
+   * with {@code fieldErrors} when there is no date; <b>409</b> when the structure stands on no
+   * site.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @PostMapping("/{structureId}/close-proximity-inspections")
+  ResponseEntity<CreatedResponse> addCloseProximityInspection(
+      @PathVariable("structureId") long structureId,
+      @RequestBody CloseProximityInspectionRequest request);
+
+  /**
+   * Adds a planned-inspection comment — the Inspections tab's Planned Inspection Comments.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — the Level 2 floor, legacy's
+   * {@code /level2Access} on the add box; it deletes nothing. <b>201</b> with the new comment's
+   * id; <b>404</b> when there is no such structure; <b>400</b> with {@code fieldErrors} when the
+   * text is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PostMapping("/{structureId}/planned-inspection-comments")
+  ResponseEntity<CreatedResponse> addPlannedInspectionComment(
+      @PathVariable("structureId") long structureId,
+      @RequestBody CommentRequest request);
+
+  /**
+   * Changes a comment's text — either kind, as legacy's edit pencil.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, legacy's
+   * {@code /saveStructure}; as legacy, any comment, whoever wrote it. <b>204</b> on success;
+   * <b>404</b> when the structure has no such comment; <b>400</b> with {@code fieldErrors} when the
+   * text is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID} the comment belongs to
+   * @param commentId   the comment's {@code STRUCTURE_COMMENT_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/comments/{commentId}")
+  ResponseEntity<Void> updateComment(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("commentId") long commentId,
+      @RequestBody CommentRequest request);
 
   /**
    * A page of the structure's inspections, newest first — legacy's inspection table, paged here.

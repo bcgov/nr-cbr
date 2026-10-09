@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
@@ -8,7 +8,12 @@ import StructureDetailPage from './index';
 
 import type { StructureDetailResponse } from './structureResponse';
 
-const authorization = vi.hoisted(() => ({ canEdit: false, canDelete: false, isPeng: false }));
+const authorization = vi.hoisted(() => ({
+  canEdit: false,
+  canDelete: false,
+  isPeng: false,
+  canWriteInspection: false,
+}));
 vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
 
 // A delete's outcome is a toast; asserted on what the page asked to show.
@@ -25,6 +30,10 @@ const api = vi.hoisted(() => ({
   getDocuments: vi.fn(),
   getDocumentFile: vi.fn(),
   getInspectionSchedule: vi.fn(),
+  updateInspectionSchedule: vi.fn(),
+  addPlannedInspectionComment: vi.fn(),
+  addCloseProximityInspection: vi.fn(),
+  updateStructureComment: vi.fn(),
   getStructureInspections: vi.fn(),
   getStructureRepairs: vi.fn(),
   deleteStructureRepair: vi.fn(),
@@ -42,6 +51,7 @@ const configurationApi = vi.hoisted(() => ({
   getRepairStatusCodes: vi.fn(),
   getRepairPriorityCodes: vi.fn(),
   getRepairGroupCodes: vi.fn(),
+  getSpecialEquipmentCodes: vi.fn(),
 }));
 vi.mock('@/services/APIs', () => ({
   default: { structureSearch: api, configuration: configurationApi },
@@ -192,6 +202,12 @@ const culvert = (overrides: Partial<StructureDetailResponse> = {}): StructureDet
     ...overrides,
   });
 
+/** Where a link or button took the page: the path and query, for the tests to read. */
+const Landed = () => {
+  const location = useLocation();
+  return <p data-testid="landed">{`${location.pathname}${location.search}`}</p>;
+};
+
 const renderAt = (
   entry: string | { pathname: string; state: unknown } = '/inventory/structure/7',
 ) =>
@@ -202,6 +218,7 @@ const renderAt = (
       <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route path="/inventory/structure/:structureId" element={<StructureDetailPage />} />
+          <Route path="/inspection/new" element={<Landed />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -222,6 +239,7 @@ const schedule = (overrides: object = {}) => ({
   nextRoutineDate: null,
   routineFrequencyYears: null,
   completedCloseProximity: [],
+  latestReviewedInspectionDate: null,
   ...overrides,
 });
 
@@ -301,6 +319,7 @@ beforeEach(() => {
   api.deleteStructureMonitor.mockResolvedValue(undefined);
   authorization.canDelete = false;
   authorization.isPeng = false;
+  authorization.canWriteInspection = false;
   api.getStructureRepairTypes.mockReset();
   api.getStructureRepairTypes.mockResolvedValue([
     { code: 'RAIL', description: 'Railing', unit: 'm', groupCode: 'APPR' },
@@ -327,6 +346,18 @@ beforeEach(() => {
     { code: 'APPR', description: 'Approach' },
     { code: 'MISC', description: 'Miscellaneous' },
     { code: 'STRU', description: 'Superstructure' },
+  ]);
+  api.addCloseProximityInspection.mockReset();
+  api.addCloseProximityInspection.mockResolvedValue({ id: '12' });
+  api.addPlannedInspectionComment.mockReset();
+  api.addPlannedInspectionComment.mockResolvedValue({ id: '9' });
+  api.updateStructureComment.mockReset();
+  api.updateStructureComment.mockResolvedValue(undefined);
+  api.updateInspectionSchedule.mockReset();
+  api.updateInspectionSchedule.mockResolvedValue(undefined);
+  configurationApi.getSpecialEquipmentCodes.mockResolvedValue([
+    { code: 'BOAT', description: 'Boat' },
+    { code: 'UBIU', description: 'Under-bridge unit' },
   ]);
   display.mockClear();
 });
@@ -930,6 +961,410 @@ describe('StructureDetailPage — Documents & Photos', () => {
 
 describe('StructureDetailPage — Inspections', () => {
   const openInspections = () => userEvent.click(screen.getByTestId('structure-tab-inspections'));
+
+  describe('adding an inspection', () => {
+    it('offers Add unplanned inspection from Level 0, and Add routine inspection from Level 1', async () => {
+      authorization.canWriteInspection = true;
+      await showing(bridge());
+      await openInspections();
+      await screen.findByTestId('structure-section-inspections');
+
+      expect(screen.getByTestId('inspection-add-unplanned')).toBeEnabled();
+      expect(screen.queryByTestId('inspection-add-routine')).not.toBeInTheDocument();
+    });
+
+    it('offers neither to a read-only user', async () => {
+      await showing(bridge());
+      await openInspections();
+      await screen.findByTestId('structure-section-inspections');
+
+      expect(screen.queryByTestId('inspection-add-unplanned')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('inspection-add-routine')).not.toBeInTheDocument();
+    });
+
+    it('opens a new routine inspection of the structure', async () => {
+      authorization.canWriteInspection = true;
+      authorization.canEdit = true;
+      await showing(bridge());
+      await openInspections();
+
+      await userEvent.click(await screen.findByTestId('inspection-add-routine'));
+
+      expect(await screen.findByTestId('landed')).toMatchTextContent(
+        '/inspection/new?structureId=7&type=ROUT',
+      );
+    });
+
+    it('opens a new unplanned inspection of the structure', async () => {
+      authorization.canWriteInspection = true;
+      await showing(bridge());
+      await openInspections();
+
+      await userEvent.click(await screen.findByTestId('inspection-add-unplanned'));
+
+      expect(await screen.findByTestId('landed')).toMatchTextContent(
+        '/inspection/new?structureId=7&type=UNP',
+      );
+    });
+
+    it('waits until the structure is complete, as legacy, and says why', async () => {
+      authorization.canWriteInspection = true;
+      authorization.canEdit = true;
+      await showing(bridge({ outstanding: [{ section: 'DETAILS', label: 'Deck Width' }] }));
+      await openInspections();
+
+      expect(await screen.findByTestId('inspection-add-routine')).toBeDisabled();
+      expect(screen.getByTestId('inspection-add-unplanned')).toBeDisabled();
+      expect(screen.getByTestId('inspection-add-note')).toMatchTextContent(
+        'once the structure has nothing outstanding',
+      );
+    });
+  });
+
+  describe('recording a completed close proximity inspection', () => {
+    const openDialog = async () => {
+      await showing(bridge());
+      await openInspections();
+      await userEvent.click(await screen.findByTestId('close-proximity-add'));
+      return screen.findByTestId('close-proximity-dialog');
+    };
+
+    it('offers Add close proximity inspection to a P.Eng only', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      await showing(bridge());
+      await openInspections();
+      await screen.findByTestId('structure-section-close-proximity');
+
+      expect(screen.queryByTestId('close-proximity-add')).not.toBeInTheDocument();
+    });
+
+    it('records the date entered, any date', async () => {
+      authorization.isPeng = true;
+      const dialog = await openDialog();
+
+      await userEvent.type(within(dialog).getByTestId('close-proximity-date'), '2031/05/04');
+      await userEvent.click(within(dialog).getByTestId('close-proximity-save'));
+
+      await vi.waitFor(() =>
+        expect(api.addCloseProximityInspection).toHaveBeenCalledWith('7', {
+          completedDate: '2031-05-04',
+        }),
+      );
+      await vi.waitFor(() =>
+        expect(screen.queryByTestId('close-proximity-dialog')).not.toBeInTheDocument(),
+      );
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Close proximity inspection recorded' }),
+      );
+    });
+
+    it('needs a real date, and says so under the box', async () => {
+      authorization.isPeng = true;
+      const dialog = await openDialog();
+
+      await userEvent.click(within(dialog).getByTestId('close-proximity-save'));
+      expect(dialog).toMatchTextContent('Date is required.');
+
+      await userEvent.type(within(dialog).getByTestId('close-proximity-date'), '2024/02/30');
+      await userEvent.click(within(dialog).getByTestId('close-proximity-save'));
+      expect(dialog).toMatchTextContent('Date must be a date, as yyyy/mm/dd.');
+      expect(api.addCloseProximityInspection).not.toHaveBeenCalled();
+    });
+
+    it('says so when the structure cannot take one', async () => {
+      authorization.isPeng = true;
+      api.addCloseProximityInspection.mockRejectedValue(new Error('stands on no site'));
+      const dialog = await openDialog();
+
+      await userEvent.type(within(dialog).getByTestId('close-proximity-date'), '2024/02/01');
+      await userEvent.click(within(dialog).getByTestId('close-proximity-save'));
+
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({
+            kind: 'error',
+            title: 'The close proximity inspection was not recorded',
+          }),
+        ),
+      );
+      expect(screen.getByTestId('close-proximity-dialog')).toBeInTheDocument();
+    });
+  });
+
+  describe('planned inspection comments', () => {
+    const withComment = schedule({
+      plannedInspectionComments: [
+        { id: '5', text: 'Bring a boat.', userId: 'IDIR\\A', timestamp: '2024-01-01T09:00:00' },
+      ],
+    });
+    const card = () => screen.findByTestId('structure-section-planned-comments');
+
+    it('offers Add comment to Level 2 and up only, and Edit from Level 1 up', async () => {
+      authorization.canEdit = true;
+      api.getInspectionSchedule.mockResolvedValue(withComment);
+      await showing(bridge());
+      await openInspections();
+
+      const section = await card();
+      expect(
+        within(section).queryByTestId('structure-section-planned-comments-add'),
+      ).not.toBeInTheDocument();
+      expect(
+        within(section).getByTestId('structure-section-planned-comments-edit-5'),
+      ).toBeInTheDocument();
+    });
+
+    it('offers neither to a read-only user', async () => {
+      api.getInspectionSchedule.mockResolvedValue(withComment);
+      await showing(bridge());
+      await openInspections();
+
+      const section = await card();
+      expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+      expect(within(section).queryByText('Actions')).not.toBeInTheDocument();
+    });
+
+    it('adds a comment in a dialog', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      api.getInspectionSchedule.mockResolvedValue(withComment);
+      await showing(bridge());
+      await openInspections();
+
+      await userEvent.click(
+        within(await card()).getByTestId('structure-section-planned-comments-add'),
+      );
+      const dialog = await screen.findByTestId('comment-dialog');
+      expect(dialog).toMatchTextContent('Add planned inspection comment');
+      await userEvent.type(within(dialog).getByTestId('comment-text'), 'Use the UBIU.');
+      await userEvent.click(within(dialog).getByTestId('comment-save'));
+
+      await vi.waitFor(() =>
+        expect(api.addPlannedInspectionComment).toHaveBeenCalledWith('7', {
+          comment: 'Use the UBIU.',
+        }),
+      );
+      await vi.waitFor(() =>
+        expect(screen.queryByTestId('comment-dialog')).not.toBeInTheDocument(),
+      );
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Comment added' }),
+      );
+    });
+
+    it('adds nothing without text, and says so under the box', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      api.getInspectionSchedule.mockResolvedValue(withComment);
+      await showing(bridge());
+      await openInspections();
+
+      await userEvent.click(
+        within(await card()).getByTestId('structure-section-planned-comments-add'),
+      );
+      const dialog = await screen.findByTestId('comment-dialog');
+      await userEvent.click(within(dialog).getByTestId('comment-save'));
+
+      expect(dialog).toMatchTextContent('Comment is required.');
+      expect(api.addPlannedInspectionComment).not.toHaveBeenCalled();
+    });
+
+    it('edits a comment in the dialog, opened with its text', async () => {
+      authorization.canEdit = true;
+      api.getInspectionSchedule.mockResolvedValue(withComment);
+      await showing(bridge());
+      await openInspections();
+
+      await userEvent.click(
+        within(await card()).getByTestId('structure-section-planned-comments-edit-5'),
+      );
+      const dialog = await screen.findByTestId('comment-dialog');
+      expect(dialog).toMatchTextContent('Edit planned inspection comment');
+      expect(within(dialog).getByTestId('comment-text')).toHaveValue('Bring a boat.');
+      await userEvent.clear(within(dialog).getByTestId('comment-text'));
+      await userEvent.type(within(dialog).getByTestId('comment-text'), 'Bring two boats.');
+      await userEvent.click(within(dialog).getByTestId('comment-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateStructureComment).toHaveBeenCalledWith('7', '5', {
+          comment: 'Bring two boats.',
+        }),
+      );
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Comment saved' }),
+      );
+    });
+
+    it('shows what the server refused under the box', async () => {
+      authorization.canEdit = true;
+      api.getInspectionSchedule.mockResolvedValue(withComment);
+      api.updateStructureComment.mockRejectedValue({
+        body: { fieldErrors: { comment: 'Comment can be at most 2000 characters.' } },
+      });
+      await showing(bridge());
+      await openInspections();
+
+      await userEvent.click(
+        within(await card()).getByTestId('structure-section-planned-comments-edit-5'),
+      );
+      const dialog = await screen.findByTestId('comment-dialog');
+      await userEvent.click(within(dialog).getByTestId('comment-save'));
+
+      await vi.waitFor(() =>
+        expect(dialog).toMatchTextContent('Comment can be at most 2000 characters.'),
+      );
+      expect(display).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'error' }));
+    });
+  });
+
+  describe('editing the schedule', () => {
+    const scheduled = schedule({
+      closeProximityRequired: true,
+      closeProximityEquipment: { code: 'UBIU', description: 'Under-bridge unit' },
+      nextCloseProximityDate: '2028-02-01',
+      nextRoutineDate: '2027-05-01',
+      routineFrequencyYears: 3,
+      latestReviewedInspectionDate: '2024-06-15',
+    });
+
+    const openEdit = async () => {
+      api.getInspectionSchedule.mockResolvedValue(scheduled);
+      await showing(bridge());
+      await openInspections();
+      await userEvent.click(await screen.findByTestId('schedule-edit'));
+      return screen.findByTestId('schedule-form');
+    };
+
+    it('offers Edit inspection schedule in the card header only from Level 1 up', async () => {
+      api.getInspectionSchedule.mockResolvedValue(scheduled);
+      await showing(bridge());
+      await openInspections();
+      await screen.findByTestId('structure-section-schedule');
+
+      expect(screen.queryByTestId('schedule-edit')).not.toBeInTheDocument();
+    });
+
+    it('edits the card in place and saves all of it for Level 2 and up', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      const form = await openEdit();
+
+      expect(screen.queryByTestId('schedule-edit')).not.toBeInTheDocument();
+      await vi.waitFor(() =>
+        expect(within(form).getByTestId('schedule-equipment')).toHaveValue('UBIU'),
+      );
+      expect(within(form).getByTestId('schedule-next-close-proximity')).toHaveValue('2028/02/01');
+      expect(within(form).getByTestId('schedule-next-routine')).toHaveValue('2027/05/01');
+      await userEvent.selectOptions(within(form).getByTestId('schedule-equipment'), 'BOAT');
+      await userEvent.click(within(form).getByTestId('schedule-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateInspectionSchedule).toHaveBeenCalledWith('7', {
+          closeProximityRequired: true,
+          closeProximityEquipmentCode: 'BOAT',
+          nextCloseProximityDate: '2028-02-01',
+          nextRoutineDate: '2027-05-01',
+          routineFrequencyYears: 3,
+        }),
+      );
+      await vi.waitFor(() => expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument());
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Inspection schedule saved' }),
+      );
+    });
+
+    it('moves the next routine date to the latest reviewed inspection plus a new frequency', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      const form = await openEdit();
+
+      await userEvent.selectOptions(within(form).getByTestId('schedule-frequency'), '5');
+
+      expect(within(form).getByTestId('schedule-next-routine')).toHaveValue('2029/06/15');
+    });
+
+    it('hides the close proximity fields when unticked, and keeps their values', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      const form = await openEdit();
+
+      await userEvent.click(within(form).getByLabelText('No'));
+      expect(within(form).queryByTestId('schedule-equipment')).not.toBeInTheDocument();
+      await userEvent.click(within(form).getByTestId('schedule-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateInspectionSchedule).toHaveBeenCalledWith(
+          '7',
+          expect.objectContaining({
+            closeProximityRequired: false,
+            closeProximityEquipmentCode: 'UBIU',
+            nextCloseProximityDate: '2028-02-01',
+          }),
+        ),
+      );
+    });
+
+    it('lets Level 1 change only the frequency, showing the date it moves', async () => {
+      authorization.canEdit = true;
+      const form = await openEdit();
+
+      expect(within(form).queryByTestId('schedule-next-routine')).not.toBeInTheDocument();
+      expect(within(form).queryByLabelText('Yes')).not.toBeInTheDocument();
+      await userEvent.selectOptions(within(form).getByTestId('schedule-frequency'), '2');
+
+      expect(form).toMatchTextContent('Jun 15, 2026');
+    });
+
+    it('needs the next routine date once the structure has one, and a real date', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      const form = await openEdit();
+
+      await userEvent.clear(within(form).getByTestId('schedule-next-routine'));
+      await userEvent.click(within(form).getByTestId('schedule-save'));
+      expect(form).toMatchTextContent('Next Planned Routine Inspection is required.');
+
+      await userEvent.type(within(form).getByTestId('schedule-next-routine'), '2027/02/30');
+      await userEvent.click(within(form).getByTestId('schedule-save'));
+      expect(form).toMatchTextContent(
+        'Next Planned Routine Inspection must be a date, as yyyy/mm/dd.',
+      );
+      expect(api.updateInspectionSchedule).not.toHaveBeenCalled();
+    });
+
+    it('shows what the server refused beside the field', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      api.updateInspectionSchedule.mockRejectedValue({
+        body: {
+          fieldErrors: {
+            closeProximityEquipmentCode:
+              'Close Proximity Special Equipment Requirements is not one of the listed requirements.',
+          },
+        },
+      });
+      const form = await openEdit();
+
+      await userEvent.click(within(form).getByTestId('schedule-save'));
+
+      await vi.waitFor(() =>
+        expect(form).toMatchTextContent('is not one of the listed requirements.'),
+      );
+      expect(display).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'error' }));
+    });
+
+    it('goes back to the values, saving nothing, on Cancel', async () => {
+      authorization.canEdit = true;
+      const form = await openEdit();
+
+      await userEvent.click(within(form).getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument();
+      expect(screen.getByTestId('schedule-edit')).toBeInTheDocument();
+      expect(api.updateInspectionSchedule).not.toHaveBeenCalled();
+    });
+  });
 
   const inspection = (id: string, overrides: object = {}) => ({
     id,
