@@ -273,7 +273,8 @@ public class StructureDocumentsService {
     // a second copy of the bytes.
     entityManager.persist(detail);
     entityManager.persist(new CrossingStructureFileEntity(detail.getFileId(), bytes(part)));
-    log.info("Added document {} ({}) to structure {}", detail.getFileId(), name, structureId);
+    // Ids only: the file name is the browser's, and could carry line breaks into the log.
+    log.info("Added document {} to structure {}", detail.getFileId(), structureId);
     return String.valueOf(detail.getFileId());
   }
 
@@ -313,13 +314,12 @@ public class StructureDocumentsService {
    */
   @Transactional
   public void delete(long structureId, long fileId) {
-    CrossingStructureFileDetailEntity detail = details.findById(fileId)
+    details.findById(fileId)
         .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
         .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
     files.deleteByFileIdIn(List.of(fileId));
     details.deleteById(fileId);
-    log.info("Deleted document {} ({}) of structure {}", fileId, detail.getFilename(),
-        structureId);
+    log.info("Deleted document {} of structure {}", fileId, structureId);
   }
 
   /**
