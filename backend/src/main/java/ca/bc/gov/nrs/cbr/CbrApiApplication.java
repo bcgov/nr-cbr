@@ -13,7 +13,7 @@ import org.springframework.data.web.config.EnableSpringDataWebSupport;
 /**
  * CBR (Corporate Bridge Register) API.
  *
- * <p>Structure follows nr-frep: an OAuth 2.0 resource server over FAM/Cognito access tokens, reading
+ * <p>An OAuth 2.0 resource server over FAM/Cognito access tokens, reading
  * and writing the shared Oracle {@code THE} schema through the legacy {@code CBR_*} PL/SQL packages.
  * Schema objects live in {@code bcgov-c/nr-mof-db}, not here.
  */

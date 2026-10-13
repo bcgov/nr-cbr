@@ -89,7 +89,7 @@
       module — undertow-servlet and undertow-websockets-jsr do not exist at that version on Maven
       Central. Overriding Boot's `undertow.version` property therefore cannot resolve, since the BOM
       drives all three artifacts from it. Servlet and websockets stay on 2.3.24.Final; the form
-      parser the CVE concerns lives in core. Same pin as nr-fspts, which runs this combination.
+      parser the CVE concerns lives in core.
 
       2.4.0.Beta1 is a development build. Revisit when 2.4.0.Final ships or Boot's managed version
       moves to a non-vulnerable release, and drop this block then.
@@ -110,12 +110,12 @@
     <!--
       JasperReports core — powers ReportService (compile JRXML on first request,
       fill against the Oracle datasource, export PDF/CSV). Pinned to 6.21.5 to
-      match nr-fspts / nr-rept so report templates port between the apps. JR 6.x
+      match the ministry's other report apps so report templates port between them. JR 6.x
       bundles the Eclipse JDT expression compiler + PDF exporter in the core jar,
       so no jasperreports-jdt / jasperreports-pdf sub-artifacts are needed.
     -->
     <!-- Apache Commons CSV — CSVReportService writes the biodiversity data-extract
-         CSVs directly from the proc cursor (no Jasper). Version matches nr-fspts. -->
+         CSVs directly from the proc cursor (no Jasper). -->
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-csv</artifactId>

@@ -15,9 +15,7 @@ for a set of local reference docs (data model, workflows, auth, offline client, 
 | Database | Oracle — the shared `THE` schema, via the legacy `CBR_*` PL/SQL packages |
 | Auth | AWS Cognito (FAM) — IDIR sign-in |
 
-The structure follows [`bcgov/nr-frep`](https://github.com/bcgov/nr-frep): same ministry, same shared
-Oracle schema, same WebADE-to-FAM move. Authentication, authorization, and the CSS/design pattern are
-ported from it deliberately — when in doubt about a convention, look there first.
+CBR shares its ministry's Oracle schema and moves from WebADE to FAM for authentication.
 
 ## Where things live
 

@@ -194,7 +194,7 @@ const SiteSearchPage: FC = () => {
 
   return (
     // PageTitle renders its own <Column>, so the page owns the <Grid>. Everything else sits in one
-    // full-width column and lays itself out with CSS grid — the nr-frep pattern.
+    // full-width column and lays itself out with CSS grid.
     <Grid fullWidth className="default-grid site-search-grid">
       <PageTitle
         title="Site Search"
@@ -302,8 +302,7 @@ const SiteSearchPage: FC = () => {
               setPendingDelete(null);
               // A toast rather than a banner on the page: the delete failed, so nothing on screen
               // changed and there is no region to replace — the row is still in the table where the
-              // user left it. This is the split nr-frep and nr-fspts both use, and the one CBR had
-              // only half of: a region that failed to load explains itself in place, an action that
+              // user left it. The split: a region that failed to load explains itself in place, an action that
               // failed reports back over the screen that is still working.
               //
               // `timeout` is ignored for an error kind — NotificationProvider pins it to 0, so the

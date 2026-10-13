@@ -15,8 +15,8 @@ $layout-side-nav-rail: 3rem;
 $layout-side-nav-row-height: 3rem;
 
 /* ------------------------------ CBR blue ------------------------------
-The BC Gov design-system blue scale, the same palette nr-fspts carries in `styles/bcgov/_colors.scss`
-— named by their scale step so the two apps can be compared step-for-step rather than hex-for-hex.
+The BC Gov design-system blue scale, named by its scale steps so it can be compared with the design
+system step-for-step rather than hex-for-hex.
 
 Two roles, because one blue can't do both jobs:
 
@@ -26,8 +26,8 @@ Two roles, because one blue can't do both jobs:
 - TEXT  — blue drawn *against* the page (links, icons, tertiary buttons). Has to flip: blue-70 has
   the contrast for white, blue-30 for #161616. The solid blue used as text on dark would fail WCAG.
 
-Hover/active steps follow the mapping nr-fspts uses in `styles/bcgov/_light-buttons.scss`
-(60 → 65 → 80 for a solid, 70 → 75 → 80 for blue text), so a control behaves the same in both apps.
+Hover/active steps follow the design system's button mapping (60 → 65 → 80 for a solid, 70 → 75 → 80
+for blue text).
 ------------------------------------------------------------------------- */
 $cbr-blue-solid: #0073e6; // blue-60
 $cbr-blue-solid-hover: #0066cc; // blue-65

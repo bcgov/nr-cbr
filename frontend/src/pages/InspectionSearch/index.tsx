@@ -152,7 +152,7 @@ const InspectionSearchPage: FC = () => {
 
   return (
     // PageTitle renders its own <Column>, so the page owns the <Grid>. Everything else sits in one
-    // full-width column and lays itself out with CSS grid — the nr-frep pattern.
+    // full-width column and lays itself out with CSS grid.
     <Grid fullWidth className="default-grid">
       {/* No `experimental` tag. The screen searches, pages, sorts and deletes against real
           endpoints, so an "Under construction" badge would now be telling users not to trust
@@ -263,7 +263,7 @@ const InspectionSearchPage: FC = () => {
               setPendingDelete(null);
               // A toast rather than a banner: the delete failed, so nothing on screen changed and
               // there is no region to replace — the row is still in the table where the user left
-              // it. Same split as Site Search, and as nr-frep and nr-fspts.
+              // it. Same split as Site Search.
               //
               // The server's sentence matters more here than on a site. A 409 means the inspection
               // stopped being offline while the results were on screen — someone else took it — and

@@ -2,7 +2,7 @@
 @use '@carbon/react/scss/type';
 @use '@carbon/react/scss/breakpoint' as *;
 
-// The status pills read beside the heading, as nr-frep's checklist pages place theirs: the heading
+// The status pills read beside the heading: the heading
 // at its own width rather than the page's, and everything on the heading's centre line. The shared
 // PageTitle stretches the heading so other pages can push their actions to the far edge; this page
 // has none there, and a stretched row also stretched the pills to the heading's height.
@@ -15,7 +15,7 @@
   }
 }
 
-// Label over value as nr-fspts' FSP Information tab sets them: the label bold and in the primary
+// Label over value: the label bold and in the primary
 // text colour, the value under it at 0.5rem. ReadOnlyField's own spacing is for forms, where it holds
 // a value level with the input boxes beside it — a 2.5rem band with the value centred, which on a
 // page with no inputs only opens a gap under every label.
@@ -35,7 +35,7 @@
 
 // A card of values, laid out in the four-column grid Site Detail and the search screens use, so the
 // structure reads like the site beside it. Steps to two columns, then one, at Carbon's lg and md.
-// Rows 2rem apart, as nr-fspts spaces its Plan details.
+// Rows 2rem apart.
 .structure-detail__fields {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -97,7 +97,7 @@ $page-inset-md: 20px;
 $page-inset-sm: 1rem;
 $page-bottom: 2rem;
 
-// The tabs over a grey pane, as nr-fspts' FSP page lays its own out: the pane runs full width, to the
+// The tabs over a grey pane: the pane runs full width, to the
 // side nav on the left, the window's edge on the right and the page's foot, by breaking out of the
 // page's padding; padding as wide brings the cards back in line with the tab bar and the title.
 //
@@ -123,8 +123,7 @@ $page-bottom: 2rem;
   gap: $spacing-06;
 }
 
-// One section: a white card on the grey pane with a thin outline and no lift — nr-fspts'
-// `fsp-info__tile` as its Information tab draws it.
+// One section: a white card on the grey pane with a thin outline and no lift.
 .structure-detail__card {
   padding: 1.25rem 2rem 1.75rem;
   border: 1px solid var(--cds-border-subtle-01);
@@ -136,8 +135,8 @@ $page-bottom: 2rem;
   }
 }
 
-// The card's header: its title at the left and its own action, if any, at the right — nr-fspts'
-// tile header. The action drops under the title on a narrow screen rather than squeezing it.
+// The card's header: its title at the left and its own action, if any, at the right. The action
+// drops under the title on a narrow screen rather than squeezing it.
 .structure-detail__card-header {
   display: flex;
   flex-wrap: wrap;
@@ -179,7 +178,7 @@ $page-bottom: 2rem;
 }
 
 // What the structure is missing (see OutstandingPanel): reference material, not an alert, so no
-// notification chrome — a link-styled toggle over a plain list, as nr-frep's checklist tabs have.
+// notification chrome — a link-styled toggle over a plain list.
 // Sits on the grey pane above the cards; the panel's gap spaces it.
 
 .structure-detail__outstanding-toggle {
@@ -322,7 +321,7 @@ $page-bottom: 2rem;
   grid-template-columns: max-content minmax(0, 1fr);
 }
 
-// A card edited in place — nr-fspts' Plan details edit (`fsp-info__edit`): its groups stacked, and
+// A card edited in place: its groups stacked, and
 // its fields grey (field-01) so they read as fields on the white card rather than vanishing into it.
 .structure-detail__edit {
   --cds-field: var(--cds-field-01);
@@ -334,8 +333,7 @@ $page-bottom: 2rem;
   gap: $spacing-06;
 }
 
-// "All fields are required unless marked optional." — nr-fspts' primary subtitle, tucked up to the
-// fields under it.
+// "All fields are required unless marked optional." — tucked up to the fields under it.
 .structure-detail__edit-intro {
   @include type.type-style('body-compact-01');
 
@@ -352,7 +350,7 @@ $page-bottom: 2rem;
 }
 
 // A sized cell. Carbon's inputs fill 100%, so the cell sets the width; the date picker's own
-// hard-coded widths are overridden so it honours the cell too (nr-fspts' `fsp-info__edit-cell`).
+// hard-coded widths are overridden so it honours the cell too.
 // One width for every cell, wide enough for the longest label on one line, so the rows line up in
 // columns.
 .structure-detail__edit-cell {
@@ -376,7 +374,7 @@ $page-bottom: 2rem;
 }
 
 
-// Cancel / Save changes — small, at the right, under the fields (nr-fspts' `fsp-info__form-actions`).
+// Cancel / Save changes — small, at the right, under the fields.
 .structure-detail__edit-actions {
   display: flex;
   flex-wrap: wrap;
@@ -406,9 +404,8 @@ $page-bottom: 2rem;
   }
 }
 
-// The upload dialog — nr-fspts' Add attachment dialog (`fsp-species-modal`, `DragDropFileInput`):
-// small, its form stacked, Carbon's 3rem bottom padding trimmed so the buttons don't float, and
-// no scroll fade over them.
+// The upload dialog: small, its form stacked, Carbon's 3rem bottom padding trimmed so the buttons
+// don't float, and no scroll fade over them.
 .structure-detail__upload-dialog {
   .cds--modal-content {
     padding-block-end: $spacing-05;
@@ -426,7 +423,7 @@ $page-bottom: 2rem;
   color: var(--cds-text-primary);
 }
 
-// "Files", bold over its helper line, as nr-fspts' `ddfi__label`.
+// "Files", bold over its helper line.
 .structure-detail__upload-label {
   @include type.type-style('heading-compact-01');
 
@@ -442,7 +439,7 @@ $page-bottom: 2rem;
   color: var(--cds-text-primary);
 }
 
-// The drop zone across the dialog, dashed, as nr-fspts' `ddfi__zone`.
+// The drop zone across the dialog, dashed.
 .structure-detail__upload-drop.cds--file__drop-container,
 .structure-detail__upload-drop .cds--file__drop-container {
   max-inline-size: none;
@@ -471,7 +468,7 @@ $page-bottom: 2rem;
   }
 }
 
-// A document's thumbnail, nr-frep's 120px photo square: an image cropped to fill it, or a box naming
+// A document's thumbnail, a 120px square: an image cropped to fill it, or a box naming
 // the file. The name breaks anywhere — `_` and `.` are not break points — and what still will not
 // fit is cut, the whole name on its title.
 .structure-detail__thumb {
@@ -509,7 +506,7 @@ $page-bottom: 2rem;
   border-block-start: 1px solid var(--cds-border-subtle);
 }
 
-// nr-fspts' file chip: a white card on the dialog's grey, naming the file.
+// The file chip: a white card on the dialog's grey, naming the file.
 .structure-detail__upload-chip {
   display: flex;
   align-items: center;
@@ -551,7 +548,7 @@ $page-bottom: 2rem;
   color: var(--cds-text-error);
 }
 
-// Cancel / Add documents — Carbon's own size, at the right (nr-fspts' `fsp-species-modal__actions`).
+// Cancel / Add documents — Carbon's own size, at the right.
 .structure-detail__upload-actions {
   display: flex;
   flex-wrap: wrap;

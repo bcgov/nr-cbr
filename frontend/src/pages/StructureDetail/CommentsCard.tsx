@@ -25,7 +25,7 @@ type Props = {
   onAdd?: () => void;
   /** Offers Edit on each row — only to a user who may edit. */
   onEdit?: (comment: StructureComment) => void;
-  /** Holds Add while another card on the tab is being edited, as nr-fspts' sections do. */
+  /** Holds Add while another card on the tab is being edited. */
   addDisabled?: boolean;
 };
 

@@ -34,4 +34,3 @@ tests
 # Excluding playwright.config.ts as well does not help — tsconfig.e2e.json would then match no
 # inputs at all (TS18003). This is a multi-stage build and only /app/dist reaches the final image,
 # so carrying the e2e sources through the build stage costs context size and nothing else.
-# nr-frep, which this tsconfig layout came from, ships no frontend .dockerignore at all.

@@ -105,8 +105,8 @@ const rowErrors = (row: Row, extensions: ReadonlySet<string>): RowErrors => {
 const hasErrors = (errors: RowErrors) => Object.values(errors).some(Boolean);
 
 /**
- * Adds documents and photos to the structure — legacy's three-step upload pop-up as one dialog,
- * laid out as nr-fspts' Add attachment dialog (small, stacked, a dashed drop zone and file chips):
+ * Adds documents and photos to the structure — legacy's three-step upload pop-up as one small,
+ * stacked dialog with a dashed drop zone and file chips:
  * choose or drop up to fifteen files (150 MB in all, 10 MB each), then give each its Photo View,
  * the date it was made (today unless changed, as legacy) and a description, required for Other.
  * One Add stores them all, or none.
@@ -227,7 +227,7 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
     <Modal
       open
       modalHeading="Add documents and photos"
-      // nr-fspts' attachment dialog: small, its form stacked, the buttons drawn below.
+      // Small, its form stacked, the buttons drawn below.
       passiveModal
       preventCloseOnClickOutside
       size="sm"
@@ -273,7 +273,7 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
               aria-label={row.file.name}
               data-testid={`upload-row-${row.key}`}
             >
-              {/* nr-fspts' file chip: a white card naming the file, with its remove button. */}
+              {/* The file chip: a white card naming the file, with its remove button. */}
               <div
                 className={
                   shown.file

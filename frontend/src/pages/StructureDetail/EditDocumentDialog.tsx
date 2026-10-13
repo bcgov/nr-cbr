@@ -32,7 +32,7 @@ type Errors = { attachmentTypeCode?: string; description?: string };
 
 /**
  * Changes a document's Photo View and description — legacy's edit in its document viewer. The
- * file is shown — a thumbnail of an image, as nr-frep's photos, so the user knows which one they
+ * file is shown — a thumbnail of an image, so the user knows which one they
  * are changing — with its name and date, which are not changed, as legacy's.
  *
  * <p>Laid out as the app's other dialogs: Carbon's grey dialog with its white fields.

@@ -322,7 +322,7 @@ describe('SiteSearchPage — results', () => {
 
     expect(screen.getByTestId('site-row-SITE-1')).toBeInTheDocument();
     expect(screen.getByText('Deadman Creek')).toBeInTheDocument();
-    // Code and name together, as nr-frep renders an org unit. Legacy hides the name in a tooltip.
+    // Code and name together. Legacy hides the name in a tooltip.
     expect(screen.getByText('DPG — Prince George Natural Resource District')).toBeInTheDocument();
     // Project File ID#-Br. is the two columns joined, which is how legacy renders it.
     expect(screen.getByText('R00123-01')).toBeInTheDocument();
@@ -564,7 +564,7 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     });
   });
 
-  it('labels an option "CODE - Description", as nr-frep does', async () => {
+  it('labels an option "CODE - Description"', async () => {
     // The code is what the business says out loud and what appears on paper; the description alone
     // leaves the user translating between the two.
     api.getSiteStatusCodes.mockResolvedValue([{ code: 'ACT', description: 'Active' }]);
@@ -883,8 +883,8 @@ describe('SiteSearchPage — deleting a site', () => {
 
   it('reports a failed delete as a toast, not as a banner on the page', async () => {
     // The action failed, so nothing on screen changed and there is no region to replace — the row
-    // is still in the table. nr-frep and nr-fspts both report an action failure this way and keep
-    // in-place notifications for a region that could not load.
+    // is still in the table. An action failure is reported this way; in-place notifications are
+    // for a region that could not load.
     siteSearchApi.deleteSite.mockRejectedValue(new Error('network'));
     await openDeleteConfirmation();
 
@@ -1060,8 +1060,8 @@ describe('SiteSearchPage — Designated Maintainer', () => {
 
   it('still searches on the name when the term matches no suggestion', async () => {
     // What the field did before the lookup existed, and what a term like "canfor" needs — several
-    // distinct clients carry that name and no single pick covers them. nr-frep refuses the search
-    // here instead; CBR does not have to, because the backend has accepted a name all along.
+    // distinct clients carry that name and no single pick covers them. The search is not refused,
+    // because the backend has accepted a name all along.
     clientApi.searchClients.mockResolvedValue([]);
     renderPage();
 

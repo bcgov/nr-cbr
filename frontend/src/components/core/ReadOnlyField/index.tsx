@@ -13,7 +13,7 @@ type Props = {
 /**
  * One label-and-value pair, for a field the user may look at but not change.
  *
- * <p>The shape nr-frep uses for its tombstone values: a small secondary-coloured label above the
+ * <p>The shape of a record's tombstone values: a small secondary-coloured label above the
  * value in body text. Deliberately <b>not</b> a disabled input — a greyed-out box invites a click
  * that does nothing, takes a tab stop for no reason, and sizes itself to the field it would have
  * been rather than to the value it holds.

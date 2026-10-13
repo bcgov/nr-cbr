@@ -93,7 +93,7 @@ const SiteSearchResults: FC<Props> = ({
   return (
     <>
       <TableContainer
-        // "Sites — 12 matches", the same shape nr-frep's search results use. The count is the server's
+        // "Sites — 12 matches". The count is the server's
         // total, not the rows on screen: a page of 20 out of 2,000 would otherwise report 20.
         title={`Sites — ${totalItems} match${totalItems === 1 ? '' : 'es'}`}
         className="bordered-table"
@@ -132,8 +132,8 @@ const SiteSearchResults: FC<Props> = ({
                   <TableCell>
                     <Link to={`/inventory/site/${site.id}`}>{site.id}</Link>
                   </TableCell>
-                  {/* "DPG — Prince George Natural Resource District", as nr-frep renders an org
-                      unit. Legacy shows the bare code and hides the name in a title attribute, which
+                  {/* "DPG — Prince George Natural Resource District": code and name together.
+                      Legacy shows the bare code and hides the name in a title attribute, which
                       its 7%-wide column forced — a tooltip only reaches a user who already suspects
                       there is more to see, and never reaches one reading on a touchscreen.
 
@@ -152,7 +152,7 @@ const SiteSearchResults: FC<Props> = ({
                     {site.forestFileId}-{site.roadSectionId}
                   </TableCell>
                   <TableCell>
-                    {/* A pill, as nr-frep renders a status. The colour comes from the code and the
+                    {/* A status pill. The colour comes from the code and the
                           label from the description — see utils/siteStatus for why that way round.
                           Nothing is rendered at all for a site with no status, rather than an empty
                           pill: "Incomplete Data?" exists to find those, and a bare outline would read

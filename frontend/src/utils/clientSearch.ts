@@ -23,8 +23,7 @@ export const isSearchableTerm = (term: string): boolean => {
 /**
  * The label for one suggestion: `CANFOR CORPORATION · Northern Division · Prince George · 00001012-01`.
  *
- * <p>Composed here rather than by the backend because it is a presentation decision, which is where
- * nr-frep's equivalent also lives. Absent parts are dropped rather than rendered empty — most
+ * <p>Composed here rather than by the backend because it is a presentation decision. Absent parts are dropped rather than rendered empty — most
  * clients have no division name — so a lone office reads as
  * `WEST FRASER MILLS LTD · Quesnel · 00010120-00` instead of carrying a stranded separator.
  *

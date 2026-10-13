@@ -22,7 +22,7 @@ import ca.bc.gov.nrs.cbr.security.Oauth2SecurityCustomizer;
 
 /**
  * Main security configuration. The API runs as a <strong>stateless</strong> OAuth 2.0 resource
- * server validating BC Gov SSO (Keycloak) access tokens. Follows nr-fspts.
+ * server validating BC Gov SSO (Keycloak) access tokens.
  *
  * <h3>No custom security headers</h3>
  * {@code .headers(...)} is deliberately not customized, which leaves Spring Security's defaults in
@@ -37,7 +37,7 @@ import ca.bc.gov.nrs.cbr.security.Oauth2SecurityCustomizer;
  * Caddy edge in {@code frontend/Caddyfile}, in front of the SPA that is an actual document.
  *
  * <p>If the API ever serves HTML — a rendered error page, a Swagger UI — reinstate a CSP here, or
- * the edge policy will not cover it. Same as nr-fspts, which also leaves the defaults alone.
+ * the edge policy will not cover it.
  */
 @Configuration
 @EnableWebSecurity
@@ -84,7 +84,7 @@ public class SecurityConfiguration {
    *
    * <p>In every deployed environment the SPA calls {@code /api/...} as a relative path and Caddy
    * reverse-proxies it to this service ({@code frontend/Caddyfile}), so requests are same-origin
-   * and CORS never engages — which is why nr-fspts carries no CORS configuration at all. This bean
+   * and CORS never engages. This bean
    * exists for the case where the Vite dev server is pointed straight at a backend on another port
    * rather than through its own proxy.
    */

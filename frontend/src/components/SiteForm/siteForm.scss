@@ -48,7 +48,7 @@ $label-block-size: 1rem;
 }
 
 // A read-only cell's label in the colour of the input labels beside it. The component's own is the
-// secondary grey nr-frep uses for a page of values; on a form that mixes values and inputs in one
+// secondary grey meant for a page of values; on a form that mixes values and inputs in one
 // row, that grey reads as a label for something disabled. Two classes, so it outranks the
 // component's one whatever order the stylesheets load in.
 .site-form__fields .read-only-field__label {

@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RequestParam;
  * HTTP contract for structure inspections. Implemented by
  * {@link ca.bc.gov.nrs.cbr.controller.v1.InspectionApiController}.
  *
- * <p>The mappings and the authorization live here rather than on the controller, following nr-frep
- * and {@link SiteApiEndpoint}: the interface is the contract, the controller is one way of
+ * <p>The mappings and the authorization live here rather than on the controller, as in
+ * {@link SiteApiEndpoint}: the interface is the contract, the controller is one way of
  * satisfying it. It also means the {@code @PreAuthorize} cannot be dropped by someone editing the
  * implementation, because removing it from the interface changes the published contract.
  *

@@ -98,9 +98,9 @@ parameters:
   # attachments are Phase 4 and no bucket is provisioned yet. Re-add the four parameters, their
   # secretKeyRef env entries and their Secret stringData keys together with the feature — they were
   # `required: true` here, so a half-restore fails `oc process` outright.
-  # NOTE: no CLAMAV_* parameters. nr-frep scans uploaded attachments through a shared clamd; CBR
-  # has no upload path yet (attachments are Phase 4 — see cbr-modernization-plan.local.md). Add them
-  # back alongside the feature, together with the cross-namespace egress note nr-frep carries.
+  # NOTE: no CLAMAV_* parameters. Uploaded attachments are not virus-scanned yet; when a scan is
+  # added (a shared clamd), add its parameters here together with the cross-namespace egress it
+  # needs.
 
 objects:
   # ── Deployment ────────────────────────────────────────────
@@ -227,15 +227,22 @@ objects:
                     secretKeyRef:
                       name: ${NAME}-backend-secret-${ZONE}
                       key: KEYSTORE_SECRET
+              # The JVM sizes its heap as a percentage of the memory LIMIT (-XX:MaxRAMPercentage=60
+              # in the Dockerfile), so changing the limit here changes the heap: 800Mi ⇒ ~480MB.
+              #
+              # ephemeral-storage must hold at once: a heap dump on OOM
+              # (/temp, up to the max heap), the multipart spool for uploads in flight (/tmp — a
+              # Documents & Photos upload is up to 150MB, see application.yml), and the logs. Every
+              # emptyDir counts against it; overrun it and the pod is evicted, losing the dump.
               resources:
                 requests:
                   cpu: ${MIN_CPU}
                   memory: ${MIN_MEM}
-                  ephemeral-storage: "200Mi"
+                  ephemeral-storage: "500Mi"
                 limits:
                   cpu: "1000m"
                   memory: "800Mi"
-                  ephemeral-storage: "500Mi"
+                  ephemeral-storage: "1Gi"
               livenessProbe:
                 httpGet:
                   path: /actuator/health

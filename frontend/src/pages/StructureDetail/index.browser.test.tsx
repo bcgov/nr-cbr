@@ -498,7 +498,7 @@ describe('StructureDetailPage — header', () => {
   });
 });
 
-describe('StructureDetailPage — incomplete data, in nr-frep form', () => {
+describe('StructureDetailPage — incomplete data', () => {
   const incomplete = () =>
     bridge({
       outstanding: [
@@ -715,7 +715,7 @@ describe('StructureDetailPage — breadcrumb', () => {
 
 describe('StructureDetailPage — tabs', () => {
   it('opens on Information, the first of its tabs', async () => {
-    // Legacy's header, moved into a tab of its own as nr-fspts' FSP page opens on Information.
+    // Legacy's header, moved into a tab of its own that the page opens on.
     await showing(bridge());
 
     const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent?.trim());

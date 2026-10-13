@@ -8,8 +8,8 @@ import java.util.List;
  * Canonical CBR role names, and the ladder they form.
  *
  * <p>FAM holds nothing but these six flat strings — no nesting, no scoping, no permissions. The
- * role&rarr;capability matrix lives here and in {@link CbrAuthorities}, which is the same split
- * nr-fspts uses ({@code FsptsRoles} + {@code FspAuthorities}).
+ * role&rarr;capability matrix lives here and in {@link CbrAuthorities}: roles here, the
+ * capabilities each role grants there.
  *
  * <h2>Two axes, not one</h2>
  * Five roles form a <b>cumulative ladder</b> — each rung carries everything below it:
@@ -180,10 +180,10 @@ public final class CbrRoles {
   /**
    * Whether a role string issued by FAM is one of ours.
    *
-   * <p><b>Exact match only — deliberately unlike nr-fspts</b>, whose {@code canonicalRoleFor} also
-   * accepts {@code <role>_<suffix>} because FSPTS scopes roles by organization. CBR scopes nothing:
-   * the WebADE export carries no org unit on any grant, and the region-scoped role names that used
-   * to be in this codebase were imported from nr-frep by mistake. Accepting a suffix here would
+   * <p><b>Exact match only — deliberately</b>: a {@code <role>_<suffix>} form, as an application
+   * that scopes roles by organization would accept, is refused. CBR scopes nothing: the WebADE
+   * export carries no org unit on any grant, and the region-scoped role names that used to be in
+   * this codebase were added by mistake. Accepting a suffix here would
    * quietly resurrect that — {@code CBR_LEVEL_2_DCK} would resolve to {@code CBR_LEVEL_2} and grant
    * province-wide delete to someone a FAM admin believed was scoped to one district.
    */

@@ -1,8 +1,7 @@
 @use '@carbon/type';
 @use '../../../styles/variables' as vars;
 
-// Label above value, the pair stacked. Matches nr-frep's tombstone cells so a read-only field looks
-// the same in both applications.
+// Label above value, the pair stacked, as a record's tombstone cells.
 .read-only-field {
   display: flex;
   flex-direction: column;
@@ -21,9 +20,8 @@
   color: var(--#{vars.$bcgov-prefix}-text-secondary);
 }
 
-// Carbon's `body-compact-01` — 14px — as nr-frep's record headers set their values. Measured
-// against nr-frep rather than chosen: its tombstone values are plain text in a Carbon Tile, which
-// gives them this style, and a read-only page set larger reads as a different application.
+// Carbon's `body-compact-01` — 14px — the style plain text in a Carbon Tile takes; a read-only page
+// set larger reads as a different application.
 .read-only-field__value {
   @include type.type-style('body-compact-01');
 

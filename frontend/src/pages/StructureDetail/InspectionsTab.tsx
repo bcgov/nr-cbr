@@ -57,7 +57,7 @@ const CloseProximityCard: FC<{
   schedule: InspectionScheduleResponse;
   /** Offered to a P.Eng only. */
   onAdd?: () => void;
-  /** Held while another card on the tab is being edited, as nr-fspts' sections are. */
+  /** Held while another card on the tab is being edited. */
   addDisabled: boolean;
 }> = ({ schedule, onAdd, addDisabled }) => (
   <Card
@@ -181,7 +181,7 @@ const InspectionsCard: FC<{
   structureId: string;
   opened: boolean;
   complete: boolean;
-  /** Held while another card on the tab is being edited, as nr-fspts' sections are. */
+  /** Held while another card on the tab is being edited. */
   addDisabled: boolean;
 }> = ({ structureId, opened, complete, addDisabled }) => {
   const { canEdit, canWriteInspection } = useAuthorization();
@@ -297,14 +297,14 @@ const InspectionsCard: FC<{
 /**
  * Legacy's Inspections tab (`inspectionTab.jsp`): the schedule, the completed close proximity
  * inspections, the inspections themselves, then the planned-inspection comments — last here, where
- * legacy has them first, as the Details tab ends on its comments. Each card carries its own edit,
- * as nr-fspts' sections: the schedule's Edit, the completed close proximity inspections' Add, and
+ * legacy has them first, as the Details tab ends on its comments. Each card carries its own edit:
+ * the schedule's Edit, the completed close proximity inspections' Add, and
  * the planned-inspection comments' Add and Edit, and the inspections' Add Routine and Add Unplanned
  * Inspection, which open the (placeholder) new-inspection page.
  */
 const InspectionsTab: FC<Props> = ({ structureId, opened, complete }) => {
   const schedule = useStructureInspectionSchedule(structureId, opened);
-  /** The card being edited, if any — one at a time, as nr-fspts' sections. */
+  /** The card being edited, if any — one at a time. */
   const [editing, setEditing] = useState<'schedule' | null>(null);
   /** The planned-inspection comment in the dialog: one being edited, `'new'` to add, or null. */
   const [comment, setComment] = useState<StructureComment | 'new' | null>(null);

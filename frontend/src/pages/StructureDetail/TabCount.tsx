@@ -8,7 +8,7 @@ type Props = {
 };
 
 /**
- * The outstanding-items badge after a tab's label — nr-frep's `TabStatusIcon`. Only a count is
+ * The outstanding-items badge after a tab's label. Only a count is
  * drawn: a tab with nothing outstanding carries no mark, so the badges stand out on their own.
  */
 const TabCount: FC<Props> = ({ count, section }) => {

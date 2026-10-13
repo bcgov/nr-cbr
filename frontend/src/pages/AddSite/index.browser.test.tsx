@@ -342,8 +342,7 @@ describe('AddSitePage — validation', () => {
 
   it('marks the Inspection Status box when it disagrees with the status, without waiting for Save', async () => {
     // Inline and live. Legacy stamps fieldName="structureInspectionStatusCode" on this rule, and a
-    // clash between two values the user deliberately chose is not a field left unfinished — the
-    // same line nr-frep draws for its duplicate-label check.
+    // clash between two values the user deliberately chose is not a field left unfinished.
     await renderPage();
     await fillRequired();
     type('structureInspectionStatusCode', 'DNI');

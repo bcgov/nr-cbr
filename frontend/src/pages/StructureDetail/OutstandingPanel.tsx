@@ -9,8 +9,7 @@ type Props = {
 };
 
 /**
- * What the structure is missing, behind a disclosure at the top of the tab — nr-frep's
- * `OutstandingPanel`.
+ * What the structure is missing, behind a disclosure at the top of the tab.
  *
  * <p>Open by default, because it is the answer to the banner above the tabs. Collapsing it is a
  * per-visit choice. Grouped by the part of the page each item belongs to; until the Inspections tab

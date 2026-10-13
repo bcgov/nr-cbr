@@ -34,4 +34,15 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
 # the tzdb bundled inside the JDK, so it works on this Alpine base even though
 # the OS has no tzdata package. Do not add -Duser.timezone: it would override
 # TZ and make the deployment parameter silently ineffective.
-ENTRYPOINT ["java","-Duser.name=CBR-API","-Xms100m","-Xmx400m","-XX:TieredStopAtLevel=1","-XX:+UseParallelGC","-XX:MinHeapFreeRatio=20","-XX:MaxHeapFreeRatio=40","-XX:GCTimeRatio=4","-XX:AdaptiveSizePolicyWeight=90","-XX:MaxMetaspaceSize=200m","-XX:ParallelGCThreads=2","-Djava.util.concurrent.ForkJoinPool.common.parallelism=8","-XX:CICompilerCount=2","-XX:+ExitOnOutOfMemoryError","-Djava.security.egd=file:/dev/./urandom","-cp","app:app/lib/*","ca.bc.gov.nrs.cbr.CbrApiApplication"]
+
+# Heap is sized as a percentage of the container's cgroup memory limit rather than a fixed -Xmx: a
+# fixed -Xmx drifts out of step with the Deployment's limit and can run out of heap on attachment
+# uploads with most of the pod unused. 60% of the 800Mi limit in
+# openshift.deploy.yml is ~480MB (the old -Xmx was 400m); the other ~40% is the non-heap footprint —
+# Metaspace (capped at 200m below), JIT code cache, thread stacks, Undertow's direct buffers.
+# Raising the percentage risks the kernel OOM-killing the container instead, which leaves no dump.
+#
+# HeapDumpOnOutOfMemoryError writes to /temp (an emptyDir; the root FS is read-only) before
+# ExitOnOutOfMemoryError ends the JVM. Keep the Deployment's ephemeral-storage limit above the max
+# heap plus the multipart spool in /tmp, or the dump fills the volume and gets the pod evicted.
+ENTRYPOINT ["java","-Duser.name=CBR-API","-XX:InitialRAMPercentage=15","-XX:MaxRAMPercentage=60","-XX:TieredStopAtLevel=1","-XX:+UseParallelGC","-XX:MinHeapFreeRatio=20","-XX:MaxHeapFreeRatio=40","-XX:GCTimeRatio=4","-XX:AdaptiveSizePolicyWeight=90","-XX:MaxMetaspaceSize=200m","-XX:ParallelGCThreads=2","-Djava.util.concurrent.ForkJoinPool.common.parallelism=8","-XX:CICompilerCount=2","-XX:+HeapDumpOnOutOfMemoryError","-XX:HeapDumpPath=/temp","-XX:+ExitOnOutOfMemoryError","-Djava.security.egd=file:/dev/./urandom","-cp","app:app/lib/*","ca.bc.gov.nrs.cbr.CbrApiApplication"]

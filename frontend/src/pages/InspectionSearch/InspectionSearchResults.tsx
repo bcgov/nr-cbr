@@ -116,7 +116,7 @@ const InspectionSearchResults: FC<Props> = ({
   return (
     <>
       <TableContainer
-        // "Inspections — 12 matches", the shape nr-frep's search results use. The count is the
+        // "Inspections — 12 matches". The count is the
         // server's total, not the rows on screen: a page of 20 out of 2,000 would report 20.
         title={`Inspections — ${totalItems} match${totalItems === 1 ? '' : 'es'}`}
         className="bordered-table"
@@ -163,8 +163,8 @@ const InspectionSearchResults: FC<Props> = ({
                       <Link to={`/inspection/${inspection.id}`}>{inspection.id}</Link>
                     )}
                   </TableCell>
-                  {/* "DPG — Prince George Natural Resource District", as nr-frep renders an org
-                      unit. Legacy shows the bare code with the name in a title attribute, which its
+                  {/* "DPG — Prince George Natural Resource District": code and name together.
+                      Legacy shows the bare code with the name in a title attribute, which its
                       6%-wide column forced — a tooltip only reaches a user who already suspects
                       there is more to see, and never reaches one reading on a touchscreen. */}
                   <TableCell>
@@ -199,7 +199,7 @@ const InspectionSearchResults: FC<Props> = ({
                     {[inspection.forestFileId, inspection.roadSectionId].filter(Boolean).join('-')}
                   </TableCell>
                   <TableCell>
-                    {/* A pill, as nr-frep renders a status. The colour comes from the code and the
+                    {/* A status pill. The colour comes from the code and the
                         label from the description — see utils/inspectionStatus. Nothing at all for a
                         row with neither, rather than an empty outline that would read as a status
                         whose name failed to load. */}

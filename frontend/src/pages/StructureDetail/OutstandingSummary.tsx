@@ -8,9 +8,8 @@ type Props = {
 };
 
 /**
- * Legacy's red "Warning: Structure data is incomplete.", in nr-frep's form: a low-contrast notice
- * above the tabs that counts what is missing and points at the tab that lists it — nr-frep's
- * `OutstandingSummary` on its checklist pages.
+ * Legacy's red "Warning: Structure data is incomplete.", as a low-contrast notice above the tabs that
+ * counts what is missing and points at the tab that lists it.
  *
  * <p>Informational, not an error: an incomplete structure is ordinary unfinished data, not a fault
  * in the page. Nothing renders when the structure is complete.

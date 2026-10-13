@@ -1,5 +1,5 @@
 // Inline-flex so the icon sits on the text's line and never wraps away from the label it belongs
-// to — a launch glyph alone on the next line reads as a separate control. nr-frep's, unchanged.
+// to — a launch glyph alone on the next line reads as a separate control.
 // No wrapping: in a narrow table column the label shrank as a flex item and broke at its hyphen,
 // "62-" over "001", with the icon beside both. An id or a name reads as one word.
 .external-link {

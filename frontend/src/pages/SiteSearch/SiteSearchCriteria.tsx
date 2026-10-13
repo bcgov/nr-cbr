@@ -56,13 +56,13 @@ type Props = {
  * "Designated Maintainer Client Number", "Incomplete Data?" and the rest.
  *
  * <p>Legacy laid this out as a 4-column HTML table with hand-set percentage widths. Here it is a
- * CSS grid of four, matching nr-frep's search filters — four criteria per row on a wide screen,
+ * CSS grid of four — four criteria per row on a wide screen,
  * stepping to two and then one as the window narrows, which the legacy table did not do at all.
  * Fields that hold a pair of inputs span two columns; see the stylesheet.
  */
 /**
- * "DCK - Chilliwack Natural Resource District", the form nr-frep uses for both code lists and org
- * units, and the same string the results table shows for a district.
+ * "DCK - Chilliwack Natural Resource District", the form used for both code lists and org units,
+ * and the same string the results table shows for a district.
  *
  * <p>Joined rather than interpolated so a missing half degrades to the other one instead of
  * rendering "DCK - undefined" or a leading dash — reference data is not ours and a row with one
@@ -144,8 +144,8 @@ const SiteSearchCriteriaForm: FC<Props> = ({
    *
    * <p>It still searches, on the client name — which is what this field did before the lookup
    * existed, and what a term like "canfor" needs: several distinct clients carry that name, and no
-   * single pick covers them. nr-frep's equivalent refuses the search and marks the field instead;
-   * CBR does not have to, because the backend has accepted a name here all along.
+   * single pick covers them. The search is not refused, because the backend has accepted a name
+   * here all along.
    */
   const typeMaintainer = (term: string) => {
     onChange('primaryUserName', term);
@@ -158,7 +158,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
    * A code-table dropdown.
    *
    * <p>`anyText` is the unfiltered option, and it says so in words — "Any status" rather than a
-   * blank line, which is how nr-frep writes it. A blank first option reads as a value that failed
+   * blank line. A blank first option reads as a value that failed
    * to load, and gives a user who has set the filter no obvious way to unset it.
    */
   const codeSelect = (
@@ -181,7 +181,7 @@ const SiteSearchCriteriaForm: FC<Props> = ({
         <SelectItem
           key={option.code}
           value={option.code}
-          // "ACT - Active", as nr-frep renders a code list. The code is what the business says out
+          // "ACT - Active": code, then description. The code is what the business says out
           // loud and what appears in reports and on paper; the description alone leaves a user
           // translating between the two.
           text={label(option.code, option.description)}

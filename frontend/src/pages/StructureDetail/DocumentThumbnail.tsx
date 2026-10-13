@@ -13,8 +13,7 @@ type Props = {
 };
 
 /**
- * A 120px square picture of a document, so the user can see which file they are changing — nr-frep's
- * photo thumbnail (`chr-checklist__thumb`). An image is fetched and drawn, cropped to fill the
+ * A 120px square picture of a document, so the user can see which file they are changing. An image is fetched and drawn, cropped to fill the
  * square; anything else, or an image that will not load, is a box of the same size naming the file.
  *
  * <p>Only an image is fetched: a PDF or a Word file cannot be drawn, and fetching it would be

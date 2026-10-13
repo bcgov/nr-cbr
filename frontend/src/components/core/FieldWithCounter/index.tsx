@@ -17,8 +17,6 @@ type Props = {
  * worth avoiding — `maxLength` silently drops the tail of pasted text, which is how someone loses
  * the end of a paragraph without noticing. Telling them it is too long, and refusing the save, is
  * the honest version of the same rule.
- *
- * <p>Ported from nr-frep's component of the same name.
  */
 const FieldWithCounter: FC<Props> = ({ used, limit, children }) => (
   <div className="cbr-field">

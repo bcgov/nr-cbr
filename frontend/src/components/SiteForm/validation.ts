@@ -306,8 +306,7 @@ export const fieldWarnings = (site: SiteFormValues): SiteErrors => coordinateWar
  * <p><b>Inspection Status carries them</b>, which is legacy's choice and the practical one: in each
  * rule it is the field that is wrong for the site rather than the site that is wrong for the field.
  *
- * <p><b>Shown live, without waiting for Save.</b> nr-frep draws the line in the same place for its
- * duplicate-label check: a clash between values the user has deliberately chosen is not a field
+ * <p><b>Shown live, without waiting for Save.</b> A clash between values the user has deliberately chosen is not a field
  * left unfinished, so holding it back until Save means telling them about a choice they made
  * twenty fields ago. Nothing can fire on a half-filled form because every rule below names a value
  * in all three boxes, so all three must already be chosen.

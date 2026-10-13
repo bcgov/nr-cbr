@@ -37,7 +37,7 @@
           // (type-style sets no colour), so this just states the intended one.
           // `text-primary`, not a literal black: it resolves to #161616 on the light theme and to
           // white under g100, so the line stays legible in both. A hardcoded #000 would be
-          // black-on-black in dark mode. Matches the FSPTS landing subtitle.
+          // black-on-black in dark mode.
           color: var(--#{vars.$bcgov-prefix}-text-primary);
           @include type.type-style('fluid-paragraph-01', true);
         }
@@ -101,7 +101,7 @@
   }
 }
 
-/* "Request access" — a link and a one-line caveat under the login buttons, mirroring FSPTS. A button
+/* "Request access" — a link and a one-line caveat under the login buttons. A button
    rather than an anchor because it opens the instructions dialog rather than navigating. */
 .landing-request-access {
   &__link {

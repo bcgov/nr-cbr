@@ -67,8 +67,8 @@ type Props = {
  * association here — each field passes `labelText` and the component wires it to its own input.
  */
 /**
- * "DCK - Chilliwack Natural Resource District", the form nr-frep uses for both code lists and org
- * units, and the same string the results table shows for a district.
+ * "DCK - Chilliwack Natural Resource District", the form used for both code lists and org units,
+ * and the same string the results table shows for a district.
  *
  * <p>Joined rather than interpolated so a missing half degrades to the other one instead of
  * rendering "DCK - undefined" or a leading dash.
@@ -201,7 +201,7 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
         <SelectItem
           key={option.code}
           value={option.code}
-          // "ROUT - Routine", as nr-frep renders a code list. The code is what the business says out
+          // "ROUT - Routine": code, then description. The code is what the business says out
           // loud and what appears in reports and on paper.
           text={label(option.code, option.description)}
         />

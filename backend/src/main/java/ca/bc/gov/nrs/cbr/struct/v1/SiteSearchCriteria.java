@@ -12,12 +12,12 @@ import lombok.Builder;
  * and there is no scoping to narrow it: any CBR user may search every site in the province
  * (cbr-auth-and-roles.local.md §3.3).
  *
- * <p><b>Bound as one object rather than 17 {@code @RequestParam}s</b>, which is a deliberate
- * departure from nr-frep's flat parameter lists. At this count a flat signature has to be repeated
- * identically in the interface, the controller override and the service call, and a transposition
- * between two same-typed neighbours — {@code kiloStart}/{@code kiloEnd},
- * {@code forestFileId}/{@code roadSectionId} — compiles and returns the wrong rows silently. The
- * wire contract is unchanged: Spring binds these from the same query string either way.
+ * <p><b>Bound as one object rather than 17 {@code @RequestParam}s</b>, deliberately. At this count
+ * a flat signature has to be repeated identically in the interface, the controller override and the
+ * service call, and a transposition between two same-typed neighbours —
+ * {@code kiloStart}/{@code kiloEnd}, {@code forestFileId}/{@code roadSectionId} — compiles and
+ * returns the wrong rows silently. The wire contract is unchanged: Spring binds these from the same
+ * query string either way.
  *
  * <p>All fields are {@link String} even where the column is numeric. The criteria are pasted,
  * partial and sometimes wildcarded, and {@code CBR.FIND_SITES_BY_CRITERIA} takes a

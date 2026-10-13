@@ -1,9 +1,8 @@
 # CBR backend configuration.
 #
-# Derived from nr-frep's application.yml — the load-bearing parts are carried over verbatim
-# (Oracle TCPS datasource, the NLS_NUMERIC_CHARACTERS pin, Cognito resource-server wiring, actuator
-# exposure, CORS). FREP-only blocks (open-maps, ClamAV, the one-time BLOB migration tooling) are not
-# carried; add them when the equivalent CBR features land.
+# The load-bearing parts: the Oracle TCPS datasource, the NLS_NUMERIC_CHARACTERS pin, Cognito
+# resource-server wiring, actuator exposure and CORS. Blocks for features CBR does not have yet
+# (a virus scan, BLOB migration tooling) are added when those features land.
 
 server:
   servlet:
@@ -17,9 +16,11 @@ server:
   undertow:
     # Connector-level request-body backstop, above spring.servlet.multipart.max-request-size so the
     # multipart layer is normally what rejects an oversized upload. 170 MB: the Documents & Photos
-    # upload takes legacy's 15 files / 150 MB in one request. Safe for the -Xmx400m heap (under
-    # -XX:+ExitOnOutOfMemoryError) only because the parts spool to /tmp and the service writes one
-    # file's byte[] at a time (StructureDocumentsService.upload) — keep it that way.
+    # upload takes legacy's 15 files / 150 MB in one request. Safe for the heap (60% of the pod's
+    # memory limit, under -XX:+ExitOnOutOfMemoryError — see the Dockerfile) only because the parts
+    # spool to /tmp and the service writes one file's byte[] at a time
+    # (StructureDocumentsService.upload) — keep it that way. The spool counts against the pod's
+    # ephemeral-storage limit in openshift.deploy.yml.
     max-http-post-size: ${MAX_HTTP_POST_SIZE:178257920}
   # Honour X-Forwarded-* from the Caddy reverse proxy when reconstructing the request URL. Without
   # this Spring sees the in-cluster Host and treats the browser Origin as cross-origin.
@@ -51,12 +52,11 @@ spring:
       max-lifetime: 1800000
       # Pin the decimal separator for every pooled connection.
       #
-      # Carried over from nr-frep, where its absence caused ORA-06502 on every decimal value. The
-      # same exposure exists here: the CBR packages take numeric parameters that arrive through
-      # implicit VARCHAR2 -> NUMBER conversion, which runs under the session's
-      # NLS_NUMERIC_CHARACTERS — derived from the JVM default locale unless set. Where the decimal
-      # separator is not ".", whole numbers save and decimals fail. CBR has plenty of decimals
-      # (channel measurements, span lengths, slope, cover depths, lat/long, UTM).
+      # Without it every decimal value can fail with ORA-06502: the CBR packages take numeric
+      # parameters that arrive through implicit VARCHAR2 -> NUMBER conversion, which runs under the
+      # session's NLS_NUMERIC_CHARACTERS — derived from the JVM default locale unless set. Where the
+      # decimal separator is not ".", whole numbers save and decimals fail. CBR has plenty of
+      # decimals (channel measurements, span lengths, slope, cover depths, lat/long, UTM).
       #
       # Value is decimal separator then group separator: "." and "," — the ANSI default.
       connection-init-sql: "ALTER SESSION SET NLS_NUMERIC_CHARACTERS = '.,'"
@@ -141,7 +141,7 @@ cbr:
     bucket: ${OBJECT_STORAGE_BUCKET:}
     access-key: ${OBJECT_STORAGE_ACCESS_KEY:}
     secret-key: ${OBJECT_STORAGE_SECRET_KEY:}
-  # ConsignO e-signature — P.Eng sealing of reviewed inspection reports. No nr-frep precedent.
+  # ConsignO e-signature — P.Eng sealing of reviewed inspection reports.
   # Secrets come from the environment; the legacy app committed them to application.properties.
   # See docs/legacy-cbr-overview.md §14.
   consigno:

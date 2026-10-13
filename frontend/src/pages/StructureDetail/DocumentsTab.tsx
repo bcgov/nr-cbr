@@ -142,7 +142,7 @@ const DocumentsTable: FC<TableProps> = ({
                     {document.description}
                   </TableCell>
                   <TableCell className="structure-detail__nowrap">
-                    {/* nr-fspts' View, on every row alike: an image or a PDF opens in a new tab,
+                    {/* View, on every row alike: an image or a PDF opens in a new tab,
                         anything else downloads — a browser cannot show it, and one from this origin
                         must not run. The hidden text says which. */}
                     <Button

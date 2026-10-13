@@ -55,14 +55,14 @@ export type StructureLinkState = { structureName?: string; fromSiteId?: string }
  *
  * <p>So far an Information tab — legacy's header above its tabs — then the Details tab, comments
  * last on it as legacy has them, for a bridge the Spans & Piers tab, then Documents & Photos and
- * Inspections, Repairs and Monitoring — every tab legacy has. Laid out as nr-fspts' FSP page: icon tabs over a grey pane, each
+ * Inspections, Repairs and Monitoring — every tab legacy has. Icon tabs over a grey pane, each
  * section a white card. The page stays marked under construction until its editing is built.
  *
  * <p>Read-only throughout. Legacy has no view mode: the page is always a form, each field deciding
  * for itself whether the user may change it. Editing comes later, behind an explicit Edit, as on
  * Site Detail.
  *
- * <p>Incomplete data follows nr-frep's checklist pattern rather than legacy's red line: a notice
+ * <p>Incomplete data is shown as a checklist rather than legacy's red line: a notice
  * above the tabs counts what is missing, the Details tab carries a count badge, and the tab opens on
  * the list itself.
  */

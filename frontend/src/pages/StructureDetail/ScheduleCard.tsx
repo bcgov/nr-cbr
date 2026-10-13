@@ -79,9 +79,9 @@ const ScheduleView: FC<{ schedule: InspectionScheduleResponse }> = ({ schedule }
 );
 
 /**
- * The card's values as a form, in place of the view — nr-fspts' section edit.
+ * The card's values as a form, in place of the view.
  *
- * <p>Laid out as nr-fspts' Plan details edit: grey fields in sized cells on the white card, "All
+ * <p>Grey fields in sized cells on the white card, "All
  * fields are required unless marked optional." over them, and the yes/no question as a radio pair.
  *
  * <p>As legacy, by role: Level 2 and up change all of it; Level 1 the frequency alone, the rest
@@ -287,7 +287,7 @@ const ScheduleForm: FC<{
         </>
       )}
 
-      {/* nr-fspts' form actions: small, at the right, under the fields. */}
+      {/* The form's actions: small, at the right, under the fields. */}
       <div className="structure-detail__edit-actions">
         <Button kind="tertiary" size="sm" onClick={onDone} disabled={update.isPending}>
           Cancel
@@ -308,7 +308,7 @@ const ScheduleForm: FC<{
 
 /**
  * When the structure is next to be inspected, and how often — legacy's fields above its table —
- * with its own "Edit inspection schedule", as nr-fspts' sections, for Level 1 and up (legacy's page
+ * with its own "Edit inspection schedule", for Level 1 and up (legacy's page
  * Save). The edit replaces the values in place.
  */
 const ScheduleCard: FC<Props> = ({

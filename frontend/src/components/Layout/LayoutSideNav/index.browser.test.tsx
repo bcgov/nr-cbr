@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { page } from 'vitest/browser';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, it, expect, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { AuthProvider } from '@/context/auth/AuthProvider';
 
