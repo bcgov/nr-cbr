@@ -4,6 +4,8 @@ import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.CloseProximityInspectionRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
@@ -30,6 +32,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureSpansAndPiersResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,6 +44,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * HTTP contract for structures. Implemented by
@@ -167,6 +172,61 @@ public interface StructureApiEndpoint {
   @GetMapping("/{structureId}/documents/{fileId}/file")
   ResponseEntity<byte[]> getDocumentFile(
       @PathVariable("structureId") long structureId, @PathVariable("fileId") long fileId);
+
+  /**
+   * Adds one document or photo to the structure — legacy's Add on the Documents &amp; Photos tab,
+   * which the page calls once for each file chosen. Multipart: {@code file}, and {@code details}, a
+   * JSON part holding its type, date and description.
+   *
+   * <p>One file a request so each request stays under the frontend WAF's body limit
+   * ({@code frontend/coraza.conf}) and the backend holds one upload at a time.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — the Level 2 floor, legacy's
+   * {@code /level2Access} on the Add button; it deletes nothing. <b>201</b> with the new id;
+   * <b>404</b> when there is no such structure; <b>400</b> with {@code fieldErrors} keyed
+   * {@code file}, {@code attachmentTypeCode}, {@code createdDate} or {@code description} when the
+   * file or its details are refused — then nothing is stored.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PostMapping(value = "/{structureId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  ResponseEntity<CreatedResponse> addDocument(
+      @PathVariable("structureId") long structureId,
+      @RequestPart("file") MultipartFile file,
+      @RequestPart("details") DocumentDetailsRequest details);
+
+  /**
+   * Changes a document's type and description — legacy's edit in its viewer.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, legacy's
+   * {@code /level1Access} on the edit. <b>204</b> on success; <b>404</b> when the structure has no
+   * such document; <b>400</b> with {@code fieldErrors} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   * @param fileId      the document's {@code FILE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/documents/{fileId}")
+  ResponseEntity<Void> updateDocument(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("fileId") long fileId,
+      @RequestBody DocumentUpdateRequest request);
+
+  /**
+   * Deletes a document and its file — legacy's delete icon on the Documents &amp; Photos tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — legacy's {@code /deleteStructureDocument},
+   * Level 2. <b>204</b> on success; <b>404</b> when the structure has no such document.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   * @param fileId      the document's {@code FILE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{structureId}/documents/{fileId}")
+  ResponseEntity<Void> deleteDocument(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("fileId") long fileId);
 
   /**
    * The top of legacy's Inspections tab: planned-inspection comments, the next planned

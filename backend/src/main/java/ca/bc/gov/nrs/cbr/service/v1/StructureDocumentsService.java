@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.exception.DocumentNotFoundException;
+import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileDetailEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileEntity;
@@ -10,32 +11,46 @@ import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureFileDetailRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureFileRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileAttachmentTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.FileMimeTypeXrefRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
+import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse.Document;
+import jakarta.persistence.EntityManager;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * A structure's documents and photos — the structure page's Documents &amp; Photos tab, legacy's
  * {@code documentTab.jsp} fed by {@code FIND_FILE_DTLS_BY_STRCTRE} — and the file behind each.
  *
- * <p>Read-only for now; legacy's Add (Level 2) and Delete come with the page's editing. The bytes
- * are read from {@code CROSSING_STRUCTURE_FILE}; once they move to object storage only
- * {@link #file} changes.
+ * <p>Lists, opens, adds, edits and deletes them. The bytes live in {@code CROSSING_STRUCTURE_FILE},
+ * as legacy keeps them; once they move to object storage only {@link #file}, {@link #upload} and
+ * {@link #delete} change.
  */
 @Service
 public class StructureDocumentsService {
@@ -47,23 +62,45 @@ public class StructureDocumentsService {
   private static final Set<MediaType> SHOWN_INLINE = Set.of(
       MediaType.IMAGE_JPEG, MediaType.IMAGE_PNG, MediaType.IMAGE_GIF, MediaType.APPLICATION_PDF);
 
+  private static final Logger log = LoggerFactory.getLogger(StructureDocumentsService.class);
+
+  /** Legacy's {@code max-file-storage-size} preference, 10 MB — here for every file, JPEGs too. */
+  public static final long MAX_FILE_BYTES = 10L * 1024 * 1024;
+  /** {@code FILENAME VARCHAR2(255 BYTE)}. */
+  private static final int NAME_MAX = 255;
+  /** {@code DESCRIPTION VARCHAR2(2000 BYTE)}. */
+  private static final int TEXT_MAX = 2000;
+  /** The type whose file must be described — legacy's {@code FileAttachment.OTHER_CODE}. */
+  private static final String OTHER = "OTH";
+  private static final String TYPE = "attachmentTypeCode";
+  private static final String DESCRIPTION = "description";
+
   private final CrossingStructureRepository structures;
   private final CrossingStructureFileDetailRepository details;
   private final CrossingStructureFileRepository files;
   private final FileAttachmentTypeCodeRepository attachmentTypes;
   private final StructureInspectionRepository inspections;
+  private final FileMimeTypeXrefRepository mimeTypes;
+  private final LoggedUserHelper loggedUser;
+  private final EntityManager entityManager;
 
   public StructureDocumentsService(
       CrossingStructureRepository structures,
       CrossingStructureFileDetailRepository details,
       CrossingStructureFileRepository files,
       FileAttachmentTypeCodeRepository attachmentTypes,
-      StructureInspectionRepository inspections) {
+      StructureInspectionRepository inspections,
+      FileMimeTypeXrefRepository mimeTypes,
+      LoggedUserHelper loggedUser,
+      EntityManager entityManager) {
     this.structures = structures;
     this.details = details;
     this.files = files;
     this.attachmentTypes = attachmentTypes;
     this.inspections = inspections;
+    this.mimeTypes = mimeTypes;
+    this.loggedUser = loggedUser;
+    this.entityManager = entityManager;
   }
 
   /**
@@ -188,6 +225,194 @@ public class StructureDocumentsService {
         inline ? mediaType : MediaType.APPLICATION_OCTET_STREAM,
         inline,
         content);
+  }
+
+  /**
+   * Adds one file to the structure — legacy's Add on the Documents &amp; Photos tab
+   * ({@code UploadAction}, {@code CBR.INSERT_FILE_ATTACHMENT_DETAIL} and
+   * {@code SET_FILE_ATTACHMENT}), as the structure's own: no inspection, as legacy's tab adds.
+   *
+   * <p>The file comes with its details: a type ("Photo View"), the date it was made, and a
+   * description, required for Other. At most 10 MB and of an extension in
+   * {@code FILE_MIME_TYPE_XREF}, its name at most 255 bytes. JPEGs are stored as sent; legacy
+   * re-encoded them to a fixed width.
+   *
+   * <p>One file a call: the page sends legacy's batch of up to fifteen one at a time, so a request
+   * stays under the frontend WAF's body limit. As legacy, which committed file by file, a batch can
+   * therefore be partly stored; the page keeps the files that were not.
+   *
+   * @return the new document's id
+   * @throws StructureNotFoundException if there is no such structure
+   * @throws FieldValidationException   with a message for each field at fault, keyed {@code file},
+   *     {@code attachmentTypeCode}, {@code createdDate} or {@code description}
+   */
+  @Transactional
+  public String upload(long structureId, MultipartFile part, DocumentDetailsRequest request) {
+    if (!structures.existsById(structureId)) {
+      throw new StructureNotFoundException(structureId);
+    }
+    String mimeCode = validateUpload(part, request);
+
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    String name = part.getOriginalFilename().trim();
+    CrossingStructureFileDetailEntity detail = CrossingStructureFileDetailEntity.builder()
+        .crossingStructureId(structureId)
+        .filename(name)
+        .fileCreateDate(request.createdDate().atStartOfDay())
+        .efileExtensionCode(extension(name))
+        .fileMimeTypeCode(mimeCode)
+        .fileAttachmentTypeCode(trimmed(request.attachmentTypeCode()))
+        .description(trimmed(request.description()))
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build();
+    // persist, not save: the file row's id is assigned, so save would merge — a SELECT first, and
+    // a second copy of the bytes.
+    entityManager.persist(detail);
+    entityManager.persist(new CrossingStructureFileEntity(detail.getFileId(), bytes(part)));
+    // Ids only: the file name is the browser's, and could carry line breaks into the log.
+    log.info("Added document {} to structure {}", detail.getFileId(), structureId);
+    return String.valueOf(detail.getFileId());
+  }
+
+  /**
+   * Changes a document's type and description — legacy's edit in its viewer
+   * ({@code CBR.UPDATE_FILE_ATTACHMENT_DETAIL}), with who changed it and when. The file, its name
+   * and its date are kept. As legacy, a document an inspection brought is edited here too.
+   *
+   * @throws DocumentNotFoundException if the structure has no such document
+   * @throws FieldValidationException  with a message for each field at fault
+   */
+  @Transactional
+  public void update(long structureId, long fileId, DocumentUpdateRequest request) {
+    CrossingStructureFileDetailEntity detail = details.findById(fileId)
+        .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
+        .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
+    Map<String, String> errors = new LinkedHashMap<>();
+    checkDetails(errors, request.attachmentTypeCode(), request.description());
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Document cannot be saved", errors);
+    }
+    details.save(detail.toBuilder()
+        .fileAttachmentTypeCode(trimmed(request.attachmentTypeCode()))
+        .description(trimmed(request.description()))
+        .updateUserid(loggedUser.getLoggedUserId())
+        .updateTimestamp(LocalDateTime.now(ZoneId.systemDefault()))
+        .build());
+    log.info("Updated document {} of structure {}", fileId, structureId);
+  }
+
+  /**
+   * Deletes a document and its file — legacy's delete icon ({@code CBR.DELETE_FILE_ATTACHMENT}):
+   * the bytes first, which the foreign key requires, then the details. As legacy, a document an
+   * inspection brought is deleted here too.
+   *
+   * @throws DocumentNotFoundException if the structure has no such document
+   */
+  @Transactional
+  public void delete(long structureId, long fileId) {
+    details.findById(fileId)
+        .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
+        .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
+    files.deleteByFileIdIn(List.of(fileId));
+    details.deleteById(fileId);
+    log.info("Deleted document {} of structure {}", fileId, structureId);
+  }
+
+  /**
+   * Checks the file and its details before anything is stored.
+   *
+   * @return the file's MIME type code
+   */
+  private String validateUpload(MultipartFile part, DocumentDetailsRequest request) {
+    Map<String, String> errors = new LinkedHashMap<>();
+    String mimeCode = checkFile(errors, part);
+    if (request.createdDate() == null) {
+      errors.put("createdDate", "Photo/Doc Created is required.");
+    }
+    checkDetails(errors, request.attachmentTypeCode(), request.description());
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Document cannot be added", errors);
+    }
+    return mimeCode;
+  }
+
+  /**
+   * One file's name, size and type.
+   *
+   * @return its MIME type code, or null when it is refused
+   */
+  private String checkFile(Map<String, String> errors, MultipartFile part) {
+    String key = "file";
+    String name = part.getOriginalFilename() == null ? "" : part.getOriginalFilename().trim();
+    if (name.isEmpty()) {
+      errors.put(key, "The file has no name.");
+      return null;
+    }
+    if (name.getBytes(StandardCharsets.UTF_8).length > NAME_MAX) {
+      errors.put(key, "The file name can be at most " + NAME_MAX + " characters.");
+      return null;
+    }
+    if (part.isEmpty()) {
+      errors.put(key, name + " is empty.");
+      return null;
+    }
+    if (part.getSize() > MAX_FILE_BYTES) {
+      errors.put(key, name + " is larger than 10 MB.");
+      return null;
+    }
+    String extension = extension(name);
+    List<String> codes = extension == null ? List.of() : mimeTypes.findMimeTypeCodes(extension);
+    if (codes.isEmpty()) {
+      errors.put(key, extension == null
+          ? name + " has no file type."
+          : "Files of type ." + extension.toLowerCase(Locale.ROOT) + " cannot be added.");
+      return null;
+    }
+    return codes.getFirst();
+  }
+
+  /** A type ("Photo View") that exists, and a description when it is Other. */
+  private void checkDetails(Map<String, String> errors, String typeCode, String text) {
+    String type = trimmed(typeCode);
+    String description = trimmed(text);
+    if (type == null) {
+      errors.put(TYPE, "Photo View is required.");
+    } else if (!attachmentTypes.existsById(type)) {
+      errors.put(TYPE, "Photo View is not one of the listed types.");
+    }
+    if (description == null) {
+      if (OTHER.equals(type)) {
+        errors.put(DESCRIPTION, "Description is required for this Photo View.");
+      }
+    } else if (description.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
+      // Bytes, because the column is declared in bytes and an accented character costs two.
+      errors.put(DESCRIPTION, "Description can be at most " + TEXT_MAX + " characters.");
+    }
+  }
+
+  /** The text after the last dot, upper case, as legacy's {@code EFILE_EXTENSION_CODE}. */
+  private static String extension(String name) {
+    int dot = name.lastIndexOf('.');
+    return dot < 0 || dot == name.length() - 1
+        ? null
+        : name.substring(dot + 1).toUpperCase(Locale.ROOT);
+  }
+
+  private static byte[] bytes(MultipartFile part) {
+    try {
+      return part.getBytes();
+    } catch (IOException unreadable) {
+      throw new UncheckedIOException("Could not read " + part.getOriginalFilename(), unreadable);
+    }
+  }
+
+  /** The value without surrounding spaces, or null when nothing is left. */
+  private static String trimmed(String value) {
+    return value == null || value.isBlank() ? null : value.trim();
   }
 
   private static MediaType mediaType(CrossingStructureFileDetailEntity detail) {

@@ -36,9 +36,7 @@ public class ClientLookupService {
    * {@code 5} asks for {@code 00000005} and can return at most that client's locations — whereas
    * two letters would match a large share of the table and tell the user nothing.
    *
-   * <p>nr-frep's floor is the same three characters, for a different reason worth not inheriting:
-   * its proc {@code BULK COLLECT}s into a {@code VARRAY(500)} and <em>raises</em> when a search
-   * overflows it. Nothing here overflows; a broad term is capped and ordered, not an error.
+   * <p>Nothing here overflows: a broad term is capped and ordered, not an error.
    */
   private static final int MINIMUM_TERM_LENGTH = 3;
 

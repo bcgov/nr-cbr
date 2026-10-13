@@ -1,8 +1,7 @@
 import type { StatusTagType } from '@/types/configuration';
 
 /**
- * Carbon `Tag` colours for a crossing site's status, matching how nr-frep colours a checklist
- * status.
+ * Carbon `Tag` colours for a crossing site's status.
  *
  * <p><b>Keyed on the code, never the description.</b> The description lives in
  * `CROSSING_SITE_STATUS_CODE` and the business can reword it there at any time — "Deactivated"

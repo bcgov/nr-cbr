@@ -272,7 +272,7 @@ class StructureServiceTest {
   void namesEveryBlocker() {
     givenStructure(1L, "Y");
     entityManager.persist(CrossingStructureFileDetailEntity.builder()
-        .fileId(1L).crossingStructureId(1L).build());
+        .crossingStructureId(1L).build());
     entityManager.persist(StructureRepairEntity.builder()
         .crossingStructureId(1L).build());
     entityManager.persist(StructureMonitorItemEntity.builder()

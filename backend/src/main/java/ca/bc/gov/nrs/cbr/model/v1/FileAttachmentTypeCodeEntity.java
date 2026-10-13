@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -15,8 +16,8 @@ import org.hibernate.annotations.Immutable;
 /**
  * {@code THE.FILE_ATTACHMENT_TYPE_CODE} — What an attached file shows or is.
  *
- * <p>Read only to decode a stored code on the structure page's Documents &amp; Photos tab, where
- * the description is the link that opens the file.
+ * <p>Decodes a stored code on the structure page's Documents &amp; Photos tab, where the
+ * description is the link that opens the file; the current codes are its "Photo View" list.
  */
 @Entity
 @Immutable
@@ -35,4 +36,10 @@ public class FileAttachmentTypeCodeEntity {
 
   @Column(name = "DESCRIPTION", length = 120)
   private String description;
+
+  @Column(name = "EFFECTIVE_DATE")
+  private LocalDateTime effectiveDate;
+
+  @Column(name = "EXPIRY_DATE")
+  private LocalDateTime expiryDate;
 }

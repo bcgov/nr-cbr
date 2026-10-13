@@ -1,8 +1,8 @@
 import { TextInput, Theme } from '@carbon/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { page } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { EMPTY_SITE } from './types';
 
@@ -112,7 +112,7 @@ describe('SiteForm — Capital Road', () => {
 
 describe('SiteForm — read-only labels', () => {
   it('are the colour of the input labels beside them', () => {
-    // The component's own label is nr-frep's secondary grey, meant for a page of values. On a form
+    // The component's own label is a secondary grey, meant for a page of values. On a form
     // mixing values and inputs in one row, it read as the label of something disabled. Inside the
     // app's Theme, which is what defines the colour tokens — without it both resolve to inherit.
     render(

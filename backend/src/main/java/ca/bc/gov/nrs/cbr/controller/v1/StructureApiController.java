@@ -14,6 +14,8 @@ import ca.bc.gov.nrs.cbr.service.v1.StructureSpansAndPiersService;
 import ca.bc.gov.nrs.cbr.struct.v1.CloseProximityInspectionRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
@@ -45,6 +47,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** Structures. Mappings and authorization are declared on {@link StructureApiEndpoint}. */
 @RestController
@@ -139,6 +142,26 @@ public class StructureApiController implements StructureApiEndpoint {
   @Override
   public StructureInspectionScheduleResponse getInspectionSchedule(long structureId) {
     return inspectionsService.schedule(structureId);
+  }
+
+  @Override
+  public ResponseEntity<CreatedResponse> addDocument(
+      long structureId, MultipartFile file, DocumentDetailsRequest details) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(new CreatedResponse(
+        documentsService.upload(structureId, file, details)));
+  }
+
+  @Override
+  public ResponseEntity<Void> updateDocument(
+      long structureId, long fileId, DocumentUpdateRequest request) {
+    documentsService.update(structureId, fileId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteDocument(long structureId, long fileId) {
+    documentsService.delete(structureId, fileId);
+    return ResponseEntity.noContent().build();
   }
 
   @Override

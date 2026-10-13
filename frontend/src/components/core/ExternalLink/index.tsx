@@ -22,8 +22,7 @@ type Props = {
 );
 
 /**
- * A link that opens in a new tab, with the trailing launch icon that says so — nr-frep's
- * `ExternalLink`, which CBR follows.
+ * A link that opens in a new tab, with the trailing launch icon that says so.
  *
  * <p>The icon is the convention users read as "this goes somewhere else"; without it a link that
  * takes a new tab looks identical to one that navigates in place. It is `aria-hidden` because a
@@ -33,7 +32,7 @@ type Props = {
  * <p>`rel="noopener noreferrer"` is not optional: without `noopener` the opened page gets a handle
  * on this window through `window.opener` and can navigate it.
  *
- * <p>Takes `to` as well as nr-frep's `href`, for a CBR page opened in its own tab — a site from the
+ * <p>Takes `to` as well as `href`, for a CBR page opened in its own tab — a site from the
  * structure it stands on — so the route still picks up the app's base path.
  */
 export const ExternalLink: FC<Props> = ({ href, to, children, className }) => {

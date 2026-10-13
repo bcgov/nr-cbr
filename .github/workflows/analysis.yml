@@ -56,9 +56,8 @@ jobs:
       # PRs from forks (no secrets) and repos that haven't had their SonarCloud
       # projects created yet skip the scan instead of failing it.
       #
-      # Backend and frontend deliberately use SEPARATE project keys. nr-fspts
-      # shares one key between them, which makes each scan replace the other's
-      # results — don't copy that here.
+      # Backend and frontend deliberately use SEPARATE project keys: one key
+      # shared between them makes each scan replace the other's results.
       - name: SonarCloud scan
         if: env.SONAR_TOKEN != '' && env.SONAR_PROJECT_KEY != ''
         working-directory: backend

@@ -127,7 +127,7 @@ class CbrAuthoritiesTest {
   @Test
   @DisplayName("role names are matched exactly — a suffixed role is not ours")
   void suffixedRolesAreNotRecognised() {
-    // Unlike nr-fspts, which accepts an org suffix. CBR scopes nothing, so CBR_LEVEL_2_DCK must NOT
+    // No org suffix is accepted. CBR scopes nothing, so CBR_LEVEL_2_DCK must NOT
     // resolve to CBR_LEVEL_2 — that would grant province-wide delete to someone a FAM admin
     // believed was scoped to one district.
     assertThat(CbrRoles.isKnown(CbrRoles.LEVEL_2)).isTrue();

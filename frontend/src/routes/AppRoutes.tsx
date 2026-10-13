@@ -13,10 +13,10 @@ import { useAuthorization } from '@/hooks/useAuthorization';
 
 /**
  * Top-level router. Switches between three route sets based on auth state: public, no-role, and
- * protected. Ported from nr-frep's AppRoutes.
+ * protected.
  *
- * <p>nr-frep also serves an offline route set when the browser is offline and the user is not
- * signed in. CBR will need the same once the offline inspection flow lands (see
+ * <p>An offline route set, served when the browser is offline and the user is not signed in, will
+ * be needed once the offline inspection flow lands (see
  * cbr-offline-client.local.md) — it is deliberately not stubbed here, because a route
  * set with nothing behind it is worse than none.
  */
@@ -68,7 +68,7 @@ const AppRoutes: FC = () => {
             router it is first given and ignores a later one, so swapping the prop alone left the
             previous set's page on screen. Every other transition between sets happens through a
             full page load (the OAuth redirect, the end-session redirect), which hides this — until
-            an in-place set swap is needed, as nr-frep found with offline sign-out. Only fires when
+            an in-place set swap is needed, as an offline sign-out would be. Only fires when
             the set changes, never on navigation. */}
           <RouterProvider key={routeSetId} router={browserRouter} />
         </Suspense>

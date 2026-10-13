@@ -1,5 +1,6 @@
-import { Download, Folder, Launch } from '@carbon/icons-react';
+import { Add, Edit, Folder, Launch, TrashCan } from '@carbon/icons-react';
 import {
+  Button,
   Checkbox,
   InlineNotification,
   Pagination,
@@ -13,13 +14,19 @@ import {
 } from '@carbon/react';
 import { useState } from 'react';
 
+import DestructiveModal from '@/components/core/DestructiveModal';
+
 import Card from './Card';
+import EditDocumentDialog from './EditDocumentDialog';
 import { opensInTab, openDocument } from './openDocument';
+import UploadDocumentsDialog from './UploadDocumentsDialog';
 
 import type { StructureDocument } from './documentsResponse';
 import type { FC } from 'react';
 
-import { useStructureDocuments } from '@/hooks/useStructureSearch';
+import { useNotification } from '@/context/notification/useNotification';
+import { useAuthorization } from '@/hooks/useAuthorization';
+import { useDeleteDocument, useStructureDocuments } from '@/hooks/useStructureSearch';
 import API from '@/services/APIs';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
@@ -72,13 +79,24 @@ type TableProps = {
   /** The file being fetched, if any. */
   opening: string | null;
   onOpen: (document: StructureDocument) => void;
+  /** Offered from Level 1 up — legacy's edit in its viewer. */
+  onEdit?: (document: StructureDocument) => void;
+  /** Offered from Level 2 up — legacy's delete icon. */
+  onDelete?: (document: StructureDocument) => void;
 };
 
 /**
  * One card's files, a page at a time. Paged here rather than by the server: a structure has tens of
  * files, not thousands, and the list arrives whole.
  */
-const DocumentsTable: FC<TableProps> = ({ title, documents, opening, onOpen }) => {
+const DocumentsTable: FC<TableProps> = ({
+  title,
+  documents,
+  opening,
+  onOpen,
+  onEdit,
+  onDelete,
+}) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   // Back to the last page there is when the list shrinks under it — when early files are hidden.
@@ -88,52 +106,90 @@ const DocumentsTable: FC<TableProps> = ({ title, documents, opening, onOpen }) =
 
   return (
     <>
-      <Table size="md" useZebraStyles aria-label={title}>
-        <TableHead>
-          <TableRow>
-            <TableHeader className="structure-detail__nowrap">Available Documents</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Photo/Doc Created</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Type</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Obtained From</TableHeader>
-            <TableHeader>Description</TableHeader>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((document) => {
-            const inTab = opensInTab(document);
-            const Icon = inTab ? Launch : Download;
-            return (
-              <TableRow key={document.id} data-testid={`structure-document-${document.id}`}>
-                <TableCell className="structure-detail__nowrap">
-                  <button
-                    type="button"
-                    className="structure-detail__file-link"
-                    disabled={opening === document.id}
-                    aria-busy={opening === document.id}
-                    onClick={() => onOpen(document)}
-                  >
+      {/* Six columns and three actions: anything wider than the card scrolls inside it. */}
+      <div className="structure-detail__table-scroll">
+        <Table size="md" useZebraStyles aria-label={title}>
+          <TableHead>
+            <TableRow>
+              <TableHeader className="structure-detail__nowrap">Available Documents</TableHeader>
+              <TableHeader className="structure-detail__nowrap">Photo/Doc Created</TableHeader>
+              <TableHeader className="structure-detail__nowrap">Type</TableHeader>
+              <TableHeader className="structure-detail__nowrap">Obtained From</TableHeader>
+              <TableHeader>Description</TableHeader>
+              {/* Always: View is everyone's. */}
+              <TableHeader>Actions</TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.map((document) => {
+              const inTab = opensInTab(document);
+              const name = document.filename ?? 'document';
+              return (
+                <TableRow key={document.id} data-testid={`structure-document-${document.id}`}>
+                  <TableCell>
                     {document.attachmentType.description ||
                       document.attachmentType.code ||
                       document.filename}
-                    <Icon size={16} aria-hidden="true" />
-                    <span className="cds--visually-hidden">
-                      {inTab ? ' (opens in a new tab)' : ' (downloads)'}
-                    </span>
-                  </button>
-                </TableCell>
-                <TableCell className="structure-detail__nowrap">
-                  {formatShortDate(document.created)}
-                </TableCell>
-                <TableCell className="structure-detail__nowrap">{document.extension}</TableCell>
-                <TableCell className="structure-detail__nowrap">
-                  {document.inspectionId === null ? 'Structure' : 'Inspection'}
-                </TableCell>
-                <TableCell className="structure-detail__comment">{document.description}</TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                  </TableCell>
+                  <TableCell className="structure-detail__nowrap">
+                    {formatShortDate(document.created)}
+                  </TableCell>
+                  <TableCell className="structure-detail__nowrap">{document.extension}</TableCell>
+                  <TableCell className="structure-detail__nowrap">
+                    {document.inspectionId === null ? 'Structure' : 'Inspection'}
+                  </TableCell>
+                  <TableCell className="structure-detail__comment">
+                    {document.description}
+                  </TableCell>
+                  <TableCell className="structure-detail__nowrap">
+                    {/* View, on every row alike: an image or a PDF opens in a new tab,
+                        anything else downloads — a browser cannot show it, and one from this origin
+                        must not run. The hidden text says which. */}
+                    <Button
+                      kind="ghost"
+                      size="sm"
+                      renderIcon={Launch}
+                      disabled={opening === document.id}
+                      aria-busy={opening === document.id}
+                      data-testid={`structure-document-view-${document.id}`}
+                      onClick={() => onOpen(document)}
+                    >
+                      View{' '}
+                      <span className="cds--visually-hidden">
+                        {name}
+                        {inTab ? ' (opens in a new tab)' : ' (downloads)'}
+                      </span>
+                    </Button>
+                    {onEdit && (
+                      <Button
+                        kind="ghost"
+                        size="sm"
+                        renderIcon={Edit}
+                        data-testid={`structure-document-edit-${document.id}`}
+                        onClick={() => onEdit(document)}
+                      >
+                        Edit <span className="cds--visually-hidden">{name}</span>
+                      </Button>
+                    )}
+                    {/* danger--ghost, as every Delete in the app: red at rest and on hover. */}
+                    {onDelete && (
+                      <Button
+                        kind="danger--ghost"
+                        size="sm"
+                        renderIcon={TrashCan}
+                        data-testid={`structure-document-delete-${document.id}`}
+                        onClick={() => onDelete(document)}
+                      >
+                        Delete <span className="cds--visually-hidden">{name}</span>
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
       <Pagination
         page={current}
         pageSize={pageSize}
@@ -150,9 +206,12 @@ const DocumentsTable: FC<TableProps> = ({ title, documents, opening, onOpen }) =
 
 /**
  * Legacy's Documents & Photos tab (`documentTab.jsp`): the structure's files, then each
- * inspection's, a card for each of legacy's folders. The attachment type opens the file — an image
- * or a PDF in a new tab, anything else as a download. Read-only for now; legacy's Add (Level 2) and
- * Delete come with the page's editing.
+ * inspection's, a card for each of legacy's folders. Each row's View opens its file — an image or a
+ * PDF in a new tab — or, for anything else, downloads it.
+ *
+ * <p>"Add documents" sits in the structure folder's header, from Level 2 up, as legacy's button —
+ * files added here are the structure's own. Each row offers Edit (its Photo View and description,
+ * Level 1 up) and Delete (Level 2 up), an inspection's files too, as legacy's tab did.
  */
 const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt }) => {
   const loaded = useStructureDocuments(structureId, opened);
@@ -160,6 +219,12 @@ const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt }) => {
   /** The file being fetched, so its link can say so and not be pressed twice. */
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
+  const { canEdit, canDelete } = useAuthorization();
+  const { display } = useNotification();
+  const deleteDocument = useDeleteDocument(structureId);
+  const [uploading, setUploading] = useState(false);
+  const [editing, setEditing] = useState<StructureDocument | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<StructureDocument | null>(null);
 
   if (loaded.isError) {
     return (
@@ -187,6 +252,22 @@ const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt }) => {
   const hidden = all.filter((document) => beforeInstall(document, yearBuilt)).length;
   const shown = showEarly ? all : all.filter((document) => !beforeInstall(document, yearBuilt));
   const groups = groupDocuments(shown);
+  // Add belongs to the structure's own folder, so that card is there to hold it even before the
+  // structure has a file of its own.
+  if (canDelete && groups.length > 0 && groups[0].key !== 'structure') {
+    groups.unshift({ key: 'structure', title: 'Structure Documents & Photos', documents: [] });
+  }
+  const addButton = canDelete && (
+    <Button
+      kind="tertiary"
+      size="sm"
+      renderIcon={Add}
+      data-testid="structure-documents-add"
+      onClick={() => setUploading(true)}
+    >
+      Add documents
+    </Button>
+  );
 
   const open = async (document: StructureDocument) => {
     setOpening(document.id);
@@ -225,7 +306,12 @@ const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt }) => {
       )}
 
       {groups.length === 0 ? (
-        <Card title="Documents & Photos" icon={Folder} testId="structure-documents-empty">
+        <Card
+          title="Documents & Photos"
+          icon={Folder}
+          testId="structure-documents-empty"
+          action={addButton}
+        >
           <p className="structure-detail__empty">No photos and/or documents have been loaded.</p>
         </Card>
       ) : (
@@ -235,16 +321,74 @@ const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt }) => {
             title={group.title}
             icon={Folder}
             testId={`structure-documents-${group.key}`}
+            action={group.key === 'structure' ? addButton : undefined}
           >
-            <DocumentsTable
-              title={group.title}
-              documents={group.documents}
-              opening={opening}
-              onOpen={(document) => void open(document)}
-            />
+            {group.documents.length === 0 ? (
+              <p className="structure-detail__empty">
+                No photos and/or documents have been loaded.
+              </p>
+            ) : (
+              <DocumentsTable
+                title={group.title}
+                documents={group.documents}
+                opening={opening}
+                onOpen={(document) => void open(document)}
+                onEdit={canEdit ? setEditing : undefined}
+                onDelete={canDelete ? setPendingDelete : undefined}
+              />
+            )}
           </Card>
         ))
       )}
+
+      {uploading && (
+        <UploadDocumentsDialog structureId={structureId} onClose={() => setUploading(false)} />
+      )}
+      {editing !== null && (
+        <EditDocumentDialog
+          key={editing.id}
+          structureId={structureId}
+          document={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {/* Legacy's window.confirm(), as the app's other deletes ask. */}
+      <DestructiveModal
+        open={pendingDelete !== null}
+        title="Delete document"
+        message={`Are you sure you would like to delete ${
+          pendingDelete?.filename ?? 'this document'
+        }? This cannot be undone.`}
+        confirmButtonText="Delete"
+        loading={deleteDocument.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const document = pendingDelete;
+          if (document === null) return;
+          deleteDocument.mutate(document.id, {
+            onSuccess: () => {
+              setPendingDelete(null);
+              display({
+                kind: 'success',
+                title: `${document.filename ?? 'Document'} deleted`,
+                timeout: 4000,
+              });
+            },
+            onError: (error) => {
+              setPendingDelete(null);
+              display({
+                kind: 'error',
+                title: 'The document was not deleted',
+                subtitle: apiErrorMessage(
+                  error,
+                  'Try again, or contact support if this continues.',
+                ),
+                timeout: 0,
+              });
+            },
+          });
+        }}
+      />
     </div>
   );
 };

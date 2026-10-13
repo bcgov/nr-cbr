@@ -18,8 +18,8 @@ describe('ReadOnlyField', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
-  it("sets the value in nr-frep's record style — 14px, 18px lines, 0.16px tracking", () => {
-    // Measured from nr-frep's record header: plain text in a Carbon Tile, which is body-compact-01.
+  it('sets the value in the record style — 14px, 18px lines, 0.16px tracking', () => {
+    // Carbon's body-compact-01, as plain text in a Carbon Tile is set.
     render(<ReadOnlyField label="Site #" value="63-007" />);
     const style = getComputedStyle(screen.getByText('63-007'));
 

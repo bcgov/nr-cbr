@@ -1,5 +1,5 @@
 /**
- * Shared vocabulary for validation that runs while the user is still typing. Ported from nr-frep.
+ * Shared vocabulary for validation that runs while the user is still typing.
  *
  * <p>A field's rules fall into two families, and only one of them can be shown on every keystroke:
  *

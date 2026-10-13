@@ -23,6 +23,7 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SuperstructureTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitorFrequencyCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.FileAttachmentTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
@@ -31,6 +32,8 @@ import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.FileAttachmentTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.FileMimeTypeXrefRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
@@ -96,6 +99,9 @@ class ConfigurationServiceTest {
       mock(RepairPriorityCodeRepository.class);
   private final StructureRepairGroupCodeRepository repairGroups =
       mock(StructureRepairGroupCodeRepository.class);
+  private final FileAttachmentTypeCodeRepository attachmentTypes =
+      mock(FileAttachmentTypeCodeRepository.class);
+  private final FileMimeTypeXrefRepository mimeTypes = mock(FileMimeTypeXrefRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes,
@@ -115,7 +121,9 @@ class ConfigurationServiceTest {
       monitorFrequencies,
       repairStatuses,
       repairPriorities,
-      repairGroups);
+      repairGroups,
+      attachmentTypes,
+      mimeTypes);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -369,5 +377,19 @@ class ConfigurationServiceTest {
         .containsExactly(new CodeOptionResponse("H", "High"));
     assertThat(service.getRepairGroupCodes())
         .containsExactly(new CodeOptionResponse("APPR", "Approach"));
+  }
+
+  @Test
+  @DisplayName("lists the document types and the extensions a document may have")
+  void documentCodes() {
+    when(attachmentTypes.findAllCurrent()).thenReturn(List.of(
+        FileAttachmentTypeCodeEntity.builder().fileAttachmentTypeCode("OTH").description("Other")
+            .build()));
+
+    when(mimeTypes.findExtensions()).thenReturn(List.of("JPG", "PDF"));
+
+    assertThat(service.getFileAttachmentTypeCodes())
+        .containsExactly(new CodeOptionResponse("OTH", "Other"));
+    assertThat(service.getDocumentExtensions()).containsExactly("JPG", "PDF");
   }
 }

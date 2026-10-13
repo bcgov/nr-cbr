@@ -16,7 +16,7 @@ describe('apiErrorMessage', () => {
     expect(apiErrorMessage(error, 'fallback')).toBe('Still in use.');
   });
 
-  it('falls back to message, the shape nr-frep returns', () => {
+  it('falls back to message, the shape a ResponseStatusException returns', () => {
     const error = Object.assign(new Error('Bad Request'), { body: { message: 'Not a month.' } });
 
     expect(apiErrorMessage(error, 'fallback')).toBe('Not a month.');

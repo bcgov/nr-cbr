@@ -127,4 +127,14 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   public ResponseEntity<List<CodeOptionResponse>> getRepairGroupCodes() {
     return ResponseEntity.ok(configurationService.getRepairGroupCodes());
   }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getFileAttachmentTypeCodes() {
+    return ResponseEntity.ok(configurationService.getFileAttachmentTypeCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<String>> getDocumentExtensions() {
+    return ResponseEntity.ok(configurationService.getDocumentExtensions());
+  }
 }

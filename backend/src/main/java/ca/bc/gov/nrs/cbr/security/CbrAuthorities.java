@@ -4,13 +4,13 @@ package ca.bc.gov.nrs.cbr.security;
  * Centralised method-security expressions for {@code @PreAuthorize}.
  *
  * <p>The role&rarr;capability matrix is defined once here, so every endpoint names a capability
- * rather than repeating a role list. Same split as nr-fspts' {@code FspAuthorities}.
+ * rather than repeating a role list.
  *
  * <p>Expressions use {@code hasAnyAuthority(...)} with bare role names, because
- * {@link Oauth2SecurityCustomizer} exposes authorities with <b>no {@code ROLE_} prefix</b>. (nr-fspts
- * prefixes and uses {@code hasRole}; the two conventions must not be mixed within one application —
- * a prefixed expression against unprefixed authorities simply never matches, and it fails as a
- * blanket 403 rather than as anything that names the cause.)
+ * {@link Oauth2SecurityCustomizer} exposes authorities with <b>no {@code ROLE_} prefix</b>. (The
+ * other convention prefixes and uses {@code hasRole}; the two must not be mixed within one
+ * application — a prefixed expression against unprefixed authorities simply never matches, and it
+ * fails as a blanket 403 rather than as anything that names the cause.)
  *
  * <h2>Capability matrix</h2>
  * Derived from the WebADE {@code ACTION_LNK} export — see {@code cbr-auth-and-roles.local.md} §3.2.
@@ -36,8 +36,7 @@ package ca.bc.gov.nrs.cbr.security;
  * <p>These are coarse, role-level gates: they decide whether a kind of user may ever perform an
  * operation. They do <b>not</b> decide whether this caller may do it to <em>this</em> record in
  * <em>this</em> state — that fence is separate, and for CBR it is the
- * {@code STRUCTURE_INSPECTION_REVIEWER} row that binds a sign-off to a named P.Eng (§6). nr-fspts
- * puts the equivalent in {@code FspAccessGuard}.
+ * {@code STRUCTURE_INSPECTION_REVIEWER} row that binds a sign-off to a named P.Eng (§6).
  *
  * <p>Every expression below is pinned against {@link CbrRoles#LADDER} by {@code CbrAuthoritiesTest},
  * so a reordered ladder fails the build instead of silently re-granting.

@@ -16,8 +16,8 @@ const RECREATION = 'REC';
 
 /**
  * The Information tab, first of the page's tabs: what the structure is and the site it stands on —
- * legacy's header above its tabs (`structure.jsp:4069-4314`), read-only, moved into a tab of its own
- * as nr-fspts' FSP page opens on an Information tab.
+ * legacy's header above its tabs (`structure.jsp:4069-4314`), read-only, moved into a tab of its own,
+ * the one the page opens on.
  *
  * <p>Site Status is not here: it sits beside the page title as a status pill, as Site Search shows
  * it.
@@ -37,7 +37,7 @@ const InformationTab: FC<Props> = ({ structure }) => {
         <ReadOnlyField
           label="Site #"
           value={
-            // Its own tab, as nr-frep opens a linked record: the structure stays where the user
+            // Its own tab: the structure stays where the user
             // left it.
             site?.siteId ? (
               <ExternalLink to={`/inventory/site/${site.siteId}`}>{site.siteId}</ExternalLink>

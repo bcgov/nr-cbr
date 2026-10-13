@@ -25,7 +25,7 @@ export type OrgUnitOption = {
   orgUnitName: string;
 };
 
-/** The Carbon `Tag` colours this application uses. Mirrors nr-frep's `StatusTagType`. */
+/** The Carbon `Tag` colours this application uses. */
 export type StatusTagType =
   | 'red'
   | 'magenta'

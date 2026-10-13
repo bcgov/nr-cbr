@@ -32,8 +32,8 @@ export const LayoutHeader: FC = () => {
         isActive={isSideNavExpanded}
         onClick={handleMenuButtonClick}
       />
-      {/* The app name renders in Carbon's prefix style (regular weight) ahead of the bold full name,
-          matching the FSPTS header treatment. */}
+      {/* The app name renders in Carbon's prefix style (regular weight) ahead of the bold full
+          name. */}
       <HeaderName as={Link} to={LANDING_AFTER_LOGIN} prefix={APP_NAME}>
         {APP_FULL_NAME}
       </HeaderName>

@@ -2,7 +2,10 @@ package ca.bc.gov.nrs.cbr.model.v1;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -15,9 +18,8 @@ import lombok.ToString;
 /**
  * {@code THE.CROSSING_STRUCTURE_FILE_DETAIL} — an attachment's metadata.
  *
- * <p>Read by the structure page's Documents &amp; Photos tab, and by the deletes that clear a
- * structure's or an inspection's attachments. The audit columns are not mapped; nothing reads them
- * yet.
+ * <p>Read by the structure page's Documents &amp; Photos tab, which also adds, edits and deletes
+ * them, and by the deletes that clear a structure's or an inspection's attachments.
  *
  * <p>{@link #inspectionId} is nullable: an attachment can hang off a structure rather than an
  * inspection, and those are not the ones an inspection delete removes.
@@ -29,10 +31,19 @@ import lombok.ToString;
 @EqualsAndHashCode(of = "fileId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class CrossingStructureFileDetailEntity {
 
+  /**
+   * From {@code THE.CROSSING_STRCTRE_FILE_DTL_SEQ}, as legacy's
+   * {@code INSERT_FILE_ATTACHMENT_DETAIL} takes it; the file's bytes take the same id.
+   * {@code allocationSize = 1} because the sequence increments by 1 and legacy draws from it too:
+   * Hibernate's default of 50 would hand out ids it assumes are reserved and collide with legacy's.
+   */
   @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "structureFileDetailSeq")
+  @SequenceGenerator(name = "structureFileDetailSeq",
+      sequenceName = "THE.CROSSING_STRCTRE_FILE_DTL_SEQ", allocationSize = 1)
   @Column(name = "FILE_ID")
   private Long fileId;
 
@@ -67,4 +78,16 @@ public class CrossingStructureFileDetailEntity {
 
   @Column(name = "DESCRIPTION", length = 2000)
   private String description;
+
+  @Column(name = "ENTRY_USERID", length = 30)
+  private String entryUserid;
+
+  @Column(name = "ENTRY_TIMESTAMP")
+  private LocalDateTime entryTimestamp;
+
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 }

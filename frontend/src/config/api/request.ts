@@ -200,7 +200,7 @@ export const getHeaders = async (
   // Multipart must carry the boundary the browser generates, and the browser only adds it when the
   // header is absent. Deleting is required, not just skipping: 'application/json' is seeded as a
   // base default above, so leaving it in place would send a FormData body labelled as JSON and the
-  // server would fail to parse it. Mirrors nr-fspts's apiFetch, which never sets Content-Type.
+  // server would fail to parse it.
   if (isFormData(options.body) || isFormData(formData)) {
     delete headers['Content-Type'];
   }

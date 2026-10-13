@@ -50,8 +50,7 @@ BackendApiConfig.TOKEN = async () => {
  * The backend API clients, one per controller.
  *
  * <p>Constructed once at module load and shared, so every call goes through the same axios instance
- * and the same token resolver. nr-frep's `APIs.ts` in miniature — it will grow a service per
- * controller as the screens land.
+ * and the same token resolver. It grows a service per controller as the screens land.
  */
 const API = {
   client: new ClientService(BackendApiConfig),

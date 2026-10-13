@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { configure, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,11 +8,6 @@ import AddSitePage from './index';
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 
 import { WORK_SAVED } from '@/context/unsavedChanges/workSaved';
-
-// The road lookup waits ROAD_SECTION_DEBOUNCE_MS (300ms) after the last keystroke before it asks,
-// so a message it decides arrives a debounce and a render after the typing. Testing Library's
-// default 1s wait covers that on a laptop but not on a loaded CI runner, where it timed out.
-configure({ asyncUtilTimeout: 3000 });
 
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
@@ -347,8 +342,7 @@ describe('AddSitePage — validation', () => {
 
   it('marks the Inspection Status box when it disagrees with the status, without waiting for Save', async () => {
     // Inline and live. Legacy stamps fieldName="structureInspectionStatusCode" on this rule, and a
-    // clash between two values the user deliberately chose is not a field left unfinished — the
-    // same line nr-frep draws for its duplicate-label check.
+    // clash between two values the user deliberately chose is not a field left unfinished.
     await renderPage();
     await fillRequired();
     type('structureInspectionStatusCode', 'DNI');
@@ -809,9 +803,14 @@ describe('AddSitePage — the site type', () => {
     type('forestFileId', 'tess');
     type('roadSectionId', '0');
 
-    expect(
-      await screen.findByText('No road matches this Project File ID# and Br.'),
-    ).toBeInTheDocument();
+    // Two boxes change, so the road is asked twice: tess/01 between the two edits, then tess/0. The
+    // message shows for the first answer, hides while the second is asked, and shows again — so
+    // wait for the last question to have been asked and answered, not for the first sighting. On a
+    // slow runner the first sighting was found and then detached before it could be checked.
+    await waitFor(() => {
+      expect(roadApi.getRoadSection).toHaveBeenLastCalledWith('tess', '0');
+      expect(screen.getByText('No road matches this Project File ID# and Br.')).toBeInTheDocument();
+    });
     save();
     expect(siteApi.createSite).not.toHaveBeenCalled();
     expect(screen.queryByText('Forest District is required.')).not.toBeInTheDocument();

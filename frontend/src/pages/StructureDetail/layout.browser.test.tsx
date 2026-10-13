@@ -160,7 +160,7 @@ describe('StructureDetailPage — layout', () => {
     expect(pill.height).toBeLessThan(heading.height);
   });
 
-  it('sets each value 8px under its bold label, as nr-fspts does', async () => {
+  it('sets each value 8px under its bold label', async () => {
     await page.viewport(1400, 900);
     await renderPage();
 
@@ -300,7 +300,7 @@ describe('StructureDetailPage — layout', () => {
   it.each([1400, 400])(
     'runs the grey pane the full width of the page at %ipx, cards in line with the tabs',
     async (width) => {
-      // nr-fspts' FSP page: no white margin either side of the pane.
+      // No white margin either side of the pane.
       await page.viewport(width, 900);
       await renderPage();
 

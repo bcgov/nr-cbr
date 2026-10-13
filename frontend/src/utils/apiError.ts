@@ -7,8 +7,8 @@
  * close-proximity inspection — and neither is visible from the screen the user is on, so without it
  * they are told "could not delete" and have nowhere to go.
  *
- * <p>`message` is checked next because that is the shape nr-frep reads (`ResponseStatusException`
- * with `server.error.include-message` enabled, no problem details), and this util came from there.
+ * <p>`message` is checked next because that is the shape a `ResponseStatusException` takes with
+ * `server.error.include-message` enabled and no problem details.
  * Anything that reaches CBR through a different Spring configuration still resolves.
  *
  * <p>The thrown `Error`'s own `message` is the third choice, not the first: for an `ApiError` it is

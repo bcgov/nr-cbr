@@ -33,7 +33,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
 
-  // nr-frep runs a `setup` project (e2e/auth.setup.ts) that signs in through IDIR with
+  // The usual shape is a `setup` project (e2e/auth.setup.ts) that signs in through IDIR with
   // E2E_IDIR_USER / E2E_IDIR_PASSWORD and saves the session to STORAGE_STATE, then makes the main
   // project depend on it. That is the right shape for CBR too, but it cannot run until CBR has a
   // FAM/Cognito client — so the suite currently covers only unauthenticated surfaces. To restore

@@ -15,15 +15,15 @@ import org.springframework.web.bind.annotation.RequestParam;
  * HTTP contract for the reference lookups that populate the UI's dropdowns. Implemented by
  * {@link ca.bc.gov.nrs.cbr.controller.v1.ConfigurationApiController}.
  *
- * <p>The mappings and the authorization live here rather than on the controller, following nr-frep:
+ * <p>The mappings and the authorization live here rather than on the controller:
  * the interface is the contract, the controller is one way of satisfying it.
  *
  * <p>One endpoint per list rather than a single bundle. The lists are cached independently, change
  * on entirely different schedules, and only one of them — management areas — takes a parameter; a
  * bundle would have to re-fetch the other nine every time a district changed.
  *
- * <p><b>Every method is gated on {@link CbrAuthorities#READ}</b>, which nr-frep's equivalent does
- * not do — it leaves its lookups at "any authenticated caller". The stricter line is taken here
+ * <p><b>Every method is gated on {@link CbrAuthorities#READ}</b> rather than left at "any
+ * authenticated caller". The stricter line is taken
  * because these lists exist to fill in the Site Search and Inspection Search forms, and both are
  * READ-gated: a token holder with no CBR role has nothing to do with them. Read is the weakest
  * capability CBR has, so this excludes only callers who could not use the answer.
@@ -167,4 +167,14 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/repair-group-codes")
   ResponseEntity<List<CodeOptionResponse>> getRepairGroupCodes();
+
+  /** Document types — the "Photo View" select on a document or photo. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/file-attachment-type-codes")
+  ResponseEntity<List<CodeOptionResponse>> getFileAttachmentTypeCodes();
+
+  /** The file extensions a document may have, upper case — the upload dialog's early check. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/document-extensions")
+  ResponseEntity<List<String>> getDocumentExtensions();
 }

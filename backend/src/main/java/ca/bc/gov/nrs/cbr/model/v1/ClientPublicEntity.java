@@ -24,8 +24,7 @@ import org.hibernate.annotations.Immutable;
  *       application at all.</li>
  *   <li>The view exists to keep personal data out of queries that do not need it. Legacy selects
  *       {@code LEGAL_FIRST_NAME} and {@code LEGAL_MIDDLE_NAME} from the table; the one column the
- *       search needs is {@code CLIENT_NAME}, which the view carries. nr-frep made the same
- *       substitution deliberately.</li>
+ *       search needs is {@code CLIENT_NAME}, which the view carries.</li>
  * </ul>
  *
  * <p><b>Read through a subquery, never an association.</b> Nothing maps a relationship to this

@@ -29,6 +29,9 @@ const api = vi.hoisted(() => ({
   getSpansAndPiers: vi.fn(),
   getDocuments: vi.fn(),
   getDocumentFile: vi.fn(),
+  addDocument: vi.fn(),
+  updateDocument: vi.fn(),
+  deleteDocument: vi.fn(),
   getInspectionSchedule: vi.fn(),
   updateInspectionSchedule: vi.fn(),
   addPlannedInspectionComment: vi.fn(),
@@ -52,6 +55,8 @@ const configurationApi = vi.hoisted(() => ({
   getRepairPriorityCodes: vi.fn(),
   getRepairGroupCodes: vi.fn(),
   getSpecialEquipmentCodes: vi.fn(),
+  getFileAttachmentTypeCodes: vi.fn(),
+  getDocumentExtensions: vi.fn(),
 }));
 vi.mock('@/services/APIs', () => ({
   default: { structureSearch: api, configuration: configurationApi },
@@ -290,6 +295,18 @@ beforeEach(() => {
   api.getDocuments.mockReset();
   api.getDocuments.mockResolvedValue({ documents: [] });
   api.getDocumentFile.mockReset();
+  api.addDocument.mockReset();
+  api.addDocument.mockResolvedValue({ id: '91' });
+  api.updateDocument.mockReset();
+  api.updateDocument.mockResolvedValue(undefined);
+  api.deleteDocument.mockReset();
+  api.deleteDocument.mockResolvedValue(undefined);
+  configurationApi.getFileAttachmentTypeCodes.mockResolvedValue([
+    { code: 'OTH', description: 'Other' },
+    { code: 'PHOTO', description: 'Photograph' },
+  ]);
+  configurationApi.getDocumentExtensions.mockResolvedValue(['JPG', 'PDF']);
+
   api.getInspectionSchedule.mockReset();
   api.getInspectionSchedule.mockResolvedValue(schedule());
   api.getStructureInspections.mockReset();
@@ -481,7 +498,7 @@ describe('StructureDetailPage — header', () => {
   });
 });
 
-describe('StructureDetailPage — incomplete data, in nr-frep form', () => {
+describe('StructureDetailPage — incomplete data', () => {
   const incomplete = () =>
     bridge({
       outstanding: [
@@ -698,7 +715,7 @@ describe('StructureDetailPage — breadcrumb', () => {
 
 describe('StructureDetailPage — tabs', () => {
   it('opens on Information, the first of its tabs', async () => {
-    // Legacy's header, moved into a tab of its own as nr-fspts' FSP page opens on Information.
+    // Legacy's header, moved into a tab of its own that the page opens on.
     await showing(bridge());
 
     const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent?.trim());
@@ -813,6 +830,264 @@ describe('StructureDetailPage — Documents & Photos', () => {
     ...overrides,
   });
 
+  describe('adding, editing and deleting', () => {
+    const fileOf = (name: string, bytes = 10) =>
+      new File([new Uint8Array(bytes)], name, { type: 'application/octet-stream' });
+
+    const todayIso = () => {
+      const now = new Date();
+      const pad = (value: number) => String(value).padStart(2, '0');
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    };
+
+    const openUpload = async (files: File[]) => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      await showing(bridge());
+      await openDocuments();
+      await userEvent.click(await screen.findByTestId('structure-documents-add'));
+      const dialog = await screen.findByTestId('upload-documents-dialog');
+      // Wait for the type list, which a PDF's default depends on.
+      await vi.waitFor(() =>
+        expect(dialog.querySelectorAll('input[type="file"]').length).toBeGreaterThan(0),
+      );
+      await vi.waitFor(() =>
+        expect(configurationApi.getFileAttachmentTypeCodes).toHaveBeenCalled(),
+      );
+      await userEvent.upload(dialog.querySelector('input[type="file"]') as HTMLInputElement, files);
+      return dialog;
+    };
+
+    it('offers Add documents to Level 2 and up only, and Edit from Level 1', async () => {
+      authorization.canEdit = true;
+      api.getDocuments.mockResolvedValue({ documents: [doc('1')] });
+      await showing(bridge());
+      await openDocuments();
+
+      await screen.findByTestId('structure-document-1');
+      expect(screen.queryByTestId('structure-documents-add')).not.toBeInTheDocument();
+      expect(screen.getByTestId('structure-document-edit-1')).toBeInTheDocument();
+      expect(screen.queryByTestId('structure-document-delete-1')).not.toBeInTheDocument();
+    });
+
+    it('offers a read-only user View alone', async () => {
+      api.getDocuments.mockResolvedValue({ documents: [doc('1')] });
+      await showing(bridge());
+      await openDocuments();
+
+      await screen.findByTestId('structure-document-1');
+      // View alone — it is everyone's.
+      expect(screen.getByTestId('structure-document-view-1')).toBeInTheDocument();
+      expect(screen.queryByTestId('structure-document-edit-1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('structure-document-delete-1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('structure-documents-add')).not.toBeInTheDocument();
+    });
+
+    it('adds the chosen files one request at a time, each with its type, date and description', async () => {
+      const deck = fileOf('deck.jpg');
+      const plan = fileOf('plan.pdf');
+      const dialog = await openUpload([deck, plan]);
+
+      const rows = within(dialog).getAllByRole('region');
+      // As legacy, a PDF starts as Other; the photo waits for a choice; both dated today.
+      expect(within(rows[1]).getByRole('combobox')).toHaveValue('OTH');
+      expect(within(rows[0]).getByRole('combobox')).toHaveValue('');
+      await userEvent.selectOptions(within(rows[0]).getByRole('combobox'), 'PHOTO');
+      await userEvent.type(within(rows[1]).getByRole('textbox', { name: 'Description' }), 'Plan.');
+      await userEvent.click(within(dialog).getByTestId('upload-save'));
+
+      await vi.waitFor(() => expect(api.addDocument).toHaveBeenCalledTimes(2));
+      expect(api.addDocument).toHaveBeenNthCalledWith(1, '7', deck, {
+        attachmentTypeCode: 'PHOTO',
+        createdDate: todayIso(),
+        description: '',
+      });
+      expect(api.addDocument).toHaveBeenNthCalledWith(2, '7', plan, {
+        attachmentTypeCode: 'OTH',
+        createdDate: todayIso(),
+        description: 'Plan.',
+      });
+      await vi.waitFor(() =>
+        expect(screen.queryByTestId('upload-documents-dialog')).not.toBeInTheDocument(),
+      );
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: '2 documents added' }),
+      );
+    });
+
+    it('checks every file and its details before sending, beside each', async () => {
+      const dialog = await openUpload([
+        fileOf('notes'),
+        fileOf('big.jpg', 10 * 1024 * 1024 + 1),
+        fileOf('plan.pdf'),
+      ]);
+
+      await userEvent.click(within(dialog).getByTestId('upload-save'));
+
+      // Which types are accepted is the server's to say, as legacy's; a file with no type at all is
+      // caught here.
+      const rows = within(dialog).getAllByRole('region');
+      expect(rows[0]).toMatchTextContent('notes has no file type.');
+      expect(rows[1]).toMatchTextContent('big.jpg is larger than 10 MB.');
+      expect(rows[0]).toMatchTextContent('Photo View is required.');
+      expect(rows[2]).toMatchTextContent('Description is required for this Photo View.');
+      expect(api.addDocument).not.toHaveBeenCalled();
+    });
+
+    it('flags a file type that may not be added as soon as it is picked, listing none', async () => {
+      const dialog = await openUpload([fileOf('notes.exe'), fileOf('deck.jpg')]);
+
+      const rows = within(dialog).getAllByRole('region');
+      await vi.waitFor(() =>
+        expect(rows[0]).toMatchTextContent('Files of type .exe cannot be added.'),
+      );
+      expect(rows[1]).not.toMatchTextContent('cannot be added');
+      expect(dialog).not.toMatchTextContent('Allowed:');
+      await userEvent.click(within(dialog).getByTestId('upload-save'));
+      expect(api.addDocument).not.toHaveBeenCalled();
+    });
+
+    it('drops a file from the batch with Remove', async () => {
+      const dialog = await openUpload([fileOf('a.jpg'), fileOf('b.jpg')]);
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Remove a.jpg' }));
+
+      expect(within(dialog).getAllByRole('region')).toHaveLength(1);
+    });
+
+    it('sends the next file only once the last has been stored', async () => {
+      let finish: (value: { id: string }) => void = () => undefined;
+      api.addDocument.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+      const dialog = await openUpload([fileOf('a.jpg'), fileOf('b.jpg')]);
+      for (const row of within(dialog).getAllByRole('region')) {
+        await userEvent.selectOptions(within(row).getByRole('combobox'), 'PHOTO');
+      }
+
+      await userEvent.click(within(dialog).getByTestId('upload-save'));
+
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('upload-save')).toMatchTextContent('Adding 1 of 2…'),
+      );
+      expect(api.addDocument).toHaveBeenCalledTimes(1);
+      finish({ id: '91' });
+      await vi.waitFor(() => expect(api.addDocument).toHaveBeenCalledTimes(2));
+    });
+
+    it('keeps the files not added, with the reason beside each, and lets the rest go', async () => {
+      api.addDocument
+        .mockResolvedValueOnce({ id: '91' })
+        .mockRejectedValueOnce({
+          body: {
+            fieldErrors: { attachmentTypeCode: 'Photo View is not one of the listed types.' },
+          },
+        })
+        .mockRejectedValueOnce({ status: 413, body: { detail: 'The file is too large.' } });
+      const dialog = await openUpload([fileOf('a.jpg'), fileOf('b.jpg'), fileOf('c.jpg')]);
+      for (const row of within(dialog).getAllByRole('region')) {
+        await userEvent.selectOptions(within(row).getByRole('combobox'), 'PHOTO');
+      }
+
+      await userEvent.click(within(dialog).getByTestId('upload-save'));
+
+      await vi.waitFor(() => expect(within(dialog).getAllByRole('region')).toHaveLength(2));
+      const [b, c] = within(dialog).getAllByRole('region');
+      expect(b).toHaveAccessibleName('b.jpg');
+      expect(b).toMatchTextContent('Photo View is not one of the listed types.');
+      expect(c).toHaveAccessibleName('c.jpg');
+      expect(c).toMatchTextContent('Not added: The file is too large.');
+      expect(within(dialog).getByTestId('upload-batch-error')).toMatchTextContent(
+        '1 of 3 files were added. Correct the files below and add them again.',
+      );
+      expect(screen.getByTestId('upload-documents-dialog')).toBeInTheDocument();
+    });
+
+    it("edits a document's Photo View and description", async () => {
+      authorization.canEdit = true;
+      api.getDocuments.mockResolvedValue({ documents: [doc('1')] });
+      await showing(bridge());
+      await openDocuments();
+
+      await userEvent.click(await screen.findByTestId('structure-document-edit-1'));
+      const dialog = await screen.findByTestId('edit-document-dialog');
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('edit-document-type')).toHaveValue('PHOTO'),
+      );
+      expect(dialog).toMatchTextContent('1.jpg');
+      await userEvent.selectOptions(within(dialog).getByTestId('edit-document-type'), 'OTH');
+      await userEvent.clear(within(dialog).getByTestId('edit-document-description'));
+      await userEvent.click(within(dialog).getByTestId('edit-document-save'));
+      expect(dialog).toMatchTextContent('Description is required for this Photo View.');
+
+      await userEvent.type(within(dialog).getByTestId('edit-document-description'), 'South side.');
+      await userEvent.click(within(dialog).getByTestId('edit-document-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateDocument).toHaveBeenCalledWith('7', '1', {
+          attachmentTypeCode: 'OTH',
+          description: 'South side.',
+        }),
+      );
+    });
+
+    it('shows a thumbnail of the photo being edited, and names a file it cannot draw', async () => {
+      authorization.canEdit = true;
+      api.getDocuments.mockResolvedValue({
+        documents: [doc('1'), doc('2', { filename: 'notes.doc', extension: 'DOC' })],
+      });
+      api.getDocumentFile.mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }));
+      await showing(bridge());
+      await openDocuments();
+
+      await userEvent.click(await screen.findByTestId('structure-document-edit-1'));
+      const photo = await screen.findByTestId('edit-document-dialog');
+      const thumbnail = await within(photo).findByTestId('document-thumbnail');
+      expect(thumbnail.getAttribute('src')).toMatch(/^blob:/);
+      expect(api.getDocumentFile).toHaveBeenCalledWith('7', '1');
+      await userEvent.click(within(photo).getByRole('button', { name: 'Cancel' }));
+
+      api.getDocumentFile.mockClear();
+      await userEvent.click(screen.getByTestId('structure-document-edit-2'));
+      const notes = await screen.findByTestId('edit-document-dialog');
+      expect(within(notes).getByTestId('document-thumbnail-placeholder')).toMatchTextContent(
+        'notes.doc',
+      );
+      expect(api.getDocumentFile).not.toHaveBeenCalled();
+    });
+
+    it('deletes a document after confirmation, an inspection one too', async () => {
+      authorization.canDelete = true;
+      api.getDocuments.mockResolvedValue({
+        documents: [doc('2', { inspectionId: '30', inspectionDate: '2023-06-01' })],
+      });
+      await showing(bridge());
+      await openDocuments();
+
+      await userEvent.click(await screen.findByTestId('structure-document-delete-2'));
+      expect(api.deleteDocument).not.toHaveBeenCalled();
+      await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+      await vi.waitFor(() => expect(api.deleteDocument).toHaveBeenCalledWith('7', '2'));
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'success', title: '2.jpg deleted' }),
+        ),
+      );
+    });
+
+    it("keeps the structure's folder, to hold Add, when only inspections have files", async () => {
+      authorization.canDelete = true;
+      api.getDocuments.mockResolvedValue({
+        documents: [doc('2', { inspectionId: '30', inspectionDate: '2023-06-01' })],
+      });
+      await showing(bridge());
+      await openDocuments();
+
+      const own = await screen.findByTestId('structure-documents-structure');
+      expect(own).toMatchTextContent('No photos and/or documents have been loaded.');
+      expect(within(own).getByTestId('structure-documents-add')).toBeInTheDocument();
+    });
+  });
+
   it('is a tab for a culvert too, after Details where there is no Spans & Piers', async () => {
     await showing(culvert());
 
@@ -919,13 +1194,52 @@ describe('StructureDetailPage — Documents & Photos', () => {
 
     await openDocuments();
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Photograph (opens in a new tab)' }),
+      await screen.findByRole('button', { name: 'View 1.jpg (opens in a new tab)' }),
     );
 
     expect(api.getDocumentFile).toHaveBeenCalledWith('7', '1');
     expect(open).toHaveBeenCalledWith('', '_blank');
     await vi.waitFor(() => expect(opened.location.href).toMatch(/^blob:/));
     open.mockRestore();
+  });
+
+  it('shows the Photo View as text, and View on every row — a file a browser cannot show downloads', async () => {
+    api.getDocuments.mockResolvedValue({
+      documents: [doc('1'), doc('2', { filename: 'report.docx', extension: 'DOCX' })],
+    });
+    await showing(bridge());
+
+    await openDocuments();
+    const row = await screen.findByTestId('structure-document-1');
+
+    expect(within(row).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(row).getByText('Photograph')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('structure-document-2')).getByRole('button', {
+        name: 'View report.docx (downloads)',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('downloads a file a browser cannot show when its View is pressed, opening no tab', async () => {
+    api.getDocuments.mockResolvedValue({
+      documents: [doc('2', { filename: 'readings.csv', extension: 'CSV' })],
+    });
+    api.getDocumentFile.mockResolvedValue(new Blob(['a,b'], { type: 'application/octet-stream' }));
+    const open = vi.spyOn(window, 'open');
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    await showing(bridge());
+
+    await openDocuments();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'View readings.csv (downloads)' }),
+    );
+
+    await vi.waitFor(() => expect(click).toHaveBeenCalled());
+    expect(api.getDocumentFile).toHaveBeenCalledWith('7', '2');
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+    click.mockRestore();
   });
 
   it('says so beside the files when one cannot be opened', async () => {
@@ -937,7 +1251,7 @@ describe('StructureDetailPage — Documents & Photos', () => {
 
     await openDocuments();
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Photograph (opens in a new tab)' }),
+      await screen.findByRole('button', { name: 'View 1.jpg (opens in a new tab)' }),
     );
 
     expect(await screen.findByTestId('structure-document-open-error')).toMatchTextContent(

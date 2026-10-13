@@ -37,7 +37,7 @@
 
     // Open (the X): Carbon's --active treatment is a light panel background with a dark icon, which
     // reads as a grey box punched into the blue bar. The header never changes colour, so keep the
-    // button transparent and the icon white in every state — matching FSPTS. Carbon also adds 1px
+    // button transparent and the icon white in every state. Carbon also adds 1px
     // inline borders when --active, which showed as light vertical lines against the blue.
     &.#{vars.$bcgov-prefix}--header__action--active {
       background-color: transparent;

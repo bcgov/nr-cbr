@@ -8,7 +8,7 @@
   margin-block-end: 0;
 }
 
-// Four criteria per row, matching nr-frep's search filters. Fixed columns rather than auto-fit:
+// Four criteria per row. Fixed columns rather than auto-fit:
 // auto-fit packs as many columns as happen to fit, so the row count changes with the window and the
 // fields never line up with the results table below. Stepped down at the Carbon lg and md
 // breakpoints so a column never gets narrower than roughly 13rem.

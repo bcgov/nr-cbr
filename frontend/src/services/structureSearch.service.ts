@@ -1,5 +1,9 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
-import type { DocumentsResponse } from '@/pages/StructureDetail/documentsResponse';
+import type {
+  DocumentDetailsRequest,
+  DocumentsResponse,
+  DocumentUpdateRequest,
+} from '@/pages/StructureDetail/documentsResponse';
 import type {
   CloseProximityInspectionRequest,
   InspectionScheduleRequest,
@@ -166,6 +170,51 @@ export class StructureSearchService extends HttpClient {
       url: '/v1/structures/{structureId}/documents/{fileId}/file',
       path: { structureId, fileId },
       responseType: 'blob',
+    });
+  }
+
+  /**
+   * Adds one file to a structure, with its details. Sent as multipart: the file, and the details as
+   * a JSON part. 400 with `fieldErrors` keyed `file`, `attachmentTypeCode`, `createdDate` or
+   * `description` when it is refused — then nothing is stored.
+   */
+  addDocument(
+    structureId: string,
+    file: File,
+    details: DocumentDetailsRequest,
+  ): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/documents',
+      path: { structureId },
+      formData: {
+        file,
+        // A Blob, so the part carries its JSON type and the server reads it as the object it is.
+        details: new Blob([JSON.stringify(details)], { type: 'application/json' }),
+      },
+    });
+  }
+
+  /** Changes a document's type and description. 400 with `fieldErrors` when a field is refused. */
+  updateDocument(
+    structureId: string,
+    fileId: string,
+    request: DocumentUpdateRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/documents/{fileId}',
+      path: { structureId, fileId },
+      body: request,
+    });
+  }
+
+  /** Deletes a document and its file. 404 when the structure has no such document. */
+  deleteDocument(structureId: string, fileId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/documents/{fileId}',
+      path: { structureId, fileId },
     });
   }
 

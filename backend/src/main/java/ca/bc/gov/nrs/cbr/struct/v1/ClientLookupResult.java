@@ -9,10 +9,9 @@ package ca.bc.gov.nrs.cbr.struct.v1;
  *
  * <p><b>The label is composed by the caller, not here.</b> {@code clientLocnName} and {@code city}
  * are carried so the UI can tell one of a client's locations from another; how they are arranged is
- * a presentation decision, and nr-frep's equivalent {@code clientLabel} lives in the frontend for
- * the same reason.
+ * a presentation decision, so it lives in the frontend.
  *
- * <p>No acronym, unlike nr-frep's: {@code CLIENT_ACRONYM} is on {@code FOREST_CLIENT}, which
+ * <p>No acronym: {@code CLIENT_ACRONYM} is on {@code FOREST_CLIENT}, which
  * {@code FSA_CBR_READ_WRITE_ROLE} cannot read. Legacy CBR's own lookup did not search it either.
  *
  * @param clientNumber       {@code CROSSING_SITE.CLIENT_NUMBER}, zero-padded to 8

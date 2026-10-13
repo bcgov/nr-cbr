@@ -25,7 +25,7 @@ import { LANDING_AFTER_LOGIN } from '@/constants/routes';
 import { ROLE_CAPABILITIES } from '@/context/auth/types';
 
 /**
- * Route table, ported from nr-frep. Three sets, selected by auth state in AppRoutes: public
+ * Route table. Three sets, selected by auth state in AppRoutes: public
  * (unauthenticated), no-role (authenticated but holding no recognised CBR group), and protected.
  *
  * <p>Site Search and Inspection Search are the protected destinations so far. The inventory they
@@ -33,8 +33,8 @@ import { ROLE_CAPABILITIES } from '@/context/auth/types';
  * report criteria pages, 3 admin pages and the search pages; the sections they hang under are in
  * cbr-navigation.local.md §1.
  *
- * <p>nr-frep also carries an offline route set (getOfflineRoutes / getOfflineMenuEntries) served
- * when the device is offline. CBR needs the equivalent once the offline inspection flow lands
+ * <p>An offline route set (getOfflineRoutes / getOfflineMenuEntries), served when the device is
+ * offline, is needed once the offline inspection flow lands
  * (§11, §16); {@link getOfflineMenuEntries} returns empty for now rather than pointing at routes
  * that do not exist.
  */
@@ -351,8 +351,7 @@ export const getNoRoleRoutes = (): RouteDescription[] => guarded(NO_ROLE_ROUTES,
  * <p>Applied here rather than repeated on each route so that a page added later cannot forget it.
  * A route that wants its own handling can still set `errorElement` itself — this only fills the gap.
  *
- * <p>nr-frep does the same thing in its own `getProtectedRoutes`, and applies it to the protected
- * set alone. Covering the public and no-role sets too costs nothing and means a crash on the
+ * <p>Covering the public and no-role sets as well as the protected one costs nothing and means a crash on the
  * landing page is not the raw react-router screen either.
  *
  * @param errorElement what to show instead of the route — see {@link CHROME_ERROR} and
@@ -367,8 +366,7 @@ const guarded = (routes: RouteDescription[], errorElement: React.ReactNode): Rou
  *
  * <p>This is the difference between a contained failure and a dead end. Each protected page
  * supplies its own `Layout`, so when react-router swaps the failed route for its error element the
- * navigation goes with it; wrapping it back keeps every other screen one click away. nr-frep wraps
- * its error element the same way and for the same reason.
+ * navigation goes with it; wrapping it back keeps every other screen one click away.
  */
 const CHROME_ERROR = (
   <Layout>

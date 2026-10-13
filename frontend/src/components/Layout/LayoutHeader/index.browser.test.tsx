@@ -57,7 +57,7 @@ describe('LayoutHeader', () => {
   /**
    * Carbon's `--active` treatment for a header action is a light panel background with a dark icon,
    * which rendered the open-state X as a grey box punched into the blue bar. The header colour never
-   * changes, so the button stays transparent and the icon white — matching FSPTS. Asserted on the
+   * changes, so the button stays transparent and the icon white. Asserted on the
    * computed style because it is a CSS override of a Carbon default: the class stays exactly the
    * same whether or not our rule wins.
    */
