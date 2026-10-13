@@ -75,6 +75,8 @@ public class StructureDocumentsService {
   private static final int TEXT_MAX = 2000;
   /** The type whose file must be described — legacy's {@code FileAttachment.OTHER_CODE}. */
   private static final String OTHER = "OTH";
+  /** The field a refusal of the whole batch is keyed to — the multipart part of that name. */
+  private static final String FILES = "files";
   private static final String TYPE = "attachmentTypeCode";
   private static final String DESCRIPTION = "description";
 
@@ -346,11 +348,11 @@ public class StructureDocumentsService {
       List<DocumentDetailsRequest> rows) {
     Map<String, String> errors = new LinkedHashMap<>();
     if (parts.isEmpty()) {
-      errors.put("files", "Choose at least one file.");
+      errors.put(FILES, "Choose at least one file.");
     } else if (parts.size() > MAX_FILES) {
-      errors.put("files", "At most " + MAX_FILES + " files can be added at a time.");
+      errors.put(FILES, "At most " + MAX_FILES + " files can be added at a time.");
     } else if (rows.size() != parts.size()) {
-      errors.put("files", "Each file needs its details.");
+      errors.put(FILES, "Each file needs its details.");
     }
     if (!errors.isEmpty()) {
       throw new FieldValidationException("Documents cannot be added", errors);
