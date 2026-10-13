@@ -33,7 +33,9 @@ import type {
 import type {
   CreatedResponse,
   CommentRequest,
+  SitePreviewResponse,
   StructureDetailResponse,
+  StructureInformationRequest,
 } from '@/pages/StructureDetail/structureResponse';
 import type { ItemListing } from '@/pages/StructureDetail/UserAudits';
 import type {
@@ -174,6 +176,31 @@ export class StructureSearchService extends HttpClient {
       url: '/v1/structures/{structureId}/documents/{fileId}/file',
       path: { structureId, fileId },
       responseType: 'blob',
+    });
+  }
+
+  /** A site a structure might move to, with why it cannot, if it cannot. */
+  previewSite(siteId: string): CancelablePromise<SitePreviewResponse> {
+    return this.doRequest<SitePreviewResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/site-preview',
+      query: { siteId },
+    });
+  }
+
+  /**
+   * Saves the Information tab's Edit — the structure's name and site. 400 with `fieldErrors` keyed
+   * `structureName` or `siteId`.
+   */
+  updateStructureInformation(
+    structureId: string,
+    request: StructureInformationRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/information',
+      path: { structureId },
+      body: request,
     });
   }
 

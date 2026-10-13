@@ -183,7 +183,8 @@ public class StructureDetailService {
 
   // ─── The header ──────────────────────────────────────────────────────
 
-  private Site site(CrossingSiteEntity site) {
+  /** The site as the Information tab shows it — also the Edit's preview of a site to move to. */
+  Site site(CrossingSiteEntity site) {
     boolean recreation = RECREATION.equals(site.getCrossingSiteTypeCode());
     return new Site(
         site.getCrossingSiteId(),

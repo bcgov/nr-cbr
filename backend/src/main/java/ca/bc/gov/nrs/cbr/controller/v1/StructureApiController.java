@@ -5,6 +5,7 @@ import ca.bc.gov.nrs.cbr.service.v1.StructureCommentsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureDetailService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureDocumentsService.DocumentFile;
 import ca.bc.gov.nrs.cbr.service.v1.StructureDocumentsService;
+import ca.bc.gov.nrs.cbr.service.v1.StructureInformationService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInspectionsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureMonitorsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureRepairsService;
@@ -26,11 +27,13 @@ import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.SitePreviewResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SpanRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInformationRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
@@ -64,6 +67,7 @@ public class StructureApiController implements StructureApiEndpoint {
   private final StructureRepairsService repairsService;
   private final StructureMonitorsService monitorsService;
   private final StructureCommentsService commentsService;
+  private final StructureInformationService informationService;
 
   public StructureApiController(
       StructureSearchService structureSearchService,
@@ -74,7 +78,8 @@ public class StructureApiController implements StructureApiEndpoint {
       StructureInspectionsService inspectionsService,
       StructureRepairsService repairsService,
       StructureMonitorsService monitorsService,
-      StructureCommentsService commentsService) {
+      StructureCommentsService commentsService,
+      StructureInformationService informationService) {
     this.structureSearchService = structureSearchService;
     this.structureService = structureService;
     this.structureDetailService = structureDetailService;
@@ -84,6 +89,7 @@ public class StructureApiController implements StructureApiEndpoint {
     this.repairsService = repairsService;
     this.monitorsService = monitorsService;
     this.commentsService = commentsService;
+    this.informationService = informationService;
   }
 
   @Override
@@ -119,6 +125,18 @@ public class StructureApiController implements StructureApiEndpoint {
   @Override
   public StructureSpansAndPiersResponse getSpansAndPiers(long structureId) {
     return spansAndPiersService.findByStructure(structureId);
+  }
+
+  @Override
+  public SitePreviewResponse previewSite(String siteId) {
+    return informationService.preview(siteId);
+  }
+
+  @Override
+  public ResponseEntity<Void> updateInformation(
+      long structureId, StructureInformationRequest request) {
+    informationService.update(structureId, request);
+    return ResponseEntity.noContent().build();
   }
 
   @Override

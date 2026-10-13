@@ -16,11 +16,13 @@ import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.SitePreviewResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SpanRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInformationRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
@@ -147,6 +149,35 @@ public interface StructureApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/spans-and-piers")
   StructureSpansAndPiersResponse getSpansAndPiers(@PathVariable("structureId") long structureId);
+
+  /**
+   * A site a structure might be moved to, as the Information tab's Edit previews it under Site #:
+   * the site as that tab shows one, and why a structure could not move there — it does not exist,
+   * is incomplete, or is Proposed — or null when it could.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}: it reads what Site Search shows anyone.
+   *
+   * @param siteId the {@code CROSSING_SITE_ID} typed
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/site-preview")
+  SitePreviewResponse previewSite(@RequestParam(name = "siteId") String siteId);
+
+  /**
+   * Saves the Information tab's Edit — the structure's name and site.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy's page Save, which
+   * let anyone change Site #; a change of name is refused below Level 2, as legacy's page offered
+   * the box to Level 2 only. <b>204</b> on success; <b>404</b> when there is no such structure;
+   * <b>400</b> with {@code fieldErrors} keyed {@code structureName} or {@code siteId}.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/information")
+  ResponseEntity<Void> updateInformation(
+      @PathVariable("structureId") long structureId,
+      @RequestBody StructureInformationRequest request);
 
   /**
    * Adds a span to the structure's bridge — legacy's Add on the Spans &amp; Piers tab.

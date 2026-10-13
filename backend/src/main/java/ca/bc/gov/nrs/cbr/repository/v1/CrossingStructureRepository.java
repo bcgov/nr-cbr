@@ -62,6 +62,32 @@ public interface CrossingStructureRepository
       @Param("now") LocalDateTime now);
 
   /**
+   * Writes the structure's name and site — the Information tab's Edit — with who changed them and
+   * when. Only these columns, as the schedule's update.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.crossingStructureName = :name,
+             structure.crossingSiteId = :siteId,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updateInformation(
+      @Param("id") Long id,
+      @Param("name") String name,
+      @Param("siteId") String siteId,
+      @Param("user") String user);
+
+  /**
+   * Whether another structure, archived or not, has this name — the database's {@code CS_UK}.
+   * Legacy checked active structures only, so a name an archived structure held passed its form and
+   * then failed the constraint.
+   */
+  boolean existsByCrossingStructureNameAndCrossingStructureIdNot(String name, Long id);
+
+  /**
    * Writes the structure's inspection schedule — the Inspections tab's Inspection Schedule card —
    * with who changed it and when (the database's clock). Only these columns: legacy's whole-row
    * save also blanked columns the page never showed (cbr-structure-edit.local.md §8).

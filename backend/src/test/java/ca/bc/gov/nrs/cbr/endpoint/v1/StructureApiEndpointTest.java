@@ -65,6 +65,14 @@ class StructureApiEndpointTest {
   }
 
   @Test
+  @DisplayName("site preview is GET /site-preview, gated on READ")
+  void sitePreviewIsMappedAndGated() {
+    Method preview = method("previewSite");
+    assertThat(preview.getAnnotation(GetMapping.class).value()).containsExactly("/site-preview");
+    assertThat(preview.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
+
+  @Test
   @DisplayName("archive is PUT /api/v1/structures/archive")
   void archiveIsMapped() {
     assertThat(method("archiveStructures").getAnnotation(PutMapping.class).value())
@@ -106,6 +114,8 @@ class StructureApiEndpointTest {
         Arguments.of("getStructure", "GET", "/{structureId}", CbrAuthorities.READ),
         Arguments.of("getSpansAndPiers", "GET", "/{structureId}/spans-and-piers",
             CbrAuthorities.READ),
+        Arguments.of("updateInformation", "PUT", "/{structureId}/information",
+            CbrAuthorities.CONTENT_EDIT),
         Arguments.of("createSpan", "POST", "/{structureId}/spans", CbrAuthorities.DESTRUCTIVE),
         Arguments.of("updateSpan", "PUT", "/{structureId}/spans/{spanId}",
             CbrAuthorities.DESTRUCTIVE),

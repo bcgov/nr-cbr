@@ -1,5 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import useDebounce from '@/hooks/useDebounce';
+
 import type {
   DocumentDetailsRequest,
   DocumentUpdateRequest,
@@ -19,7 +21,10 @@ import type {
   RepairView,
 } from '@/pages/StructureDetail/repairsResponse';
 import type { PierRequest, SpanRequest } from '@/pages/StructureDetail/spansAndPiersResponse';
-import type { CommentRequest } from '@/pages/StructureDetail/structureResponse';
+import type {
+  CommentRequest,
+  StructureInformationRequest,
+} from '@/pages/StructureDetail/structureResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
 import type {
   PagedResponse,
@@ -253,6 +258,44 @@ export const useStructureMonitors = (
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
+
+/**
+ * Saves the Information tab's Edit, then refreshes the structure — its title and header. What the
+ * server refused comes back as `fieldErrors`.
+ */
+export const useUpdateStructureInformation = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: StructureInformationRequest) =>
+      API.structureSearch.updateStructureInformation(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId], exact: true }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Long enough that typing a site number is one request rather than one a keystroke. */
+const SITE_PREVIEW_DEBOUNCE_MS = 400;
+
+/**
+ * The site a structure would move to, as the Information tab's Edit shows it under Site # — legacy
+ * refreshed its header the same way as the number was typed. Nothing is asked while the box is
+ * empty or holds the structure's own site.
+ */
+export const useSitePreview = (siteId: string, currentSiteId: string | null) => {
+  const debounced = useDebounce(siteId.trim(), SITE_PREVIEW_DEBOUNCE_MS);
+  const asked = debounced !== '' && debounced !== (currentSiteId ?? '');
+  const query = useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, 'site-preview', debounced],
+    queryFn: () => API.structureSearch.previewSite(debounced),
+    enabled: asked,
+    staleTime: 30_000,
+    retry: false,
+  });
+  // Settled only once the typing has stopped on the number asked about.
+  const settled = asked && debounced === siteId.trim();
+  return { preview: settled ? query.data : undefined, loading: asked && query.isFetching };
+};
 
 /**
  * After a span or pier change: the tab's lists, and the structure itself, whose Details tab counts
