@@ -25,3 +25,9 @@ export type SpansAndPiersResponse = {
   /** By pier number. */
   piers: BridgePier[];
 };
+
+/** A span to add, or a span's new values — the backend's `SpanRequest`. */
+export type SpanRequest = { number: number; lengthMetres: number };
+
+/** A pier to add, or a pier's new values — the backend's `PierRequest`. */
+export type PierRequest = { number: number; typeCode: string };

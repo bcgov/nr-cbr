@@ -1,4 +1,12 @@
-import { Building, Pipelines, RecentlyViewed, Renew, Road, Scales } from '@carbon/icons-react';
+import {
+  Building,
+  Pipelines,
+  RecentlyViewed,
+  Renew,
+  Road,
+  Scales,
+  WarningAltFilled,
+} from '@carbon/icons-react';
 import {
   Checkbox,
   Table,
@@ -52,9 +60,26 @@ const codeWithOther = (
 /** Legacy's culvert type for a wood log culvert, which hides Culvert Type and Open Bottom. */
 const WOOD_LOG_CULVERT = 'WLC';
 
+/** Legacy warns when a bridge has more spans than this. */
+const SPANS_ADVISED = 10;
+
 const BridgeFields: FC<{ bridge: BridgeDetails }> = ({ bridge }) => (
   <>
-    <ReadOnlyField label="Number of Spans" value={String(bridge.spanCount)} />
+    <ReadOnlyField
+      label="Number of Spans"
+      value={
+        <>
+          {bridge.spanCount}
+          {/* Legacy's warning under the count; it blocks nothing. */}
+          {bridge.spanCount > SPANS_ADVISED && (
+            <span className="structure-detail__field-warning" data-testid="span-count-warning">
+              <WarningAltFilled size={16} aria-hidden="true" />
+              Should not be greater than {SPANS_ADVISED}.
+            </span>
+          )}
+        </>
+      }
+    />
     <ReadOnlyField label="Needle Beams?" value={yesNo(bridge.needleBeams)} />
     <ReadOnlyField label="Bridge Length (metres)" value={number(bridge.lengthMetres)} />
     {codeWithOther('Superstructure', bridge.superstructure, bridge.superstructureComment)}

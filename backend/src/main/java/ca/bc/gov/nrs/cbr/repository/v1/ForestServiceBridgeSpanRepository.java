@@ -18,4 +18,7 @@ public interface ForestServiceBridgeSpanRepository
   /** A bridge's spans by span number — legacy's {@code FIND_SPANS_BY_BRIDGE_ID}. */
   List<ForestServiceBridgeSpanEntity> findByForestServiceBridgeIdOrderBySpanNumberAsc(
       Long forestServiceBridgeId);
+
+  /** A bridge's span of this number, if any — legacy's {@code FIND_SPAN_BY_BRDGE_ID_NMBR}. */
+  boolean existsByForestServiceBridgeIdAndSpanNumber(Long forestServiceBridgeId, Integer spanNumber);
 }

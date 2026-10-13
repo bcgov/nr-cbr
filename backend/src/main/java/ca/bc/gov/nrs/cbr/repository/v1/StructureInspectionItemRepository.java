@@ -10,4 +10,16 @@ public interface StructureInspectionItemRepository
     extends JpaRepository<StructureInspectionItemEntity, Long> {
 
   void deleteByInspectionId(Long inspectionId);
+
+  /**
+   * Whether any inspection answered a question about this span — legacy's
+   * {@code FIND_INSPCTN_ITEMS_BY_SPAN_ID}, which blocks its delete.
+   */
+  boolean existsByForestServiceBridgeSpanId(Long forestServiceBridgeSpanId);
+
+  /**
+   * Whether any inspection answered a question about this pier — legacy's
+   * {@code FIND_INSPCTN_ITEMS_BY_PIER_ID}, which blocks its delete.
+   */
+  boolean existsByForestServiceBridgePierId(Long forestServiceBridgePierId);
 }

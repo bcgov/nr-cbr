@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -15,8 +16,8 @@ import org.hibernate.annotations.Immutable;
 /**
  * {@code THE.PIER_TYPE_CODE} — A bridge pier's type.
  *
- * <p>Read only to decode a stored code on the structure page's Spans &amp; Piers tab; the code and
- * its description are all that tab needs.
+ * <p>Decodes a stored pier's type on the structure page's Spans &amp; Piers tab, and lists the
+ * current ones for its pier dialog.
  */
 @Entity
 @Immutable
@@ -35,4 +36,10 @@ public class PierTypeCodeEntity {
 
   @Column(name = "DESCRIPTION", length = 120)
   private String description;
+
+  @Column(name = "EFFECTIVE_DATE")
+  private LocalDateTime effectiveDate;
+
+  @Column(name = "EXPIRY_DATE")
+  private LocalDateTime expiryDate;
 }

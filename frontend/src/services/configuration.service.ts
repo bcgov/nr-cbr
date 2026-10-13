@@ -147,6 +147,14 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Pier types, current ones by description — the pier dialog's Type select. */
+  getPierTypeCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/pier-type-codes',
+    });
+  }
+
   /** Document types — "Photo View" — current ones by description. */
   getFileAttachmentTypeCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {

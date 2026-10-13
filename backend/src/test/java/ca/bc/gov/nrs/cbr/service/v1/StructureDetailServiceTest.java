@@ -296,9 +296,9 @@ class StructureDetailServiceTest {
       givenStructure(7L, "B100", "SITE-1", s -> { });
       givenBridge(70L, 7L);
       entityManager.persist(ForestServiceBridgeSpanEntity.builder()
-          .forestServiceBridgeSpanId(1L).forestServiceBridgeId(70L).build());
+          .forestServiceBridgeId(70L).build());
       entityManager.persist(ForestServiceBridgeSpanEntity.builder()
-          .forestServiceBridgeSpanId(2L).forestServiceBridgeId(70L).build());
+          .forestServiceBridgeId(70L).build());
 
       StructureDetailResponse structure = read(7L);
 

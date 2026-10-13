@@ -25,7 +25,11 @@ import type {
   RepairView,
   StructureRepair,
 } from '@/pages/StructureDetail/repairsResponse';
-import type { SpansAndPiersResponse } from '@/pages/StructureDetail/spansAndPiersResponse';
+import type {
+  PierRequest,
+  SpanRequest,
+  SpansAndPiersResponse,
+} from '@/pages/StructureDetail/spansAndPiersResponse';
 import type {
   CreatedResponse,
   CommentRequest,
@@ -170,6 +174,70 @@ export class StructureSearchService extends HttpClient {
       url: '/v1/structures/{structureId}/documents/{fileId}/file',
       path: { structureId, fileId },
       responseType: 'blob',
+    });
+  }
+
+  /**
+   * Adds a span to a structure's bridge. 400 with `fieldErrors` keyed `number` or `lengthMetres`;
+   * 409 when the structure has no bridge record.
+   */
+  createSpan(structureId: string, request: SpanRequest): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/spans',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Changes a span's number and length. 400 with `fieldErrors` when a field is refused. */
+  updateSpan(structureId: string, spanId: string, request: SpanRequest): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/spans/{spanId}',
+      path: { structureId, spanId },
+      body: request,
+    });
+  }
+
+  /** Deletes a span. 409, with the reason as its detail, when the bridge will not allow it. */
+  deleteSpan(structureId: string, spanId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/spans/{spanId}',
+      path: { structureId, spanId },
+    });
+  }
+
+  /**
+   * Adds a pier to a structure's bridge. 400 with `fieldErrors` keyed `number` or `typeCode`, or
+   * `pier` when the bridge has too few spans for another.
+   */
+  createPier(structureId: string, request: PierRequest): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/piers',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Changes a pier's number and type. 400 with `fieldErrors` when a field is refused. */
+  updatePier(structureId: string, pierId: string, request: PierRequest): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/piers/{pierId}',
+      path: { structureId, pierId },
+      body: request,
+    });
+  }
+
+  /** Deletes a pier. 409, with the reason as its detail, when it has been inspected. */
+  deletePier(structureId: string, pierId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/piers/{pierId}',
+      path: { structureId, pierId },
     });
   }
 

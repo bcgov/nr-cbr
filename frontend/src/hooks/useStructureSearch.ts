@@ -18,6 +18,7 @@ import type {
   RepairUpdateRequest,
   RepairView,
 } from '@/pages/StructureDetail/repairsResponse';
+import type { PierRequest, SpanRequest } from '@/pages/StructureDetail/spansAndPiersResponse';
 import type { CommentRequest } from '@/pages/StructureDetail/structureResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
 import type {
@@ -30,7 +31,7 @@ import type {
   RepairResponsibilityResponse,
   StructureArchiveResponse,
 } from '@/services/structureSearch.service';
-import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
+import type { QueryClient, UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
@@ -252,6 +253,78 @@ export const useStructureMonitors = (
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
+
+/**
+ * After a span or pier change: the tab's lists, and the structure itself, whose Details tab counts
+ * the spans. Only the structure's own query, not every tab's under it.
+ */
+const refreshSpansAndPiers = (queryClient: QueryClient, structureId: string) =>
+  Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: [STRUCTURE_QUERY_KEY, structureId, 'spans-and-piers'],
+    }),
+    queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId], exact: true }),
+  ]);
+
+/** Adds a span. What the server refused comes back as `fieldErrors`. */
+export const useCreateSpan = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: SpanRequest) => API.structureSearch.createSpan(structureId, request),
+    onSuccess: () => refreshSpansAndPiers(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Changes a span. What the server refused comes back as `fieldErrors`. */
+export const useUpdateSpan = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ spanId, request }: { spanId: string; request: SpanRequest }) =>
+      API.structureSearch.updateSpan(structureId, spanId, request),
+    onSuccess: () => refreshSpansAndPiers(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Deletes a span. A refusal is a 409 whose detail says why. */
+export const useDeleteSpan = (structureId: string): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (spanId: string) => API.structureSearch.deleteSpan(structureId, spanId),
+    onSuccess: () => refreshSpansAndPiers(queryClient, structureId),
+  });
+};
+
+/** Adds a pier. What the server refused comes back as `fieldErrors`. */
+export const useCreatePier = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: PierRequest) => API.structureSearch.createPier(structureId, request),
+    onSuccess: () => refreshSpansAndPiers(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Changes a pier. What the server refused comes back as `fieldErrors`. */
+export const useUpdatePier = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ pierId, request }: { pierId: string; request: PierRequest }) =>
+      API.structureSearch.updatePier(structureId, pierId, request),
+    onSuccess: () => refreshSpansAndPiers(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Deletes a pier. A refusal is a 409 whose detail says why. */
+export const useDeletePier = (structureId: string): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pierId: string) => API.structureSearch.deletePier(structureId, pierId),
+    onSuccess: () => refreshSpansAndPiers(queryClient, structureId),
+  });
+};
 
 /**
  * Adds a monitoring item, then refreshes the structure's monitoring table. The fields the server

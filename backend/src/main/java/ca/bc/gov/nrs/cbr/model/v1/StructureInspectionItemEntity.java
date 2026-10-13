@@ -14,9 +14,9 @@ import lombok.ToString;
 /**
  * {@code THE.STRUCTURE_INSPECTION_ITEM} — One answered question of a filled-in inspection form — the inspection form engine's leaf row.
  *
- * <p><b>Only the two columns an inspection delete needs.</b> The table is wide and the rest of it
- * arrives with the screens that read it; mapping columns nothing reads would be mapping them on the
- * chance something might.
+ * <p><b>Only the columns an inspection delete and a span or pier delete need.</b> The table is wide
+ * and the rest of it arrives with the screens that read it; mapping columns nothing reads would be
+ * mapping them on the chance something might.
  */
 @Entity
 @Table(name = "STRUCTURE_INSPECTION_ITEM", schema = "THE")
@@ -34,4 +34,12 @@ public class StructureInspectionItemEntity {
 
   @Column(name = "INSPECTION_ID")
   private Long inspectionId;
+
+  /** The span this answer is about, if any — such a span cannot be deleted. */
+  @Column(name = "FOREST_SERVICE_BRIDGE_SPAN_ID")
+  private Long forestServiceBridgeSpanId;
+
+  /** The pier this answer is about, if any — such a pier cannot be deleted. */
+  @Column(name = "FOREST_SERVICE_BRIDGE_PIER_ID")
+  private Long forestServiceBridgePierId;
 }

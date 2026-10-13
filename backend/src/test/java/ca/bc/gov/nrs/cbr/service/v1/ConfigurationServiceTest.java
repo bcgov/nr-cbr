@@ -13,21 +13,22 @@ import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.EngineeredCulvertTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.FileAttachmentTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.MonitorFrequencyCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.PierTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SpecialAccessRequirementCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SpecialEquipmentRequirementCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StrctreInspectionTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureCurbTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureRepairGroupCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SuperstructureTypeCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.MonitorFrequencyCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.FileAttachmentTypeCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.StructureRepairGroupCodeEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
@@ -35,17 +36,18 @@ import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileAttachmentTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileMimeTypeXrefRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.PierTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairPriorityCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairStatusCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
@@ -102,6 +104,7 @@ class ConfigurationServiceTest {
   private final FileAttachmentTypeCodeRepository attachmentTypes =
       mock(FileAttachmentTypeCodeRepository.class);
   private final FileMimeTypeXrefRepository mimeTypes = mock(FileMimeTypeXrefRepository.class);
+  private final PierTypeCodeRepository pierTypes = mock(PierTypeCodeRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes,
@@ -123,7 +126,8 @@ class ConfigurationServiceTest {
       repairPriorities,
       repairGroups,
       attachmentTypes,
-      mimeTypes);
+      mimeTypes,
+      pierTypes);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -391,5 +395,15 @@ class ConfigurationServiceTest {
     assertThat(service.getFileAttachmentTypeCodes())
         .containsExactly(new CodeOptionResponse("OTH", "Other"));
     assertThat(service.getDocumentExtensions()).containsExactly("JPG", "PDF");
+  }
+
+  @Test
+  @DisplayName("lists the current pier types the pier dialog offers")
+  void pierTypeCodes() {
+    when(pierTypes.findAllCurrent()).thenReturn(List.of(
+        PierTypeCodeEntity.builder().pierTypeCode("CRIB").description("Timber crib").build()));
+
+    assertThat(service.getPierTypeCodes())
+        .containsExactly(new CodeOptionResponse("CRIB", "Timber crib"));
   }
 }

@@ -135,6 +135,12 @@ export const documentExtensionsQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const pierTypeCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'pier-type-codes'],
+  queryFn: () => API.configuration.getPierTypeCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 export const repairStatusCodesQuery = queryOptions({
   queryKey: [CONFIGURATION_QUERY_KEY, 'repair-status-codes'],
   queryFn: () => API.configuration.getRepairStatusCodes(),
@@ -408,3 +414,6 @@ export const useFileAttachmentTypeCodes = (): UseQueryResult<CodeOption[]> =>
 /** The file extensions a document may have, upper case — for the upload's check as files are picked. */
 export const useDocumentExtensions = (): UseQueryResult<string[]> =>
   useQuery(documentExtensionsQuery);
+
+/** The Type select on a pier: current types, by description. */
+export const usePierTypeCodes = (): UseQueryResult<CodeOption[]> => useQuery(pierTypeCodesQuery);
