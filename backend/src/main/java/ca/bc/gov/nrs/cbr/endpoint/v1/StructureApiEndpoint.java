@@ -11,10 +11,12 @@ import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.PierRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.SpanRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
@@ -145,6 +147,100 @@ public interface StructureApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/spans-and-piers")
   StructureSpansAndPiersResponse getSpansAndPiers(@PathVariable("structureId") long structureId);
+
+  /**
+   * Adds a span to the structure's bridge — legacy's Add on the Spans &amp; Piers tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — the Level 2 floor, legacy's
+   * {@code /level2Access} on the Add button; it deletes nothing. <b>201</b> with the new id;
+   * <b>404</b> when there is no such structure; <b>409</b> when it has no bridge record; <b>400</b>
+   * with {@code fieldErrors} keyed {@code number} or {@code lengthMetres} when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PostMapping("/{structureId}/spans")
+  ResponseEntity<CreatedResponse> createSpan(
+      @PathVariable("structureId") long structureId, @RequestBody SpanRequest request);
+
+  /**
+   * Changes a span's number and length — legacy's Update on the Spans &amp; Piers tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE}, as legacy's Level 2 Update button. <b>204</b>
+   * on success; <b>404</b> when the structure has no such span; <b>400</b> with {@code fieldErrors}
+   * when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   * @param spanId      the span's {@code FOREST_SERVICE_BRIDGE_SPAN_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PutMapping("/{structureId}/spans/{spanId}")
+  ResponseEntity<Void> updateSpan(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("spanId") long spanId,
+      @RequestBody SpanRequest request);
+
+  /**
+   * Deletes a span — legacy's delete icon on the Spans &amp; Piers tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE}, as legacy's Level 2 icon. <b>204</b> on
+   * success; <b>404</b> when the structure has no such span; <b>409</b> with legacy's sentence
+   * when the span has been inspected, is the last, or the spans left would not outnumber the piers.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   * @param spanId      the span's {@code FOREST_SERVICE_BRIDGE_SPAN_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{structureId}/spans/{spanId}")
+  ResponseEntity<Void> deleteSpan(
+      @PathVariable("structureId") long structureId, @PathVariable("spanId") long spanId);
+
+  /**
+   * Adds a pier to the structure's bridge — legacy's Add on the Spans &amp; Piers tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE}, as legacy's Level 2 Add button. <b>201</b>
+   * with the new id; <b>404</b> when there is no such structure; <b>409</b> when it has no bridge
+   * record; <b>400</b> with {@code fieldErrors} keyed {@code number} or {@code typeCode}, or
+   * {@code pier} when the bridge has too few spans for another pier.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PostMapping("/{structureId}/piers")
+  ResponseEntity<CreatedResponse> createPier(
+      @PathVariable("structureId") long structureId, @RequestBody PierRequest request);
+
+  /**
+   * Changes a pier's number and type — legacy's Update on the Spans &amp; Piers tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE}, as legacy's Level 2 Update button. <b>204</b>
+   * on success; <b>404</b> when the structure has no such pier; <b>400</b> with {@code fieldErrors}
+   * when a field is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   * @param pierId      the pier's {@code FOREST_SERVICE_BRIDGE_PIER_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PutMapping("/{structureId}/piers/{pierId}")
+  ResponseEntity<Void> updatePier(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("pierId") long pierId,
+      @RequestBody PierRequest request);
+
+  /**
+   * Deletes a pier — legacy's delete icon on the Spans &amp; Piers tab.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE}, as legacy's Level 2 icon. <b>204</b> on
+   * success; <b>404</b> when the structure has no such pier; <b>409</b> with legacy's sentence
+   * when the pier has been inspected.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   * @param pierId      the pier's {@code FOREST_SERVICE_BRIDGE_PIER_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{structureId}/piers/{pierId}")
+  ResponseEntity<Void> deletePier(
+      @PathVariable("structureId") long structureId, @PathVariable("pierId") long pierId);
 
   /**
    * A structure's documents and photos — legacy's Documents &amp; Photos tab, fetched when that tab

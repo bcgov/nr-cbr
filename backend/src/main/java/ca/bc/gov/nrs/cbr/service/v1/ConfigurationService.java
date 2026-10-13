@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
+import ca.bc.gov.nrs.cbr.repository.v1.PierTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
@@ -99,6 +100,7 @@ public class ConfigurationService {
   private final StructureRepairGroupCodeRepository structureRepairGroupCodeRepository;
   private final FileAttachmentTypeCodeRepository fileAttachmentTypeCodeRepository;
   private final FileMimeTypeXrefRepository fileMimeTypeXrefRepository;
+  private final PierTypeCodeRepository pierTypeCodeRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -120,7 +122,8 @@ public class ConfigurationService {
       RepairPriorityCodeRepository repairPriorityCodeRepository,
       StructureRepairGroupCodeRepository structureRepairGroupCodeRepository,
       FileAttachmentTypeCodeRepository fileAttachmentTypeCodeRepository,
-      FileMimeTypeXrefRepository fileMimeTypeXrefRepository) {
+      FileMimeTypeXrefRepository fileMimeTypeXrefRepository,
+      PierTypeCodeRepository pierTypeCodeRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -141,6 +144,7 @@ public class ConfigurationService {
     this.structureRepairGroupCodeRepository = structureRepairGroupCodeRepository;
     this.fileAttachmentTypeCodeRepository = fileAttachmentTypeCodeRepository;
     this.fileMimeTypeXrefRepository = fileMimeTypeXrefRepository;
+    this.pierTypeCodeRepository = pierTypeCodeRepository;
   }
 
   /**
@@ -467,5 +471,16 @@ public class ConfigurationService {
   @Cacheable("documentExtensions")
   public List<String> getDocumentExtensions() {
     return fileMimeTypeXrefRepository.findExtensions();
+  }
+
+  /**
+   * Pier types — {@code THE.PIER_TYPE_CODE}, current ones by description, as legacy's pier select
+   * lists them.
+   */
+  @Cacheable("pierTypeCodes")
+  public List<CodeOptionResponse> getPierTypeCodes() {
+    return pierTypeCodeRepository.findAllCurrent().stream()
+        .map(entity -> new CodeOptionResponse(entity.getPierTypeCode(), entity.getDescription()))
+        .toList();
   }
 }

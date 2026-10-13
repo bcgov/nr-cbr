@@ -666,3 +666,56 @@ $page-bottom: 2rem;
   justify-content: flex-end;
   margin-block-end: $spacing-05;
 }
+
+// A warning beside a read-only value — legacy's "Should not be greater than 10." under Number of
+// Spans: Carbon's warning icon and helper text, on its own line under the value.
+.structure-detail__field-warning {
+  @include type.type-style('helper-text-01');
+
+  display: flex;
+  align-items: center;
+  gap: $spacing-02;
+  margin-block-start: $spacing-02;
+  color: var(--cds-text-secondary);
+
+  svg {
+    flex: none;
+    fill: var(--cds-support-warning);
+  }
+
+  // The exclamation mark, dark on the yellow, as Carbon draws its own warn icon.
+  svg [data-icon-path='inner-path'] {
+    fill: var(--cds-icon-primary);
+    opacity: 1;
+  }
+}
+
+// Two fields side by side in a small dialog — a span's number and length, a pier's number and type —
+// stacked again on a narrow screen.
+.structure-detail__dialog-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: $spacing-05;
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// The Spans and Piers tables: narrow, as they hold a number and one short value, and laid out
+// alike — the same width and the same fixed columns — so their Actions columns line up one above
+// the other.
+.structure-detail__bridge-table.cds--data-table {
+  inline-size: 100%;
+  max-inline-size: 40rem;
+  table-layout: fixed;
+
+  th:nth-child(1) {
+    inline-size: 8rem;
+  }
+
+  th:nth-child(2) {
+    inline-size: 14rem;
+  }
+}

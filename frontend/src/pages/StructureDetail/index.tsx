@@ -238,6 +238,7 @@ const StructureDetailPage: FC = () => {
                       {key === 'spans-and-piers' && (
                         <SpansAndPiersTab
                           structureId={structure.id}
+                          hasBridgeRecord={structure.bridge !== null}
                           opened={openedTabs.has('spans-and-piers')}
                         />
                       )}

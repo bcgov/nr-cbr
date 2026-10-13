@@ -137,4 +137,9 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   public ResponseEntity<List<String>> getDocumentExtensions() {
     return ResponseEntity.ok(configurationService.getDocumentExtensions());
   }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getPierTypeCodes() {
+    return ResponseEntity.ok(configurationService.getPierTypeCodes());
+  }
 }

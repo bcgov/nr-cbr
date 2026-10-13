@@ -27,6 +27,12 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 const api = vi.hoisted(() => ({
   getStructure: vi.fn(),
   getSpansAndPiers: vi.fn(),
+  createSpan: vi.fn(),
+  updateSpan: vi.fn(),
+  deleteSpan: vi.fn(),
+  createPier: vi.fn(),
+  updatePier: vi.fn(),
+  deletePier: vi.fn(),
   getDocuments: vi.fn(),
   getDocumentFile: vi.fn(),
   addDocument: vi.fn(),
@@ -57,6 +63,7 @@ const configurationApi = vi.hoisted(() => ({
   getSpecialEquipmentCodes: vi.fn(),
   getFileAttachmentTypeCodes: vi.fn(),
   getDocumentExtensions: vi.fn(),
+  getPierTypeCodes: vi.fn(),
 }));
 vi.mock('@/services/APIs', () => ({
   default: { structureSearch: api, configuration: configurationApi },
@@ -292,6 +299,23 @@ beforeEach(() => {
   api.getStructure.mockReset();
   api.getSpansAndPiers.mockReset();
   api.getSpansAndPiers.mockResolvedValue({ spans: [], piers: [] });
+  for (const write of [
+    api.createSpan,
+    api.updateSpan,
+    api.deleteSpan,
+    api.createPier,
+    api.updatePier,
+    api.deletePier,
+  ]) {
+    write.mockReset();
+    write.mockResolvedValue(undefined);
+  }
+  api.createSpan.mockResolvedValue({ id: 's9' });
+  api.createPier.mockResolvedValue({ id: 'p9' });
+  configurationApi.getPierTypeCodes.mockResolvedValue([
+    { code: 'CONC', description: 'Concrete' },
+    { code: 'CRIB', description: 'Timber crib' },
+  ]);
   api.getDocuments.mockReset();
   api.getDocuments.mockResolvedValue({ documents: [] });
   api.getDocumentFile.mockReset();
@@ -585,6 +609,22 @@ describe('StructureDetailPage — Details tab', () => {
     expect(screen.queryByTestId('structure-section-culvert')).not.toBeInTheDocument();
   });
 
+  it('warns beside Number of Spans past ten, as legacy, and not before', async () => {
+    await showing(bridge({ bridge: { ...bridge().bridge!, spanCount: 11 } }));
+    const section = screen.getByTestId('structure-section-bridge');
+
+    expect(within(section).getByTestId('span-count-warning')).toMatchTextContent(
+      'Should not be greater than 10.',
+    );
+    expect(screen.queryAllByTestId('span-count-warning')).toHaveLength(1);
+  });
+
+  it('shows no warning for ten spans', async () => {
+    await showing(bridge({ bridge: { ...bridge().bridge!, spanCount: 10 } }));
+
+    expect(screen.queryByTestId('span-count-warning')).not.toBeInTheDocument();
+  });
+
   it('adds the "If Other" comment only when a code is Other', async () => {
     await showing(
       bridge({
@@ -812,6 +852,264 @@ describe('StructureDetailPage — Spans & Piers', () => {
     expect(await screen.findByTestId('structure-spans-piers-error')).toMatchTextContent(
       'Spans and piers could not be loaded',
     );
+  });
+
+  describe('adding, editing and deleting', () => {
+    const span = (id: string, number: number, lengthMetres: number) => ({
+      id,
+      number,
+      lengthMetres,
+    });
+    const pier = (id: string, number: number, code = 'CRIB', description = 'Timber crib') => ({
+      id,
+      number,
+      type: { code, description },
+    });
+
+    /** Opens the tab as a Level 2 user, the lists as given. */
+    const openAsLevel2 = async (spans: object[], piers: object[] = []) => {
+      authorization.canDelete = true;
+      api.getSpansAndPiers.mockResolvedValue({ spans, piers });
+      await showing(bridge());
+      await openSpansAndPiers();
+      await screen.findByTestId('structure-section-spans');
+    };
+
+    it('offers nothing to change below Level 2', async () => {
+      authorization.canEdit = true;
+      api.getSpansAndPiers.mockResolvedValue({
+        spans: [span('s1', 1, 10)],
+        piers: [pier('p1', 1)],
+      });
+      await showing(bridge());
+
+      await openSpansAndPiers();
+      await screen.findByTestId('structure-span-s1');
+
+      expect(screen.queryByTestId('structure-span-add')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('structure-pier-add')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('structure-span-edit-s1')).not.toBeInTheDocument();
+      expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+    });
+
+    it('adds a span at the next number, and says so', async () => {
+      await openAsLevel2([span('s1', 1, 10), span('s2', 4, 10)]);
+
+      await userEvent.click(screen.getByTestId('structure-span-add'));
+      const dialog = await screen.findByTestId('span-dialog');
+      expect(within(dialog).getByTestId('span-number')).toHaveValue('5');
+      await userEvent.type(within(dialog).getByTestId('span-length'), '12.5');
+      await userEvent.click(within(dialog).getByTestId('span-save'));
+
+      await vi.waitFor(() =>
+        expect(api.createSpan).toHaveBeenCalledWith('7', { number: 5, lengthMetres: 12.5 }),
+      );
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'success', title: 'Span 5 added' }),
+        ),
+      );
+      expect(screen.queryByTestId('span-dialog')).not.toBeInTheDocument();
+    });
+
+    it('checks the number and length beside each before sending', async () => {
+      await openAsLevel2([span('s1', 1, 10)]);
+
+      await userEvent.click(screen.getByTestId('structure-span-add'));
+      const dialog = await screen.findByTestId('span-dialog');
+      await userEvent.clear(within(dialog).getByTestId('span-number'));
+      await userEvent.type(within(dialog).getByTestId('span-number'), '0');
+      await userEvent.type(within(dialog).getByTestId('span-length'), '1.2345');
+      await userEvent.click(within(dialog).getByTestId('span-save'));
+
+      expect(dialog).toMatchTextContent('Span Number must be greater than 0.');
+      expect(dialog).toMatchTextContent('Length can have at most 3 decimal places.');
+      expect(api.createSpan).not.toHaveBeenCalled();
+    });
+
+    it('shows beside Length a span the Bridge Length cannot hold', async () => {
+      api.createSpan.mockRejectedValue({
+        body: {
+          fieldErrors: {
+            lengthMetres:
+              'The spans would total 30 metres, more than the Bridge Length of 24.5 metres.',
+          },
+        },
+      });
+      await openAsLevel2([span('s1', 1, 20)]);
+
+      await userEvent.click(screen.getByTestId('structure-span-add'));
+      const dialog = await screen.findByTestId('span-dialog');
+      await userEvent.type(within(dialog).getByTestId('span-length'), '10');
+      await userEvent.click(within(dialog).getByTestId('span-save'));
+
+      await vi.waitFor(() =>
+        expect(dialog).toMatchTextContent(
+          'The spans would total 30 metres, more than the Bridge Length of 24.5 metres.',
+        ),
+      );
+      expect(display).not.toHaveBeenCalled();
+    });
+
+    it('warns, without stopping it, when adding the eleventh span', async () => {
+      await openAsLevel2(Array.from({ length: 10 }, (_, i) => span(`s${i + 1}`, i + 1, 5)));
+
+      await userEvent.click(screen.getByTestId('structure-span-add'));
+      const dialog = await screen.findByTestId('span-dialog');
+
+      expect(dialog).toMatchTextContent(
+        'This will be span 11. A bridge should not have more than 10 spans.',
+      );
+      await userEvent.type(within(dialog).getByTestId('span-length'), '5');
+      await userEvent.click(within(dialog).getByTestId('span-save'));
+      await vi.waitFor(() => expect(api.createSpan).toHaveBeenCalled());
+    });
+
+    it("edits a span's number and length", async () => {
+      await openAsLevel2([span('s1', 1, 10)]);
+
+      await userEvent.click(screen.getByTestId('structure-span-edit-s1'));
+      const dialog = await screen.findByTestId('span-dialog');
+      expect(within(dialog).getByTestId('span-length')).toHaveValue('10');
+      await userEvent.clear(within(dialog).getByTestId('span-length'));
+      await userEvent.type(within(dialog).getByTestId('span-length'), '11.25');
+      await userEvent.click(within(dialog).getByTestId('span-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updateSpan).toHaveBeenCalledWith('7', 's1', { number: 1, lengthMetres: 11.25 }),
+      );
+    });
+
+    it("deletes a span once confirmed, and gives the server's reason when it refuses", async () => {
+      api.deleteSpan.mockRejectedValueOnce({
+        status: 409,
+        body: { detail: "Span can't be deleted, it is associated with an inspection." },
+      });
+      await openAsLevel2([span('s1', 1, 10), span('s2', 2, 10)]);
+
+      await userEvent.click(screen.getByTestId('structure-span-delete-s2'));
+      expect(api.deleteSpan).not.toHaveBeenCalled();
+      await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({
+            kind: 'error',
+            title: 'Span 2 was not deleted',
+            subtitle: "Span can't be deleted, it is associated with an inspection.",
+          }),
+        ),
+      );
+      await userEvent.click(screen.getByTestId('structure-span-delete-s2'));
+      await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+      await vi.waitFor(() =>
+        expect(display).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: 'success', title: 'Span 2 deleted' }),
+        ),
+      );
+      expect(api.deleteSpan).toHaveBeenCalledWith('7', 's2');
+    });
+
+    it('adds a pier with its type when the spans will still outnumber the piers', async () => {
+      await openAsLevel2([span('s1', 1, 10), span('s2', 2, 10)]);
+
+      await userEvent.click(screen.getByTestId('structure-pier-add'));
+      const dialog = await screen.findByTestId('pier-dialog');
+      expect(within(dialog).getByTestId('pier-number')).toHaveValue('1');
+      await vi.waitFor(() =>
+        expect(within(within(dialog).getByTestId('pier-type')).getAllByRole('option')).toHaveLength(
+          3,
+        ),
+      );
+      await userEvent.selectOptions(within(dialog).getByTestId('pier-type'), 'CONC');
+      await userEvent.click(within(dialog).getByTestId('pier-save'));
+
+      await vi.waitFor(() =>
+        expect(api.createPier).toHaveBeenCalledWith('7', { number: 1, typeCode: 'CONC' }),
+      );
+    });
+
+    it('refuses another pier while the spans would not outnumber the piers', async () => {
+      await openAsLevel2([span('s1', 1, 10), span('s2', 2, 10)], [pier('p1', 1)]);
+
+      await userEvent.click(screen.getByTestId('structure-pier-add'));
+      const dialog = await screen.findByTestId('pier-dialog');
+      await vi.waitFor(() =>
+        expect(within(within(dialog).getByTestId('pier-type')).getAllByRole('option')).toHaveLength(
+          3,
+        ),
+      );
+      await userEvent.selectOptions(within(dialog).getByTestId('pier-type'), 'CONC');
+      await userEvent.click(within(dialog).getByTestId('pier-save'));
+
+      expect(within(dialog).getByTestId('pier-error')).toMatchTextContent(
+        'Number of spans must be greater than number of piers.',
+      );
+      expect(api.createPier).not.toHaveBeenCalled();
+    });
+
+    it('says in the dialog that a structure with no bridge record can take no span or pier', async () => {
+      authorization.canDelete = true;
+      await showing(bridge({ bridge: null }));
+      await openSpansAndPiers();
+      await screen.findByTestId('structure-section-spans');
+
+      await userEvent.click(screen.getByTestId('structure-span-add'));
+      const spanDialog = await screen.findByTestId('span-dialog');
+      expect(within(spanDialog).getByTestId('span-refusal')).toMatchTextContent(
+        'This structure has no bridge record, so no spans or piers can be added to it.',
+      );
+      expect(within(spanDialog).getByTestId('span-length')).toBeDisabled();
+      expect(within(spanDialog).getByTestId('span-save')).toBeDisabled();
+      await userEvent.click(within(spanDialog).getByRole('button', { name: 'Cancel' }));
+
+      await userEvent.click(screen.getByTestId('structure-pier-add'));
+      const pierDialog = await screen.findByTestId('pier-dialog');
+      expect(within(pierDialog).getByTestId('pier-error')).toMatchTextContent(
+        'This structure has no bridge record, so no spans or piers can be added to it.',
+      );
+      expect(within(pierDialog).getByTestId('pier-save')).toBeDisabled();
+    });
+
+    it("shows the server's refusal for want of a bridge record in the dialog, not a toast", async () => {
+      api.createSpan.mockRejectedValue({
+        status: 409,
+        body: { detail: 'Structure 7 has no bridge record, so it has no spans or piers.' },
+      });
+      await openAsLevel2([]);
+
+      await userEvent.click(screen.getByTestId('structure-span-add'));
+      const dialog = await screen.findByTestId('span-dialog');
+      await userEvent.type(within(dialog).getByTestId('span-length'), '10');
+      await userEvent.click(within(dialog).getByTestId('span-save'));
+
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('span-refusal')).toMatchTextContent(
+          'Structure 7 has no bridge record, so it has no spans or piers.',
+        ),
+      );
+      expect(within(dialog).getByTestId('span-save')).toBeDisabled();
+      expect(display).not.toHaveBeenCalled();
+    });
+
+    it("keeps a pier's expired type in the list, so it can be saved unchanged", async () => {
+      await openAsLevel2(
+        [span('s1', 1, 10), span('s2', 2, 10)],
+        [pier('p1', 1, 'OLD', 'Retired type')],
+      );
+
+      await userEvent.click(screen.getByTestId('structure-pier-edit-p1'));
+      const dialog = await screen.findByTestId('pier-dialog');
+      expect(within(dialog).getByTestId('pier-type')).toHaveValue('OLD');
+      expect(within(dialog).getByRole('option', { name: 'Retired type' })).toBeInTheDocument();
+      await userEvent.clear(within(dialog).getByTestId('pier-number'));
+      await userEvent.type(within(dialog).getByTestId('pier-number'), '3');
+      await userEvent.click(within(dialog).getByTestId('pier-save'));
+
+      await vi.waitFor(() =>
+        expect(api.updatePier).toHaveBeenCalledWith('7', 'p1', { number: 3, typeCode: 'OLD' }),
+      );
+    });
   });
 });
 

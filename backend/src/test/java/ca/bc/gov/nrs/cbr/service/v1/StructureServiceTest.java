@@ -184,9 +184,9 @@ class StructureServiceTest {
     entityManager.persist(ForestServiceBridgeEntity.builder()
         .forestServiceBridgeId(id * 10).crossingStructureId(id).build());
     entityManager.persist(ForestServiceBridgePierEntity.builder()
-        .forestServiceBridgePierId(id * 10).forestServiceBridgeId(id * 10).build());
+        .forestServiceBridgeId(id * 10).build());
     entityManager.persist(ForestServiceBridgeSpanEntity.builder()
-        .forestServiceBridgeSpanId(id * 10).forestServiceBridgeId(id * 10).build());
+        .forestServiceBridgeId(id * 10).build());
     entityManager.persist(StructureCommentEntity.builder()
         .crossingStructureId(id).build());
     entityManager.persist(CrossingStructureNameHistEntity.builder()

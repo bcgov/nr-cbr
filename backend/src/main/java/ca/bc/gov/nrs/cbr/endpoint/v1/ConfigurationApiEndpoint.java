@@ -177,4 +177,9 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/document-extensions")
   ResponseEntity<List<String>> getDocumentExtensions();
+
+  /** Pier types — the Type select on a pier. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/pier-type-codes")
+  ResponseEntity<List<CodeOptionResponse>> getPierTypeCodes();
 }

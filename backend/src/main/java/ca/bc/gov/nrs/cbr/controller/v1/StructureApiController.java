@@ -21,10 +21,12 @@ import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.PierRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.SpanRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
@@ -117,6 +119,42 @@ public class StructureApiController implements StructureApiEndpoint {
   @Override
   public StructureSpansAndPiersResponse getSpansAndPiers(long structureId) {
     return spansAndPiersService.findByStructure(structureId);
+  }
+
+  @Override
+  public ResponseEntity<CreatedResponse> createSpan(long structureId, SpanRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(new CreatedResponse(spansAndPiersService.createSpan(structureId, request)));
+  }
+
+  @Override
+  public ResponseEntity<Void> updateSpan(long structureId, long spanId, SpanRequest request) {
+    spansAndPiersService.updateSpan(structureId, spanId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteSpan(long structureId, long spanId) {
+    spansAndPiersService.deleteSpan(structureId, spanId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<CreatedResponse> createPier(long structureId, PierRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(new CreatedResponse(spansAndPiersService.createPier(structureId, request)));
+  }
+
+  @Override
+  public ResponseEntity<Void> updatePier(long structureId, long pierId, PierRequest request) {
+    spansAndPiersService.updatePier(structureId, pierId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> deletePier(long structureId, long pierId) {
+    spansAndPiersService.deletePier(structureId, pierId);
+    return ResponseEntity.noContent().build();
   }
 
   @Override
