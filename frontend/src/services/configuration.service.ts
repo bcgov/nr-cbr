@@ -147,6 +147,22 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Document types — "Photo View" — current ones by description. */
+  getFileAttachmentTypeCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/file-attachment-type-codes',
+    });
+  }
+
+  /** The file extensions a document may have, upper case, e.g. `JPG` — not shown to the user. */
+  getDocumentExtensions(): CancelablePromise<string[]> {
+    return this.doRequest<string[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/document-extensions',
+    });
+  }
+
   /** Inspection types, by description. Retired codes are included. */
   getInspectionTypeCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {

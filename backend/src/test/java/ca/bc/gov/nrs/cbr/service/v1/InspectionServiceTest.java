@@ -139,10 +139,10 @@ class InspectionServiceTest {
         .entryTimestamp(LocalDateTime.of(2026, 6, 15, 9, 0))
         .build());
 
-    long fileId = nextId++;
-    entityManager.persist(CrossingStructureFileDetailEntity.builder()
-        .fileId(fileId).inspectionId(INSPECTION).build());
-    entityManager.persist(CrossingStructureFileEntity.builder().fileId(fileId).build());
+    CrossingStructureFileDetailEntity detail = CrossingStructureFileDetailEntity.builder()
+        .inspectionId(INSPECTION).build();
+    entityManager.persist(detail);
+    entityManager.persist(CrossingStructureFileEntity.builder().fileId(detail.getFileId()).build());
   }
 
   private void flush() {

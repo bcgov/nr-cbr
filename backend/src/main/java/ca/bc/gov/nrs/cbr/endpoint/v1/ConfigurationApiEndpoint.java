@@ -167,4 +167,14 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/repair-group-codes")
   ResponseEntity<List<CodeOptionResponse>> getRepairGroupCodes();
+
+  /** Document types — the "Photo View" select on a document or photo. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/file-attachment-type-codes")
+  ResponseEntity<List<CodeOptionResponse>> getFileAttachmentTypeCodes();
+
+  /** The file extensions a document may have, upper case — the upload dialog's early check. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/document-extensions")
+  ResponseEntity<List<String>> getDocumentExtensions();
 }

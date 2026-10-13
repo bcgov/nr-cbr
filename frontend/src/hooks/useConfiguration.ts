@@ -123,6 +123,18 @@ export const monitorFrequencyCodesQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const fileAttachmentTypeCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'file-attachment-type-codes'],
+  queryFn: () => API.configuration.getFileAttachmentTypeCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const documentExtensionsQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'document-extensions'],
+  queryFn: () => API.configuration.getDocumentExtensions(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 export const repairStatusCodesQuery = queryOptions({
   queryKey: [CONFIGURATION_QUERY_KEY, 'repair-status-codes'],
   queryFn: () => API.configuration.getRepairStatusCodes(),
@@ -388,3 +400,11 @@ export const useRepairPriorityCodes = (): UseQueryResult<CodeOption[]> =>
 /** The group checkboxes that narrow a repair's Repair Type list. */
 export const useRepairGroupCodes = (): UseQueryResult<CodeOption[]> =>
   useQuery(repairGroupCodesQuery);
+
+/** The "Photo View" select on a document or photo. */
+export const useFileAttachmentTypeCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(fileAttachmentTypeCodesQuery);
+
+/** The file extensions a document may have, upper case — for the upload's check as files are picked. */
+export const useDocumentExtensions = (): UseQueryResult<string[]> =>
+  useQuery(documentExtensionsQuery);

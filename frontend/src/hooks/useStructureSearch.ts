@@ -1,6 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
+  DocumentDetailsRequest,
+  DocumentUpdateRequest,
+} from '@/pages/StructureDetail/documentsResponse';
+import type {
   CloseProximityInspectionRequest,
   InspectionScheduleRequest,
 } from '@/pages/StructureDetail/inspectionsResponse';
@@ -359,6 +363,43 @@ export const useStructureDocuments = (structureId: string | undefined, enabled: 
     queryFn: () => API.structureSearch.getDocuments(structureId as string),
     enabled: enabled && Boolean(structureId),
   });
+
+/**
+ * Adds files to a structure, then refreshes its documents. What the server refused comes back as
+ * `fieldErrors`, keyed `documents[i].field` or `files`.
+ */
+export const useAddDocuments = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ files, details }: { files: File[]; details: DocumentDetailsRequest[] }) =>
+      API.structureSearch.addDocuments(structureId, files, details),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'documents'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Changes a document's type and description, then refreshes the structure's documents. */
+export const useUpdateDocument = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ fileId, request }: { fileId: string; request: DocumentUpdateRequest }) =>
+      API.structureSearch.updateDocument(structureId, fileId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'documents'] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Deletes a document and its file, then refreshes the structure's documents. */
+export const useDeleteDocument = (structureId: string): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fileId: string) => API.structureSearch.deleteDocument(structureId, fileId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'documents'] }),
+  });
+};
 
 /**
  * Runs a structure search, or nothing until one has been submitted.

@@ -16,10 +16,11 @@ server:
   max-http-request-header-size: 16KB
   undertow:
     # Connector-level request-body backstop, above spring.servlet.multipart.max-request-size so the
-    # multipart layer is normally what rejects an oversized upload with a field-level message.
-    # Sized by heap, not by the connector: attachment bytes are held as a byte[] and the JVM runs
-    # -Xmx400m under -XX:+ExitOnOutOfMemoryError, so an oversized upload kills the pod.
-    max-http-post-size: ${MAX_HTTP_POST_SIZE:52428800}
+    # multipart layer is normally what rejects an oversized upload. 170 MB: the Documents & Photos
+    # upload takes legacy's 15 files / 150 MB in one request. Safe for the -Xmx400m heap (under
+    # -XX:+ExitOnOutOfMemoryError) only because the parts spool to /tmp and the service writes one
+    # file's byte[] at a time (StructureDocumentsService.upload) — keep it that way.
+    max-http-post-size: ${MAX_HTTP_POST_SIZE:178257920}
   # Honour X-Forwarded-* from the Caddy reverse proxy when reconstructing the request URL. Without
   # this Spring sees the in-cluster Host and treats the browser Origin as cross-origin.
   forward-headers-strategy: framework
@@ -32,8 +33,11 @@ spring:
       # Inspection photos and as-built drawings. file-size-threshold stays at its 0 default so every
       # part spools to a temp file under java.io.tmpdir rather than buffering in memory — which makes
       # the /tmp emptyDir mount in openshift.deploy.yml load-bearing under readOnlyRootFilesystem.
+      # The per-file rule is 10 MB (StructureDocumentsService.MAX_FILE_BYTES), checked by the
+      # service so the message lands beside the file; this cap is only the backstop above it. The
+      # request holds legacy's 15 files / 150 MB plus the details part.
       max-file-size: ${MULTIPART_MAX_FILE_SIZE:15MB}
-      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:17MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:160MB}
   datasource:
     url: "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=${DATABASE_HOST})(PORT=${DATABASE_PORT:1543}))(CONNECT_DATA=(SERVICE_NAME=${DATABASE_SERVICE_NAME})(SERVER=DEDICATED)))"
     username: ${DATABASE_USER}

@@ -22,3 +22,18 @@ export type StructureDocument = {
  * inspection's, newest inspection first; within each, newest file first.
  */
 export type DocumentsResponse = { documents: StructureDocument[] };
+
+/** One file's details in an upload — the backend's `DocumentDetailsRequest`. */
+export type DocumentDetailsRequest = {
+  /** "Photo View" — `FILE_ATTACHMENT_TYPE_CODE`. */
+  attachmentTypeCode: string;
+  /** `yyyy-MM-dd`. */
+  createdDate: string;
+  description: string;
+};
+
+/** An edit to a document's details — the backend's `DocumentUpdateRequest`. */
+export type DocumentUpdateRequest = { attachmentTypeCode: string; description: string };
+
+/** The documents just added — the backend's `DocumentsCreatedResponse`. */
+export type DocumentsCreatedResponse = { ids: string[] };

@@ -11,6 +11,8 @@ import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.FileAttachmentTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.FileMimeTypeXrefRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairPriorityCodeRepository;
@@ -95,6 +97,8 @@ public class ConfigurationService {
   private final RepairStatusCodeRepository repairStatusCodeRepository;
   private final RepairPriorityCodeRepository repairPriorityCodeRepository;
   private final StructureRepairGroupCodeRepository structureRepairGroupCodeRepository;
+  private final FileAttachmentTypeCodeRepository fileAttachmentTypeCodeRepository;
+  private final FileMimeTypeXrefRepository fileMimeTypeXrefRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -114,7 +118,9 @@ public class ConfigurationService {
       MonitorFrequencyCodeRepository monitorFrequencyCodeRepository,
       RepairStatusCodeRepository repairStatusCodeRepository,
       RepairPriorityCodeRepository repairPriorityCodeRepository,
-      StructureRepairGroupCodeRepository structureRepairGroupCodeRepository) {
+      StructureRepairGroupCodeRepository structureRepairGroupCodeRepository,
+      FileAttachmentTypeCodeRepository fileAttachmentTypeCodeRepository,
+      FileMimeTypeXrefRepository fileMimeTypeXrefRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -133,6 +139,8 @@ public class ConfigurationService {
     this.repairStatusCodeRepository = repairStatusCodeRepository;
     this.repairPriorityCodeRepository = repairPriorityCodeRepository;
     this.structureRepairGroupCodeRepository = structureRepairGroupCodeRepository;
+    this.fileAttachmentTypeCodeRepository = fileAttachmentTypeCodeRepository;
+    this.fileMimeTypeXrefRepository = fileMimeTypeXrefRepository;
   }
 
   /**
@@ -437,5 +445,27 @@ public class ConfigurationService {
         .map(entity ->
             new CodeOptionResponse(entity.getStructureRepairGroupCode(), entity.getDescription()))
         .toList();
+  }
+
+  /**
+   * Document types — {@code THE.FILE_ATTACHMENT_TYPE_CODE}, current ones by description: the
+   * "Photo View" of a document or photo.
+   */
+  @Cacheable("fileAttachmentTypeCodes")
+  public List<CodeOptionResponse> getFileAttachmentTypeCodes() {
+    return fileAttachmentTypeCodeRepository.findAllCurrent().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getFileAttachmentTypeCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * The file extensions a document may have, upper case — {@code THE.FILE_MIME_TYPE_XREF}, which
+   * a stored document's extension must be in. For the upload dialog to flag a file as it is
+   * picked; not shown to the user.
+   */
+  @Cacheable("documentExtensions")
+  public List<String> getDocumentExtensions() {
+    return fileMimeTypeXrefRepository.findExtensions();
   }
 }

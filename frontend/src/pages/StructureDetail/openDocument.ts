@@ -10,6 +10,12 @@ const isShowable = (type: string) =>
 const extensionOf = (document: StructureDocument): string =>
   (document.extension || document.filename?.split('.').pop() || '').toUpperCase();
 
+/** The extensions a thumbnail can be drawn from — images a browser shows. */
+const IMAGES = new Set(['JPG', 'JPEG', 'PNG', 'GIF']);
+
+/** Whether the file is an image a browser can draw, so worth fetching for a thumbnail. */
+export const isImage = (document: StructureDocument): boolean => IMAGES.has(extensionOf(document));
+
 /** Whether the file opens in a new tab rather than downloading. */
 export const opensInTab = (document: StructureDocument): boolean =>
   SHOWN.has(extensionOf(document));

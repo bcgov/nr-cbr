@@ -295,42 +295,6 @@ $page-bottom: 2rem;
   margin-inline-start: $spacing-03;
 }
 
-// A document's attachment type, which opens its file: a button, as it fetches rather than navigates,
-// drawn as a link with the icon saying whether it opens a tab or downloads.
-.structure-detail__file-link {
-  @include type.type-style('body-compact-01');
-
-  display: inline-flex;
-  align-items: center;
-  gap: $spacing-02;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--cds-link-primary);
-  cursor: pointer;
-  text-decoration: underline;
-  white-space: nowrap;
-
-  svg {
-    flex: 0 0 auto;
-    fill: currentColor;
-  }
-
-  &:hover {
-    color: var(--cds-link-primary-hover);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--cds-focus);
-    outline-offset: 2px;
-  }
-
-  &:disabled {
-    cursor: progress;
-    opacity: 0.6;
-  }
-}
-
 // Several structure links in one value, separated so they read as a list.
 .structure-detail__links {
   display: inline-flex;
@@ -440,6 +404,160 @@ $page-bottom: 2rem;
   @media (max-width: 671px) {
     grid-column: auto;
   }
+}
+
+// The upload dialog — nr-fspts' Add attachment dialog (`fsp-species-modal`, `DragDropFileInput`):
+// small, its form stacked, Carbon's 3rem bottom padding trimmed so the buttons don't float, and
+// no scroll fade over them.
+.structure-detail__upload-dialog {
+  .cds--modal-content {
+    padding-block-end: $spacing-05;
+  }
+
+  .cds--modal-scroll-content {
+    mask-image: none;
+  }
+}
+
+.structure-detail__upload-intro {
+  @include type.type-style('body-01');
+
+  margin: 0;
+  color: var(--cds-text-primary);
+}
+
+// "Files", bold over its helper line, as nr-fspts' `ddfi__label`.
+.structure-detail__upload-label {
+  @include type.type-style('heading-compact-01');
+
+  display: block;
+  margin-block-end: $spacing-02;
+  color: var(--cds-text-primary);
+}
+
+.structure-detail__upload-helper {
+  @include type.type-style('helper-text-01');
+
+  margin: 0 0 $spacing-04;
+  color: var(--cds-text-primary);
+}
+
+// The drop zone across the dialog, dashed, as nr-fspts' `ddfi__zone`.
+.structure-detail__upload-drop.cds--file__drop-container,
+.structure-detail__upload-drop .cds--file__drop-container {
+  max-inline-size: none;
+  inline-size: 100%;
+  min-block-size: 5rem;
+  border-radius: 4px;
+}
+
+// The edit dialog's file: its thumbnail beside its name and date.
+.structure-detail__document-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: $spacing-05;
+}
+
+.structure-detail__document-facts {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-direction: column;
+  gap: $spacing-05;
+  min-inline-size: 0;
+
+  .read-only-field__value {
+    overflow-wrap: anywhere;
+  }
+}
+
+// A document's thumbnail, nr-frep's 120px photo square: an image cropped to fill it, or a box naming
+// the file. The name breaks anywhere — `_` and `.` are not break points — and what still will not
+// fit is cut, the whole name on its title.
+.structure-detail__thumb {
+  flex: 0 0 auto;
+  inline-size: 120px;
+  block-size: 120px;
+  object-fit: cover;
+  border: 1px solid var(--cds-border-subtle-01, #e0e0e0);
+  background: var(--cds-layer-02, #fff);
+}
+
+.structure-detail__thumb--placeholder {
+  @include type.type-style('label-01');
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-03;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: var(--cds-text-secondary);
+}
+
+// One chosen file and its fields, stacked.
+.structure-detail__upload-row {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-05;
+}
+
+// A rule between one file's fields and the next file's chip, so each file reads as its own group.
+.structure-detail__upload-row + .structure-detail__upload-row {
+  padding-block-start: $spacing-05;
+  border-block-start: 1px solid var(--cds-border-subtle);
+}
+
+// nr-fspts' file chip: a white card on the dialog's grey, naming the file.
+.structure-detail__upload-chip {
+  display: flex;
+  align-items: center;
+  gap: $spacing-03;
+  padding: $spacing-02 $spacing-02 $spacing-02 $spacing-04;
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 2px;
+  background: var(--cds-layer-02, #fff);
+
+  > svg {
+    flex: 0 0 auto;
+    fill: var(--cds-icon-secondary);
+  }
+}
+
+.structure-detail__upload-chip--error {
+  border-color: var(--cds-support-error);
+}
+
+.structure-detail__upload-name {
+  @include type.type-style('body-compact-01');
+
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.structure-detail__upload-size {
+  @include type.type-style('body-compact-01');
+
+  flex: 0 0 auto;
+  color: var(--cds-text-secondary);
+}
+
+.structure-detail__upload-error {
+  @include type.type-style('helper-text-01');
+
+  margin: $spacing-02 0 0;
+  color: var(--cds-text-error);
+}
+
+// Cancel / Add documents — Carbon's own size, at the right (nr-fspts' `fsp-species-modal__actions`).
+.structure-detail__upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: $spacing-03;
+  margin-block-start: $spacing-06;
 }
 
 // The repairs table's Actions: Edit and Delete side by side when the table has the room, Edit over
