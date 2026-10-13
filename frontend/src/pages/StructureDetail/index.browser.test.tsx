@@ -29,7 +29,7 @@ const api = vi.hoisted(() => ({
   getSpansAndPiers: vi.fn(),
   getDocuments: vi.fn(),
   getDocumentFile: vi.fn(),
-  addDocuments: vi.fn(),
+  addDocument: vi.fn(),
   updateDocument: vi.fn(),
   deleteDocument: vi.fn(),
   getInspectionSchedule: vi.fn(),
@@ -295,8 +295,8 @@ beforeEach(() => {
   api.getDocuments.mockReset();
   api.getDocuments.mockResolvedValue({ documents: [] });
   api.getDocumentFile.mockReset();
-  api.addDocuments.mockReset();
-  api.addDocuments.mockResolvedValue({ ids: ['91', '92'] });
+  api.addDocument.mockReset();
+  api.addDocument.mockResolvedValue({ id: '91' });
   api.updateDocument.mockReset();
   api.updateDocument.mockResolvedValue(undefined);
   api.deleteDocument.mockReset();
@@ -883,7 +883,7 @@ describe('StructureDetailPage — Documents & Photos', () => {
       expect(screen.queryByTestId('structure-documents-add')).not.toBeInTheDocument();
     });
 
-    it('adds the chosen files, each with its type, date and description, in one request', async () => {
+    it('adds the chosen files one request at a time, each with its type, date and description', async () => {
       const deck = fileOf('deck.jpg');
       const plan = fileOf('plan.pdf');
       const dialog = await openUpload([deck, plan]);
@@ -896,16 +896,17 @@ describe('StructureDetailPage — Documents & Photos', () => {
       await userEvent.type(within(rows[1]).getByRole('textbox', { name: 'Description' }), 'Plan.');
       await userEvent.click(within(dialog).getByTestId('upload-save'));
 
-      await vi.waitFor(() =>
-        expect(api.addDocuments).toHaveBeenCalledWith(
-          '7',
-          [deck, plan],
-          [
-            { attachmentTypeCode: 'PHOTO', createdDate: todayIso(), description: '' },
-            { attachmentTypeCode: 'OTH', createdDate: todayIso(), description: 'Plan.' },
-          ],
-        ),
-      );
+      await vi.waitFor(() => expect(api.addDocument).toHaveBeenCalledTimes(2));
+      expect(api.addDocument).toHaveBeenNthCalledWith(1, '7', deck, {
+        attachmentTypeCode: 'PHOTO',
+        createdDate: todayIso(),
+        description: '',
+      });
+      expect(api.addDocument).toHaveBeenNthCalledWith(2, '7', plan, {
+        attachmentTypeCode: 'OTH',
+        createdDate: todayIso(),
+        description: 'Plan.',
+      });
       await vi.waitFor(() =>
         expect(screen.queryByTestId('upload-documents-dialog')).not.toBeInTheDocument(),
       );
@@ -930,7 +931,7 @@ describe('StructureDetailPage — Documents & Photos', () => {
       expect(rows[1]).toMatchTextContent('big.jpg is larger than 10 MB.');
       expect(rows[0]).toMatchTextContent('Photo View is required.');
       expect(rows[2]).toMatchTextContent('Description is required for this Photo View.');
-      expect(api.addDocuments).not.toHaveBeenCalled();
+      expect(api.addDocument).not.toHaveBeenCalled();
     });
 
     it('flags a file type that may not be added as soon as it is picked, listing none', async () => {
@@ -943,7 +944,7 @@ describe('StructureDetailPage — Documents & Photos', () => {
       expect(rows[1]).not.toMatchTextContent('cannot be added');
       expect(dialog).not.toMatchTextContent('Allowed:');
       await userEvent.click(within(dialog).getByTestId('upload-save'));
-      expect(api.addDocuments).not.toHaveBeenCalled();
+      expect(api.addDocument).not.toHaveBeenCalled();
     });
 
     it('drops a file from the batch with Remove', async () => {
@@ -954,14 +955,9 @@ describe('StructureDetailPage — Documents & Photos', () => {
       expect(within(dialog).getAllByRole('region')).toHaveLength(1);
     });
 
-    it('shows what the server refused beside the file it concerns', async () => {
-      api.addDocuments.mockRejectedValue({
-        body: {
-          fieldErrors: {
-            'documents[1].attachmentTypeCode': 'Photo View is not one of the listed types.',
-          },
-        },
-      });
+    it('sends the next file only once the last has been stored', async () => {
+      let finish: (value: { id: string }) => void = () => undefined;
+      api.addDocument.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
       const dialog = await openUpload([fileOf('a.jpg'), fileOf('b.jpg')]);
       for (const row of within(dialog).getAllByRole('region')) {
         await userEvent.selectOptions(within(row).getByRole('combobox'), 'PHOTO');
@@ -970,11 +966,39 @@ describe('StructureDetailPage — Documents & Photos', () => {
       await userEvent.click(within(dialog).getByTestId('upload-save'));
 
       await vi.waitFor(() =>
-        expect(within(dialog).getAllByRole('region')[1]).toMatchTextContent(
-          'Photo View is not one of the listed types.',
-        ),
+        expect(within(dialog).getByTestId('upload-save')).toMatchTextContent('Adding 1 of 2…'),
       );
-      expect(within(dialog).getAllByRole('region')[0]).not.toMatchTextContent('not one of');
+      expect(api.addDocument).toHaveBeenCalledTimes(1);
+      finish({ id: '91' });
+      await vi.waitFor(() => expect(api.addDocument).toHaveBeenCalledTimes(2));
+    });
+
+    it('keeps the files not added, with the reason beside each, and lets the rest go', async () => {
+      api.addDocument
+        .mockResolvedValueOnce({ id: '91' })
+        .mockRejectedValueOnce({
+          body: {
+            fieldErrors: { attachmentTypeCode: 'Photo View is not one of the listed types.' },
+          },
+        })
+        .mockRejectedValueOnce({ status: 413, body: { detail: 'The file is too large.' } });
+      const dialog = await openUpload([fileOf('a.jpg'), fileOf('b.jpg'), fileOf('c.jpg')]);
+      for (const row of within(dialog).getAllByRole('region')) {
+        await userEvent.selectOptions(within(row).getByRole('combobox'), 'PHOTO');
+      }
+
+      await userEvent.click(within(dialog).getByTestId('upload-save'));
+
+      await vi.waitFor(() => expect(within(dialog).getAllByRole('region')).toHaveLength(2));
+      const [b, c] = within(dialog).getAllByRole('region');
+      expect(b).toHaveAccessibleName('b.jpg');
+      expect(b).toMatchTextContent('Photo View is not one of the listed types.');
+      expect(c).toHaveAccessibleName('c.jpg');
+      expect(c).toMatchTextContent('Not added: The file is too large.');
+      expect(within(dialog).getByTestId('upload-batch-error')).toMatchTextContent(
+        '1 of 3 files were added. Correct the files below and add them again.',
+      );
+      expect(screen.getByTestId('upload-documents-dialog')).toBeInTheDocument();
     });
 
     it("edits a document's Photo View and description", async () => {

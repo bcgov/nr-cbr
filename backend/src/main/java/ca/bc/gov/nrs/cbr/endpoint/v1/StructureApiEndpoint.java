@@ -6,7 +6,6 @@ import ca.bc.gov.nrs.cbr.struct.v1.CommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentUpdateRequest;
-import ca.bc.gov.nrs.cbr.struct.v1.DocumentsCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
@@ -175,23 +174,27 @@ public interface StructureApiEndpoint {
       @PathVariable("structureId") long structureId, @PathVariable("fileId") long fileId);
 
   /**
-   * Adds documents and photos to the structure — legacy's Add on the Documents &amp; Photos tab.
-   * Multipart: {@code files}, one to fifteen, and {@code details}, a JSON array of the same length
-   * holding each file's type, date and description in the same order.
+   * Adds one document or photo to the structure — legacy's Add on the Documents &amp; Photos tab,
+   * which the page calls once for each file chosen. Multipart: {@code file}, and {@code details}, a
+   * JSON part holding its type, date and description.
+   *
+   * <p>One file a request so each request stays under the frontend WAF's body limit
+   * ({@code frontend/coraza.conf}) and the backend holds one upload at a time.
    *
    * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — the Level 2 floor, legacy's
-   * {@code /level2Access} on the Add button; it deletes nothing. <b>201</b> with the new ids;
+   * {@code /level2Access} on the Add button; it deletes nothing. <b>201</b> with the new id;
    * <b>404</b> when there is no such structure; <b>400</b> with {@code fieldErrors} keyed
-   * {@code documents[i].field} when a file or its details are refused — then nothing is stored.
+   * {@code file}, {@code attachmentTypeCode}, {@code createdDate} or {@code description} when the
+   * file or its details are refused — then nothing is stored.
    *
    * @param structureId the {@code CROSSING_STRUCTURE_ID}
    */
   @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
   @PostMapping(value = "/{structureId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  ResponseEntity<DocumentsCreatedResponse> addDocuments(
+  ResponseEntity<CreatedResponse> addDocument(
       @PathVariable("structureId") long structureId,
-      @RequestPart("files") List<MultipartFile> files,
-      @RequestPart("details") List<DocumentDetailsRequest> details);
+      @RequestPart("file") MultipartFile file,
+      @RequestPart("details") DocumentDetailsRequest details);
 
   /**
    * Changes a document's type and description — legacy's edit in its viewer.

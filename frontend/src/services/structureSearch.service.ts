@@ -1,7 +1,6 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type {
   DocumentDetailsRequest,
-  DocumentsCreatedResponse,
   DocumentsResponse,
   DocumentUpdateRequest,
 } from '@/pages/StructureDetail/documentsResponse';
@@ -175,22 +174,22 @@ export class StructureSearchService extends HttpClient {
   }
 
   /**
-   * Adds files to a structure, each with its details at the same position. Sent as multipart: the
-   * files, and the details as a JSON part. 400 with `fieldErrors` keyed `documents[i].field` when
-   * any is refused — then none is stored.
+   * Adds one file to a structure, with its details. Sent as multipart: the file, and the details as
+   * a JSON part. 400 with `fieldErrors` keyed `file`, `attachmentTypeCode`, `createdDate` or
+   * `description` when it is refused — then nothing is stored.
    */
-  addDocuments(
+  addDocument(
     structureId: string,
-    files: File[],
-    details: DocumentDetailsRequest[],
-  ): CancelablePromise<DocumentsCreatedResponse> {
-    return this.doRequest<DocumentsCreatedResponse>(this.config, {
+    file: File,
+    details: DocumentDetailsRequest,
+  ): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
       method: 'POST',
       url: '/v1/structures/{structureId}/documents',
       path: { structureId },
       formData: {
-        files,
-        // A Blob, so the part carries its JSON type and the server reads it as the list it is.
+        file,
+        // A Blob, so the part carries its JSON type and the server reads it as the object it is.
         details: new Blob([JSON.stringify(details)], { type: 'application/json' }),
       },
     });

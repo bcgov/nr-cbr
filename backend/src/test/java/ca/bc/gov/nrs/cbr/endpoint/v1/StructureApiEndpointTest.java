@@ -109,7 +109,7 @@ class StructureApiEndpointTest {
         Arguments.of("getDocuments", "GET", "/{structureId}/documents", CbrAuthorities.READ),
         Arguments.of("getDocumentFile", "GET", "/{structureId}/documents/{fileId}/file",
             CbrAuthorities.READ),
-        Arguments.of("addDocuments", "POST", "/{structureId}/documents",
+        Arguments.of("addDocument", "POST", "/{structureId}/documents",
             CbrAuthorities.DESTRUCTIVE),
         Arguments.of("updateDocument", "PUT", "/{structureId}/documents/{fileId}",
             CbrAuthorities.CONTENT_EDIT),

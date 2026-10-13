@@ -15,12 +15,11 @@ import FieldWithCounter from '@/components/core/FieldWithCounter';
 import { toBox, toIso } from './dateBox';
 import DateField from './DateField';
 
-import type { DocumentDetailsRequest } from './documentsResponse';
 import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { useDocumentExtensions, useFileAttachmentTypeCodes } from '@/hooks/useConfiguration';
-import { useAddDocuments } from '@/hooks/useStructureSearch';
+import { useAddDocuments, type DocumentUploadOutcome } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { byteLength, overLimitError } from '@/utils/textLimits';
 
@@ -29,10 +28,12 @@ type Props = {
   onClose: () => void;
 };
 
-/** Legacy's upload page: fifteen rows, 150 MB in all, 10 MB a file — here for every file. */
+/**
+ * Legacy's upload page: fifteen rows, 10 MB a file — here for every file. Legacy's 150 MB in all
+ * follows from those two, so it is not checked on its own.
+ */
 const MAX_FILES = 15;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 150 * 1024 * 1024;
 /** `FILENAME VARCHAR2(255 BYTE)`. */
 const NAME_MAX = 255;
 /** The description column, in bytes. */
@@ -107,12 +108,15 @@ const hasErrors = (errors: RowErrors) => Object.values(errors).some(Boolean);
 /**
  * Adds documents and photos to the structure — legacy's three-step upload pop-up as one small,
  * stacked dialog with a dashed drop zone and file chips:
- * choose or drop up to fifteen files (150 MB in all, 10 MB each), then give each its Photo View,
- * the date it was made (today unless changed, as legacy) and a description, required for Other.
- * One Add stores them all, or none.
+ * choose or drop up to fifteen files (10 MB each), then give each its Photo View, the date it was
+ * made (today unless changed, as legacy) and a description, required for Other.
+ *
+ * <p>Add sends the files one at a time, each in its own request (see `useAddDocuments`), so some
+ * can be stored and others not, as in legacy. Those stored leave the dialog; those not stay, with
+ * the reason beside each, to be corrected and added again.
  *
  * <p>Every rule is checked here before anything is sent; whatever the server still refuses lands
- * beside the file's field. Unlike legacy, a refusal keeps the chosen files.
+ * beside the file's field.
  */
 const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
   const types = useFileAttachmentTypeCodes();
@@ -125,23 +129,19 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
   const [nextKey, setNextKey] = useState(0);
   /** The form's own errors, by row key, set on Add and cleared field by field as each changes. */
   const [errors, setErrors] = useState<Record<number, RowErrors>>({});
-  /** A problem with the whole batch: too many files, or too much in all. */
+  /** What the server refused, by row key, cleared field by field as each changes. */
+  const [serverErrors, setServerErrors] = useState<Record<number, RowErrors>>({});
+  /** A problem with the whole batch: none chosen, too many, or some not added. */
   const [batchError, setBatchError] = useState<string>();
-  /** The rows as last sent, so the server's `documents[i]` errors find their row. */
-  const [sentKeys, setSentKeys] = useState<number[]>([]);
+  /** While adding: how many have been sent, of how many. */
+  const [progress, setProgress] = useState<{ sent: number; total: number }>();
 
-  const serverErrors = (key: number): RowErrors => {
-    const index = sentKeys.indexOf(key);
-    if (index < 0) return {};
-    const found: RowErrors = {};
-    for (const [field, message] of Object.entries(add.fieldErrors)) {
-      const match = /^documents\[(\d+)]\.(\w+)$/.exec(field);
-      if (match && Number(match[1]) === index) found[match[2] as Field] = message;
-    }
-    return found;
+  // The form's own message wins where it has one; a field it found nothing wrong with is left to
+  // the server's.
+  const shownFor = (key: number): RowErrors => {
+    const own = Object.entries(errors[key] ?? {}).filter(([, message]) => message);
+    return { ...serverErrors[key], ...Object.fromEntries(own) };
   };
-  const shownFor = (key: number): RowErrors => ({ ...serverErrors(key), ...errors[key] });
-  const shownBatch = batchError ?? add.fieldErrors.files;
 
   const addFiles = (files: File[]) => {
     const offersOther = (types.data ?? []).some((option) => option.code === OTHER);
@@ -171,6 +171,10 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
       current.map((row) => (row.key === key ? { ...row, [field]: value } : row)),
     );
     setErrors((current) => ({ ...current, [key]: { ...current[key], [field]: undefined } }));
+    setServerErrors((current) => ({
+      ...current,
+      [key]: { ...current[key], [field]: undefined },
+    }));
   };
 
   const remove = (key: number) => {
@@ -178,48 +182,67 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
     setBatchError(undefined);
   };
 
+  /** Closes when every file was stored; otherwise keeps the rest, each with its reason. */
+  const settle = ({ added, failed }: DocumentUploadOutcome) => {
+    setProgress(undefined);
+    if (failed.length === 0) {
+      display({
+        kind: 'success',
+        title: added.length === 1 ? '1 document added' : `${added.length} documents added`,
+        timeout: 4000,
+      });
+      onClose();
+      return;
+    }
+    setRows((current) => current.filter((row) => !added.includes(row.key)));
+    setServerErrors(
+      Object.fromEntries(
+        failed.map(({ key, error }) => {
+          const fields = apiFieldErrors(error) as RowErrors;
+          return [
+            key,
+            Object.keys(fields).length > 0
+              ? fields
+              : {
+                  file: `Not added: ${apiErrorMessage(error, 'try again, or contact support if this continues.')}`,
+                },
+          ];
+        }),
+      ),
+    );
+    setBatchError(
+      added.length === 0
+        ? 'No files were added. Correct the files below and add them again.'
+        : `${added.length} of ${added.length + failed.length} files were added. ` +
+            'Correct the files below and add them again.',
+    );
+  };
+
   const save = () => {
     let batch: string | undefined;
-    const total = rows.reduce((sum, row) => sum + row.file.size, 0);
     if (rows.length === 0) batch = 'Choose at least one file.';
     else if (rows.length > MAX_FILES) {
       batch = `At most ${MAX_FILES} files can be added at a time.`;
-    } else if (total > MAX_TOTAL_BYTES) {
-      batch = `The files come to ${megabytes(total)}; at most 150 MB can be added at a time.`;
     }
     const found = Object.fromEntries(rows.map((row) => [row.key, rowErrors(row, extensions)]));
     setBatchError(batch);
     setErrors(found);
+    setServerErrors({});
     if (batch || Object.values(found).some(hasErrors)) return;
 
-    const details: DocumentDetailsRequest[] = rows.map((row) => ({
-      attachmentTypeCode: row.attachmentTypeCode,
-      createdDate: toIso(row.createdDate) as string,
-      description: row.description,
-    }));
-    setSentKeys(rows.map((row) => row.key));
-    add.mutate(
-      { files: rows.map((row) => row.file), details },
-      {
-        onSuccess: ({ ids }) => {
-          display({
-            kind: 'success',
-            title: ids.length === 1 ? '1 document added' : `${ids.length} documents added`,
-            timeout: 4000,
-          });
-          onClose();
-        },
-        onError: (error) => {
-          // Refusals show beside their files; anything else is a toast.
-          if (Object.keys(apiFieldErrors(error)).length > 0) return;
-          display({
-            kind: 'error',
-            title: 'The documents were not added',
-            subtitle: apiErrorMessage(error, 'Try again, or contact support if this continues.'),
-            timeout: 0,
-          });
-        },
+    const uploads = rows.map((row) => ({
+      key: row.key,
+      file: row.file,
+      details: {
+        attachmentTypeCode: row.attachmentTypeCode,
+        createdDate: toIso(row.createdDate) as string,
+        description: row.description,
       },
+    }));
+    setProgress({ sent: 0, total: uploads.length });
+    add.mutate(
+      { uploads, onProgress: (sent) => setProgress({ sent, total: uploads.length }) },
+      { onSuccess: settle },
     );
   };
 
@@ -242,9 +265,7 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
 
         <div>
           <span className="structure-detail__upload-label">Files</span>
-          <p className="structure-detail__upload-helper">
-            Up to {MAX_FILES} files, 10 MB each and 150 MB in all.
-          </p>
+          <p className="structure-detail__upload-helper">Up to {MAX_FILES} files, 10 MB each.</p>
           <FileUploaderDropContainer
             labelText="Drag and drop files here or click to upload"
             multiple
@@ -253,13 +274,13 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
             data-testid="upload-documents-drop"
             onAddFiles={(_, { addedFiles }) => addFiles(addedFiles)}
           />
-          {shownBatch && (
+          {batchError && (
             <p
               className="structure-detail__upload-error"
               role="alert"
               data-testid="upload-batch-error"
             >
-              {shownBatch}
+              {batchError}
             </p>
           )}
         </div>
@@ -347,7 +368,7 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
           Cancel
         </Button>
         <Button kind="primary" onClick={save} disabled={add.isPending} data-testid="upload-save">
-          {add.isPending ? 'Adding…' : 'Add documents'}
+          {progress ? `Adding ${progress.sent + 1} of ${progress.total}…` : 'Add documents'}
         </Button>
       </div>
     </Modal>

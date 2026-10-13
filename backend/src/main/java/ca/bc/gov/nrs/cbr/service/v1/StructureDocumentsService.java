@@ -26,7 +26,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -65,8 +64,6 @@ public class StructureDocumentsService {
 
   private static final Logger log = LoggerFactory.getLogger(StructureDocumentsService.class);
 
-  /** Legacy's upload page: fifteen rows. */
-  public static final int MAX_FILES = 15;
   /** Legacy's {@code max-file-storage-size} preference, 10 MB — here for every file, JPEGs too. */
   public static final long MAX_FILE_BYTES = 10L * 1024 * 1024;
   /** {@code FILENAME VARCHAR2(255 BYTE)}. */
@@ -75,8 +72,6 @@ public class StructureDocumentsService {
   private static final int TEXT_MAX = 2000;
   /** The type whose file must be described — legacy's {@code FileAttachment.OTHER_CODE}. */
   private static final String OTHER = "OTH";
-  /** The field a refusal of the whole batch is keyed to — the multipart part of that name. */
-  private static final String FILES = "files";
   private static final String TYPE = "attachmentTypeCode";
   private static final String DESCRIPTION = "description";
 
@@ -233,65 +228,53 @@ public class StructureDocumentsService {
   }
 
   /**
-   * Adds files to the structure — legacy's Add on the Documents &amp; Photos tab
+   * Adds one file to the structure — legacy's Add on the Documents &amp; Photos tab
    * ({@code UploadAction}, {@code CBR.INSERT_FILE_ATTACHMENT_DETAIL} and
    * {@code SET_FILE_ATTACHMENT}), as the structure's own: no inspection, as legacy's tab adds.
    *
-   * <p>One to fifteen files, each with its details at the same position: a type ("Photo View"),
-   * the date it was made, and a description, required for Other. Each file at most 10 MB and of an
-   * extension in {@code FILE_MIME_TYPE_XREF}, its name at most 255 bytes. Every file is checked
-   * before any is stored, and all are stored in one transaction — all or none, where legacy
-   * committed file by file and left the first few behind when one failed. JPEGs are stored as
-   * sent; legacy re-encoded them to a fixed width.
+   * <p>The file comes with its details: a type ("Photo View"), the date it was made, and a
+   * description, required for Other. At most 10 MB and of an extension in
+   * {@code FILE_MIME_TYPE_XREF}, its name at most 255 bytes. JPEGs are stored as sent; legacy
+   * re-encoded them to a fixed width.
    *
-   * <p>Each file's bytes are written and released before the next is read, so the heap holds one
-   * file at a time; the parts themselves wait on disk ({@code spring.servlet.multipart}).
+   * <p>One file a call: the page sends legacy's batch of up to fifteen one at a time, so a request
+   * stays under the frontend WAF's body limit. As legacy, which committed file by file, a batch can
+   * therefore be partly stored; the page keeps the files that were not.
    *
-   * @return the new documents' ids, in the order the files were sent
+   * @return the new document's id
    * @throws StructureNotFoundException if there is no such structure
-   * @throws FieldValidationException   with a message for each file and field at fault, keyed
-   *     {@code documents[i].field}, or {@code files} for the batch
+   * @throws FieldValidationException   with a message for each field at fault, keyed {@code file},
+   *     {@code attachmentTypeCode}, {@code createdDate} or {@code description}
    */
   @Transactional
-  public List<String> upload(long structureId, List<MultipartFile> parts,
-      List<DocumentDetailsRequest> rows) {
+  public String upload(long structureId, MultipartFile part, DocumentDetailsRequest request) {
     if (!structures.existsById(structureId)) {
       throw new StructureNotFoundException(structureId);
     }
-    List<String> mimeCodes = validateUpload(parts, rows);
+    String mimeCode = validateUpload(part, request);
 
     String user = loggedUser.getLoggedUserId();
     LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
-    List<String> ids = new ArrayList<>();
-    for (int i = 0; i < parts.size(); i++) {
-      MultipartFile part = parts.get(i);
-      DocumentDetailsRequest row = rows.get(i);
-      String name = part.getOriginalFilename().trim();
-      CrossingStructureFileDetailEntity detail = CrossingStructureFileDetailEntity.builder()
-          .crossingStructureId(structureId)
-          .filename(name)
-          .fileCreateDate(row.createdDate().atStartOfDay())
-          .efileExtensionCode(extension(name))
-          .fileMimeTypeCode(mimeCodes.get(i))
-          .fileAttachmentTypeCode(trimmed(row.attachmentTypeCode()))
-          .description(trimmed(row.description()))
-          .entryUserid(user)
-          .entryTimestamp(now)
-          .updateUserid(user)
-          .updateTimestamp(now)
-          .build();
-      entityManager.persist(detail);
-      CrossingStructureFileEntity file = new CrossingStructureFileEntity(detail.getFileId(),
-          bytes(part));
-      entityManager.persist(file);
-      // Written, then let go: the next file's bytes should not join this one's in the heap.
-      entityManager.flush();
-      entityManager.detach(file);
-      entityManager.detach(detail);
-      ids.add(String.valueOf(detail.getFileId()));
-    }
-    log.info("Added {} document(s) {} to structure {}", ids.size(), ids, structureId);
-    return ids;
+    String name = part.getOriginalFilename().trim();
+    CrossingStructureFileDetailEntity detail = CrossingStructureFileDetailEntity.builder()
+        .crossingStructureId(structureId)
+        .filename(name)
+        .fileCreateDate(request.createdDate().atStartOfDay())
+        .efileExtensionCode(extension(name))
+        .fileMimeTypeCode(mimeCode)
+        .fileAttachmentTypeCode(trimmed(request.attachmentTypeCode()))
+        .description(trimmed(request.description()))
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build();
+    // persist, not save: the file row's id is assigned, so save would merge — a SELECT first, and
+    // a second copy of the bytes.
+    entityManager.persist(detail);
+    entityManager.persist(new CrossingStructureFileEntity(detail.getFileId(), bytes(part)));
+    log.info("Added document {} ({}) to structure {}", detail.getFileId(), name, structureId);
+    return String.valueOf(detail.getFileId());
   }
 
   /**
@@ -308,7 +291,7 @@ public class StructureDocumentsService {
         .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
         .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
     Map<String, String> errors = new LinkedHashMap<>();
-    checkDetails(errors, "", request.attachmentTypeCode(), request.description());
+    checkDetails(errors, request.attachmentTypeCode(), request.description());
     if (!errors.isEmpty()) {
       throw new FieldValidationException("Document cannot be saved", errors);
     }
@@ -340,37 +323,21 @@ public class StructureDocumentsService {
   }
 
   /**
-   * Checks every file and its details before any is stored.
+   * Checks the file and its details before anything is stored.
    *
-   * @return each file's MIME type code, in order
+   * @return the file's MIME type code
    */
-  private List<String> validateUpload(List<MultipartFile> parts,
-      List<DocumentDetailsRequest> rows) {
+  private String validateUpload(MultipartFile part, DocumentDetailsRequest request) {
     Map<String, String> errors = new LinkedHashMap<>();
-    if (parts.isEmpty()) {
-      errors.put(FILES, "Choose at least one file.");
-    } else if (parts.size() > MAX_FILES) {
-      errors.put(FILES, "At most " + MAX_FILES + " files can be added at a time.");
-    } else if (rows.size() != parts.size()) {
-      errors.put(FILES, "Each file needs its details.");
+    String mimeCode = checkFile(errors, part);
+    if (request.createdDate() == null) {
+      errors.put("createdDate", "Photo/Doc Created is required.");
     }
+    checkDetails(errors, request.attachmentTypeCode(), request.description());
     if (!errors.isEmpty()) {
-      throw new FieldValidationException("Documents cannot be added", errors);
+      throw new FieldValidationException("Document cannot be added", errors);
     }
-    List<String> mimeCodes = new ArrayList<>();
-    for (int i = 0; i < parts.size(); i++) {
-      String prefix = "documents[" + i + "].";
-      mimeCodes.add(checkFile(errors, prefix, parts.get(i)));
-      DocumentDetailsRequest row = rows.get(i);
-      if (row.createdDate() == null) {
-        errors.put(prefix + "createdDate", "Photo/Doc Created is required.");
-      }
-      checkDetails(errors, prefix, row.attachmentTypeCode(), row.description());
-    }
-    if (!errors.isEmpty()) {
-      throw new FieldValidationException("Documents cannot be added", errors);
-    }
-    return mimeCodes;
+    return mimeCode;
   }
 
   /**
@@ -378,8 +345,8 @@ public class StructureDocumentsService {
    *
    * @return its MIME type code, or null when it is refused
    */
-  private String checkFile(Map<String, String> errors, String prefix, MultipartFile part) {
-    String key = prefix + "file";
+  private String checkFile(Map<String, String> errors, MultipartFile part) {
+    String key = "file";
     String name = part.getOriginalFilename() == null ? "" : part.getOriginalFilename().trim();
     if (name.isEmpty()) {
       errors.put(key, "The file has no name.");
@@ -409,22 +376,21 @@ public class StructureDocumentsService {
   }
 
   /** A type ("Photo View") that exists, and a description when it is Other. */
-  private void checkDetails(Map<String, String> errors, String prefix, String typeCode,
-      String text) {
+  private void checkDetails(Map<String, String> errors, String typeCode, String text) {
     String type = trimmed(typeCode);
     String description = trimmed(text);
     if (type == null) {
-      errors.put(prefix + TYPE, "Photo View is required.");
+      errors.put(TYPE, "Photo View is required.");
     } else if (!attachmentTypes.existsById(type)) {
-      errors.put(prefix + TYPE, "Photo View is not one of the listed types.");
+      errors.put(TYPE, "Photo View is not one of the listed types.");
     }
     if (description == null) {
       if (OTHER.equals(type)) {
-        errors.put(prefix + DESCRIPTION, "Description is required for this Photo View.");
+        errors.put(DESCRIPTION, "Description is required for this Photo View.");
       }
     } else if (description.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
       // Bytes, because the column is declared in bytes and an accented character costs two.
-      errors.put(prefix + DESCRIPTION, "Description can be at most " + TEXT_MAX + " characters.");
+      errors.put(DESCRIPTION, "Description can be at most " + TEXT_MAX + " characters.");
     }
   }
 

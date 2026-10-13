@@ -364,19 +364,53 @@ export const useStructureDocuments = (structureId: string | undefined, enabled: 
     enabled: enabled && Boolean(structureId),
   });
 
+/** One file to add, under the caller's key for it. */
+export type DocumentUpload = { key: number; file: File; details: DocumentDetailsRequest };
+
+/** What became of each file: the keys stored, and why each of the rest was not. */
+export type DocumentUploadOutcome = {
+  added: number[];
+  failed: { key: number; error: unknown }[];
+};
+
 /**
- * Adds files to a structure, then refreshes its documents. What the server refused comes back as
- * `fieldErrors`, keyed `documents[i].field` or `files`.
+ * Adds files to a structure, one request a file and one request at a time, then refreshes its
+ * documents. One file a request keeps each under the frontend WAF's body limit
+ * (`frontend/coraza.conf`); one at a time keeps the WAF and the backend holding a single upload.
+ *
+ * <p>Never rejects: a file the server refuses is reported in the outcome — its `fieldErrors` keyed
+ * `file`, `attachmentTypeCode`, `createdDate` or `description` — and the rest are still sent.
+ * `onProgress` is told how many have been sent before each request.
  */
 export const useAddDocuments = (structureId: string) => {
   const queryClient = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: ({ files, details }: { files: File[]; details: DocumentDetailsRequest[] }) =>
-      API.structureSearch.addDocuments(structureId, files, details),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'documents'] }),
+  return useMutation({
+    mutationFn: async ({
+      uploads,
+      onProgress,
+    }: {
+      uploads: DocumentUpload[];
+      onProgress?: (sent: number) => void;
+    }): Promise<DocumentUploadOutcome> => {
+      const outcome: DocumentUploadOutcome = { added: [], failed: [] };
+      for (const [sent, upload] of uploads.entries()) {
+        onProgress?.(sent);
+        try {
+          await API.structureSearch.addDocument(structureId, upload.file, upload.details);
+          outcome.added.push(upload.key);
+        } catch (error) {
+          outcome.failed.push({ key: upload.key, error });
+        }
+      }
+      return outcome;
+    },
+    onSuccess: ({ added }) =>
+      added.length > 0
+        ? queryClient.invalidateQueries({
+            queryKey: [STRUCTURE_QUERY_KEY, structureId, 'documents'],
+          })
+        : undefined,
   });
-  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
 
 /** Changes a document's type and description, then refreshes the structure's documents. */

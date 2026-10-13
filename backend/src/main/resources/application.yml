@@ -15,13 +15,10 @@ server:
   max-http-request-header-size: 16KB
   undertow:
     # Connector-level request-body backstop, above spring.servlet.multipart.max-request-size so the
-    # multipart layer is normally what rejects an oversized upload. 170 MB: the Documents & Photos
-    # upload takes legacy's 15 files / 150 MB in one request. Safe for the heap (60% of the pod's
-    # memory limit, under -XX:+ExitOnOutOfMemoryError — see the Dockerfile) only because the parts
-    # spool to /tmp and the service writes one file's byte[] at a time
-    # (StructureDocumentsService.upload) — keep it that way. The spool counts against the pod's
-    # ephemeral-storage limit in openshift.deploy.yml.
-    max-http-post-size: ${MAX_HTTP_POST_SIZE:178257920}
+    # multipart layer is normally what rejects an oversized upload. 16 MB: the Documents & Photos
+    # upload sends one file (10 MB at most) a request. The parts spool to /tmp, which counts against
+    # the pod's ephemeral-storage limit in openshift.deploy.yml.
+    max-http-post-size: ${MAX_HTTP_POST_SIZE:16777216}
   # Honour X-Forwarded-* from the Caddy reverse proxy when reconstructing the request URL. Without
   # this Spring sees the in-cluster Host and treats the browser Origin as cross-origin.
   forward-headers-strategy: framework
@@ -35,10 +32,11 @@ spring:
       # part spools to a temp file under java.io.tmpdir rather than buffering in memory — which makes
       # the /tmp emptyDir mount in openshift.deploy.yml load-bearing under readOnlyRootFilesystem.
       # The per-file rule is 10 MB (StructureDocumentsService.MAX_FILE_BYTES), checked by the
-      # service so the message lands beside the file; this cap is only the backstop above it. The
-      # request holds legacy's 15 files / 150 MB plus the details part.
-      max-file-size: ${MULTIPART_MAX_FILE_SIZE:15MB}
-      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:160MB}
+      # service so the message lands beside the file; these caps are only the backstop above it.
+      # A request holds one file plus its details part, and must stay under the frontend WAF's
+      # 12.5 MB body limit (frontend/coraza.conf, SecRequestBodyLimit) or Caddy refuses it first.
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:11MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:12MB}
   datasource:
     url: "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=${DATABASE_HOST})(PORT=${DATABASE_PORT:1543}))(CONNECT_DATA=(SERVICE_NAME=${DATABASE_SERVICE_NAME})(SERVER=DEDICATED)))"
     username: ${DATABASE_USER}

@@ -221,7 +221,7 @@ class StructureDocumentsServiceTest {
   }
 
   private static MultipartFile part(String name, int bytes) {
-    return new MockMultipartFile("files", name, "application/octet-stream", new byte[bytes]);
+    return new MockMultipartFile("file", name, "application/octet-stream", new byte[bytes]);
   }
 
   private static DocumentDetailsRequest row(String type, String description) {
@@ -234,10 +234,9 @@ class StructureDocumentsServiceTest {
     return entityManager.find(CrossingStructureFileDetailEntity.class, id);
   }
 
-  private Map<String, String> uploadRefused(List<MultipartFile> parts,
-      List<DocumentDetailsRequest> rows) {
+  private Map<String, String> uploadRefused(MultipartFile part, DocumentDetailsRequest row) {
     try {
-      service.upload(7L, parts, rows);
+      service.upload(7L, part, row);
     } catch (FieldValidationException refused) {
       return refused.getFieldErrors();
     }
@@ -245,16 +244,13 @@ class StructureDocumentsServiceTest {
   }
 
   @Test
-  @DisplayName("adds each file as the structure's own, with its details, bytes and who added it")
+  @DisplayName("adds the file as the structure's own, with its details, bytes and who added it")
   void uploads() {
-    MultipartFile photo = new MockMultipartFile("files", " deck.jpg ", "image/jpeg",
+    MultipartFile photo = new MockMultipartFile("file", " deck.jpg ", "image/jpeg",
         "jpeg bytes".getBytes());
-    List<String> ids = service.upload(7L,
-        List.of(photo, part("plan.PDF", 10)),
-        List.of(row(" PHOTO ", "  North abutment.  "), row("OTH", "As-built plan")));
+    String id = service.upload(7L, photo, row(" PHOTO ", "  North abutment.  "));
 
-    assertThat(ids).hasSize(2);
-    CrossingStructureFileDetailEntity detail = storedDetail(Long.parseLong(ids.getFirst()));
+    CrossingStructureFileDetailEntity detail = storedDetail(Long.parseLong(id));
     assertThat(detail.getCrossingStructureId()).isEqualTo(7L);
     assertThat(detail.getInspectionId()).isNull();
     assertThat(detail.getFilename()).isEqualTo("deck.jpg");
@@ -265,65 +261,61 @@ class StructureDocumentsServiceTest {
     assertThat(detail.getDescription()).isEqualTo("North abutment.");
     assertThat(detail.getEntryUserid()).isEqualTo("IDIR\\EDITOR");
     assertThat(detail.getUpdateUserid()).isEqualTo("IDIR\\EDITOR");
-    assertThat(new String(service.file(7L, Long.parseLong(ids.getFirst())).content()))
+    assertThat(new String(service.file(7L, Long.parseLong(id)).content()))
         .isEqualTo("jpeg bytes");
-    assertThat(storedDetail(Long.parseLong(ids.get(1))).getEfileExtensionCode()).isEqualTo("PDF");
   }
 
   @Test
-  @DisplayName("stores none of the files when any one is refused, naming each at fault")
-  void allOrNothing() {
-    Map<String, String> errors = uploadRefused(
-        List.of(part("deck.jpg", 10), part("notes.exe", 10), part("big.jpg",
-            (int) StructureDocumentsService.MAX_FILE_BYTES + 1), part("noext", 10)),
-        List.of(row("PHOTO", null), row("PHOTO", null), row("PHOTO", null), row("PHOTO", null)));
+  @DisplayName("gives each file its own id, its extension read from its name")
+  void uploadsEachFile() {
+    String photo = service.upload(7L, part("deck.jpg", 10), row("PHOTO", null));
+    String plan = service.upload(7L, part("plan.PDF", 10), row("OTH", "As-built plan"));
 
-    assertThat(errors).containsExactly(
-        Map.entry("documents[1].file", "Files of type .exe cannot be added."),
-        Map.entry("documents[2].file", "big.jpg is larger than 10 MB."),
-        Map.entry("documents[3].file", "noext has no file type."));
+    assertThat(plan).isNotEqualTo(photo);
+    assertThat(storedDetail(Long.parseLong(plan)).getEfileExtensionCode()).isEqualTo("PDF");
+    assertThat(documents(7L)).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("refuses a file of an unlisted type, over 10 MB, or without an extension")
+  void refusesFiles() {
+    assertThat(uploadRefused(part("notes.exe", 10), row("PHOTO", null)))
+        .containsExactly(Map.entry("file", "Files of type .exe cannot be added."));
+    assertThat(uploadRefused(
+        part("big.jpg", (int) StructureDocumentsService.MAX_FILE_BYTES + 1), row("PHOTO", null)))
+        .containsExactly(Map.entry("file", "big.jpg is larger than 10 MB."));
+    assertThat(uploadRefused(part("noext", 10), row("PHOTO", null)))
+        .containsExactly(Map.entry("file", "noext has no file type."));
+    assertThat(uploadRefused(part("empty.jpg", 0), row("PHOTO", null)))
+        .containsExactly(Map.entry("file", "empty.jpg is empty."));
     assertThat(documents(7L)).isEmpty();
   }
 
   @Test
   @DisplayName("needs a known Photo View, a created date, and a description for Other")
   void refusesDetails() {
-    Map<String, String> errors = uploadRefused(
-        List.of(part("a.jpg", 10), part("b.jpg", 10), part("c.jpg", 10), part("d.jpg", 10)),
-        List.of(row(" ", null), row("NOPE", null), row("OTH", " "),
-            new DocumentDetailsRequest("PHOTO", null, "é".repeat(1001))));
-
-    assertThat(errors).containsExactly(
-        Map.entry("documents[0].attachmentTypeCode", "Photo View is required."),
-        Map.entry("documents[1].attachmentTypeCode",
-            "Photo View is not one of the listed types."),
-        Map.entry("documents[2].description", "Description is required for this Photo View."),
-        Map.entry("documents[3].createdDate", "Photo/Doc Created is required."),
-        Map.entry("documents[3].description", "Description can be at most 2000 characters."));
-  }
-
-  @Test
-  @DisplayName("takes one to fifteen files, each with its details")
-  void refusesBatch() {
-    List<MultipartFile> sixteen = java.util.stream.IntStream.range(0, 16)
-        .mapToObj(i -> part(i + ".jpg", 1)).toList();
-    List<DocumentDetailsRequest> rows = sixteen.stream().map(p -> row("PHOTO", null)).toList();
-
-    assertThat(uploadRefused(List.of(), List.of()))
-        .containsExactly(Map.entry("files", "Choose at least one file."));
-    assertThat(uploadRefused(sixteen, rows))
-        .containsExactly(Map.entry("files", "At most 15 files can be added at a time."));
-    assertThat(uploadRefused(List.of(part("a.jpg", 1)), List.of()))
-        .containsExactly(Map.entry("files", "Each file needs its details."));
+    assertThat(uploadRefused(part("a.jpg", 10), row(" ", null)))
+        .containsExactly(Map.entry("attachmentTypeCode", "Photo View is required."));
+    assertThat(uploadRefused(part("b.jpg", 10), row("NOPE", null)))
+        .containsExactly(
+            Map.entry("attachmentTypeCode", "Photo View is not one of the listed types."));
+    assertThat(uploadRefused(part("c.jpg", 10), row("OTH", " ")))
+        .containsExactly(Map.entry("description", "Description is required for this Photo View."));
+    assertThat(uploadRefused(part("d.jpg", 10),
+        new DocumentDetailsRequest("PHOTO", null, "é".repeat(1001))))
+        .containsExactly(
+            Map.entry("createdDate", "Photo/Doc Created is required."),
+            Map.entry("description", "Description can be at most 2000 characters."));
+    assertThat(documents(7L)).isEmpty();
   }
 
   @Test
   @DisplayName("adds nothing to a structure that does not exist")
   void uploadMissingStructure() {
-    List<MultipartFile> parts = List.of(part("a.jpg", 1));
-    List<DocumentDetailsRequest> rows = List.of(row("PHOTO", null));
+    MultipartFile part = part("a.jpg", 1);
+    DocumentDetailsRequest row = row("PHOTO", null);
 
-    assertThatThrownBy(() -> service.upload(404L, parts, rows))
+    assertThatThrownBy(() -> service.upload(404L, part, row))
         .isInstanceOf(StructureNotFoundException.class);
   }
 

@@ -232,8 +232,9 @@ objects:
               #
               # ephemeral-storage must hold at once: a heap dump on OOM
               # (/temp, up to the max heap), the multipart spool for uploads in flight (/tmp — a
-              # Documents & Photos upload is up to 150MB, see application.yml), and the logs. Every
-              # emptyDir counts against it; overrun it and the pod is evicted, losing the dump.
+              # Documents & Photos upload is one file, up to 12MB, see application.yml), and the
+              # logs. Every emptyDir counts against it; overrun it and the pod is evicted, losing
+              # the dump.
               resources:
                 requests:
                   cpu: ${MIN_CPU}

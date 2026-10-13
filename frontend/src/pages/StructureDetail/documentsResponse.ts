@@ -34,6 +34,3 @@ export type DocumentDetailsRequest = {
 
 /** An edit to a document's details — the backend's `DocumentUpdateRequest`. */
 export type DocumentUpdateRequest = { attachmentTypeCode: string; description: string };
-
-/** The documents just added — the backend's `DocumentsCreatedResponse`. */
-export type DocumentsCreatedResponse = { ids: string[] };

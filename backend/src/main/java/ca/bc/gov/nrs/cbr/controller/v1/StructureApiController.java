@@ -16,7 +16,6 @@ import ca.bc.gov.nrs.cbr.struct.v1.CommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentUpdateRequest;
-import ca.bc.gov.nrs.cbr.struct.v1.DocumentsCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
@@ -146,10 +145,10 @@ public class StructureApiController implements StructureApiEndpoint {
   }
 
   @Override
-  public ResponseEntity<DocumentsCreatedResponse> addDocuments(
-      long structureId, List<MultipartFile> files, List<DocumentDetailsRequest> details) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(new DocumentsCreatedResponse(
-        documentsService.upload(structureId, files, details)));
+  public ResponseEntity<CreatedResponse> addDocument(
+      long structureId, MultipartFile file, DocumentDetailsRequest details) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(new CreatedResponse(
+        documentsService.upload(structureId, file, details)));
   }
 
   @Override
