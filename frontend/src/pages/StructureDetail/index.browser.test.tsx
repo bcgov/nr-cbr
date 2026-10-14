@@ -27,6 +27,8 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 const api = vi.hoisted(() => ({
   getStructure: vi.fn(),
   getSpansAndPiers: vi.fn(),
+  previewSite: vi.fn(),
+  updateStructureInformation: vi.fn(),
   createSpan: vi.fn(),
   updateSpan: vi.fn(),
   deleteSpan: vi.fn(),
@@ -299,6 +301,9 @@ beforeEach(() => {
   api.getStructure.mockReset();
   api.getSpansAndPiers.mockReset();
   api.getSpansAndPiers.mockResolvedValue({ spans: [], piers: [] });
+  api.previewSite.mockReset();
+  api.updateStructureInformation.mockReset();
+  api.updateStructureInformation.mockResolvedValue(undefined);
   for (const write of [
     api.createSpan,
     api.updateSpan,
@@ -451,13 +456,14 @@ describe('StructureDetailPage — header', () => {
     expect(screen.getByRole('heading', { name: 'Structure B100' })).toBeInTheDocument();
   });
 
-  it('shows the structure and its site, every code decoded', async () => {
+  it('shows the structure and its site', async () => {
     const header = await showing(bridge());
 
-    expect(valueOf('Type/Class', header)).toBe('Timber Bridge');
-    expect(within(header).queryByText('Site Status')).not.toBeInTheDocument();
-    // Legacy shows the raw code here.
-    expect(valueOf('Inspection Status', header)).toBe('Inspected');
+    expect(valueOf('Structure #', header)).toBe('B100');
+    // Type/Class is on the Details tab, with the bridge.
+    expect(within(header).queryByText('Type/Class')).not.toBeInTheDocument();
+    // Code and description; legacy shows the raw code alone.
+    expect(valueOf('Inspection Status', header)).toBe('OK - Inspected');
     expect(valueOf('Forest District', header)).toBe('Cariboo-Chilcotin Natural Resource District');
     expect(valueOf('Management Area', header)).toBe('Central Cariboo');
     expect(valueOf('Forest Service Road', header)).toBe('CHILCOTIN SOUTH');
@@ -496,10 +502,11 @@ describe('StructureDetailPage — header', () => {
     expect(within(header).queryByText('Forest Service Road')).not.toBeInTheDocument();
   });
 
-  it('shows the site status as a pill beside the title', async () => {
-    await showing(bridge());
+  it('shows the site status as a pill on the Information tab, not beside the title', async () => {
+    const header = await showing(bridge());
 
-    expect(screen.getByTestId('structure-site-status')).toMatchTextContent('Active');
+    expect(within(header).getByTestId('structure-site-status')).toMatchTextContent('Active');
+    expect(valueOf('Site Status', header)).toBe('Active');
   });
 
   it('shows no status pill when the site has no status', async () => {
@@ -519,6 +526,137 @@ describe('StructureDetailPage — header', () => {
     await showing(bridge());
 
     expect(screen.queryByTestId('structure-archived')).not.toBeInTheDocument();
+  });
+});
+
+describe('StructureDetailPage — editing the structure and site', () => {
+  const newSite = {
+    ...bridge().site!,
+    siteId: '62-145',
+    siteStatus: code('ACT', 'Active'),
+    crossingName: 'Bonaparte R',
+    districtName: 'Thompson Rivers Natural Resource District',
+    forestServiceRoad: 'BONAPARTE/FROSTY',
+    kilometres: '12.5',
+  };
+
+  const openEdit = async () => {
+    await showing(bridge());
+    await userEvent.click(screen.getByTestId('information-edit'));
+    return screen.findByTestId('information-form');
+  };
+
+  const typeSite = async (form: HTMLElement, siteId: string) => {
+    const box = within(form).getByTestId('information-site-id');
+    await userEvent.clear(box);
+    await userEvent.type(box, siteId);
+  };
+
+  it('offers no Edit to a read-only user', async () => {
+    await showing(bridge());
+
+    expect(screen.queryByTestId('information-edit')).not.toBeInTheDocument();
+  });
+
+  it('lets Level 1 move the structure to another site, previewing it, but not rename it', async () => {
+    authorization.canEdit = true;
+    api.previewSite.mockResolvedValue({ site: newSite, problem: null });
+    const form = await openEdit();
+
+    expect(within(form).queryByTestId('information-structure-name')).not.toBeInTheDocument();
+    expect(valueOf('Structure #', form)).toBe('B100');
+    await typeSite(form, '62-145');
+
+    // Every field stays in its place; the site's show the typed site once it is found.
+    await vi.waitFor(() => expect(form).toMatchTextContent('Showing site 62-145.'));
+    expect(valueOf('Crossing Name', form)).toBe('Bonaparte R');
+    expect(valueOf('Forest Service Road', form)).toBe('BONAPARTE/FROSTY');
+    expect(within(form).queryByText('Type/Class')).not.toBeInTheDocument();
+    expect(api.previewSite).toHaveBeenLastCalledWith('62-145');
+    await userEvent.click(within(form).getByTestId('information-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateStructureInformation).toHaveBeenCalledWith('7', {
+        structureName: 'B100',
+        siteId: '62-145',
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Structure information saved' }),
+      ),
+    );
+    expect(screen.queryByTestId('information-form')).not.toBeInTheDocument();
+  });
+
+  it('says beside Site # why the structure cannot move there, and does not save', async () => {
+    authorization.canEdit = true;
+    api.previewSite.mockResolvedValue({
+      site: { ...newSite, siteStatus: code('PP', 'Proposed') },
+      problem: 'Site 62-145 is Proposed. A structure cannot be moved to a Proposed site.',
+    });
+    const form = await openEdit();
+
+    await typeSite(form, '62-145');
+
+    await vi.waitFor(() =>
+      expect(form).toMatchTextContent(
+        'Site 62-145 is Proposed. A structure cannot be moved to a Proposed site.',
+      ),
+    );
+    await userEvent.click(within(form).getByTestId('information-save'));
+    expect(api.updateStructureInformation).not.toHaveBeenCalled();
+  });
+
+  it('lets Level 2 rename the structure, and shows a name the server refuses beside it', async () => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    api.updateStructureInformation.mockRejectedValue({
+      body: { fieldErrors: { structureName: 'Structure B200 already exists.' } },
+    });
+    const form = await openEdit();
+
+    const name = within(form).getByTestId('information-structure-name');
+    expect(name).toHaveValue('B100');
+    // The fields that are not edited here are still shown, the site's own.
+    expect(valueOf('Crossing Name', form)).toBe('Riske Cr');
+    expect(valueOf('Inspection Status', form)).toBe('OK - Inspected');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'B200');
+    await userEvent.click(within(form).getByTestId('information-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateStructureInformation).toHaveBeenCalledWith('7', {
+        structureName: 'B200',
+        siteId: '62-001',
+      }),
+    );
+    await vi.waitFor(() => expect(form).toMatchTextContent('Structure B200 already exists.'));
+    expect(api.previewSite).not.toHaveBeenCalled();
+  });
+
+  it('needs a name and, once the structure has one, a site', async () => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    const form = await openEdit();
+
+    await userEvent.clear(within(form).getByTestId('information-structure-name'));
+    await userEvent.clear(within(form).getByTestId('information-site-id'));
+    await userEvent.click(within(form).getByTestId('information-save'));
+
+    expect(form).toMatchTextContent('Structure # is required.');
+    expect(form).toMatchTextContent('Site # is required.');
+    expect(api.updateStructureInformation).not.toHaveBeenCalled();
+  });
+
+  it('puts the values back with Cancel', async () => {
+    authorization.canEdit = true;
+    const form = await openEdit();
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByTestId('information-form')).not.toBeInTheDocument();
+    expect(screen.getByTestId('structure-header')).toBeInTheDocument();
   });
 });
 
@@ -603,6 +741,7 @@ describe('StructureDetailPage — Details tab', () => {
     await showing(bridge());
     const section = screen.getByTestId('structure-section-bridge');
 
+    expect(valueOf('Type/Class', section)).toBe('Timber Bridge');
     expect(valueOf('Number of Spans', section)).toBe('2');
     expect(valueOf('Superstructure', section)).toBe('Steel Girder');
     expect(valueOf('Deck Width (metres)', section)).toBe('4.27');
@@ -641,10 +780,19 @@ describe('StructureDetailPage — Details tab', () => {
     expect(within(section).getByText('Recycled rail ties')).toBeInTheDocument();
   });
 
+  it('shows Type/Class with the structure fields when there is no bridge or culvert row', async () => {
+    await showing(bridge({ bridge: null }));
+
+    expect(valueOf('Type/Class', screen.getByTestId('structure-section-common'))).toBe(
+      'Timber Bridge',
+    );
+  });
+
   it('shows a culvert its culvert fields, with its number on the site', async () => {
     await showing(culvert());
     const section = screen.getByTestId('structure-section-culvert');
 
+    expect(valueOf('Type/Class', section)).toBe('Culvert');
     expect(valueOf('Culvert Number', section)).toBe('2 of 3');
     expect(valueOf('Culvert Material', section)).toBe('Corrugated Steel Pipe');
     expect(valueOf('Culvert Type', section)).toBe('Round');

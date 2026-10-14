@@ -185,3 +185,13 @@ export type StructureDetailResponse = {
   /** Empty when the structure is complete. */
   outstanding: OutstandingItem[];
 };
+
+/** The Information tab's Edit — the backend's `StructureInformationRequest`. */
+export type StructureInformationRequest = { structureName: string; siteId: string };
+
+/**
+ * A site a structure might move to — `GET /v1/structures/site-preview`, the backend's
+ * `SitePreviewResponse`. `problem` is why it cannot, or null when it can; `site` is null when there
+ * is no such site.
+ */
+export type SitePreviewResponse = { site: StructureSite | null; problem: string | null };

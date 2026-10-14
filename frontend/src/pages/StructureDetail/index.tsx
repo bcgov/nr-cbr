@@ -42,7 +42,6 @@ import type { FC } from 'react';
 
 import { useStructure } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
-import { siteStatusLabel, siteStatusTagType } from '@/utils/siteStatus';
 
 /**
  * What a link to this page carries. Structure Search sends the name, so the title can name the
@@ -148,17 +147,6 @@ const StructureDetailPage: FC = () => {
       >
         {/* Legacy never shows this. An archived structure looks like any other there, which
             matters now that Structure Search can include archived structures and archive them. */}
-        {/* The site's status, as Site Search shows it: a pill coloured by the code. Nothing when
-            the site has no status, rather than an empty pill. */}
-        {(structure?.site?.siteStatus.code || structure?.site?.siteStatus.description) && (
-          <Tag
-            type={siteStatusTagType(structure.site.siteStatus.code)}
-            size="sm"
-            data-testid="structure-site-status"
-          >
-            {siteStatusLabel(structure.site.siteStatus.code, structure.site.siteStatus.description)}
-          </Tag>
-        )}
         {structure && !structure.active && (
           <Tag type="gray" size="sm" data-testid="structure-archived">
             Archived

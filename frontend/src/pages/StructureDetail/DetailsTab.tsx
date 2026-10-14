@@ -175,12 +175,18 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
     ? loadRating.history
     : loadRating.history.filter((entry) => !beforeInstall(entry, details.yearBuilt));
 
+  // First in the Bridge or Culvert card: a bridge's Type/Class is edited with that card, beside the
+  // Curb Type, Superstructure and abutments its Durable Bridge rules check.
+  const typeClass = <ReadOnlyField label="Type/Class" value={describe(structure.typeClass)} />;
+
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-details-tab">
       <OutstandingPanel groups={outstanding} />
 
       <Card title="Structure" icon={Building} testId="structure-section-common">
         <div className="structure-detail__fields">
+          {/* Here only when there is no bridge or culvert card to carry it. */}
+          {!bridge && !culvert && typeClass}
           <ReadOnlyField label="Built For" value={describe(details.builtBy)} />
           <ReadOnlyField
             label="Year Superstructure Fabricated"
@@ -209,6 +215,7 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
       {bridge && (
         <Card title="Bridge" icon={Road} testId="structure-section-bridge">
           <div className="structure-detail__fields">
+            {typeClass}
             <BridgeFields bridge={bridge} />
           </div>
         </Card>
@@ -217,6 +224,7 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
       {culvert && (
         <Card title="Culvert" icon={Pipelines} testId="structure-section-culvert">
           <div className="structure-detail__fields">
+            {typeClass}
             <CulvertFields
               culvert={culvert}
               woodLog={structure.typeClass.code === WOOD_LOG_CULVERT}

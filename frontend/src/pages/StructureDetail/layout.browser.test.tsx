@@ -145,19 +145,20 @@ describe('StructureDetailPage — layout', () => {
     expect(badge.left).toBeGreaterThan(box.left);
   });
 
-  it('puts the status pill right beside the heading, on its centre line', async () => {
+  it('keeps the site status pill its own small size under its label on the Information tab', async () => {
     await page.viewport(1400, 900);
     await renderPage();
 
-    const heading = screen.getByRole('heading', { name: 'Structure B100' }).getBoundingClientRect();
-    const pill = screen.getByTestId('structure-site-status').getBoundingClientRect();
+    const pill = screen.getByTestId('structure-site-status');
+    const label = pill
+      .closest('.read-only-field')!
+      .querySelector('.read-only-field__label')!
+      .getBoundingClientRect();
+    const box = pill.getBoundingClientRect();
 
-    // Beside it, not pushed to the far edge of the page.
-    expect(pill.left - heading.right).toBeGreaterThanOrEqual(0);
-    expect(pill.left - heading.right).toBeLessThanOrEqual(16);
-    // Centred on it, and its own small height rather than stretched to the heading's.
-    expect(pill.top + pill.height / 2).toBeCloseTo(heading.top + heading.height / 2, 0);
-    expect(pill.height).toBeLessThan(heading.height);
+    expect(box.top).toBeGreaterThan(label.bottom);
+    // A pill, not stretched across its column.
+    expect(box.width).toBeLessThan(200);
   });
 
   it('sets each value 8px under its bold label', async () => {

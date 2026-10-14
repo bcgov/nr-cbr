@@ -21,10 +21,9 @@ import org.hibernate.annotations.Immutable;
  * <p>The key is the old name and the change time ({@code CSNH_PK}); the table has no id column of
  * its own.
  *
- * <p><b>Minimal and read-only:</b> the key and the column that ties it to its structure, nothing
- * else. Nothing reads this table yet; a structure delete clears it, with native SQL in
- * {@code StructureService.delete}. Mapped so the test schema has the table without hand-written
- * DDL. The structure screens will map the rest when they arrive.
+ * <p>Written when the Information tab renames a structure, as legacy's {@code UPDATE_STRUCTURE}
+ * wrote it: the old name, when, and who. Never changed once written ({@code @Immutable} still
+ * inserts). A structure delete clears it, with native SQL in {@code StructureService.delete}.
  */
 @Entity
 @Immutable
@@ -48,6 +47,9 @@ public class CrossingStructureNameHistEntity {
 
   @Column(name = "CROSSING_STRUCTURE_ID")
   private Long crossingStructureId;
+
+  @Column(name = "CHANGE_USERID", length = 120)
+  private String changeUserid;
 
   /** The composite key. */
   @EqualsAndHashCode
