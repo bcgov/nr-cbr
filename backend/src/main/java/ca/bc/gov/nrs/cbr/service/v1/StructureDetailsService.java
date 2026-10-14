@@ -153,9 +153,9 @@ public class StructureDetailsService {
     } else if (!source.equals(structure.getStructureSourceCode())
         && !sourceCodes.existsById(source)) {
       errors.put(SOURCE, "Source is not one of the listed values.");
-    } else if (SOURCES_NEEDING_YEAR_ADDED.contains(source) && request.inventoryAddedYear() == null
-        && !errors.containsKey(INVENTORY_ADDED)) {
-      errors.put(INVENTORY_ADDED, "Year Added to Inventory is required for this Source.");
+    } else if (SOURCES_NEEDING_YEAR_ADDED.contains(source) && request.inventoryAddedYear() == null) {
+      // Not over the year's own error, if it has one.
+      errors.putIfAbsent(INVENTORY_ADDED, "Year Added to Inventory is required for this Source.");
     }
   }
 

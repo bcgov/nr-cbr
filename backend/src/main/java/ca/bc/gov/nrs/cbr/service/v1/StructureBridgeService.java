@@ -247,26 +247,28 @@ public class StructureBridgeService {
   /** A Portable structure's superstructure is one of the portable kinds. */
   private static void checkPortable(Map<String, String> errors, BridgeDetailsRequest request,
       String superstructure) {
-    if (Boolean.TRUE.equals(request.portable()) && !errors.containsKey(SUPERSTRUCTURE)
+    if (Boolean.TRUE.equals(request.portable())
         && !PORTABLE_SUPERSTRUCTURES.contains(superstructure)) {
-      errors.put(SUPERSTRUCTURE, "Only Steel Box Beam, Steel I-beam, Steel Truss/Bailey/Acrow, "
-          + "Timber - Untreated Stringers and Timber - Treated Stringers are allowed when Portable "
-          + "Structure is checked.");
+      errors.putIfAbsent(SUPERSTRUCTURE, "Only Steel Box Beam, Steel I-beam, "
+          + "Steel Truss/Bailey/Acrow, Timber - Untreated Stringers and Timber - Treated Stringers "
+          + "are allowed when Portable Structure is checked.");
     }
   }
 
   /** No temporary superstructure or abutment in a Durable Bridge. */
   private static void checkDurable(Map<String, String> errors, String superstructure,
       String left, String right) {
-    if (!errors.containsKey(SUPERSTRUCTURE) && TEMPORARY_SUPERSTRUCTURES.contains(superstructure)) {
-      errors.put(SUPERSTRUCTURE,
+    // Each only where its field has no error yet.
+    if (TEMPORARY_SUPERSTRUCTURES.contains(superstructure)) {
+      errors.putIfAbsent(SUPERSTRUCTURE,
           "Superstructure: temporary materials are not permitted in a Durable Bridge.");
     }
-    if (!errors.containsKey(LEFT) && TEMPORARY_ABUTMENTS.contains(left)) {
-      errors.put(LEFT, "Left Abutment: temporary materials are not permitted in a Durable Bridge.");
+    if (TEMPORARY_ABUTMENTS.contains(left)) {
+      errors.putIfAbsent(LEFT,
+          "Left Abutment: temporary materials are not permitted in a Durable Bridge.");
     }
-    if (!errors.containsKey(RIGHT) && TEMPORARY_ABUTMENTS.contains(right)) {
-      errors.put(RIGHT,
+    if (TEMPORARY_ABUTMENTS.contains(right)) {
+      errors.putIfAbsent(RIGHT,
           "Right Abutment: temporary materials are not permitted in a Durable Bridge.");
     }
   }
