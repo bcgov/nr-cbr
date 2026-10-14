@@ -2,13 +2,16 @@ import { Button, Modal, TextArea } from '@carbon/react';
 import { useState } from 'react';
 
 import FieldWithCounter from '@/components/core/FieldWithCounter';
+import { requiredLabel } from '@/utils/requiredLabel';
 
 import type { StructureComment } from './structureResponse';
 import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import {
   useAddPlannedInspectionComment,
+  useAddStructureComment,
   useUpdateStructureComment,
 } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
@@ -17,10 +20,12 @@ import { byteLength, overLimitError } from '@/utils/textLimits';
 type Props = {
   structureId: string;
   /**
-   * The comment being edited, or null to add a planned-inspection one. The dialog is mounted only
-   * while it is open, so it opens fresh each time.
+   * The comment being edited, or null to add one. The dialog is mounted only while it is open, so
+   * it opens fresh each time.
    */
   comment: StructureComment | null;
+  /** Which comments: the Details tab's general ones, or the Inspections tab's planned-inspection. */
+  kind?: 'general' | 'planned';
   onClose: () => void;
 };
 
@@ -28,22 +33,29 @@ type Props = {
 const TEXT_MAX = 2000;
 
 /**
- * Adds a planned-inspection comment, or changes a comment's text — legacy's add box and edit pencil
- * on the Inspections tab, as a dialog like the tab's other items'.
+ * Adds a comment, or changes a comment's text — legacy's add box and edit pencil on the Details tab
+ * (general comments) and the Inspections tab (planned-inspection ones), as a dialog like the tabs'
+ * other items'.
  *
  * <p>The error sits under the box — the form's own rule on Save, then whatever the server refused.
  * A save that fails for no field's sake is a toast, as the app's other actions report one.
  */
-const CommentDialog: FC<Props> = ({ structureId, comment, onClose }) => {
-  const add = useAddPlannedInspectionComment(structureId);
+const CommentDialog: FC<Props> = ({ structureId, comment, kind = 'planned', onClose }) => {
+  const addGeneral = useAddStructureComment(structureId);
+  const addPlanned = useAddPlannedInspectionComment(structureId);
+  const add = kind === 'general' ? addGeneral : addPlanned;
+  const noun = kind === 'general' ? 'comment' : 'planned inspection comment';
   const update = useUpdateStructureComment(structureId);
   const saving = add.isPending || update.isPending;
   const { display } = useNotification();
 
   const [text, setText] = useState(comment?.text ?? '');
-  /** The form's own error, set on Save and cleared as the text changes. */
-  const [error, setError] = useState<string>();
-  const shown = error ?? (comment === null ? add.fieldErrors : update.fieldErrors).comment;
+  // Checked as the text changes; shown once the box is left, or at Save.
+  const form = useFieldErrors<'comment'>(
+    { comment: text.trim() ? overLimitError(text, TEXT_MAX) || undefined : 'Comment is required.' },
+    comment === null ? add.fieldErrors : update.fieldErrors,
+  );
+  const shown = form.shown.comment;
 
   const failed = (failure: unknown) => {
     // A refused text shows under the box; anything else is a toast.
@@ -57,9 +69,7 @@ const CommentDialog: FC<Props> = ({ structureId, comment, onClose }) => {
   };
 
   const save = () => {
-    const found = text.trim() ? overLimitError(text, TEXT_MAX) : 'Comment is required.';
-    setError(found || undefined);
-    if (found) return;
+    if (!form.submit()) return;
     const done = (title: string) => () => {
       display({ kind: 'success', title, timeout: 4000 });
       onClose();
@@ -77,9 +87,7 @@ const CommentDialog: FC<Props> = ({ structureId, comment, onClose }) => {
   return (
     <Modal
       open
-      modalHeading={
-        comment === null ? 'Add planned inspection comment' : 'Edit planned inspection comment'
-      }
+      modalHeading={comment === null ? `Add ${noun}` : `Edit ${noun}`}
       // Passive, with the buttons drawn below, as the app's other form dialogs close.
       passiveModal
       preventCloseOnClickOutside
@@ -91,23 +99,31 @@ const CommentDialog: FC<Props> = ({ structureId, comment, onClose }) => {
         <TextArea
           id="comment-text"
           data-testid="comment-text"
-          labelText="Comment"
+          labelText={requiredLabel('Comment', true)}
           rows={5}
           value={text}
           invalid={Boolean(shown)}
           invalidText={shown}
           onChange={(event) => {
             setText(event.target.value);
-            setError(undefined);
+            form.change('comment');
           }}
+          onBlur={() => form.leave('comment')}
         />
       </FieldWithCounter>
 
       <div className="structure-detail__dialog-actions">
-        <Button kind="tertiary" size="md" onClick={onClose} disabled={saving}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          size="md"
+          onClick={onClose}
+          disabled={saving}
+        >
           Cancel
         </Button>
         <Button
+          onMouseDown={holdFocus}
           kind="primary"
           size="md"
           onClick={save}

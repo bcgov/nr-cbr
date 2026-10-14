@@ -9,6 +9,7 @@ import type { BridgeSpan, SpanRequest } from './spansAndPiersResponse';
 import type { ChangeEvent, FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useCreateSpan, useUpdateSpan } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 
@@ -83,21 +84,22 @@ const SpanDialog: FC<Props> = ({ structureId, span, spans, hasBridgeRecord, onCl
     number: adding ? String(nextNumber) : number(span.number),
     lengthMetres: adding ? '' : number(span.lengthMetres),
   });
-  /** The form's own errors, set on Save and cleared field by field as each is changed. */
-  const [errors, setErrors] = useState<Errors>({});
-  const shown: Errors = { ...(adding ? create.fieldErrors : update.fieldErrors), ...errors };
+  // Checked as the values change; each shown once its field is left, or at Save.
+  const form = useFieldErrors<keyof Values>(
+    validate(values),
+    adding ? create.fieldErrors : update.fieldErrors,
+  );
+  const shown: Errors = form.shown;
   /** Why the span cannot be saved at all: no bridge record, known now or from the server's 409. */
   const [refusal, setRefusal] = useState(adding && !hasBridgeRecord ? NO_BRIDGE_RECORD : undefined);
 
   const change = (field: keyof Values, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
+    form.change(field);
   };
 
   const save = () => {
-    const found = validate(values);
-    setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
+    if (!form.submit()) return;
     const request: SpanRequest = {
       number: Number(values.number.trim()),
       lengthMetres: Number(values.lengthMetres.trim()),
@@ -150,6 +152,8 @@ const SpanDialog: FC<Props> = ({ structureId, span, spans, hasBridgeRecord, onCl
           <TextInput
             id="span-number"
             data-testid="span-number"
+            // As legacy's box: SPAN_NUMBER is NUMBER(5).
+            maxLength={5}
             labelText={requiredLabel('Span Number', true)}
             helperText="Numbered Left Bank to Right Bank (Looking Downstream)."
             inputMode="numeric"
@@ -162,10 +166,13 @@ const SpanDialog: FC<Props> = ({ structureId, span, spans, hasBridgeRecord, onCl
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               change('number', event.target.value)
             }
+            onBlur={() => form.leave('number')}
           />
           <TextInput
             id="span-length"
             data-testid="span-length"
+            // 99999.999 at most — SPAN_LENGTH is NUMBER(8,3).
+            maxLength={9}
             labelText={requiredLabel('Length (metres)', true)}
             helperText="Centre of bearing to centre of bearing."
             inputMode="decimal"
@@ -176,15 +183,23 @@ const SpanDialog: FC<Props> = ({ structureId, span, spans, hasBridgeRecord, onCl
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               change('lengthMetres', event.target.value)
             }
+            onBlur={() => form.leave('lengthMetres')}
           />
         </div>
       </Stack>
 
       <div className="structure-detail__dialog-actions">
-        <Button kind="tertiary" size="md" onClick={onClose} disabled={saving}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          size="md"
+          onClick={onClose}
+          disabled={saving}
+        >
           Cancel
         </Button>
         <Button
+          onMouseDown={holdFocus}
           kind="primary"
           size="md"
           onClick={save}

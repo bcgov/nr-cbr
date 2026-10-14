@@ -11,6 +11,7 @@ import type { ChangeEvent, FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { usePierTypeCodes } from '@/hooks/useConfiguration';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useCreatePier, useUpdatePier } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 
@@ -77,9 +78,16 @@ const PierDialog: FC<Props> = ({
     number: adding ? String(nextNumber) : number(pier.number),
     typeCode: adding ? '' : (pier.type.code ?? ''),
   });
-  /** The form's own errors, set on Save and cleared field by field as each is changed. */
-  const [errors, setErrors] = useState<Errors>({});
-  const shown: Errors = { ...(adding ? create.fieldErrors : update.fieldErrors), ...errors };
+  // Checked as the values change; each shown once its field is left, or at Save. Too few spans
+  // for another pier is about the pier as a whole, so it waits for Save.
+  const form = useFieldErrors<keyof Errors>(
+    {
+      ...validate(values),
+      pier: adding && spanCount <= piers.length + 1 ? SPANS_OUTNUMBER_PIERS : undefined,
+    },
+    adding ? create.fieldErrors : update.fieldErrors,
+  );
+  const shown: Errors = form.shown;
   /** Why the pier cannot be saved at all: no bridge record, known now or from the server's 409. */
   const [refusal, setRefusal] = useState(adding && !hasBridgeRecord ? NO_BRIDGE_RECORD : undefined);
   const disabled = Boolean(refusal);
@@ -94,14 +102,11 @@ const PierDialog: FC<Props> = ({
 
   const change = (field: keyof Values, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
+    form.change(field);
   };
 
   const save = () => {
-    const found = validate(values);
-    if (adding && spanCount <= piers.length + 1) found.pier = SPANS_OUTNUMBER_PIERS;
-    setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
+    if (!form.submit()) return;
     const request: PierRequest = {
       number: Number(values.number.trim()),
       typeCode: values.typeCode,
@@ -153,6 +158,8 @@ const PierDialog: FC<Props> = ({
           <TextInput
             id="pier-number"
             data-testid="pier-number"
+            // As legacy's box: PIER_NUMBER is NUMBER(10).
+            maxLength={10}
             labelText={requiredLabel('Pier Number', true)}
             inputMode="numeric"
             value={values.number}
@@ -162,6 +169,7 @@ const PierDialog: FC<Props> = ({
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               change('number', event.target.value)
             }
+            onBlur={() => form.leave('number')}
           />
           <Select
             id="pier-type"
@@ -172,6 +180,7 @@ const PierDialog: FC<Props> = ({
             invalid={Boolean(shown.typeCode)}
             invalidText={shown.typeCode}
             onChange={(event) => change('typeCode', event.target.value)}
+            onBlur={() => form.leave('typeCode')}
           >
             <SelectItem value="" text="Choose a type" />
             {options.map((option) => (
@@ -182,10 +191,17 @@ const PierDialog: FC<Props> = ({
       </Stack>
 
       <div className="structure-detail__dialog-actions">
-        <Button kind="tertiary" size="md" onClick={onClose} disabled={saving}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          size="md"
+          onClick={onClose}
+          disabled={saving}
+        >
           Cancel
         </Button>
         <Button
+          onMouseDown={holdFocus}
           kind="primary"
           size="md"
           onClick={save}

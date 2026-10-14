@@ -28,7 +28,18 @@ const api = vi.hoisted(() => ({
   getStructure: vi.fn(),
   getSpansAndPiers: vi.fn(),
   previewSite: vi.fn(),
+  suggestStructureNames: vi.fn(),
+  createReplacement: vi.fn(),
+  deleteReplacement: vi.fn(),
   updateStructureInformation: vi.fn(),
+  updateStructureDetails: vi.fn(),
+  updateBridgeDetails: vi.fn(),
+  updateCulvertDetails: vi.fn(),
+  updateLoadRatingDetails: vi.fn(),
+  updateReplacementDetails: vi.fn(),
+  createLoadRating: vi.fn(),
+  updateLoadRating: vi.fn(),
+  deleteLoadRating: vi.fn(),
   createSpan: vi.fn(),
   updateSpan: vi.fn(),
   deleteSpan: vi.fn(),
@@ -43,6 +54,7 @@ const api = vi.hoisted(() => ({
   getInspectionSchedule: vi.fn(),
   updateInspectionSchedule: vi.fn(),
   addPlannedInspectionComment: vi.fn(),
+  addStructureComment: vi.fn(),
   addCloseProximityInspection: vi.fn(),
   updateStructureComment: vi.fn(),
   getStructureInspections: vi.fn(),
@@ -66,6 +78,12 @@ const configurationApi = vi.hoisted(() => ({
   getFileAttachmentTypeCodes: vi.fn(),
   getDocumentExtensions: vi.fn(),
   getPierTypeCodes: vi.fn(),
+  getBuiltByCodes: vi.fn(),
+  getStructureSourceCodes: vi.fn(),
+  getBridgeCodes: vi.fn(),
+  getStructureTypeClassCodes: vi.fn(),
+  getLoadRatingCodes: vi.fn(),
+  getCulvertCodes: vi.fn(),
 }));
 vi.mock('@/services/APIs', () => ({
   default: { structureSearch: api, configuration: configurationApi },
@@ -302,8 +320,80 @@ beforeEach(() => {
   api.getSpansAndPiers.mockReset();
   api.getSpansAndPiers.mockResolvedValue({ spans: [], piers: [] });
   api.previewSite.mockReset();
+  api.suggestStructureNames.mockReset();
+  api.suggestStructureNames.mockResolvedValue([]);
+  api.createReplacement.mockReset();
+  api.deleteReplacement.mockReset();
   api.updateStructureInformation.mockReset();
   api.updateStructureInformation.mockResolvedValue(undefined);
+  api.updateStructureDetails.mockReset();
+  api.updateStructureDetails.mockResolvedValue(undefined);
+  api.updateBridgeDetails.mockReset();
+  api.updateBridgeDetails.mockResolvedValue(undefined);
+  for (const write of [api.updateLoadRatingDetails, api.updateLoadRating, api.deleteLoadRating]) {
+    write.mockReset();
+    write.mockResolvedValue(undefined);
+  }
+  api.updateCulvertDetails.mockReset();
+  api.updateCulvertDetails.mockResolvedValue(undefined);
+  configurationApi.getCulvertCodes.mockResolvedValue({
+    culvertTypes: [
+      { code: 'RND', description: 'Round' },
+      { code: 'OPN', description: 'Open Bottom' },
+    ],
+    materials: [
+      { code: 'CSP', description: 'Corrugated Steel Pipe' },
+      { code: 'OTH', description: 'Other' },
+    ],
+    headwallLocations: [{ code: 'IN', description: 'Inlet' }],
+    openBottomSubstructures: [{ code: 'CON', description: 'Concrete' }],
+  });
+  api.updateReplacementDetails.mockReset();
+  api.updateReplacementDetails.mockResolvedValue(undefined);
+  api.createLoadRating.mockReset();
+  api.createLoadRating.mockResolvedValue({ id: 'r9' });
+  configurationApi.getLoadRatingCodes.mockResolvedValue({
+    loadPostingSigns: [
+      { code: 'N', description: 'No' },
+      { code: 'Y', description: 'Yes' },
+    ],
+    designVehicles: [
+      { code: 'L75', description: 'L-75', designLoadRating: 75 },
+      { code: 'OTHER', description: 'Other', designLoadRating: null },
+    ],
+    reasons: [
+      { code: 'INSP', description: 'Inspection', deltas: ['INC', 'DEC'] },
+      { code: 'NOC', description: 'No change', deltas: ['NOC'] },
+      { code: 'OTHR', description: 'Other', deltas: ['UNDEF'] },
+    ],
+  });
+  configurationApi.getBridgeCodes.mockResolvedValue({
+    superstructureTypes: [
+      { code: 'STL', description: 'Steel Girder' },
+      { code: 'SBB', description: 'Steel Box Beam' },
+      { code: 'RAIL', description: 'Rail Car' },
+      { code: 'OTH', description: 'Other' },
+    ],
+    deckTypes: [{ code: 'TIM', description: 'Timber' }],
+    runningSurfaces: [{ code: 'GRV', description: 'Gravel' }],
+    curbTypes: [{ code: 'TMB', description: 'Timber' }],
+    abutments: [
+      { code: 'CON', description: 'Concrete' },
+      { code: 'CLT', description: 'Crib Log Timber' },
+    ],
+  });
+  configurationApi.getStructureTypeClassCodes.mockResolvedValue([
+    { code: 'PB', description: 'Durable Bridge' },
+    { code: 'TB', description: 'Non-Durable Bridge' },
+  ]);
+  configurationApi.getBuiltByCodes.mockResolvedValue([
+    { code: 'MOF', description: 'Ministry of Forests' },
+    { code: 'LIC', description: 'Licensee' },
+  ]);
+  configurationApi.getStructureSourceCodes.mockResolvedValue([
+    { code: 'MOF', description: 'MoF Engineering' },
+    { code: 'IR', description: 'Inventory Reconnaissance' },
+  ]);
   for (const write of [
     api.createSpan,
     api.updateSpan,
@@ -397,6 +487,8 @@ beforeEach(() => {
   api.addCloseProximityInspection.mockResolvedValue({ id: '12' });
   api.addPlannedInspectionComment.mockReset();
   api.addPlannedInspectionComment.mockResolvedValue({ id: '9' });
+  api.addStructureComment.mockReset();
+  api.addStructureComment.mockResolvedValue({ id: '9' });
   api.updateStructureComment.mockReset();
   api.updateStructureComment.mockResolvedValue(undefined);
   api.updateInspectionSchedule.mockReset();
@@ -526,6 +618,606 @@ describe('StructureDetailPage — header', () => {
     await showing(bridge());
 
     expect(screen.queryByTestId('structure-archived')).not.toBeInTheDocument();
+  });
+});
+
+describe('StructureDetailPage — editing the Structure card', () => {
+  const openEdit = async () => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    await showing(bridge());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    await userEvent.click(await screen.findByTestId('structure-details-edit'));
+    const form = await screen.findByTestId('structure-details-form');
+    // Wait for the dropdowns' lists, which the form fetches as it opens.
+    await vi.waitFor(() =>
+      expect(within(form).getByTestId('structure-builtByCode')).toHaveValue('MOF'),
+    );
+    return form;
+  };
+
+  const retype = async (form: HTMLElement, field: string, value: string) => {
+    const box = within(form).getByTestId(`structure-${field}`);
+    await userEvent.clear(box);
+    if (value) await userEvent.type(box, value);
+  };
+
+  it('offers Edit structure at Level 2 only, as legacy', async () => {
+    authorization.canEdit = true;
+    await showing(bridge());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    await screen.findByTestId('structure-section-common');
+
+    expect(screen.queryByTestId('structure-details-edit')).not.toBeInTheDocument();
+  });
+
+  it('shows Portable Structure with the bridge, not in the Structure card', async () => {
+    await showing(bridge());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+
+    expect(valueOf('Portable Structure?', screen.getByTestId('structure-section-bridge'))).toBe(
+      'No',
+    );
+    expect(
+      within(screen.getByTestId('structure-section-common')).queryByText('Portable Structure?'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('saves the card, and says so', async () => {
+    const form = await openEdit();
+
+    expect(within(form).getByTestId('structure-yearBuilt')).toHaveValue('2000');
+    await retype(form, 'yearBuilt', '2002');
+    await retype(form, 'installationCost', '130000');
+    await userEvent.click(within(form).getByRole('radio', { name: 'No' }));
+    await userEvent.click(within(form).getByTestId('structure-details-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateStructureDetails).toHaveBeenCalledWith('7', {
+        builtByCode: 'MOF',
+        yearFabricated: 1998,
+        yearBuilt: 2002,
+        inventoryAddedYear: 2001,
+        sourceCode: 'MOF',
+        endOfDesignLifeYear: 2045,
+        asBuiltInfoOnFile: false,
+        installationCost: 130000,
+        materialCost: 0,
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Structure details saved' }),
+      ),
+    );
+    expect(screen.queryByTestId('structure-details-form')).not.toBeInTheDocument();
+  });
+
+  it('refuses beside it a fabrication year after the year installed', async () => {
+    const form = await openEdit();
+
+    await retype(form, 'yearFabricated', '2005');
+    await userEvent.click(within(form).getByTestId('structure-details-save'));
+
+    expect(form).toMatchTextContent(
+      'Year Superstructure Fabricated must not be after Year Superstructure Installed.',
+    );
+    expect(api.updateStructureDetails).not.toHaveBeenCalled();
+  });
+
+  it('warns as legacy did about an unlikely year, and still saves', async () => {
+    const form = await openEdit();
+
+    await retype(form, 'yearBuilt', '1850');
+    await retype(form, 'yearFabricated', '1849');
+
+    expect(form).toMatchTextContent('Must be greater than or equal to 1900.');
+    await userEvent.click(within(form).getByTestId('structure-details-save'));
+    await vi.waitFor(() =>
+      expect(api.updateStructureDetails).toHaveBeenCalledWith(
+        '7',
+        expect.objectContaining({ yearBuilt: 1850 }),
+      ),
+    );
+  });
+
+  it('refuses a year that is not four digits, where legacy saved 200', async () => {
+    const form = await openEdit();
+
+    await retype(form, 'inventoryAddedYear', '200');
+    await userEvent.click(within(form).getByTestId('structure-details-save'));
+
+    expect(form).toMatchTextContent('Year Added to Inventory must be a 4-digit year, e.g. 2004.');
+    // An error, not a warning: red, and nothing is sent.
+    expect(within(form).getByTestId('structure-inventoryAddedYear')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(api.updateStructureDetails).not.toHaveBeenCalled();
+  });
+
+  it("shows a field's error as soon as it is left, without Save, and clears it as it is fixed", async () => {
+    const form = await openEdit();
+
+    await retype(form, 'inventoryAddedYear', '200');
+    expect(form).not.toMatchTextContent('must be a 4-digit year');
+    await userEvent.tab();
+
+    expect(form).toMatchTextContent('Year Added to Inventory must be a 4-digit year, e.g. 2004.');
+    await userEvent.type(within(form).getByTestId('structure-inventoryAddedYear'), '4');
+    expect(form).not.toMatchTextContent('must be a 4-digit year');
+  });
+
+  it('marks the required fields with a red asterisk', async () => {
+    const form = await openEdit();
+
+    // Source is required once the structure has one; As Built always.
+    expect(form.querySelectorAll('.required-asterisk').length).toBeGreaterThanOrEqual(2);
+    expect(form).not.toMatchTextContent('(optional)');
+  });
+
+  it('takes no more digits than the column holds', async () => {
+    const form = await openEdit();
+
+    await retype(form, 'yearBuilt', '200567');
+    await retype(form, 'materialCost', '12345678');
+
+    expect(within(form).getByTestId('structure-yearBuilt')).toHaveValue('2005');
+    expect(within(form).getByTestId('structure-materialCost')).toHaveValue('123456');
+  });
+
+  it('needs Year Added to Inventory for the sources that call for it', async () => {
+    const form = await openEdit();
+
+    await userEvent.selectOptions(within(form).getByTestId('structure-sourceCode'), 'IR');
+    await retype(form, 'inventoryAddedYear', '');
+    await userEvent.click(within(form).getByTestId('structure-details-save'));
+
+    expect(form).toMatchTextContent('Year Added to Inventory is required for this Source.');
+    expect(api.updateStructureDetails).not.toHaveBeenCalled();
+  });
+});
+
+describe('StructureDetailPage — editing the Bridge card', () => {
+  const openEdit = async (overrides: Partial<StructureDetailResponse> = {}) => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    await showing(bridge(overrides));
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    await userEvent.click(await screen.findByTestId('bridge-details-edit'));
+    const form = await screen.findByTestId('bridge-details-form');
+    await vi.waitFor(() =>
+      expect(within(form).getByTestId('bridge-superstructureTypeCode')).toHaveValue('STL'),
+    );
+    return form;
+  };
+
+  it('offers Edit bridge at Level 2 only', async () => {
+    authorization.canEdit = true;
+    await showing(bridge());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    await screen.findByTestId('structure-section-bridge');
+
+    expect(screen.queryByTestId('bridge-details-edit')).not.toBeInTheDocument();
+  });
+
+  it('saves the bridge with its Type/Class, and says so', async () => {
+    const form = await openEdit();
+
+    expect(within(form).getByTestId('bridge-typeClassCode')).toHaveValue('TB');
+    await userEvent.clear(within(form).getByTestId('bridge-totalBridgeLength'));
+    await userEvent.type(within(form).getByTestId('bridge-totalBridgeLength'), '26');
+    await userEvent.selectOptions(within(form).getByTestId('bridge-typeClassCode'), 'PB');
+    await userEvent.click(within(form).getByTestId('bridge-details-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateBridgeDetails).toHaveBeenCalledWith(
+        '7',
+        expect.objectContaining({
+          typeClassCode: 'PB',
+          portable: false,
+          totalBridgeLength: 26,
+          superstructureTypeCode: 'STL',
+          curbTypeCode: 'TMB',
+          deckWidth: 4.27,
+        }),
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Bridge details saved' }),
+      ),
+    );
+  });
+
+  it("holds a Durable Bridge to its rules as soon as it's chosen", async () => {
+    const form = await openEdit();
+
+    await userEvent.selectOptions(within(form).getByTestId('bridge-curbTypeCode'), '');
+    await userEvent.selectOptions(
+      within(form).getByTestId('bridge-superstructureTypeCode'),
+      'RAIL',
+    );
+    await userEvent.selectOptions(within(form).getByTestId('bridge-typeClassCode'), 'PB');
+    await userEvent.click(within(form).getByTestId('bridge-details-save'));
+
+    expect(form).toMatchTextContent('Curb Type is required for a Durable Bridge.');
+    expect(form).toMatchTextContent(
+      'Superstructure: temporary materials are not permitted in a Durable Bridge.',
+    );
+    expect(api.updateBridgeDetails).not.toHaveBeenCalled();
+  });
+
+  it('allows only a portable superstructure on a portable structure', async () => {
+    const form = await openEdit();
+
+    await userEvent.click(within(form).getAllByRole('radio', { name: 'Yes' })[0]);
+    await userEvent.click(within(form).getByTestId('bridge-details-save'));
+
+    expect(form).toMatchTextContent('are allowed when Portable Structure is checked.');
+    await userEvent.selectOptions(within(form).getByTestId('bridge-superstructureTypeCode'), 'SBB');
+    expect(form).not.toMatchTextContent('are allowed when Portable Structure is checked.');
+  });
+
+  it('asks for the details of an Other, as soon as the box is left', async () => {
+    const form = await openEdit();
+
+    await userEvent.selectOptions(within(form).getByTestId('bridge-superstructureTypeCode'), 'OTH');
+    await userEvent.click(within(form).getByTestId('bridge-superstructureComment'));
+    await userEvent.tab();
+
+    expect(form).toMatchTextContent('Superstructure Details is required.');
+  });
+});
+
+describe('StructureDetailPage — editing the Culvert card', () => {
+  const openEdit = async (structure: StructureDetailResponse = culvert()) => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    await showing(structure);
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    await userEvent.click(await screen.findByTestId('culvert-details-edit'));
+    const form = await screen.findByTestId('culvert-details-form');
+    await vi.waitFor(() =>
+      expect(within(form).getByTestId('culvert-materialCode')).toHaveValue('CSP'),
+    );
+    return form;
+  };
+
+  it('saves the culvert, and says so', async () => {
+    const form = await openEdit();
+
+    // A culvert's Type/Class cannot change; it is shown, not offered.
+    expect(within(form).queryByTestId('bridge-typeClassCode')).not.toBeInTheDocument();
+    await userEvent.clear(within(form).getByTestId('culvert-lengthMetres'));
+    await userEvent.type(within(form).getByTestId('culvert-lengthMetres'), '20.5');
+    await userEvent.click(within(form).getByTestId('culvert-details-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateCulvertDetails).toHaveBeenCalledWith(
+        '8',
+        expect.objectContaining({
+          culvertNumber: 2,
+          lengthMetres: 20.5,
+          gradient: 2.5,
+          culvertTypeCode: 'RND',
+          materialCode: 'CSP',
+          openingHeightMm: 1200,
+        }),
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Culvert details saved' }),
+      ),
+    );
+  });
+
+  it('needs an open bottom for an open-bottom culvert, and warns as legacy on a long culvert', async () => {
+    const form = await openEdit();
+
+    await userEvent.selectOptions(within(form).getByTestId('culvert-culvertTypeCode'), 'OPN');
+    await userEvent.selectOptions(within(form).getByTestId('culvert-openBottomCode'), '');
+    await userEvent.clear(within(form).getByTestId('culvert-lengthMetres'));
+    await userEvent.type(within(form).getByTestId('culvert-lengthMetres'), '150');
+    await userEvent.click(within(form).getByTestId('culvert-details-save'));
+
+    expect(form).toMatchTextContent(
+      'Open Bottom Substructure is required for an open-bottom culvert.',
+    );
+    expect(form).toMatchTextContent('Culvert Length is not in the range 5 through 100.');
+    expect(api.updateCulvertDetails).not.toHaveBeenCalled();
+  });
+
+  it('offers a Wood Log Culvert no Culvert Type or Open Bottom, as legacy', async () => {
+    const form = await openEdit(culvert({ typeClass: code('WLC', 'Wood Log Culvert') }));
+
+    expect(within(form).queryByTestId('culvert-culvertTypeCode')).not.toBeInTheDocument();
+    expect(within(form).queryByTestId('culvert-openBottomCode')).not.toBeInTheDocument();
+  });
+});
+
+describe('StructureDetailPage — Replacement Details', () => {
+  const openEdit = async () => {
+    authorization.canEdit = true;
+    authorization.isPeng = true;
+    await showing(bridge());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    const card = await screen.findByTestId('structure-section-replacement');
+    await userEvent.click(within(card).getByTestId('replacement-details-edit'));
+    return within(card).findByTestId('replacement-details-form');
+  };
+
+  const retype = async (form: HTMLElement, field: string, value: string) => {
+    const box = within(form).getByTestId(`replacement-${field}`);
+    await userEvent.clear(box);
+    if (value) await userEvent.type(box, value);
+  };
+
+  it("is a P.Eng's to edit, as legacy", async () => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    await showing(bridge());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    await screen.findByTestId('structure-section-replacement');
+
+    expect(screen.queryByTestId('replacement-details-edit')).not.toBeInTheDocument();
+  });
+
+  it('saves the years, cost and comments, and says so', async () => {
+    const form = await openEdit();
+
+    await retype(form, 'closureYear', '2060');
+    await retype(form, 'replacementYear', '2055');
+    await retype(form, 'loadRestrictionYear', '2050');
+    await retype(form, 'cost', '450000');
+    await userEvent.type(within(form).getByTestId('replacement-costComment'), 'Steel');
+    await userEvent.click(within(form).getByTestId('replacement-details-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateReplacementDetails).toHaveBeenCalledWith(
+        '7',
+        expect.objectContaining({
+          closureYear: 2060,
+          replacementYear: 2055,
+          loadRestrictionYear: 2050,
+          cost: 450000,
+        }),
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Replacement details saved' }),
+      ),
+    );
+  });
+
+  it('keeps load restriction before replacement and replacement before closure', async () => {
+    const form = await openEdit();
+
+    await retype(form, 'closureYear', '2050');
+    await retype(form, 'replacementYear', '2055');
+    await userEvent.tab();
+
+    expect(form).toMatchTextContent('Estimated Replacement must not be after Estimated Closure.');
+    await userEvent.click(within(form).getByTestId('replacement-details-save'));
+    expect(api.updateReplacementDetails).not.toHaveBeenCalled();
+  });
+});
+
+describe('StructureDetailPage — Replacement History', () => {
+  const withReplacedBy = () => ({ ...bridge(), replacedBy: [{ id: '9', structureName: 'B900' }] });
+
+  const openCard = async () => {
+    authorization.canEdit = true;
+    authorization.isPeng = true;
+    await showing(withReplacedBy());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    return screen.findByTestId('structure-section-replacement-history');
+  };
+
+  it("shows legacy's table of what this structure replaced, and what replaced it", async () => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    authorization.isPeng = false;
+    await showing(withReplacedBy());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    const card = await screen.findByTestId('structure-section-replacement-history');
+
+    const rows = within(card).getAllByRole('row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchTextContent(
+      'This structure was replaced by structure #This structure replaced structure #',
+    );
+    expect(rows[1]).toMatchTextContent('B100B050 (opens in a new tab)');
+    expect(within(rows[1]).getByRole('link')).toHaveAttribute('href', '/inventory/structure/3');
+    expect(valueOf('This structure was replaced by structure #', card)).toBe(
+      'B900 (opens in a new tab)',
+    );
+    // A P.Eng's to change, as legacy.
+    expect(within(card).queryByTestId('replacement-add')).not.toBeInTheDocument();
+    expect(within(card).queryByTestId('replacement-delete-3')).not.toBeInTheDocument();
+  });
+
+  it('says when there are none', async () => {
+    await showing({ ...bridge(), replaced: [], replacedBy: [] });
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+
+    expect(await screen.findByTestId('structure-section-replacement-history')).toMatchTextContent(
+      'There are no replacement details for this structure.',
+    );
+  });
+
+  it('adds "this structure replaces" a Structure # picked from suggestions', async () => {
+    api.suggestStructureNames.mockResolvedValue([
+      { id: '40', structureName: 'B040', archived: true },
+    ]);
+    api.createReplacement.mockResolvedValue(undefined);
+    const card = await openCard();
+
+    await userEvent.click(within(card).getByTestId('replacement-add'));
+    const dialog = await screen.findByTestId('replacement-dialog');
+    // This structure, shown and not editable.
+    expect(within(dialog).getByTestId('replacement-replacing')).toHaveTextContent('B100');
+    expect(within(dialog).getAllByRole('combobox')).toHaveLength(1);
+    expect(dialog).toMatchTextContent(/replaces/);
+    await userEvent.type(within(dialog).getByRole('combobox'), 'B04');
+    await userEvent.click(await within(dialog).findByRole('option', { name: /B040 \(archived\)/ }));
+    await userEvent.click(within(dialog).getByTestId('replacement-save'));
+
+    await vi.waitFor(() =>
+      expect(api.createReplacement).toHaveBeenCalledWith('7', { replacedName: 'B040' }),
+    );
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Replacement added' }),
+      ),
+    );
+  });
+
+  it('refuses a repeat or this structure, and shows what the server refuses', async () => {
+    api.createReplacement.mockRejectedValue({
+      body: { fieldErrors: { replacedName: 'Structure # B404 does not exist.' } },
+    });
+    const card = await openCard();
+    await userEvent.click(within(card).getByTestId('replacement-add'));
+    const dialog = await screen.findByTestId('replacement-dialog');
+    const box = within(dialog).getByRole('combobox');
+
+    await userEvent.click(within(dialog).getByTestId('replacement-save'));
+    expect(dialog).toMatchTextContent('Replaced Structure # is required.');
+    await userEvent.type(box, 'B050');
+    expect(dialog).toMatchTextContent('Replacement already exists.');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'B100');
+    expect(dialog).toMatchTextContent('A structure cannot replace itself.');
+    expect(api.createReplacement).not.toHaveBeenCalled();
+
+    await userEvent.clear(box);
+    await userEvent.type(box, 'B404');
+    await userEvent.click(within(dialog).getByTestId('replacement-save'));
+    await vi.waitFor(() => expect(dialog).toMatchTextContent('Structure # B404 does not exist.'));
+  });
+
+  it('deletes a replacement after asking, and has no edit', async () => {
+    api.deleteReplacement.mockResolvedValue(undefined);
+    const card = await openCard();
+    expect(within(card).queryByRole('button', { name: /^Edit/ })).not.toBeInTheDocument();
+
+    await userEvent.click(within(card).getByTestId('replacement-delete-3'));
+    const confirm = await screen.findByRole('dialog', { name: /Delete replacement/ });
+    expect(confirm).toMatchTextContent(/replacement of B050 by B100/);
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(() => expect(api.deleteReplacement).toHaveBeenCalledWith('7', '3'));
+  });
+});
+
+describe('StructureDetailPage — Load Rating Details', () => {
+  const openDetailsTab = async () => {
+    await showing(bridge());
+    await userEvent.click(screen.getByTestId('structure-tab-details'));
+    return screen.findByTestId('structure-section-load-rating');
+  };
+
+  const openEdit = async () => {
+    const card = await openDetailsTab();
+    await userEvent.click(within(card).getByTestId('load-rating-details-edit'));
+    return within(card).findByTestId('load-rating-details-form');
+  };
+
+  it('lets Level 1 change Load Rating Review Required alone', async () => {
+    authorization.canEdit = true;
+    const form = await openEdit();
+
+    expect(within(form).queryByTestId('load-rating-posting')).not.toBeInTheDocument();
+    expect(within(form).queryByTestId('load-rating-vehicle')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('load-rating-add')).not.toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('radio', { name: 'Yes' }));
+    // Legacy's advice: a review still asked for although a rating is recorded.
+    expect(form).toMatchTextContent(
+      'Load rating review is required although a rating is recorded.',
+    );
+    await userEvent.click(within(form).getByTestId('load-rating-details-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateLoadRatingDetails).toHaveBeenCalledWith('7', {
+        loadPostingSignsCode: 'N',
+        reviewRequired: true,
+        designVehicleCode: 'L75',
+        designVehicleComment: '',
+        // The vehicle was left as it was, so the stored 63 stays, not L-75's 75.
+        designLoadRating: 63,
+      }),
+    );
+  });
+
+  it("refuses a Level 2 user's Other vehicle, whose words only a P.Eng may enter, as legacy", async () => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    const form = await openEdit();
+    await vi.waitFor(() =>
+      expect(within(form).getByTestId('load-rating-vehicle')).toHaveValue('L75'),
+    );
+
+    await userEvent.selectOptions(within(form).getByTestId('load-rating-vehicle'), 'OTHER');
+    // No fixed rating for Other: the design rating is typed.
+    expect(within(form).getByTestId('load-rating-design')).toBeInTheDocument();
+    await userEvent.click(within(form).getByTestId('load-rating-details-save'));
+
+    expect(form).toMatchTextContent(
+      'Design Vehicle Configuration Details is required. Only a P.Eng can enter them.',
+    );
+    expect(api.updateLoadRatingDetails).not.toHaveBeenCalled();
+  });
+
+  it('adds a load rating with a reason that fits the change, and words for Other', async () => {
+    authorization.canEdit = true;
+    authorization.isPeng = true;
+    const card = await openDetailsTab();
+
+    await userEvent.click(within(card).getByTestId('load-rating-add'));
+    const dialog = await screen.findByTestId('load-rating-dialog');
+    expect(within(dialog).getByTestId('load-rating-reason')).toBeDisabled();
+    await userEvent.type(within(dialog).getByTestId('load-rating-value'), '70');
+    // An increase on the current 60: Inspection and Other, not No change.
+    const reasons = within(within(dialog).getByTestId('load-rating-reason'))
+      .getAllByRole('option')
+      .map((option) => option.textContent);
+    expect(reasons).toEqual(['Choose a reason', 'INSP - Inspection', 'OTHR - Other']);
+    await userEvent.selectOptions(within(dialog).getByTestId('load-rating-reason'), 'OTHR');
+    await userEvent.click(within(dialog).getByTestId('load-rating-save'));
+    expect(dialog).toMatchTextContent('Load Rating Reason Comment is required for Other.');
+    await userEvent.type(within(dialog).getByTestId('load-rating-comment'), 'Retested');
+    await userEvent.click(within(dialog).getByTestId('load-rating-save'));
+
+    await vi.waitFor(() =>
+      expect(api.createLoadRating).toHaveBeenCalledWith('7', {
+        rating: 70,
+        reasonCode: 'OTHR',
+        reasonComment: 'Retested',
+      }),
+    );
+  });
+
+  it('offers a P.Eng Edit and Delete on manual ratings only, and deletes once confirmed', async () => {
+    authorization.canEdit = true;
+    authorization.isPeng = true;
+    await openDetailsTab();
+
+    expect(screen.queryByTestId('load-rating-edit-r2')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('load-rating-edit-r1'));
+    const dialog = await screen.findByTestId('load-rating-dialog');
+    expect(within(dialog).getByTestId('load-rating-value')).toHaveValue('63');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    await userEvent.click(screen.getByTestId('load-rating-delete-r1'));
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: /Delete load rating/ })).getByRole(
+        'button',
+        { name: 'Delete' },
+      ),
+    );
+    await vi.waitFor(() => expect(api.deleteLoadRating).toHaveBeenCalledWith('7', 'r1'));
   });
 });
 
@@ -824,6 +1516,63 @@ describe('StructureDetailPage — Details tab', () => {
     expect(rows[2]).toMatchTextContent('Installed.');
   });
 
+  it('lets Level 1 add a comment, and says so', async () => {
+    authorization.canEdit = true;
+    await showing(bridge());
+    await openDetails();
+    const card = screen.getByTestId('structure-section-comments');
+
+    await userEvent.click(within(card).getByTestId('structure-section-comments-add'));
+    const dialog = await screen.findByTestId('comment-dialog');
+    expect(dialog).toMatchTextContent(/Add comment/);
+    await userEvent.click(within(dialog).getByTestId('comment-save'));
+    expect(dialog).toMatchTextContent('Comment is required.');
+    await userEvent.type(within(dialog).getByTestId('comment-text'), 'Deck resurfaced.');
+    await userEvent.click(within(dialog).getByTestId('comment-save'));
+
+    await vi.waitFor(() =>
+      expect(api.addStructureComment).toHaveBeenCalledWith('7', { comment: 'Deck resurfaced.' }),
+    );
+    expect(api.addPlannedInspectionComment).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'success', title: 'Comment added' }),
+      ),
+    );
+  });
+
+  it('lets Level 1 edit any comment, as legacy', async () => {
+    authorization.canEdit = true;
+    await showing(bridge());
+    await openDetails();
+    const card = screen.getByTestId('structure-section-comments');
+
+    await userEvent.click(within(card).getByTestId('structure-section-comments-edit-2'));
+    const dialog = await screen.findByTestId('comment-dialog');
+    expect(dialog).toMatchTextContent(/Edit comment/);
+    const box = within(dialog).getByTestId('comment-text');
+    expect(box).toHaveValue('Deck replaced.');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'Deck replaced. Again.');
+    await userEvent.click(within(dialog).getByTestId('comment-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateStructureComment).toHaveBeenCalledWith('7', '2', {
+        comment: 'Deck replaced. Again.',
+      }),
+    );
+  });
+
+  it('offers no add or edit to a read-only user', async () => {
+    authorization.canEdit = false;
+    await showing(bridge());
+    await openDetails();
+    const card = screen.getByTestId('structure-section-comments');
+
+    expect(within(card).queryByTestId('structure-section-comments-add')).not.toBeInTheDocument();
+    expect(within(card).queryByTestId('structure-section-comments-edit-2')).not.toBeInTheDocument();
+  });
+
   it('says when there are no comments', async () => {
     await showing(bridge({ comments: [] }));
 
@@ -867,7 +1616,6 @@ describe('StructureDetailPage — Details tab', () => {
     const link = within(section).getByRole('link', { name: 'B050 (opens in a new tab)' });
     expect(link).toHaveAttribute('href', '/inventory/structure/3');
     expect(link).toHaveAttribute('target', '_blank');
-    expect(valueOf('This structure was replaced by structure #', section)).toBe('—');
   });
 
   it('shows the replacement details', async () => {
@@ -1037,7 +1785,9 @@ describe('StructureDetailPage — Spans & Piers', () => {
       expect(screen.queryByTestId('structure-span-add')).not.toBeInTheDocument();
       expect(screen.queryByTestId('structure-pier-add')).not.toBeInTheDocument();
       expect(screen.queryByTestId('structure-span-edit-s1')).not.toBeInTheDocument();
-      expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('structure-spans-piers-tab')).queryByText('Actions'),
+      ).not.toBeInTheDocument();
     });
 
     it('adds a span at the next number, and says so', async () => {
@@ -1058,6 +1808,32 @@ describe('StructureDetailPage — Spans & Piers', () => {
         ),
       );
       expect(screen.queryByTestId('span-dialog')).not.toBeInTheDocument();
+    });
+
+    it('says a required field is empty once it is left, and not before', async () => {
+      await openAsLevel2([span('s1', 1, 10)]);
+
+      await userEvent.click(screen.getByTestId('structure-span-add'));
+      const dialog = await screen.findByTestId('span-dialog');
+      expect(dialog).not.toMatchTextContent('Length is required.');
+      await userEvent.click(within(dialog).getByTestId('span-length'));
+      await userEvent.tab();
+
+      expect(dialog).toMatchTextContent('Length is required.');
+      expect(api.createSpan).not.toHaveBeenCalled();
+    });
+
+    it('saves on the first click even when leaving a field brings up its error', async () => {
+      await openAsLevel2([span('s1', 1, 10)]);
+
+      await userEvent.click(screen.getByTestId('structure-span-add'));
+      const dialog = await screen.findByTestId('span-dialog');
+      await userEvent.type(within(dialog).getByTestId('span-length'), '1.2345');
+      await userEvent.click(within(dialog).getByTestId('span-save'));
+
+      // One click: the save ran (and refused), rather than being lost to the blur.
+      expect(dialog).toMatchTextContent('Length can have at most 3 decimal places.');
+      expect(api.createSpan).not.toHaveBeenCalled();
     });
 
     it('checks the number and length beside each before sending', async () => {

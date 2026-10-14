@@ -470,12 +470,18 @@ describe('AddSitePage — inline validation', () => {
     expect(screen.queryByText('Must be a number, e.g. 12.5')).not.toBeInTheDocument();
   });
 
-  it('says nothing when the user tabs past a field they left empty', async () => {
-    // A blank box is a gap, not a mistake. Reporting it on blur turns the whole form red for
-    // anyone who reads it through before filling it in.
+  it('says a required field is required once the user leaves it empty', async () => {
+    // The app's one rule: an error shows once its field is left, blank included.
     await renderPage();
 
     blur('siteId');
+
+    expect(await screen.findByText('Site # is required.')).toBeInTheDocument();
+    expect(field('siteId')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('says nothing about a field the user has not been in', async () => {
+    await renderPage();
 
     expect(screen.queryByText('Site # is required.')).not.toBeInTheDocument();
     expect(field('siteId')).not.toHaveAttribute('aria-invalid', 'true');

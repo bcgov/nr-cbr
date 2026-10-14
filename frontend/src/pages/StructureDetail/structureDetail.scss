@@ -331,14 +331,13 @@ $page-bottom: 2rem;
   display: flex;
   flex-direction: column;
   gap: $spacing-06;
-}
 
-// "All fields are required unless marked optional." — tucked up to the fields under it.
-.structure-detail__edit-intro {
-  @include type.type-style('body-compact-01');
-
-  margin: 0 0 (-$spacing-03);
-  color: var(--cds-text-primary);
+  // The view's field grid, reused so each box stands where its value did, but with rows closer:
+  // a form's row is already taller — label, box, and at times a message under it — so the view's
+  // 2rem between rows reads as a gap.
+  .structure-detail__fields {
+    row-gap: $spacing-05;
+  }
 }
 
 // A row of fields, each in a cell sized to what it holds; they wrap on a narrow screen.
@@ -372,7 +371,6 @@ $page-bottom: 2rem;
     min-inline-size: 0;
   }
 }
-
 
 // Cancel / Save changes — small, at the right, under the fields.
 .structure-detail__edit-actions {
@@ -414,13 +412,6 @@ $page-bottom: 2rem;
   .cds--modal-scroll-content {
     mask-image: none;
   }
-}
-
-.structure-detail__upload-intro {
-  @include type.type-style('body-01');
-
-  margin: 0;
-  color: var(--cds-text-primary);
 }
 
 // "Files", bold over its helper line.
@@ -717,5 +708,55 @@ $page-bottom: 2rem;
 
   th:nth-child(2) {
     inline-size: 14rem;
+  }
+}
+
+// Replacement History: two short columns and the actions, not stretched across the card.
+.structure-detail__replacement-table {
+  max-width: 48rem;
+  margin-block-end: $spacing-05;
+  overflow-x: auto;
+}
+
+// The Add replacement dialog: "Structure # [this] replaces Structure # [typed]" on one line — this
+// structure and the word take only their own width, the box the rest — with room before the
+// buttons; stacked on a narrow screen.
+.structure-detail__replaces-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: $spacing-06;
+  margin-block-end: $spacing-03;
+
+  @media (max-width: 671px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+// This structure's number and "replaces": below the labels, level with the text in the box.
+.structure-detail__replaces-self,
+.structure-detail__replaces-word {
+  margin: 0;
+  line-height: 2.5rem;
+}
+
+.structure-detail__replaces-self {
+  font-size: 0.875rem;
+}
+
+.structure-detail__replaces-word {
+  padding-block-start: $spacing-06;
+}
+
+// The same space above the buttons as below them: 2.5rem each. Carbon pads the content 3rem below and
+// adds 1.5rem under its last child, which left the bottom heavier than the top.
+.structure-detail__replacement-dialog {
+  .cds--modal-content {
+    padding-block-end: $spacing-08;
+  }
+
+  .cds--modal-scroll-content > *:last-child,
+  .cds--modal-content > *:last-child {
+    margin-block-end: 0;
   }
 }

@@ -195,7 +195,7 @@ const AddSitePage: FC = () => {
    * — a letter in a kilometre box, a third decimal place, 91 degrees of latitude. Those are wrong
    * the moment they are typed and waiting to say so helps nobody.
    *
-   * <p>`errorsForSettledFields` adds the full check for boxes the user has left *and* filled in.
+   * <p>`errorsForSettledFields` adds the full check for boxes the user has left, blank ones included.
    * An empty box is a gap rather than a mistake, so tabbing through the form never turns it red.
    *
    * <p>Pressing Save shows everything, including what is still missing.
@@ -205,7 +205,7 @@ const AddSitePage: FC = () => {
 
   const merged: SiteErrors = {
     ...fieldErrors(site, 'typing'),
-    ...errorsForSettledFields(settledErrors, settled, (key) => String(site[key] ?? '')),
+    ...errorsForSettledFields(settledErrors, settled),
     ...(submitted ? settledErrors : {}),
     // The two-field rules, live rather than held to Save — see `crossFieldErrors`. After the
     // required set, so "this combination is wrong" wins over "this field is required" on the same

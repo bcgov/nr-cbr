@@ -28,6 +28,7 @@ import {
   useRepairPriorityCodes,
   useRepairStatusCodes,
 } from '@/hooks/useConfiguration';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import {
   useCreateStructureRepair,
   useStructureRepairTypes,
@@ -168,9 +169,12 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
     description: repair?.description ?? '',
   });
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
-  /** The form's own errors, set on Save and cleared field by field as each is changed. */
-  const [errors, setErrors] = useState<Errors>({});
-  const shown: Errors = { ...(adding ? create.fieldErrors : update.fieldErrors), ...errors };
+  // Checked as the values change; each shown once its field is left, or at Save.
+  const form = useFieldErrors<Field>(
+    validate(values),
+    adding ? create.fieldErrors : update.fieldErrors,
+  );
+  const shown: Errors = form.shown;
   const completed = values.statusCode === COMPLETED;
 
   const typeOptions = useMemo(() => {
@@ -207,7 +211,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
       }
       return next;
     });
-    setErrors((current) => ({ ...current, [field]: undefined }));
+    form.change(field);
   };
 
   const toggleGroup = (code: string, checked: boolean) => {
@@ -221,9 +225,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
   };
 
   const save = () => {
-    const found = validate(values);
-    setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
+    if (!form.submit()) return;
     const request: RepairUpdateRequest = {
       statusCode: values.statusCode,
       priorityCode: values.priorityCode,
@@ -294,6 +296,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
       invalid={Boolean(shown[field])}
       invalidText={shown[field]}
       onChange={(event: ChangeEvent<HTMLInputElement>) => change(field, event.target.value)}
+      onBlur={() => form.leave(field)}
     />
   );
 
@@ -325,6 +328,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
             invalid={Boolean(shown.statusCode)}
             invalidText={shown.statusCode}
             onChange={(event) => change('statusCode', event.target.value)}
+            onBlur={() => form.leave('statusCode')}
           >
             <SelectItem value="" text="Choose a status" />
             {offeredStatuses.map((option) => (
@@ -341,6 +345,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
           invalid={Boolean(shown.priorityCode)}
           invalidText={shown.priorityCode}
           onChange={(event) => change('priorityCode', event.target.value)}
+          onBlur={() => form.leave('priorityCode')}
         >
           <SelectItem value="" text="Choose a priority" />
           {priorityOptions.map((option) => (
@@ -358,6 +363,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
               disabled={!completed}
               invalidText={shown.completedDate}
               onChange={(value) => change('completedDate', value)}
+              onBlur={() => form.leave('completedDate')}
             />
           </>
         )}
@@ -394,6 +400,7 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
             invalid={Boolean(shown.typeCode)}
             invalidText={shown.typeCode}
             onChange={(event) => change('typeCode', event.target.value)}
+            onBlur={() => form.leave('typeCode')}
           >
             <SelectItem value="" text="Choose a type" />
             {typeOptions.map((option) => (
@@ -426,15 +433,29 @@ const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
             invalid={Boolean(shown.description)}
             invalidText={shown.description}
             onChange={(event) => change('description', event.target.value)}
+            onBlur={() => form.leave('description')}
           />
         </FieldWithCounter>
       </div>
 
       <div className="structure-detail__dialog-actions">
-        <Button kind="tertiary" size="md" onClick={onClose} disabled={saving}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          size="md"
+          onClick={onClose}
+          disabled={saving}
+        >
           Cancel
         </Button>
-        <Button kind="primary" size="md" onClick={save} disabled={saving} data-testid="repair-save">
+        <Button
+          onMouseDown={holdFocus}
+          kind="primary"
+          size="md"
+          onClick={save}
+          disabled={saving}
+          data-testid="repair-save"
+        >
           {adding ? 'Add' : 'Save'}
         </Button>
       </div>

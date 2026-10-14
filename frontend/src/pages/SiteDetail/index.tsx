@@ -254,7 +254,7 @@ const SiteDetailPage: FC = () => {
   const settledErrors = fieldErrors(site, 'settled');
   const merged: SiteErrors = {
     ...fieldErrors(site, 'typing'),
-    ...errorsForSettledFields(settledErrors, settled, (key) => String(site[key] ?? '')),
+    ...errorsForSettledFields(settledErrors, settled),
     ...(submitted ? settledErrors : {}),
     // The two-field rules, live rather than held to Save — see `crossFieldErrors`.
     ...(mode === 'edit' ? { ...crossFieldErrors(site), ...stored.errors } : {}),

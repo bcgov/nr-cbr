@@ -1,5 +1,11 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
-import type { CodeOption, OrgUnitOption } from '@/types/configuration';
+import type {
+  BridgeCodes,
+  CodeOption,
+  CulvertCodes,
+  LoadRatingCodes,
+  OrgUnitOption,
+} from '@/types/configuration';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
 
@@ -144,6 +150,46 @@ export class ConfigurationService extends HttpClient {
     return this.doRequest<CodeOption[]>(this.config, {
       method: 'GET',
       url: '/v1/configuration/repair-group-codes',
+    });
+  }
+
+  /** Load Rating Details' lists: posting signs, design vehicles, reasons. */
+  getLoadRatingCodes(): CancelablePromise<LoadRatingCodes> {
+    return this.doRequest<LoadRatingCodes>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/load-rating-codes',
+    });
+  }
+
+  /** The Culvert card's four lists, current codes only, by description. */
+  getCulvertCodes(): CancelablePromise<CulvertCodes> {
+    return this.doRequest<CulvertCodes>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/culvert-codes',
+    });
+  }
+
+  /** The Bridge card's five lists, current codes only, by description. */
+  getBridgeCodes(): CancelablePromise<BridgeCodes> {
+    return this.doRequest<BridgeCodes>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/bridge-codes',
+    });
+  }
+
+  /** Built For, current values by description — the Details tab's Structure card. */
+  getBuiltByCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/built-by-codes',
+    });
+  }
+
+  /** Structure sources, current ones by description — the Details tab's Structure card. */
+  getStructureSourceCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/structure-source-codes',
     });
   }
 

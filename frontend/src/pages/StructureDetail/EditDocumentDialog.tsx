@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 
 import FieldWithCounter from '@/components/core/FieldWithCounter';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
+import { requiredLabel } from '@/utils/requiredLabel';
 
 import DocumentThumbnail from './DocumentThumbnail';
 
@@ -11,6 +12,7 @@ import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { useFileAttachmentTypeCodes } from '@/hooks/useConfiguration';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useUpdateDocument } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
@@ -44,8 +46,16 @@ const EditDocumentDialog: FC<Props> = ({ structureId, document, onClose }) => {
 
   const [type, setType] = useState(document.attachmentType.code ?? '');
   const [description, setDescription] = useState(document.description ?? '');
-  const [errors, setErrors] = useState<Errors>({});
-  const shown: Errors = { ...update.fieldErrors, ...errors };
+  const found: Errors = {};
+  if (!type) found.attachmentTypeCode = 'Photo View is required.';
+  if (type === OTHER && !description.trim()) {
+    found.description = 'Description is required for this Photo View.';
+  } else if (overLimitError(description, TEXT_MAX)) {
+    found.description = overLimitError(description, TEXT_MAX);
+  }
+  // Checked as the values change; each shown once its field is left, or at Save.
+  const form = useFieldErrors<keyof Errors>(found, update.fieldErrors);
+  const shown: Errors = form.shown;
 
   // A stored type since expired is still the document's, so it stays in the list.
   const options = useMemo(() => {
@@ -57,15 +67,7 @@ const EditDocumentDialog: FC<Props> = ({ structureId, document, onClose }) => {
   }, [types.data, document.attachmentType]);
 
   const save = () => {
-    const found: Errors = {};
-    if (!type) found.attachmentTypeCode = 'Photo View is required.';
-    if (type === OTHER && !description.trim()) {
-      found.description = 'Description is required for this Photo View.';
-    } else if (overLimitError(description, TEXT_MAX)) {
-      found.description = overLimitError(description, TEXT_MAX);
-    }
-    setErrors(found);
-    if (found.attachmentTypeCode || found.description) return;
+    if (!form.submit()) return;
     update.mutate(
       { fileId: document.id, request: { attachmentTypeCode: type, description } },
       {
@@ -108,15 +110,16 @@ const EditDocumentDialog: FC<Props> = ({ structureId, document, onClose }) => {
         <Select
           id="edit-document-type"
           data-testid="edit-document-type"
-          labelText="Photo View"
+          labelText={requiredLabel('Photo View', true)}
           value={type}
           disabled={types.isLoading}
           invalid={Boolean(shown.attachmentTypeCode)}
           invalidText={shown.attachmentTypeCode}
           onChange={(event) => {
             setType(event.target.value);
-            setErrors((current) => ({ ...current, attachmentTypeCode: undefined }));
+            form.change('attachmentTypeCode');
           }}
+          onBlur={() => form.leave('attachmentTypeCode')}
         >
           <SelectItem value="" text="Choose a type" />
           {options.map((option) => (
@@ -127,23 +130,30 @@ const EditDocumentDialog: FC<Props> = ({ structureId, document, onClose }) => {
           <TextArea
             id="edit-document-description"
             data-testid="edit-document-description"
-            labelText={type === OTHER ? 'Description' : 'Description (optional)'}
+            labelText={requiredLabel('Description', type === OTHER)}
             rows={4}
             value={description}
             invalid={Boolean(shown.description)}
             invalidText={shown.description}
             onChange={(event) => {
               setDescription(event.target.value);
-              setErrors((current) => ({ ...current, description: undefined }));
+              form.change('description');
             }}
+            onBlur={() => form.leave('description')}
           />
         </FieldWithCounter>
       </Stack>
       <div className="structure-detail__upload-actions">
-        <Button kind="tertiary" onClick={onClose} disabled={update.isPending}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          onClick={onClose}
+          disabled={update.isPending}
+        >
           Cancel
         </Button>
         <Button
+          onMouseDown={holdFocus}
           kind="primary"
           onClick={save}
           disabled={update.isPending}

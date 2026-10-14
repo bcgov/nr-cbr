@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import ExternalLink from '@/components/core/ExternalLink';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
+import { requiredLabel } from '@/utils/requiredLabel';
 
 import Card from './Card';
 
@@ -17,6 +18,7 @@ import type { ChangeEvent, FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useSitePreview, useUpdateStructureInformation } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { siteStatusLabel, siteStatusTagType } from '@/utils/siteStatus';
@@ -28,6 +30,8 @@ type Props = { structure: StructureDetailResponse };
 const RECREATION = 'REC';
 /** `CROSSING_STRUCTURE_NAME VARCHAR2(14 BYTE)`. */
 const NAME_MAX = 14;
+/** `CROSSING_SITE_ID VARCHAR2(14)`. */
+const SITE_ID_MAX = 14;
 
 /** A code as legacy's lists show it — "OK - Inspected" — or whichever half is stored. */
 const codeAndDescription = (value: CodeValue | null | undefined): string =>
@@ -118,20 +122,7 @@ const InformationForm: FC<{ structure: StructureDetailResponse; onDone: () => vo
     structureName: structure.structureName ?? '',
     siteId: currentSiteId ?? '',
   });
-  /** The form's own errors, set on Save and cleared field by field as each is changed. */
-  const [errors, setErrors] = useState<Errors>({});
   const { preview, loading } = useSitePreview(values.siteId, currentSiteId);
-  const shown: Errors = {
-    ...update.fieldErrors,
-    // A site that cannot be moved to says so as soon as it is looked up, not only on Save.
-    ...(preview?.problem ? { siteId: preview.problem } : {}),
-    ...Object.fromEntries(Object.entries(errors).filter(([, message]) => message)),
-  };
-
-  const change = (field: keyof Values, value: string) => {
-    setValues((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
-  };
 
   const validate = (): Errors => {
     const found: Errors = {};
@@ -147,10 +138,21 @@ const InformationForm: FC<{ structure: StructureDetailResponse; onDone: () => vo
     return found;
   };
 
+  // Checked as the values change; each shown once its field is left, or at Save.
+  const form = useFieldErrors<keyof Values>(validate(), update.fieldErrors);
+  const shown: Errors = {
+    // A site that cannot be moved to says so as soon as it is looked up.
+    ...(preview?.problem ? { siteId: preview.problem } : {}),
+    ...form.shown,
+  };
+
+  const change = (field: keyof Values, value: string) => {
+    setValues((current) => ({ ...current, [field]: value }));
+    form.change(field);
+  };
+
   const save = () => {
-    const found = validate();
-    setErrors(found);
-    if (Object.values(found).some(Boolean) || preview?.problem) return;
+    if (!form.submit() || preview?.problem) return;
     const request: StructureInformationRequest = {
       structureName: canRename ? values.structureName.trim() : (structure.structureName ?? ''),
       siteId: values.siteId.trim(),
@@ -180,22 +182,22 @@ const InformationForm: FC<{ structure: StructureDetailResponse; onDone: () => vo
 
   return (
     <div className="structure-detail__edit" data-testid="information-form">
-      <p className="structure-detail__edit-intro">
-        All fields are required unless marked optional.
-      </p>
       {/* Every field in its place, as in the view; only Structure # and Site # are boxes. */}
       <div className="structure-detail__fields" data-testid="structure-header">
         {canRename ? (
           <TextInput
             id="information-structure-name"
             data-testid="information-structure-name"
-            labelText="Structure #"
+            // As legacy's box: CROSSING_STRUCTURE_NAME is 14 bytes; the byte count is checked on Save.
+            maxLength={NAME_MAX}
+            labelText={requiredLabel('Structure #', true)}
             value={values.structureName}
             invalid={Boolean(shown.structureName)}
             invalidText={shown.structureName}
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               change('structureName', event.target.value)
             }
+            onBlur={() => form.leave('structureName')}
           />
         ) : (
           // Level 1: the name as it is, as legacy's read-only box.
@@ -204,7 +206,9 @@ const InformationForm: FC<{ structure: StructureDetailResponse; onDone: () => vo
         <TextInput
           id="information-site-id"
           data-testid="information-site-id"
-          labelText={currentSiteId ? 'Site #' : 'Site # (optional)'}
+          // As legacy's box: CROSSING_SITE_ID is 14 characters.
+          maxLength={SITE_ID_MAX}
+          labelText={requiredLabel('Site #', Boolean(currentSiteId))}
           helperText={
             !moving
               ? undefined
@@ -218,6 +222,7 @@ const InformationForm: FC<{ structure: StructureDetailResponse; onDone: () => vo
           invalid={Boolean(shown.siteId)}
           invalidText={shown.siteId}
           onChange={(event: ChangeEvent<HTMLInputElement>) => change('siteId', event.target.value)}
+          onBlur={() => form.leave('siteId')}
         />
         <ReadOnlyField
           label="Site Status"
@@ -232,10 +237,17 @@ const InformationForm: FC<{ structure: StructureDetailResponse; onDone: () => vo
 
       {/* The form's actions: small, at the right, under the fields. */}
       <div className="structure-detail__edit-actions">
-        <Button kind="tertiary" size="sm" onClick={onDone} disabled={update.isPending}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          size="sm"
+          onClick={onDone}
+          disabled={update.isPending}
+        >
           Cancel
         </Button>
         <Button
+          onMouseDown={holdFocus}
           kind="primary"
           size="sm"
           onClick={save}
