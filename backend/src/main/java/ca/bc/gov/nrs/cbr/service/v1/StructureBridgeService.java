@@ -70,6 +70,7 @@ public class StructureBridgeService {
   private static final int TEXT_MAX = 2000;
   private static final String YES = "Y";
   private static final String NO = "N";
+  private static final String IS_REQUIRED = " is required.";
 
   private static final String TYPE_CLASS = "typeClassCode";
   private static final String LENGTH = "totalBridgeLength";
@@ -129,20 +130,66 @@ public class StructureBridgeService {
 
     Map<String, String> errors = new LinkedHashMap<>();
     String typeClass = trimmed(request.typeClassCode());
+    boolean durable = DURABLE.equals(typeClass);
+    String superstructure = trimmed(request.superstructureTypeCode());
+    String deckType = trimmed(request.deckTypeCode());
+    String curb = trimmed(request.curbTypeCode());
+    String left = trimmed(request.leftAbutmentCode());
+    String right = trimmed(request.rightAbutmentCode());
+
+    checkIdentity(errors, typeClass, request);
+    checkDimensions(errors, bridge, request);
+    checkCodes(errors, bridge, request, durable);
+    checkPortable(errors, request, superstructure);
+    if (durable) {
+      checkDurable(errors, superstructure, left, right);
+    }
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Bridge details cannot be saved", errors);
+    }
+
+    String user = loggedUser.getLoggedUserId();
+    structures.updateBridgeIdentity(structureId, typeClass,
+        Boolean.TRUE.equals(request.portable()) ? YES : NO, user);
+    bridges.save(bridge.toBuilder()
+        .needleBeamInd(Boolean.TRUE.equals(request.needleBeams()) ? YES : NO)
+        .totalBridgeLength(request.totalBridgeLength())
+        .superstructureTypeCode(superstructure)
+        .superstructureComment(otherComment(superstructure, request.superstructureComment()))
+        .deckTypeCode(deckType)
+        .deckTypeComment(otherComment(deckType, request.deckTypeComment()))
+        .deckWidth(request.deckWidth())
+        .runningSurfaceCode(trimmed(request.runningSurfaceCode()))
+        .structureCurbTypeCode(curb)
+        .structureCurbTypeCmt(otherComment(curb, request.curbTypeComment()))
+        .leftAbutmentCode(left)
+        .rightAbutmentCode(right)
+        .abutmentComment(otherComment(OTHER.equals(left) || OTHER.equals(right) ? OTHER : null,
+            request.abutmentComment()))
+        .build());
+    log.info("Updated the bridge details of structure {}", structureId);
+  }
+
+  /** Type/Class — Durable or Non-Durable only — and the two yes/no questions. */
+  private static void checkIdentity(Map<String, String> errors, String typeClass,
+      BridgeDetailsRequest request) {
     if (typeClass == null) {
-      errors.put(TYPE_CLASS, "Type/Class is required.");
+      errors.put(TYPE_CLASS, "Type/Class" + IS_REQUIRED);
     } else if (!BRIDGE_TYPES.contains(typeClass)) {
       errors.put(TYPE_CLASS,
           "Type/Class can only be changed between Durable Bridge and Non-Durable Bridge.");
     }
-    boolean durable = DURABLE.equals(typeClass);
     if (request.portable() == null) {
-      errors.put("portable", "Portable Structure is required.");
+      errors.put("portable", "Portable Structure" + IS_REQUIRED);
     }
     if (request.needleBeams() == null) {
-      errors.put("needleBeams", "Needle Beams is required.");
+      errors.put("needleBeams", "Needle Beams" + IS_REQUIRED);
     }
+  }
 
+  /** Bridge Length — at least the spans' total — and Deck Width. */
+  private void checkDimensions(Map<String, String> errors, ForestServiceBridgeEntity bridge,
+      BridgeDetailsRequest request) {
     BigDecimal length = request.totalBridgeLength();
     checkMetres(errors, LENGTH, "Bridge Length", length, bridge.getTotalBridgeLength(),
         LENGTH_MAX, 3);
@@ -160,7 +207,11 @@ public class StructureBridgeService {
     }
     checkMetres(errors, "deckWidth", "Deck Width", request.deckWidth(), bridge.getDeckWidth(),
         WIDTH_MAX, 2);
+  }
 
+  /** The coded fields and their Others' details; Curb Type is required for a Durable Bridge. */
+  private void checkCodes(Map<String, String> errors, ForestServiceBridgeEntity bridge,
+      BridgeDetailsRequest request, boolean durable) {
     String superstructure = trimmed(request.superstructureTypeCode());
     checkCode(errors, SUPERSTRUCTURE, "Superstructure", superstructure,
         bridge.getSuperstructureTypeCode(), superstructureTypes::existsById);
@@ -191,50 +242,33 @@ public class StructureBridgeService {
         abutments::existsById);
     checkOther(errors, "abutmentComment", "Abutment Details",
         OTHER.equals(left) || OTHER.equals(right) ? OTHER : null, request.abutmentComment());
+  }
 
+  /** A Portable structure's superstructure is one of the portable kinds. */
+  private static void checkPortable(Map<String, String> errors, BridgeDetailsRequest request,
+      String superstructure) {
     if (Boolean.TRUE.equals(request.portable()) && !errors.containsKey(SUPERSTRUCTURE)
         && !PORTABLE_SUPERSTRUCTURES.contains(superstructure)) {
       errors.put(SUPERSTRUCTURE, "Only Steel Box Beam, Steel I-beam, Steel Truss/Bailey/Acrow, "
           + "Timber - Untreated Stringers and Timber - Treated Stringers are allowed when Portable "
           + "Structure is checked.");
     }
-    if (durable) {
-      if (!errors.containsKey(SUPERSTRUCTURE) && TEMPORARY_SUPERSTRUCTURES.contains(superstructure)) {
-        errors.put(SUPERSTRUCTURE,
-            "Superstructure: temporary materials are not permitted in a Durable Bridge.");
-      }
-      if (!errors.containsKey(LEFT) && TEMPORARY_ABUTMENTS.contains(left)) {
-        errors.put(LEFT, "Left Abutment: temporary materials are not permitted in a Durable Bridge.");
-      }
-      if (!errors.containsKey(RIGHT) && TEMPORARY_ABUTMENTS.contains(right)) {
-        errors.put(RIGHT,
-            "Right Abutment: temporary materials are not permitted in a Durable Bridge.");
-      }
-    }
-    if (!errors.isEmpty()) {
-      throw new FieldValidationException("Bridge details cannot be saved", errors);
-    }
+  }
 
-    String user = loggedUser.getLoggedUserId();
-    structures.updateBridgeIdentity(structureId, typeClass,
-        Boolean.TRUE.equals(request.portable()) ? YES : NO, user);
-    bridges.save(bridge.toBuilder()
-        .needleBeamInd(Boolean.TRUE.equals(request.needleBeams()) ? YES : NO)
-        .totalBridgeLength(length)
-        .superstructureTypeCode(superstructure)
-        .superstructureComment(otherComment(superstructure, request.superstructureComment()))
-        .deckTypeCode(deckType)
-        .deckTypeComment(otherComment(deckType, request.deckTypeComment()))
-        .deckWidth(request.deckWidth())
-        .runningSurfaceCode(trimmed(request.runningSurfaceCode()))
-        .structureCurbTypeCode(curb)
-        .structureCurbTypeCmt(otherComment(curb, request.curbTypeComment()))
-        .leftAbutmentCode(left)
-        .rightAbutmentCode(right)
-        .abutmentComment(otherComment(OTHER.equals(left) || OTHER.equals(right) ? OTHER : null,
-            request.abutmentComment()))
-        .build());
-    log.info("Updated the bridge details of structure {}", structureId);
+  /** No temporary superstructure or abutment in a Durable Bridge. */
+  private static void checkDurable(Map<String, String> errors, String superstructure,
+      String left, String right) {
+    if (!errors.containsKey(SUPERSTRUCTURE) && TEMPORARY_SUPERSTRUCTURES.contains(superstructure)) {
+      errors.put(SUPERSTRUCTURE,
+          "Superstructure: temporary materials are not permitted in a Durable Bridge.");
+    }
+    if (!errors.containsKey(LEFT) && TEMPORARY_ABUTMENTS.contains(left)) {
+      errors.put(LEFT, "Left Abutment: temporary materials are not permitted in a Durable Bridge.");
+    }
+    if (!errors.containsKey(RIGHT) && TEMPORARY_ABUTMENTS.contains(right)) {
+      errors.put(RIGHT,
+          "Right Abutment: temporary materials are not permitted in a Durable Bridge.");
+    }
   }
 
   /**
@@ -244,7 +278,7 @@ public class StructureBridgeService {
       BigDecimal value, BigDecimal stored, BigDecimal max, int scale) {
     if (value == null) {
       if (stored != null) {
-        errors.put(field, label + " is required.");
+        errors.put(field, label + IS_REQUIRED);
       }
     } else if (value.signum() < 0) {
       errors.put(field, label + " cannot be negative.");
@@ -263,7 +297,7 @@ public class StructureBridgeService {
       String code, String stored, Predicate<String> exists) {
     if (code == null) {
       if (trimmed(stored) != null) {
-        errors.put(field, label + " is required.");
+        errors.put(field, label + IS_REQUIRED);
       }
     } else if (!code.equals(stored) && !exists.test(code)) {
       errors.put(field, label + " is not one of the listed values.");
@@ -278,7 +312,7 @@ public class StructureBridgeService {
     }
     String text = trimmed(comment);
     if (text == null) {
-      errors.put(field, label + " is required.");
+      errors.put(field, label + IS_REQUIRED);
     } else if (text.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
       errors.put(field, label + " can be at most " + TEXT_MAX + " characters.");
     }

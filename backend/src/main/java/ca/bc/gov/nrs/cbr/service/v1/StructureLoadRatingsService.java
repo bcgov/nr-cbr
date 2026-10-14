@@ -74,6 +74,9 @@ public class StructureLoadRatingsService {
   private static final String RATING = "rating";
   private static final String REASON = "reasonCode";
   private static final String REASON_COMMENT = "reasonComment";
+  private static final String POSTING_SIGNS = "loadPostingSignsCode";
+  private static final String VEHICLE_COMMENT = "designVehicleComment";
+  private static final String DESIGN_RATING = "designLoadRating";
 
   private final CrossingStructureRepository structures;
   private final StructureLoadRatingRepository loadRatings;
@@ -152,16 +155,7 @@ public class StructureLoadRatingsService {
       errors.put("reviewRequired", "Load Rating Review Required is required.");
     }
     String posting = trimmed(request.loadPostingSignsCode());
-    boolean postingChanged = !Objects.equals(posting, structure.getLoadPostingSignWrrntdCode());
-    if (postingChanged && !level2) {
-      errors.put("loadPostingSignsCode", "Are Load Posting Signs Warranted?" + LEVEL_2_ONLY);
-    } else if (posting == null) {
-      errors.put("loadPostingSignsCode", "Are Load Posting Signs Warranted? is required.");
-    } else if (postingChanged && !postingSigns.existsById(posting)) {
-      errors.put("loadPostingSignsCode",
-          "Are Load Posting Signs Warranted? is not one of the listed values.");
-    }
-
+    checkPostingSigns(errors, structure, posting, level2);
     String vehicle = trimmed(request.designVehicleCode());
     boolean vehicleChanged = !Objects.equals(vehicle, trimmed(structure.getDesignVehicleLoadCode()));
     if (vehicleChanged && !level2) {
@@ -171,40 +165,9 @@ public class StructureLoadRatingsService {
     }
     String comment = OTHER_VEHICLE.equals(vehicle) ? trimmed(request.designVehicleComment()) : null;
     if (OTHER_VEHICLE.equals(vehicle)) {
-      boolean commentChanged = !Objects.equals(comment, trimmed(structure.getDesignVehicleCmt()));
-      if (commentChanged && !loggedUser.isPeng()) {
-        errors.put("designVehicleComment",
-            "Only a P.Eng can enter the Design Vehicle Configuration details.");
-      } else if (comment == null) {
-        errors.put("designVehicleComment", "Design Vehicle Configuration Details is required.");
-      } else if (tooLong(comment, VEHICLE_TEXT_MAX)) {
-        errors.put("designVehicleComment",
-            "Design Vehicle Configuration Details can be at most " + VEHICLE_TEXT_MAX
-                + " characters.");
-      }
+      checkVehicleComment(errors, structure, comment);
     }
-
-    // Choosing a vehicle that fixes the design load rating sets it, as legacy's page did on the
-    // change; a vehicle left as it was keeps the rating stored. Otherwise the rating is typed.
-    Long stored = structure.getDesignLoadRating() == null
-        ? null
-        : structure.getDesignLoadRating().longValue();
-    Optional<Long> fixed = fixedRating(vehicle);
-    Long design;
-    if (fixed.isPresent()) {
-      design = vehicleChanged ? fixed.get() : stored;
-    } else {
-      design = request.designLoadRating();
-      if (!Objects.equals(design, stored) && !level2) {
-        errors.put("designLoadRating", "Original Design Load Rating" + LEVEL_2_ONLY);
-      } else if (design != null && design < 1) {
-        errors.put("designLoadRating",
-            "Original Design Load Rating GVW (tonnes) must be greater than or equal to 1.");
-      } else if (design != null && design > RATING_MAX) {
-        errors.put("designLoadRating",
-            "Original Design Load Rating GVW (tonnes) can be at most " + RATING_MAX + ".");
-      }
-    }
+    Long design = designRating(errors, structure, request, vehicle, vehicleChanged, level2);
     if (!errors.isEmpty()) {
       throw new FieldValidationException("Load rating details cannot be saved", errors);
     }
@@ -213,6 +176,63 @@ public class StructureLoadRatingsService {
         Boolean.TRUE.equals(request.reviewRequired()) ? YES : NO, vehicle, comment,
         design == null ? null : BigDecimal.valueOf(design), loggedUser.getLoggedUserId());
     log.info("Updated the load rating details of structure {}", structureId);
+  }
+
+  /** Are Load Posting Signs Warranted?: required, a listed value, changed only at Level 2. */
+  private void checkPostingSigns(Map<String, String> errors, CrossingStructureEntity structure,
+      String posting, boolean level2) {
+    boolean postingChanged = !Objects.equals(posting, structure.getLoadPostingSignWrrntdCode());
+    if (postingChanged && !level2) {
+      errors.put(POSTING_SIGNS, "Are Load Posting Signs Warranted?" + LEVEL_2_ONLY);
+    } else if (posting == null) {
+      errors.put(POSTING_SIGNS, "Are Load Posting Signs Warranted? is required.");
+    } else if (postingChanged && !postingSigns.existsById(posting)) {
+      errors.put(POSTING_SIGNS,
+          "Are Load Posting Signs Warranted? is not one of the listed values.");
+    }
+  }
+
+  /** An Other vehicle's details: a P.Eng's to change, required, at most 2000 bytes. */
+  private void checkVehicleComment(Map<String, String> errors, CrossingStructureEntity structure,
+      String comment) {
+    boolean commentChanged = !Objects.equals(comment, trimmed(structure.getDesignVehicleCmt()));
+    if (commentChanged && !loggedUser.isPeng()) {
+      errors.put(VEHICLE_COMMENT,
+          "Only a P.Eng can enter the Design Vehicle Configuration details.");
+    } else if (comment == null) {
+      errors.put(VEHICLE_COMMENT, "Design Vehicle Configuration Details is required.");
+    } else if (tooLong(comment, VEHICLE_TEXT_MAX)) {
+      errors.put(VEHICLE_COMMENT,
+          "Design Vehicle Configuration Details can be at most " + VEHICLE_TEXT_MAX
+              + " characters.");
+    }
+  }
+
+  /**
+   * The design load rating to save. Choosing a vehicle that fixes it sets it, as legacy's page did
+   * on the change; a vehicle left as it was keeps the rating stored. Otherwise the rating is typed:
+   * Level 2 to change, 1 to the column's limit.
+   */
+  private Long designRating(Map<String, String> errors, CrossingStructureEntity structure,
+      LoadRatingDetailsRequest request, String vehicle, boolean vehicleChanged, boolean level2) {
+    Long stored = structure.getDesignLoadRating() == null
+        ? null
+        : structure.getDesignLoadRating().longValue();
+    Optional<Long> fixed = fixedRating(vehicle);
+    if (fixed.isPresent()) {
+      return vehicleChanged ? fixed.get() : stored;
+    }
+    Long design = request.designLoadRating();
+    if (!Objects.equals(design, stored) && !level2) {
+      errors.put(DESIGN_RATING, "Original Design Load Rating" + LEVEL_2_ONLY);
+    } else if (design != null && design < 1) {
+      errors.put(DESIGN_RATING,
+          "Original Design Load Rating GVW (tonnes) must be greater than or equal to 1.");
+    } else if (design != null && design > RATING_MAX) {
+      errors.put(DESIGN_RATING,
+          "Original Design Load Rating GVW (tonnes) can be at most " + RATING_MAX + ".");
+    }
+    return design;
   }
 
   /**

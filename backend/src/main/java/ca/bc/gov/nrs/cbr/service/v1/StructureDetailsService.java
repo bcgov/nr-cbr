@@ -50,6 +50,10 @@ public class StructureDetailsService {
   private static final long REPLACEMENT_COST_MAX = 99_999_999L;
   /** {@code ESTIMATED_REPLACEMENT_COST_CMT VARCHAR2(2000 BYTE)}. */
   private static final int TEXT_MAX = 2000;
+  private static final String YEAR_FABRICATED = "yearFabricated";
+  private static final String YEAR_BUILT = "yearBuilt";
+  private static final String INVENTORY_ADDED = "inventoryAddedYear";
+  private static final String SOURCE = "sourceCode";
   private static final String CLOSURE = "closureYear";
   private static final String REPLACEMENT = "replacementYear";
   private static final String LOAD_RESTRICTION = "loadRestrictionYear";
@@ -96,33 +100,12 @@ public class StructureDetailsService {
         && !builtByCodes.existsById(builtBy)) {
       errors.put("builtByCode", "Built For is not one of the listed values.");
     }
-    checkYear(errors, "yearFabricated", "Year Superstructure Fabricated", request.yearFabricated());
-    checkYear(errors, "yearBuilt", "Year Superstructure Installed", request.yearBuilt());
-    checkYear(errors, "inventoryAddedYear", "Year Added to Inventory",
-        request.inventoryAddedYear());
+    checkYear(errors, YEAR_FABRICATED, "Year Superstructure Fabricated", request.yearFabricated());
+    checkYear(errors, YEAR_BUILT, "Year Superstructure Installed", request.yearBuilt());
+    checkYear(errors, INVENTORY_ADDED, "Year Added to Inventory", request.inventoryAddedYear());
     checkYear(errors, "endOfDesignLifeYear", "End of Design Life", request.endOfDesignLifeYear());
-    if (!errors.containsKey("yearFabricated") && request.yearFabricated() != null) {
-      int thisYear = LocalDate.now(ZoneId.systemDefault()).getYear();
-      if (request.yearFabricated() > thisYear) {
-        errors.put("yearFabricated",
-            "Year Superstructure Fabricated must not be after this year (" + thisYear + ").");
-      } else if (request.yearBuilt() != null && !errors.containsKey("yearBuilt")
-          && request.yearFabricated() > request.yearBuilt()) {
-        errors.put("yearFabricated",
-            "Year Superstructure Fabricated must not be after Year Superstructure Installed.");
-      }
-    }
-    if (source == null) {
-      if (trimmed(structure.getStructureSourceCode()) != null) {
-        errors.put("sourceCode", "Source is required.");
-      }
-    } else if (!source.equals(structure.getStructureSourceCode())
-        && !sourceCodes.existsById(source)) {
-      errors.put("sourceCode", "Source is not one of the listed values.");
-    } else if (SOURCES_NEEDING_YEAR_ADDED.contains(source) && request.inventoryAddedYear() == null
-        && !errors.containsKey("inventoryAddedYear")) {
-      errors.put("inventoryAddedYear", "Year Added to Inventory is required for this Source.");
-    }
+    checkFabricated(errors, request);
+    checkSource(errors, structure, source, request);
     if (request.asBuiltInfoOnFile() == null) {
       errors.put("asBuiltInfoOnFile", "As Built Information on File is required.");
     }
@@ -137,6 +120,43 @@ public class StructureDetailsService {
         Objects.equals(request.asBuiltInfoOnFile(), Boolean.TRUE) ? YES : NO,
         request.installationCost(), request.materialCost(), loggedUser.getLoggedUserId());
     log.info("Updated the structure details of structure {}", structureId);
+  }
+
+  /** Year Superstructure Fabricated: not after this year, nor after the year installed. */
+  private static void checkFabricated(Map<String, String> errors,
+      StructureDetailsRequest request) {
+    Integer fabricated = request.yearFabricated();
+    if (errors.containsKey(YEAR_FABRICATED) || fabricated == null) {
+      return;
+    }
+    int thisYear = LocalDate.now(ZoneId.systemDefault()).getYear();
+    if (fabricated > thisYear) {
+      errors.put(YEAR_FABRICATED,
+          "Year Superstructure Fabricated must not be after this year (" + thisYear + ").");
+    } else if (request.yearBuilt() != null && !errors.containsKey(YEAR_BUILT)
+        && fabricated > request.yearBuilt()) {
+      errors.put(YEAR_FABRICATED,
+          "Year Superstructure Fabricated must not be after Year Superstructure Installed.");
+    }
+  }
+
+  /**
+   * Source: required once the structure has one, a code that exists (or the structure's own), and
+   * some sources need Year Added to Inventory.
+   */
+  private void checkSource(Map<String, String> errors, CrossingStructureEntity structure,
+      String source, StructureDetailsRequest request) {
+    if (source == null) {
+      if (trimmed(structure.getStructureSourceCode()) != null) {
+        errors.put(SOURCE, "Source is required.");
+      }
+    } else if (!source.equals(structure.getStructureSourceCode())
+        && !sourceCodes.existsById(source)) {
+      errors.put(SOURCE, "Source is not one of the listed values.");
+    } else if (SOURCES_NEEDING_YEAR_ADDED.contains(source) && request.inventoryAddedYear() == null
+        && !errors.containsKey(INVENTORY_ADDED)) {
+      errors.put(INVENTORY_ADDED, "Year Added to Inventory is required for this Source.");
+    }
   }
 
   /**
@@ -160,25 +180,10 @@ public class StructureDetailsService {
     checkYear(errors, REPLACEMENT, "Estimated Replacement", request.replacementYear());
     checkYear(errors, LOAD_RESTRICTION, "Estimated Load Restriction",
         request.loadRestrictionYear());
-    Integer closure = errors.containsKey(CLOSURE) ? null : request.closureYear();
-    Integer replacement = errors.containsKey(REPLACEMENT) ? null : request.replacementYear();
-    Integer restriction = errors.containsKey(LOAD_RESTRICTION)
-        ? null
-        : request.loadRestrictionYear();
     if (request.loadRestrictionYear() == null && structure.getFullLogHaulReplacementYear() != null) {
       errors.put(LOAD_RESTRICTION, "Estimated Load Restriction is required.");
     }
-    if (replacement != null && closure != null && replacement > closure) {
-      errors.put(REPLACEMENT, "Estimated Replacement must not be after Estimated Closure.");
-    }
-    if (restriction != null && replacement != null && restriction > replacement) {
-      errors.putIfAbsent(LOAD_RESTRICTION,
-          "Estimated Load Restriction must not be after Estimated Replacement.");
-    }
-    if (restriction != null && closure != null && restriction > closure) {
-      errors.putIfAbsent(LOAD_RESTRICTION,
-          "Estimated Load Restriction must not be after Estimated Closure.");
-    }
+    checkReplacementOrder(errors, request);
     Long cost = request.cost();
     if (cost != null && (cost < 0 || cost > REPLACEMENT_COST_MAX)) {
       errors.put("cost", "Estimated Replacement Cost must be whole dollars from $0 to $99,999,999.");
@@ -195,6 +200,33 @@ public class StructureDetailsService {
         request.replacementYear(), request.loadRestrictionYear(), cost, comment,
         loggedUser.getLoggedUserId());
     log.info("Updated the replacement details of structure {}", structureId);
+  }
+
+  /**
+   * Load restriction not after replacement, and neither after closure — of the years that are
+   * valid.
+   */
+  private static void checkReplacementOrder(Map<String, String> errors,
+      ReplacementDetailsRequest request) {
+    Integer closure = errors.containsKey(CLOSURE) ? null : request.closureYear();
+    Integer replacement = errors.containsKey(REPLACEMENT) ? null : request.replacementYear();
+    Integer restriction = errors.containsKey(LOAD_RESTRICTION)
+        ? null
+        : request.loadRestrictionYear();
+    if (replacement != null && closure != null && replacement > closure) {
+      errors.put(REPLACEMENT, "Estimated Replacement must not be after Estimated Closure.");
+    }
+    if (restriction == null) {
+      return;
+    }
+    if (replacement != null && restriction > replacement) {
+      errors.putIfAbsent(LOAD_RESTRICTION,
+          "Estimated Load Restriction must not be after Estimated Replacement.");
+    }
+    if (closure != null && restriction > closure) {
+      errors.putIfAbsent(LOAD_RESTRICTION,
+          "Estimated Load Restriction must not be after Estimated Closure.");
+    }
   }
 
   /**

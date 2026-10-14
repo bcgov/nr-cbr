@@ -103,10 +103,11 @@ class StructureReplacementsServiceTest {
   @DisplayName("deletes only what this structure replaced, and needs the structure")
   void notFound() {
     links.save(new StructureReplacementXrefEntity(7L, 9L));
+    ReplacementRequest request = new ReplacementRequest("B8");
 
     assertThatThrownBy(() -> service.delete(7L, 9L))
         .isInstanceOf(ReplacementNotFoundException.class);
-    assertThatThrownBy(() -> service.add(404L, new ReplacementRequest("B8")))
+    assertThatThrownBy(() -> service.add(404L, request))
         .isInstanceOf(StructureNotFoundException.class);
   }
 

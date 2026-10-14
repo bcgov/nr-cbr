@@ -62,7 +62,10 @@ public class StructureCulvertService {
   private static final String YES = "Y";
   private static final String NO = "N";
 
+  private static final String IS_REQUIRED = " is required.";
   private static final String TYPE = "culvertTypeCode";
+  private static final String OPEN_BOTTOM_FIELD = "openBottomCode";
+  private static final String MATERIAL_COMMENT = "materialComment";
 
   private final CrossingStructureRepository structures;
   private final ForestServiceCulvertRepository culverts;
@@ -130,12 +133,53 @@ public class StructureCulvertService {
 
     Map<String, String> errors = new LinkedHashMap<>();
     if (request.portable() == null) {
-      errors.put("portable", "Portable Structure is required.");
+      errors.put("portable", "Portable Structure" + IS_REQUIRED);
     }
+    checkMeasurements(errors, culvert, request);
+    String type = woodLog ? WOOD_LOG_TYPE : trimmed(request.culvertTypeCode());
+    String openBottom = woodLog
+        ? culvert.getOpnBtomClvrtSubstrctreCode()
+        : trimmed(request.openBottomCode());
+    if (!woodLog) {
+      checkTypeAndOpenBottom(errors, culvert, type, openBottom);
+    }
+    String material = trimmed(request.materialCode());
+    String materialComment = OTHER.equals(material) ? trimmed(request.materialComment()) : null;
+    checkMaterial(errors, culvert, material, materialComment);
+    String headwall = trimmed(request.headwallLocationCode());
+    checkCode(errors, "headwallLocationCode", "Headwall Location", headwall,
+        culvert.getHeadwallLocationCode(), false, headwalls::existsById);
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Culvert details cannot be saved", errors);
+    }
+
+    String user = loggedUser.getLoggedUserId();
+    structures.updatePortable(structureId, Boolean.TRUE.equals(request.portable()) ? YES : NO,
+        user);
+    culverts.save(culvert.toBuilder()
+        .culvertNumber(request.culvertNumber())
+        .culvertLength(request.lengthMetres())
+        .slope(request.gradient())
+        .engineeredCulvertTypeCode(type)
+        .engineeredCulvertMaterialCode(material)
+        .culvertMaterialComment(materialComment)
+        .inletCoverDepth(request.inletCoverDepthMm())
+        .outletCoverDepth(request.outletCoverDepthMm())
+        .openingHeight(request.openingHeightMm())
+        .openingWidth(request.openingWidthMm())
+        .headwallLocationCode(headwall)
+        .opnBtomClvrtSubstrctreCode(openBottom)
+        .build());
+    log.info("Updated the culvert details of structure {}", structureId);
+  }
+
+  /** Culvert Number, the length and gradient, and the depths and openings. */
+  private static void checkMeasurements(Map<String, String> errors,
+      ForestServiceCulvertEntity culvert, CulvertDetailsRequest request) {
     Integer number = request.culvertNumber();
     if (number == null) {
       if (culvert.getCulvertNumber() != null) {
-        errors.put("culvertNumber", "Culvert Number is required.");
+        errors.put("culvertNumber", "Culvert Number" + IS_REQUIRED);
       }
     } else if (number < 0 || number > NUMBER_MAX) {
       errors.put("culvertNumber", "Culvert Number must be a whole number from 0 to " + NUMBER_MAX
@@ -153,58 +197,35 @@ public class StructureCulvertService {
         culvert.getOpeningHeight() != null);
     checkMillimetres(errors, "openingWidthMm", "Opening Width", request.openingWidthMm(),
         culvert.getOpeningWidth() != null);
+  }
 
-    String type = woodLog ? WOOD_LOG_TYPE : trimmed(request.culvertTypeCode());
-    String openBottom = woodLog
-        ? culvert.getOpnBtomClvrtSubstrctreCode()
-        : trimmed(request.openBottomCode());
-    if (!woodLog) {
-      checkCode(errors, TYPE, "Culvert Type", type, culvert.getEngineeredCulvertTypeCode(),
-          true, culvertTypes::existsById);
-      checkCode(errors, "openBottomCode", "Open Bottom Substructure", openBottom,
-          culvert.getOpnBtomClvrtSubstrctreCode(), false, openBottoms::existsById);
-      if (OPEN_BOTTOM.equals(type) && openBottom == null) {
-        errors.put("openBottomCode",
-            "Open Bottom Substructure is required for an open-bottom culvert.");
-      }
+  /** Culvert Type, and Open Bottom Substructure — required for an open-bottom culvert. */
+  private void checkTypeAndOpenBottom(Map<String, String> errors,
+      ForestServiceCulvertEntity culvert, String type, String openBottom) {
+    checkCode(errors, TYPE, "Culvert Type", type, culvert.getEngineeredCulvertTypeCode(),
+        true, culvertTypes::existsById);
+    checkCode(errors, OPEN_BOTTOM_FIELD, "Open Bottom Substructure", openBottom,
+        culvert.getOpnBtomClvrtSubstrctreCode(), false, openBottoms::existsById);
+    if (OPEN_BOTTOM.equals(type) && openBottom == null) {
+      errors.put(OPEN_BOTTOM_FIELD,
+          "Open Bottom Substructure is required for an open-bottom culvert.");
     }
-    String material = trimmed(request.materialCode());
+  }
+
+  /** Culvert Material, and an Other's details: required with it, at most 2000 bytes. */
+  private void checkMaterial(Map<String, String> errors, ForestServiceCulvertEntity culvert,
+      String material, String materialComment) {
     checkCode(errors, "materialCode", "Culvert Material", material,
         culvert.getEngineeredCulvertMaterialCode(), true, materials::existsById);
-    String materialComment = OTHER.equals(material) ? trimmed(request.materialComment()) : null;
-    if (OTHER.equals(material)) {
-      if (materialComment == null) {
-        errors.put("materialComment", "Culvert Details is required.");
-      } else if (materialComment.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
-        errors.put("materialComment", "Culvert Details can be at most " + TEXT_MAX
-            + " characters.");
-      }
+    if (!OTHER.equals(material)) {
+      return;
     }
-    String headwall = trimmed(request.headwallLocationCode());
-    checkCode(errors, "headwallLocationCode", "Headwall Location", headwall,
-        culvert.getHeadwallLocationCode(), false, headwalls::existsById);
-    if (!errors.isEmpty()) {
-      throw new FieldValidationException("Culvert details cannot be saved", errors);
+    if (materialComment == null) {
+      errors.put(MATERIAL_COMMENT, "Culvert Details" + IS_REQUIRED);
+    } else if (materialComment.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
+      errors.put(MATERIAL_COMMENT, "Culvert Details can be at most " + TEXT_MAX
+          + " characters.");
     }
-
-    String user = loggedUser.getLoggedUserId();
-    structures.updatePortable(structureId, Boolean.TRUE.equals(request.portable()) ? YES : NO,
-        user);
-    culverts.save(culvert.toBuilder()
-        .culvertNumber(number)
-        .culvertLength(request.lengthMetres())
-        .slope(request.gradient())
-        .engineeredCulvertTypeCode(type)
-        .engineeredCulvertMaterialCode(material)
-        .culvertMaterialComment(materialComment)
-        .inletCoverDepth(request.inletCoverDepthMm())
-        .outletCoverDepth(request.outletCoverDepthMm())
-        .openingHeight(request.openingHeightMm())
-        .openingWidth(request.openingWidthMm())
-        .headwallLocationCode(headwall)
-        .opnBtomClvrtSubstrctreCode(openBottom)
-        .build());
-    log.info("Updated the culvert details of structure {}", structureId);
   }
 
   /** A number with one decimal place, in range, required once the culvert has one. */
@@ -212,7 +233,7 @@ public class StructureCulvertService {
       BigDecimal value, boolean requiredOnceSet, BigDecimal min, BigDecimal max) {
     if (value == null) {
       if (requiredOnceSet) {
-        errors.put(field, label + " is required.");
+        errors.put(field, label + IS_REQUIRED);
       }
     } else if (value.stripTrailingZeros().scale() > 1) {
       errors.put(field, label + " can have at most 1 decimal place.");
@@ -227,7 +248,7 @@ public class StructureCulvertService {
       Long value, boolean requiredOnceSet) {
     if (value == null) {
       if (requiredOnceSet) {
-        errors.put(field, label + " is required.");
+        errors.put(field, label + IS_REQUIRED);
       }
     } else if (value < 0 || value > MILLIMETRES_MAX) {
       errors.put(field, label + " must be a whole number of millimetres from 0 to "
@@ -243,7 +264,7 @@ public class StructureCulvertService {
       String code, String stored, boolean requiredOnceSet, Predicate<String> exists) {
     if (code == null) {
       if (requiredOnceSet && trimmed(stored) != null) {
-        errors.put(field, label + " is required.");
+        errors.put(field, label + IS_REQUIRED);
       }
     } else if (!Objects.equals(code, stored) && !exists.test(code)) {
       errors.put(field, label + " is not one of the listed values.");
