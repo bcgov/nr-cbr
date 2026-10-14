@@ -6,6 +6,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.service.v1.ConfigurationService;
+import ca.bc.gov.nrs.cbr.service.v1.StructureCulvertService;
+import ca.bc.gov.nrs.cbr.service.v1.StructureLoadRatingsService;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import java.util.List;
@@ -25,7 +27,9 @@ import org.springframework.http.ResponseEntity;
 class ConfigurationApiControllerTest {
 
   private final ConfigurationService service = mock(ConfigurationService.class);
-  private final ConfigurationApiController controller = new ConfigurationApiController(service);
+  private final ConfigurationApiController controller =
+      new ConfigurationApiController(service, mock(StructureLoadRatingsService.class),
+          mock(StructureCulvertService.class));
 
   private static List<CodeOptionResponse> codes(String marker) {
     return List.of(new CodeOptionResponse(marker, marker));

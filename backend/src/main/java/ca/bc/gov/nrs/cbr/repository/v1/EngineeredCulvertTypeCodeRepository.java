@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 import ca.bc.gov.nrs.cbr.model.v1.EngineeredCulvertTypeCodeEntity;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /** {@code THE.ENGINEERED_CULVERT_TYPE_CODE}. */
@@ -16,4 +17,13 @@ public interface EngineeredCulvertTypeCodeRepository
    * dates.
    */
   List<EngineeredCulvertTypeCodeEntity> findAllByOrderByDescriptionAsc();
+
+  /** The current codes, by description — the Details tab's Culvert Type select. */
+  @Query("""
+      SELECT code
+        FROM EngineeredCulvertTypeCodeEntity code
+       WHERE CURRENT_TIMESTAMP BETWEEN code.effectiveDate AND code.expiryDate
+       ORDER BY code.description
+      """)
+  List<EngineeredCulvertTypeCodeEntity> findAllCurrent();
 }

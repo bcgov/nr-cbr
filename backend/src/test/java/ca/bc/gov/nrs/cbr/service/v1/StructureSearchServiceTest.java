@@ -314,7 +314,7 @@ class StructureSearchServiceTest {
       givenStructure(2L, "MANUAL", "SITE-1", s -> s.loadRatingUnknownIndicator("N"));
       givenCompleteBridge(12L, 2L, "STL", "CONC");
       entityManager.persist(StructureLoadRatingEntity.builder()
-          .structureLoadRatingId(1L).crossingStructureId(2L).loadRating(new BigDecimal("40"))
+          .crossingStructureId(2L).loadRating(new BigDecimal("40"))
           .entryTimestamp(LocalDateTime.of(2024, 1, 1, 9, 0)).build());
       givenStructure(3L, "REVIEWED", "SITE-1", s -> s.loadRatingUnknownIndicator("N"));
       givenCompleteBridge(13L, 3L, "STL", "CONC");

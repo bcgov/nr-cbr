@@ -2,7 +2,10 @@ package ca.bc.gov.nrs.cbr.model.v1;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -35,10 +38,17 @@ import lombok.ToString;
 @EqualsAndHashCode(of = "structureLoadRatingId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class StructureLoadRatingEntity {
 
+  /**
+   * From {@code THE.STRUCTURE_LOAD_RATING_SEQ}, as legacy's {@code INSERT_LOAD_RATING} takes it.
+   * {@code allocationSize = 1} because legacy and the inspection approval draw from it too.
+   */
   @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "structureLoadRatingSeq")
+  @SequenceGenerator(name = "structureLoadRatingSeq",
+      sequenceName = "THE.STRUCTURE_LOAD_RATING_SEQ", allocationSize = 1)
   @Column(name = "STRUCTURE_LOAD_RATING_ID")
   private Long structureLoadRatingId;
 
@@ -72,4 +82,14 @@ public class StructureLoadRatingEntity {
   /** Who entered a manual rating — the IDIR ID it is listed under. */
   @Column(name = "ENTRY_USERID", length = 30)
   private String entryUserid;
+
+  /** The site the structure stood on when it was rated. */
+  @Column(name = "SITE_AT_TIME_OF_LOAD_RATING", length = 14)
+  private String siteAtTimeOfLoadRating;
+
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 }

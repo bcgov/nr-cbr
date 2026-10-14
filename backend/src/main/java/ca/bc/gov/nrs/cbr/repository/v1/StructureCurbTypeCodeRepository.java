@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 import ca.bc.gov.nrs.cbr.model.v1.StructureCurbTypeCodeEntity;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /** {@code THE.STRUCTURE_CURB_TYPE_CODE}. */
@@ -16,4 +17,13 @@ public interface StructureCurbTypeCodeRepository
    * dates.
    */
   List<StructureCurbTypeCodeEntity> findAllByOrderByDescriptionAsc();
+
+  /** The current codes, by description — the Details tab's Bridge card select. */
+  @Query("""
+      SELECT code
+        FROM StructureCurbTypeCodeEntity code
+       WHERE CURRENT_TIMESTAMP BETWEEN code.effectiveDate AND code.expiryDate
+       ORDER BY code.description
+      """)
+  List<StructureCurbTypeCodeEntity> findAllCurrent();
 }

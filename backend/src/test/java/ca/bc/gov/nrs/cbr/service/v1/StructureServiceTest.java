@@ -180,7 +180,7 @@ class StructureServiceTest {
   private void givenBridgeWithItsParts(long id) {
     givenStructure(id, "Y");
     entityManager.persist(StructureLoadRatingEntity.builder()
-        .structureLoadRatingId(id * 10).crossingStructureId(id).build());
+        .crossingStructureId(id).build());
     entityManager.persist(ForestServiceBridgeEntity.builder()
         .forestServiceBridgeId(id * 10).crossingStructureId(id).build());
     entityManager.persist(ForestServiceBridgePierEntity.builder()

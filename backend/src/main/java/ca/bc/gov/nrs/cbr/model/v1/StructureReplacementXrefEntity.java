@@ -12,19 +12,18 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.hibernate.annotations.Immutable;
 
 /**
  * {@code THE.STRUCTURE_REPLACEMENT_XREF} — one structure replaced by another, a link over time
  * between two structures at a site.
  *
  * <p>Both columns are structure ids, despite the names, and both are foreign keys to
- * {@code CROSSING_STRUCTURE} ({@code SRX_CRS_REPLACED_FK}, {@code SRX_CRS_REPLACES_FK}). Read-only
- * here: mapped so a structure on either side of a link is refused a delete rather than failing at
- * the constraint, which is what legacy did.
+ * {@code CROSSING_STRUCTURE} ({@code SRX_CRS_REPLACED_FK}, {@code SRX_CRS_REPLACES_FK}).
+ * Mapped so a structure on either side of a link is refused a delete rather than failing at the
+ * constraint, as legacy did, and so Replacement Details can add and remove links. A link is never
+ * changed, only added or removed: both columns are the key.
  */
 @Entity
-@Immutable
 @Table(name = "STRUCTURE_REPLACEMENT_XREF", schema = "THE")
 @IdClass(StructureReplacementXrefEntity.Key.class)
 @Getter

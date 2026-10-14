@@ -1,10 +1,12 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -80,12 +82,153 @@ public interface CrossingStructureRepository
       @Param("siteId") String siteId,
       @Param("user") String user);
 
+  /** Writes Portable Structure, which the Details tab's Culvert card holds. */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.portableStructureInd = :portableInd,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updatePortable(
+      @Param("id") Long id,
+      @Param("portableInd") String portableInd,
+      @Param("user") String user);
+
+  /** Writes the Details tab's Replacement Details, with who changed them and when. */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.estimatedClosureYear = :closureYear,
+             structure.lightVehicleReplacementYear = :replacementYear,
+             structure.fullLogHaulReplacementYear = :loadRestrictionYear,
+             structure.estimatedReplacementCost = :cost,
+             structure.estimatedReplacementCostCmt = :costComment,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updateReplacementDetails(
+      @Param("id") Long id,
+      @Param("closureYear") Integer closureYear,
+      @Param("replacementYear") Integer replacementYear,
+      @Param("loadRestrictionYear") Integer loadRestrictionYear,
+      @Param("cost") Long cost,
+      @Param("costComment") String costComment,
+      @Param("user") String user);
+
+  /**
+   * Writes the fields of the Details tab's Load Rating Details, with who changed them and when.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.loadPostingSignWrrntdCode = :postingCode,
+             structure.loadRatingUnknownIndicator = :reviewInd,
+             structure.designVehicleLoadCode = :vehicleCode,
+             structure.designVehicleCmt = :vehicleComment,
+             structure.designLoadRating = :designLoadRating,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updateLoadRatingDetails(
+      @Param("id") Long id,
+      @Param("postingCode") String postingCode,
+      @Param("reviewInd") String reviewInd,
+      @Param("vehicleCode") String vehicleCode,
+      @Param("vehicleComment") String vehicleComment,
+      @Param("designLoadRating") BigDecimal designLoadRating,
+      @Param("user") String user);
+
+  /**
+   * Copies the structure's current load rating onto it — what legacy's rating procedures do after
+   * each change — and, when given, sets Load Rating Review Required.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.currentLoadRating = :rating,
+             structure.loadRatingUnknownIndicator =
+               COALESCE(:reviewInd, structure.loadRatingUnknownIndicator)
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updateCurrentLoadRating(
+      @Param("id") Long id,
+      @Param("rating") BigDecimal rating,
+      @Param("reviewInd") String reviewInd);
+
+  /**
+   * Writes the Type/Class and Portable Structure the Details tab's Bridge card holds, with who
+   * changed them and when.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.structureTypeClassCode = :typeClassCode,
+             structure.portableStructureInd = :portableInd,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updateBridgeIdentity(
+      @Param("id") Long id,
+      @Param("typeClassCode") String typeClassCode,
+      @Param("portableInd") String portableInd,
+      @Param("user") String user);
+
+  /**
+   * Writes the Details tab's Structure card, with who changed it and when. Only these columns, as
+   * the schedule's update.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.builtByCode = :builtByCode,
+             structure.yearFabricated = :yearFabricated,
+             structure.yearBuilt = :yearBuilt,
+             structure.inventoryAddedYear = :inventoryAddedYear,
+             structure.structureSourceCode = :sourceCode,
+             structure.originalReplacementYear = :endOfDesignLifeYear,
+             structure.asBuiltInfoPresentInd = :asBuiltInd,
+             structure.installationCost = :installationCost,
+             structure.materialCost = :materialCost,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  @SuppressWarnings("java:S107") // One parameter a column, as the card has them.
+  int updateStructureDetails(
+      @Param("id") Long id,
+      @Param("builtByCode") String builtByCode,
+      @Param("yearFabricated") Integer yearFabricated,
+      @Param("yearBuilt") Integer yearBuilt,
+      @Param("inventoryAddedYear") Integer inventoryAddedYear,
+      @Param("sourceCode") String sourceCode,
+      @Param("endOfDesignLifeYear") Integer endOfDesignLifeYear,
+      @Param("asBuiltInd") String asBuiltInd,
+      @Param("installationCost") Long installationCost,
+      @Param("materialCost") Long materialCost,
+      @Param("user") String user);
+
   /**
    * Whether another structure, archived or not, has this name — the database's {@code CS_UK}.
    * Legacy checked active structures only, so a name an archived structure held passed its form and
    * then failed the constraint.
    */
   boolean existsByCrossingStructureNameAndCrossingStructureIdNot(String name, Long id);
+
+  /**
+   * The structure with this name, archived or not — the names are unique ({@code CS_UK}). How
+   * legacy's replacement history found the other structure of a link.
+   */
+  Optional<CrossingStructureEntity> findByCrossingStructureName(String name);
+
+  /** The first 20 structures, by name, whose Structure # starts with this — any case. */
+  List<CrossingStructureEntity>
+      findTop20ByCrossingStructureNameStartingWithIgnoreCaseOrderByCrossingStructureNameAsc(
+          String prefix);
 
   /**
    * Writes the structure's inspection schedule — the Inspections tab's Inspection Schedule card —

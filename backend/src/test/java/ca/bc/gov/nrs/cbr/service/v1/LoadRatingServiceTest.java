@@ -74,7 +74,6 @@ class LoadRatingServiceTest {
   /** A rating typed in by hand — no inspection behind it. */
   private StructureLoadRatingEntity givenManualRating(String rating, LocalDateTime enteredAt) {
     StructureLoadRatingEntity entity = StructureLoadRatingEntity.builder()
-        .structureLoadRatingId(nextId++)
         .crossingStructureId(STRUCTURE)
         .loadRating(new BigDecimal(rating))
         .entryTimestamp(enteredAt)
@@ -112,7 +111,6 @@ class LoadRatingServiceTest {
       return null;
     }
     StructureLoadRatingEntity entity = StructureLoadRatingEntity.builder()
-        .structureLoadRatingId(nextId++)
         .crossingStructureId(STRUCTURE)
         .inspectionId(inspectionId)
         .loadRating(new BigDecimal(rating))

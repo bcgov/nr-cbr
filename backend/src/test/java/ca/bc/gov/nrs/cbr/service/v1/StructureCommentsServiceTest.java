@@ -85,6 +85,19 @@ class StructureCommentsServiceTest {
   }
 
   @Test
+  @DisplayName("adds a general comment — the Details tab's — trimmed, entered by the user")
+  void addsGeneral() {
+    String id = service.addComment(7L, new CommentRequest("  Deck replaced.  ")).id();
+
+    StructureCommentEntity comment = stored(Long.parseLong(id));
+    assertThat(comment.getCrossingStructureId()).isEqualTo(7L);
+    assertThat(comment.getStructureComment()).isEqualTo("Deck replaced.");
+    assertThat(comment.getPlannedInspectionCmtInd()).isEqualTo("N");
+    assertThat(comment.getEntryUserid()).isEqualTo("IDIR\\EDITOR");
+    assertThat(comment.getUpdateUserid()).isEqualTo("IDIR\\EDITOR");
+  }
+
+  @Test
   @DisplayName("changes the text and who last updated it, keeping its kind and who entered it — "
       + "anyone's comment, as legacy")
   void updates() {

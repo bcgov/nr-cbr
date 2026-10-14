@@ -132,7 +132,6 @@ class InspectionServiceTest {
     entityManager.persist(StructureInspectionItemEntity.builder()
         .structureInspectionItemId(nextId++).inspectionId(INSPECTION).build());
     entityManager.persist(StructureLoadRatingEntity.builder()
-        .structureLoadRatingId(nextId++)
         .crossingStructureId(STRUCTURE)
         .inspectionId(INSPECTION)
         .loadRating(new BigDecimal("35"))
@@ -264,7 +263,6 @@ class InspectionServiceTest {
       // deleted never supplied it, so nothing about the structure should change.
       givenInspection(1L, LocalDate.of(2024, 1, 1), "RVD");
       entityManager.persist(StructureLoadRatingEntity.builder()
-          .structureLoadRatingId(nextId++)
           .crossingStructureId(STRUCTURE).inspectionId(1L)
           .loadRating(new BigDecimal("20"))
           .entryTimestamp(LocalDateTime.of(2024, 1, 1, 9, 0)).build());
@@ -301,7 +299,6 @@ class InspectionServiceTest {
       // is — its rating has stopped counting by the time it becomes deletable.
       givenInspection(INSPECTION, LocalDate.of(2026, 6, 15), "RVD");
       entityManager.persist(StructureLoadRatingEntity.builder()
-          .structureLoadRatingId(nextId++)
           .crossingStructureId(STRUCTURE).inspectionId(INSPECTION)
           .loadRating(new BigDecimal("35"))
           .entryTimestamp(LocalDateTime.of(2026, 6, 15, 9, 0)).build());

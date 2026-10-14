@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -35,4 +36,10 @@ public class LoadPostingSignWrrntdCodeEntity {
 
   @Column(name = "DESCRIPTION", length = 120)
   private String description;
+
+  @Column(name = "EFFECTIVE_DATE")
+  private LocalDateTime effectiveDate;
+
+  @Column(name = "EXPIRY_DATE")
+  private LocalDateTime expiryDate;
 }

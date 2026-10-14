@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Comments on a structure — legacy's comment lists on the structure page: the Details tab's general
  * comments and the Inspections tab's planned-inspection ones, one table told apart by
- * {@code PLANNED_INSPECTION_CMT_IND}. Adds planned-inspection comments and edits either kind;
+ * {@code PLANNED_INSPECTION_CMT_IND}. Adds and edits either kind;
  * legacy deletes none.
  */
 @Service
@@ -32,6 +32,8 @@ public class StructureCommentsService {
 
   /** A planned-inspection comment, as against a general one. */
   private static final String PLANNED_INSPECTION = "Y";
+  /** A general comment, the Details tab's. */
+  private static final String GENERAL = "N";
   /** The comment column, in bytes. */
   private static final int TEXT_MAX = 2000;
   private static final String FIELD = "comment";
@@ -50,10 +52,20 @@ public class StructureCommentsService {
   }
 
   /**
+   * Adds a general comment — legacy's add on the Details tab ({@code addStructureComment},
+   * {@code CBR.INSERT_STRUCTURE_COMMENT}).
+   *
+   * @throws StructureNotFoundException if there is no such structure
+   * @throws FieldValidationException   when the text is blank or over 2000 bytes
+   */
+  @Transactional
+  public CreatedResponse addComment(long structureId, CommentRequest request) {
+    return add(structureId, request, GENERAL);
+  }
+
+  /**
    * Adds a planned-inspection comment — legacy's add on the Inspections tab
-   * ({@code addPlannedInspectionComment}, {@code CBR.INSERT_STRUCTURE_COMMENT}), written here at
-   * once where legacy held it for the page's Save. Entered and last updated by the user, now; its
-   * id from {@code STRUCTURE_COMMENT_SEQ} through the entity's generator.
+   * ({@code addPlannedInspectionComment}, {@code CBR.INSERT_STRUCTURE_COMMENT}).
    *
    * @throws StructureNotFoundException if there is no such structure
    * @throws FieldValidationException   when the text is blank or over 2000 bytes
@@ -61,6 +73,15 @@ public class StructureCommentsService {
   @Transactional
   public CreatedResponse addPlannedInspectionComment(long structureId,
       CommentRequest request) {
+    return add(structureId, request, PLANNED_INSPECTION);
+  }
+
+  /**
+   * Adds a comment of either kind, written at once where legacy held it for the page's Save.
+   * Entered and last updated by the user, now; its id from {@code STRUCTURE_COMMENT_SEQ} through
+   * the entity's generator.
+   */
+  private CreatedResponse add(long structureId, CommentRequest request, String kind) {
     if (!structures.existsById(structureId)) {
       throw new StructureNotFoundException(structureId);
     }
@@ -70,13 +91,14 @@ public class StructureCommentsService {
     StructureCommentEntity saved = comments.save(StructureCommentEntity.builder()
         .crossingStructureId(structureId)
         .structureComment(text)
-        .plannedInspectionCmtInd(PLANNED_INSPECTION)
+        .plannedInspectionCmtInd(kind)
         .entryUserid(user)
         .entryTimestamp(now)
         .updateUserid(user)
         .updateTimestamp(now)
         .build());
-    log.info("Added planned-inspection comment {} to structure {}",
+    log.info("Added {} comment {} to structure {}",
+        PLANNED_INSPECTION.equals(kind) ? "planned-inspection" : "general",
         saved.getStructureCommentId(), structureId);
     return new CreatedResponse(String.valueOf(saved.getStructureCommentId()));
   }
