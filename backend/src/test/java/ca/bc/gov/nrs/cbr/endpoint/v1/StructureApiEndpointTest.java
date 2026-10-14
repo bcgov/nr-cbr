@@ -73,6 +73,15 @@ class StructureApiEndpointTest {
   }
 
   @Test
+  @DisplayName("name suggestions are GET /name-suggestions, gated on READ")
+  void nameSuggestionsAreMappedAndGated() {
+    Method suggest = method("suggestNames");
+    assertThat(suggest.getAnnotation(GetMapping.class).value())
+        .containsExactly("/name-suggestions");
+    assertThat(suggest.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
+
+  @Test
   @DisplayName("archive is PUT /api/v1/structures/archive")
   void archiveIsMapped() {
     assertThat(method("archiveStructures").getAnnotation(PutMapping.class).value())
@@ -116,6 +125,26 @@ class StructureApiEndpointTest {
             CbrAuthorities.READ),
         Arguments.of("updateInformation", "PUT", "/{structureId}/information",
             CbrAuthorities.CONTENT_EDIT),
+        Arguments.of("updateStructureDetails", "PUT", "/{structureId}/structure-details",
+            CbrAuthorities.DESTRUCTIVE),
+        Arguments.of("updateBridgeDetails", "PUT", "/{structureId}/bridge-details",
+            CbrAuthorities.DESTRUCTIVE),
+        Arguments.of("updateCulvertDetails", "PUT", "/{structureId}/culvert-details",
+            CbrAuthorities.DESTRUCTIVE),
+        Arguments.of("updateLoadRatingDetails", "PUT", "/{structureId}/load-rating-details",
+            CbrAuthorities.CONTENT_EDIT),
+        Arguments.of("updateReplacementDetails", "PUT", "/{structureId}/replacement-details",
+            CbrAuthorities.APPROVE),
+        Arguments.of("createLoadRating", "POST", "/{structureId}/load-ratings",
+            CbrAuthorities.APPROVE),
+        Arguments.of("updateLoadRating", "PUT", "/{structureId}/load-ratings/{loadRatingId}",
+            CbrAuthorities.APPROVE),
+        Arguments.of("deleteLoadRating", "DELETE", "/{structureId}/load-ratings/{loadRatingId}",
+            CbrAuthorities.APPROVE),
+        Arguments.of("createReplacement", "POST", "/{structureId}/replacements",
+            CbrAuthorities.APPROVE),
+        Arguments.of("deleteReplacement", "DELETE", "/{structureId}/replacements/{replacedId}",
+            CbrAuthorities.APPROVE),
         Arguments.of("createSpan", "POST", "/{structureId}/spans", CbrAuthorities.DESTRUCTIVE),
         Arguments.of("updateSpan", "PUT", "/{structureId}/spans/{spanId}",
             CbrAuthorities.DESTRUCTIVE),
@@ -142,6 +171,8 @@ class StructureApiEndpointTest {
             CbrAuthorities.CONTENT_EDIT),
         Arguments.of("addCloseProximityInspection", "POST",
             "/{structureId}/close-proximity-inspections", CbrAuthorities.APPROVE),
+        Arguments.of("addComment", "POST", "/{structureId}/comments",
+            CbrAuthorities.CONTENT_EDIT),
         Arguments.of("addPlannedInspectionComment", "POST",
             "/{structureId}/planned-inspection-comments", CbrAuthorities.DESTRUCTIVE),
         Arguments.of("updateComment", "PUT", "/{structureId}/comments/{commentId}",

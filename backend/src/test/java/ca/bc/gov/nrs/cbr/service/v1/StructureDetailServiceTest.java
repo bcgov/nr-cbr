@@ -150,10 +150,10 @@ class StructureDetailServiceTest {
         .inspectionReportStatusCode(status).build());
   }
 
-  private void givenRating(long id, long structureId, Long inspectionId, String rating,
+  private void givenRating(long structureId, Long inspectionId, String rating,
       LocalDateTime entered) {
     entityManager.persist(StructureLoadRatingEntity.builder()
-        .structureLoadRatingId(id).crossingStructureId(structureId).inspectionId(inspectionId)
+        .crossingStructureId(structureId).inspectionId(inspectionId)
         .loadRating(new BigDecimal(rating)).entryTimestamp(entered)
         .entryUserid("IDIR\\ENTERER").build());
   }
@@ -389,9 +389,9 @@ class StructureDetailServiceTest {
       givenSite("SITE-1", site -> { });
       givenStructure(7L, "B100", "SITE-1", s -> s.designLoadRating(new BigDecimal("63")));
       givenBridge(70L, 7L);
-      givenRating(1L, 7L, null, "63", LocalDateTime.of(2000, 10, 1, 9, 0));
+      givenRating(7L, null, "63", LocalDateTime.of(2000, 10, 1, 9, 0));
       givenInspection(100L, 7L, LocalDate.of(2024, 5, 1), "RVD", 5L);
-      givenRating(2L, 7L, 100L, "60", LocalDateTime.of(2024, 5, 20, 9, 0));
+      givenRating(7L, 100L, "60", LocalDateTime.of(2024, 5, 20, 9, 0));
       // Reviewed, but recorded no rating — legacy's "UNK".
       givenInspection(101L, 7L, LocalDate.of(2010, 6, 1), "ACC", 5L);
       // Not reviewed, so not a load rating at all.

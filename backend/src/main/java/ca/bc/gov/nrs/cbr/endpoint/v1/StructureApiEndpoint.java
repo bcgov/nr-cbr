@@ -1,12 +1,16 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.BridgeDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CloseProximityInspectionRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.CulvertDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingDetailsRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
@@ -16,11 +20,15 @@ import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.ReplacementDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.SitePreviewResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SpanRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.ReplacementRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailsRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureNameSuggestion;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInformationRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
@@ -163,6 +171,7 @@ public interface StructureApiEndpoint {
   @GetMapping("/site-preview")
   SitePreviewResponse previewSite(@RequestParam(name = "siteId") String siteId);
 
+
   /**
    * Saves the Information tab's Edit — the structure's name and site.
    *
@@ -178,6 +187,173 @@ public interface StructureApiEndpoint {
   ResponseEntity<Void> updateInformation(
       @PathVariable("structureId") long structureId,
       @RequestBody StructureInformationRequest request);
+
+  /**
+   * Saves the Details tab's Structure card — Built For, the three years, Source, End of Design
+   * Life, As Built Information on File and the two costs.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — Level 2 and up, legacy's
+   * {@code /level2Access} on every one of these fields. <b>204</b> on success; <b>404</b> when
+   * there is no such structure; <b>400</b> with {@code fieldErrors} keyed by the request's fields.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PutMapping("/{structureId}/structure-details")
+  ResponseEntity<Void> updateStructureDetails(
+      @PathVariable("structureId") long structureId,
+      @RequestBody StructureDetailsRequest request);
+
+  /**
+   * Saves the Details tab's Bridge card — the bridge's fields, with the structure's Type/Class
+   * (Durable or Non-Durable Bridge) and Portable Structure.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — Level 2 and up, legacy's
+   * {@code /level2Access} on every one of these fields. <b>204</b> on success; <b>404</b> when
+   * there is no such structure; <b>409</b> when it has no bridge record; <b>400</b> with
+   * {@code fieldErrors} keyed by the request's fields.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PutMapping("/{structureId}/bridge-details")
+  ResponseEntity<Void> updateBridgeDetails(
+      @PathVariable("structureId") long structureId,
+      @RequestBody BridgeDetailsRequest request);
+
+  /**
+   * Saves the fields of the Details tab's Load Rating Details.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, who change Load Rating
+   * Review Required; the service refuses the other fields below Level 2, and the Other vehicle's
+   * words to anyone but a P.Eng, as legacy's page. <b>204</b> on success; <b>404</b> when there is
+   * no such structure; <b>400</b> with {@code fieldErrors} keyed by the request's fields.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PutMapping("/{structureId}/load-rating-details")
+  ResponseEntity<Void> updateLoadRatingDetails(
+      @PathVariable("structureId") long structureId,
+      @RequestBody LoadRatingDetailsRequest request);
+
+  /**
+   * Adds a manual load rating — legacy's Add Load Rating.
+   *
+   * <p>Gated on {@link CbrAuthorities#APPROVE} — a P.Eng's, as legacy's {@code /pEngAccess}.
+   * <b>201</b> with the new id; <b>404</b> when there is no such structure; <b>400</b> with
+   * {@code fieldErrors} keyed {@code rating}, {@code reasonCode} or {@code reasonComment}.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @PostMapping("/{structureId}/load-ratings")
+  ResponseEntity<CreatedResponse> createLoadRating(
+      @PathVariable("structureId") long structureId, @RequestBody LoadRatingRequest request);
+
+  /**
+   * Changes a manual load rating — legacy's Edit Manual Load Rating.
+   *
+   * <p>Gated on {@link CbrAuthorities#APPROVE}. <b>204</b> on success; <b>404</b> when the structure
+   * has no such manual rating; <b>400</b> with {@code fieldErrors}.
+   *
+   * @param structureId  the {@code CROSSING_STRUCTURE_ID}
+   * @param loadRatingId the rating's {@code STRUCTURE_LOAD_RATING_ID}
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @PutMapping("/{structureId}/load-ratings/{loadRatingId}")
+  ResponseEntity<Void> updateLoadRating(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("loadRatingId") long loadRatingId,
+      @RequestBody LoadRatingRequest request);
+
+  /**
+   * Deletes a manual load rating.
+   *
+   * <p>Gated on {@link CbrAuthorities#APPROVE}. <b>204</b> on success; <b>404</b> when the structure
+   * has no such manual rating.
+   *
+   * @param structureId  the {@code CROSSING_STRUCTURE_ID}
+   * @param loadRatingId the rating's {@code STRUCTURE_LOAD_RATING_ID}
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @DeleteMapping("/{structureId}/load-ratings/{loadRatingId}")
+  ResponseEntity<Void> deleteLoadRating(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("loadRatingId") long loadRatingId);
+
+  /**
+   * Structures whose Structure # starts with the term — Replacement History's type-ahead. At most
+   * 20, by name, archived ones included; none for fewer than 2 characters.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}: it reads what Structure Search shows anyone.
+   *
+   * @param term the start of a Structure #, any case
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/name-suggestions")
+  List<StructureNameSuggestion> suggestNames(@RequestParam(name = "term") String term);
+
+  /**
+   * Records that this structure replaced another — legacy's Replacement History pop-up.
+   *
+   * <p>Gated on {@link CbrAuthorities#APPROVE} — a P.Eng's, as legacy. <b>201</b> on success;
+   * <b>404</b> when there is no such structure; <b>400</b> with {@code fieldErrors} keyed
+   * {@code replacedName}.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}, the replacing structure
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @PostMapping("/{structureId}/replacements")
+  ResponseEntity<Void> createReplacement(
+      @PathVariable("structureId") long structureId, @RequestBody ReplacementRequest request);
+
+  /**
+   * Deletes that this structure replaced another.
+   *
+   * <p>Gated on {@link CbrAuthorities#APPROVE}. <b>204</b> on success; <b>404</b> when this
+   * structure did not replace that one.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}, the replacing structure
+   * @param replacedId  the replaced structure's id, {@code REPLACED_STRUCTURE_NUMBER}
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @DeleteMapping("/{structureId}/replacements/{replacedId}")
+  ResponseEntity<Void> deleteReplacement(
+      @PathVariable("structureId") long structureId,
+      @PathVariable("replacedId") long replacedId);
+
+  /**
+   * Saves the Details tab's Replacement Details.
+   *
+   * <p>Gated on {@link CbrAuthorities#APPROVE} — a P.Eng's, legacy's {@code /pEngAccess} on every
+   * one of these fields. <b>204</b> on success; <b>404</b> when there is no such structure;
+   * <b>400</b> with {@code fieldErrors} keyed by the request's fields.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @PutMapping("/{structureId}/replacement-details")
+  ResponseEntity<Void> updateReplacementDetails(
+      @PathVariable("structureId") long structureId,
+      @RequestBody ReplacementDetailsRequest request);
+
+  /**
+   * Saves the Details tab's Culvert card — the culvert's fields, with the structure's Portable
+   * Structure.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — Level 2 and up, legacy's
+   * {@code /level2Access} on every one of these fields. <b>204</b> on success; <b>404</b> when
+   * there is no such structure; <b>409</b> when it has no culvert record; <b>400</b> with
+   * {@code fieldErrors} keyed by the request's fields.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PutMapping("/{structureId}/culvert-details")
+  ResponseEntity<Void> updateCulvertDetails(
+      @PathVariable("structureId") long structureId,
+      @RequestBody CulvertDetailsRequest request);
 
   /**
    * Adds a span to the structure's bridge — legacy's Add on the Spans &amp; Piers tab.
@@ -400,6 +576,21 @@ public interface StructureApiEndpoint {
   ResponseEntity<CreatedResponse> addCloseProximityInspection(
       @PathVariable("structureId") long structureId,
       @RequestBody CloseProximityInspectionRequest request);
+
+  /**
+   * Adds a general comment — the Details tab's Comments.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, legacy's
+   * {@code /level1Access} on the add box. <b>201</b> with the new comment's id; <b>404</b> when
+   * there is no such structure; <b>400</b> with {@code fieldErrors} when the text is refused.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PostMapping("/{structureId}/comments")
+  ResponseEntity<CreatedResponse> addComment(
+      @PathVariable("structureId") long structureId,
+      @RequestBody CommentRequest request);
 
   /**
    * Adds a planned-inspection comment — the Inspections tab's Planned Inspection Comments.

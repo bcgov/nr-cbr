@@ -11,28 +11,25 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.hibernate.annotations.Immutable;
 
 /**
  * {@code THE.FOREST_SERVICE_BRIDGE} — the bridge half of a structure whose type/class is a bridge
- * ({@code PB} portable, {@code TB} timber).
+ * ({@code PB} Durable Bridge, {@code TB} Non-Durable Bridge).
  *
- * <p><b>Read by Structure Search only, and only the columns it filters on</b> — the superstructure
- * and curb types, and the eight "Incomplete Data?" checks. Reached by subquery on
- * {@link #crossingStructureId} rather than as an association of the structure: the relationship is
- * an optional one-to-one held on this side, and Hibernate cannot load the inverse side lazily, so
- * mapping it would cost a select per result row on every search. The bridge screens will map the
- * rest when they arrive.
+ * <p>Read by Structure Search's filters and the structure page, and written by the Details tab's
+ * Bridge card. Reached by subquery on {@link #crossingStructureId} rather than as an association of
+ * the structure: the relationship is an optional one-to-one held on this side, and Hibernate cannot
+ * load the inverse side lazily, so mapping it would cost a select per result row on every search.
+ * Spans and piers hang from {@link #forestServiceBridgeId}.
  */
 @Entity
-@Immutable
 @Table(name = "FOREST_SERVICE_BRIDGE", schema = "THE")
 @Getter
 @ToString
 @EqualsAndHashCode(of = "forestServiceBridgeId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class ForestServiceBridgeEntity {
 
   @Id

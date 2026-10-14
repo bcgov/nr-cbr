@@ -11,25 +11,22 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.hibernate.annotations.Immutable;
 
 /**
  * {@code THE.FOREST_SERVICE_CULVERT} — the culvert half of a structure whose type/class is a
- * culvert ({@code CUL}, or {@code WLC} wildlife culvert).
+ * culvert ({@code CUL} Culvert, or {@code WLC} Wood Log Culvert).
  *
- * <p>Read by Structure Search only, and only the columns it filters on — the culvert type, and the
- * six "Incomplete Data?" checks. Reached by subquery, for the reason given on
- * {@link ForestServiceBridgeEntity}.
+ * <p>Read by Structure Search's filters and the structure page, and written by the Details tab's
+ * Culvert card. Reached by subquery, for the reason given on {@link ForestServiceBridgeEntity}.
  */
 @Entity
-@Immutable
 @Table(name = "FOREST_SERVICE_CULVERT", schema = "THE")
 @Getter
 @ToString
 @EqualsAndHashCode(of = "forestServiceCulvertId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class ForestServiceCulvertEntity {
 
   @Id

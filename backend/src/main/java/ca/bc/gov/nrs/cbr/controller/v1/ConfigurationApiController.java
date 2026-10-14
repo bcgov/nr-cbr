@@ -2,7 +2,12 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.ConfigurationApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.ConfigurationService;
+import ca.bc.gov.nrs.cbr.service.v1.StructureCulvertService;
+import ca.bc.gov.nrs.cbr.service.v1.StructureLoadRatingsService;
+import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.CulvertCodesResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
 import java.util.List;
@@ -18,9 +23,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConfigurationApiController implements ConfigurationApiEndpoint {
 
   private final ConfigurationService configurationService;
+  private final StructureLoadRatingsService loadRatingsService;
+  private final StructureCulvertService culvertService;
 
-  public ConfigurationApiController(ConfigurationService configurationService) {
+  public ConfigurationApiController(
+      ConfigurationService configurationService,
+      StructureLoadRatingsService loadRatingsService,
+      StructureCulvertService culvertService) {
     this.configurationService = configurationService;
+    this.loadRatingsService = loadRatingsService;
+    this.culvertService = culvertService;
   }
 
   @Override
@@ -141,5 +153,30 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   @Override
   public ResponseEntity<List<CodeOptionResponse>> getPierTypeCodes() {
     return ResponseEntity.ok(configurationService.getPierTypeCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getBuiltByCodes() {
+    return ResponseEntity.ok(configurationService.getBuiltByCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getStructureSourceCodes() {
+    return ResponseEntity.ok(configurationService.getStructureSourceCodes());
+  }
+
+  @Override
+  public ResponseEntity<BridgeCodesResponse> getBridgeCodes() {
+    return ResponseEntity.ok(configurationService.getBridgeCodes());
+  }
+
+  @Override
+  public ResponseEntity<LoadRatingCodesResponse> getLoadRatingCodes() {
+    return ResponseEntity.ok(loadRatingsService.codes());
+  }
+
+  @Override
+  public ResponseEntity<CulvertCodesResponse> getCulvertCodes() {
+    return ResponseEntity.ok(culvertService.codes());
   }
 }

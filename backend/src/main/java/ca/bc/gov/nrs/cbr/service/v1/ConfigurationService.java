@@ -1,28 +1,34 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
-import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
-import ca.bc.gov.nrs.cbr.repository.v1.PierTypeCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.AbutmentCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.BuiltByCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.DeckTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileAttachmentTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileMimeTypeXrefRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.PierTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairPriorityCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairStatusCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RunningSurfaceCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureSourceCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
@@ -101,6 +107,11 @@ public class ConfigurationService {
   private final FileAttachmentTypeCodeRepository fileAttachmentTypeCodeRepository;
   private final FileMimeTypeXrefRepository fileMimeTypeXrefRepository;
   private final PierTypeCodeRepository pierTypeCodeRepository;
+  private final BuiltByCodeRepository builtByCodeRepository;
+  private final StructureSourceCodeRepository structureSourceCodeRepository;
+  private final DeckTypeCodeRepository deckTypeCodeRepository;
+  private final RunningSurfaceCodeRepository runningSurfaceCodeRepository;
+  private final AbutmentCodeRepository abutmentCodeRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -123,7 +134,12 @@ public class ConfigurationService {
       StructureRepairGroupCodeRepository structureRepairGroupCodeRepository,
       FileAttachmentTypeCodeRepository fileAttachmentTypeCodeRepository,
       FileMimeTypeXrefRepository fileMimeTypeXrefRepository,
-      PierTypeCodeRepository pierTypeCodeRepository) {
+      PierTypeCodeRepository pierTypeCodeRepository,
+      BuiltByCodeRepository builtByCodeRepository,
+      StructureSourceCodeRepository structureSourceCodeRepository,
+      DeckTypeCodeRepository deckTypeCodeRepository,
+      RunningSurfaceCodeRepository runningSurfaceCodeRepository,
+      AbutmentCodeRepository abutmentCodeRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -145,6 +161,11 @@ public class ConfigurationService {
     this.fileAttachmentTypeCodeRepository = fileAttachmentTypeCodeRepository;
     this.fileMimeTypeXrefRepository = fileMimeTypeXrefRepository;
     this.pierTypeCodeRepository = pierTypeCodeRepository;
+    this.builtByCodeRepository = builtByCodeRepository;
+    this.structureSourceCodeRepository = structureSourceCodeRepository;
+    this.deckTypeCodeRepository = deckTypeCodeRepository;
+    this.runningSurfaceCodeRepository = runningSurfaceCodeRepository;
+    this.abutmentCodeRepository = abutmentCodeRepository;
   }
 
   /**
@@ -482,5 +503,49 @@ public class ConfigurationService {
     return pierTypeCodeRepository.findAllCurrent().stream()
         .map(entity -> new CodeOptionResponse(entity.getPierTypeCode(), entity.getDescription()))
         .toList();
+  }
+
+  /** Built For — {@code THE.BUILT_BY_CODE}, current ones by description. */
+  @Cacheable("builtByCodes")
+  public List<CodeOptionResponse> getBuiltByCodes() {
+    return builtByCodeRepository.findAllCurrent().stream()
+        .map(entity -> new CodeOptionResponse(entity.getBuiltByCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /** Structure sources — {@code THE.STRUCTURE_SOURCE_CODE}, current ones by description. */
+  @Cacheable("structureSourceCodes")
+  public List<CodeOptionResponse> getStructureSourceCodes() {
+    return structureSourceCodeRepository.findAllCurrent().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getStructureSourceCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * The Bridge card's five lists, current codes only, by description: superstructure, deck type,
+   * running surface, curb type and abutment.
+   */
+  @Cacheable("bridgeCodes")
+  public BridgeCodesResponse getBridgeCodes() {
+    return new BridgeCodesResponse(
+        superstructureTypeCodeRepository.findAllCurrent().stream()
+            .map(code -> new CodeOptionResponse(
+                code.getSuperstructureTypeCode(), code.getDescription()))
+            .toList(),
+        deckTypeCodeRepository.findAllCurrent().stream()
+            .map(code -> new CodeOptionResponse(code.getDeckTypeCode(), code.getDescription()))
+            .toList(),
+        runningSurfaceCodeRepository.findAllCurrent().stream()
+            .map(code -> new CodeOptionResponse(
+                code.getRunningSurfaceCode(), code.getDescription()))
+            .toList(),
+        structureCurbTypeCodeRepository.findAllCurrent().stream()
+            .map(code -> new CodeOptionResponse(
+                code.getStructureCurbTypeCode(), code.getDescription()))
+            .toList(),
+        abutmentCodeRepository.findAllCurrent().stream()
+            .map(code -> new CodeOptionResponse(code.getAbutmentCode(), code.getDescription()))
+            .toList());
   }
 }

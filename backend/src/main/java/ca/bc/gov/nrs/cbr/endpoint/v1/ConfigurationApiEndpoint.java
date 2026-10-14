@@ -1,7 +1,10 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.CulvertCodesResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
 import java.util.List;
@@ -182,4 +185,29 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/pier-type-codes")
   ResponseEntity<List<CodeOptionResponse>> getPierTypeCodes();
+
+  /** Built For — the select on the Details tab's Structure card. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/built-by-codes")
+  ResponseEntity<List<CodeOptionResponse>> getBuiltByCodes();
+
+  /** Structure sources — the Source select on the Details tab's Structure card. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/structure-source-codes")
+  ResponseEntity<List<CodeOptionResponse>> getStructureSourceCodes();
+
+  /** The Bridge card's five lists, current codes only. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/bridge-codes")
+  ResponseEntity<BridgeCodesResponse> getBridgeCodes();
+
+  /** Load Rating Details' lists: posting signs, design vehicles with their ratings, reasons. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/load-rating-codes")
+  ResponseEntity<LoadRatingCodesResponse> getLoadRatingCodes();
+
+  /** The Culvert card's lists: culvert type, material, headwall location, open bottom. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/culvert-codes")
+  ResponseEntity<CulvertCodesResponse> getCulvertCodes();
 }

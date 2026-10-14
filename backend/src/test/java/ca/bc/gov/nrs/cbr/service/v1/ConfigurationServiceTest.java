@@ -9,9 +9,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ca.bc.gov.nrs.cbr.model.v1.AbutmentCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.BuiltByCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.DeckTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.EngineeredCulvertTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.FileAttachmentTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
@@ -21,17 +24,22 @@ import ca.bc.gov.nrs.cbr.model.v1.PierTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RunningSurfaceCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SpecialAccessRequirementCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SpecialEquipmentRequirementCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StrctreInspectionTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureCurbTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairGroupCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureSourceCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.SuperstructureTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.repository.v1.AbutmentCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.BuiltByCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.DeckTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileAttachmentTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileMimeTypeXrefRepository;
@@ -42,14 +50,17 @@ import ca.bc.gov.nrs.cbr.repository.v1.PierTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairPriorityCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.RunningSurfaceCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialAccessRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureSourceCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import java.util.List;
@@ -105,6 +116,11 @@ class ConfigurationServiceTest {
       mock(FileAttachmentTypeCodeRepository.class);
   private final FileMimeTypeXrefRepository mimeTypes = mock(FileMimeTypeXrefRepository.class);
   private final PierTypeCodeRepository pierTypes = mock(PierTypeCodeRepository.class);
+  private final BuiltByCodeRepository builtBy = mock(BuiltByCodeRepository.class);
+  private final StructureSourceCodeRepository sources = mock(StructureSourceCodeRepository.class);
+  private final DeckTypeCodeRepository deckTypes = mock(DeckTypeCodeRepository.class);
+  private final RunningSurfaceCodeRepository surfaces = mock(RunningSurfaceCodeRepository.class);
+  private final AbutmentCodeRepository abutments = mock(AbutmentCodeRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes,
@@ -127,7 +143,12 @@ class ConfigurationServiceTest {
       repairGroups,
       attachmentTypes,
       mimeTypes,
-      pierTypes);
+      pierTypes,
+      builtBy,
+      sources,
+      deckTypes,
+      surfaces,
+      abutments);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -395,6 +416,46 @@ class ConfigurationServiceTest {
     assertThat(service.getFileAttachmentTypeCodes())
         .containsExactly(new CodeOptionResponse("OTH", "Other"));
     assertThat(service.getDocumentExtensions()).containsExactly("JPG", "PDF");
+  }
+
+  @Test
+  @DisplayName("lists the current Built For values and sources the Structure card offers")
+  void structureCardCodes() {
+    when(builtBy.findAllCurrent()).thenReturn(List.of(
+        BuiltByCodeEntity.builder().builtByCode("MOF").description("Ministry of Forests").build()));
+    when(sources.findAllCurrent()).thenReturn(List.of(
+        StructureSourceCodeEntity.builder().structureSourceCode("IR").description("Inventory")
+            .build()));
+
+    assertThat(service.getBuiltByCodes())
+        .containsExactly(new CodeOptionResponse("MOF", "Ministry of Forests"));
+    assertThat(service.getStructureSourceCodes())
+        .containsExactly(new CodeOptionResponse("IR", "Inventory"));
+  }
+
+  @Test
+  @DisplayName("lists the Bridge card's five code lists together, current codes only")
+  void bridgeCodes() {
+    when(superstructureTypes.findAllCurrent()).thenReturn(List.of(
+        SuperstructureTypeCodeEntity.builder().superstructureTypeCode("STL").description("Steel")
+            .build()));
+    when(deckTypes.findAllCurrent()).thenReturn(List.of(
+        DeckTypeCodeEntity.builder().deckTypeCode("TIM").description("Timber").build()));
+    when(surfaces.findAllCurrent()).thenReturn(List.of(
+        RunningSurfaceCodeEntity.builder().runningSurfaceCode("GRV").description("Gravel").build()));
+    when(curbTypes.findAllCurrent()).thenReturn(List.of(
+        StructureCurbTypeCodeEntity.builder().structureCurbTypeCode("TMB").description("Timber")
+            .build()));
+    when(abutments.findAllCurrent()).thenReturn(List.of(
+        AbutmentCodeEntity.builder().abutmentCode("CON").description("Concrete").build()));
+
+    BridgeCodesResponse codes = service.getBridgeCodes();
+
+    assertThat(codes.superstructureTypes()).containsExactly(new CodeOptionResponse("STL", "Steel"));
+    assertThat(codes.deckTypes()).containsExactly(new CodeOptionResponse("TIM", "Timber"));
+    assertThat(codes.runningSurfaces()).containsExactly(new CodeOptionResponse("GRV", "Gravel"));
+    assertThat(codes.curbTypes()).containsExactly(new CodeOptionResponse("TMB", "Timber"));
+    assertThat(codes.abutments()).containsExactly(new CodeOptionResponse("CON", "Concrete"));
   }
 
   @Test

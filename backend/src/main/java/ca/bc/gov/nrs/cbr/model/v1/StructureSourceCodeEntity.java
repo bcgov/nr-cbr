@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -15,8 +16,8 @@ import org.hibernate.annotations.Immutable;
 /**
  * {@code THE.STRUCTURE_SOURCE_CODE} — Where a structure's record came from.
  *
- * <p>Read only to decode a stored code on the structure page; the code and its description are all
- * that page needs.
+ * <p>Decodes a stored code on the structure page, and lists the current ones for the Details tab's
+ * Structure card edit.
  */
 @Entity
 @Immutable
@@ -35,4 +36,10 @@ public class StructureSourceCodeEntity {
 
   @Column(name = "DESCRIPTION", length = 120)
   private String description;
+
+  @Column(name = "EFFECTIVE_DATE")
+  private LocalDateTime effectiveDate;
+
+  @Column(name = "EXPIRY_DATE")
+  private LocalDateTime expiryDate;
 }
