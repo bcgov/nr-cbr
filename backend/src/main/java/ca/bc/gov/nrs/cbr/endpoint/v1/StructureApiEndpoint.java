@@ -27,6 +27,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.ReplacementRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureNameSuggestion;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
@@ -157,6 +158,18 @@ public interface StructureApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/spans-and-piers")
   StructureSpansAndPiersResponse getSpansAndPiers(@PathVariable("structureId") long structureId);
+
+  /**
+   * Adds a structure to a site — Add Structure, reached from Site Detail.
+   *
+   * <p>Gated on {@link CbrAuthorities#DESTRUCTIVE} — Level 2 and up: legacy showed the button at
+   * Level 1, but only Level 2 could type the Structure # it needs. <b>201</b> with the new
+   * structure's id; <b>400</b> with {@code fieldErrors} keyed by field ({@code structureName},
+   * {@code bridge.deckWidth}, {@code spans}, …).
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @PostMapping
+  ResponseEntity<CreatedResponse> createStructure(@RequestBody StructureCreateRequest request);
 
   /**
    * A site a structure might be moved to, as the Information tab's Edit previews it under Site #:

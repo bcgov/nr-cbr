@@ -24,7 +24,7 @@ const OutstandingSummary: FC<Props> = ({ total }) => {
       lowContrast
       hideCloseButton
       title={`Structure data is incomplete: ${total} ${items} outstanding`}
-      subtitle="The Details tab lists what is missing."
+      subtitle="The tab counts show where; each tab lists what is missing in it."
       data-testid="structure-outstanding-summary"
     />
   );

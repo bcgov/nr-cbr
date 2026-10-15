@@ -37,6 +37,7 @@ import TabCount from './TabCount';
 
 import './structureDetail.scss';
 
+import type { OutstandingSection } from './structureResponse';
 import type { CarbonIconType } from '@carbon/icons-react';
 import type { FC } from 'react';
 
@@ -94,6 +95,13 @@ const TAB_LABELS: Record<TabKey, { label: string; icon: CarbonIconType }> = {
   'monitoring': { label: 'Monitoring', icon: View },
 };
 
+/** The tabs that list outstanding items, and whose. */
+const TAB_SECTIONS: Partial<Record<TabKey, OutstandingSection>> = {
+  information: 'SITE',
+  details: 'DETAILS',
+  inspections: 'INSPECTIONS',
+};
+
 const StructureDetailPage: FC = () => {
   const { structureId } = useParams<{ structureId: string }>();
   const linkState = useLocation().state as StructureLinkState | null;
@@ -107,8 +115,13 @@ const StructureDetailPage: FC = () => {
 
   const structure = loaded.data;
   const name = structure?.structureName || linkState?.structureName || structureId || '';
-  const outstanding = groupOutstanding(structure?.outstanding ?? []);
-  const outstandingTotal = structure?.outstanding.length ?? 0;
+  const outstandingItems = structure?.outstanding ?? [];
+  const outstandingTotal = outstandingItems.length;
+  /** Each tab's items, grouped by the section they are in. */
+  const outstandingIn = (section: OutstandingSection) =>
+    groupOutstanding(outstandingItems, section);
+  const countIn = (section: OutstandingSection) =>
+    outstandingItems.filter((item) => item.section === section).length;
   // Legacy decides by the type/class, not by whether a bridge row exists (S:1404-1418).
   const bridge = BRIDGE_TYPE_CLASSES.has(structure?.typeClass.code ?? '');
   const tabs: TabKey[] = [
@@ -126,7 +139,6 @@ const StructureDetailPage: FC = () => {
     <Grid fullWidth className="default-grid structure-detail">
       <PageTitle
         title={`Structure ${name}`.trim()}
-        experimental
         breadCrumbs={
           // Back the way the user came: to the site from Display Structures, otherwise to the
           // search. State does not survive a new tab or a pasted link, which fall back to search.
@@ -204,10 +216,10 @@ const StructureDetailPage: FC = () => {
                     const { label, icon } = TAB_LABELS[key];
                     return (
                       <Tab key={key} renderIcon={icon} data-testid={`structure-tab-${key}`}>
-                        {key === 'details' ? (
+                        {TAB_SECTIONS[key] ? (
                           <span className="structure-detail__tab-label">
                             {label}
-                            <TabCount count={outstandingTotal} section="Details" />
+                            <TabCount count={countIn(TAB_SECTIONS[key])} section={label} />
                           </span>
                         ) : (
                           label
@@ -219,9 +231,11 @@ const StructureDetailPage: FC = () => {
                 <TabPanels>
                   {tabs.map((key) => (
                     <TabPanel key={key}>
-                      {key === 'information' && <InformationTab structure={structure} />}
+                      {key === 'information' && (
+                        <InformationTab structure={structure} outstanding={outstandingIn('SITE')} />
+                      )}
                       {key === 'details' && (
-                        <DetailsTab structure={structure} outstanding={outstanding} />
+                        <DetailsTab structure={structure} outstanding={outstandingIn('DETAILS')} />
                       )}
                       {key === 'spans-and-piers' && (
                         <SpansAndPiersTab
@@ -235,6 +249,7 @@ const StructureDetailPage: FC = () => {
                           structureId={structure.id}
                           opened={openedTabs.has('inspections')}
                           complete={outstandingTotal === 0}
+                          outstanding={outstandingIn('INSPECTIONS')}
                         />
                       )}
                       {key === 'repairs' && (

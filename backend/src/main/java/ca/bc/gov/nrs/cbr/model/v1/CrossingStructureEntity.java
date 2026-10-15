@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.model.v1;
 
+import ca.bc.gov.nrs.cbr.model.id.AssignableSequence;
 import jakarta.persistence.Column;
 import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
@@ -48,6 +49,7 @@ import lombok.ToString;
 public class CrossingStructureEntity {
 
   @Id
+  @AssignableSequence
   @Column(name = "CROSSING_STRUCTURE_ID")
   private Long crossingStructureId;
 
@@ -152,6 +154,17 @@ public class CrossingStructureEntity {
   /** Read by "Incomplete Data?" only. */
   @Column(name = "STRUCTURE_SOURCE_CODE", length = 10)
   private String structureSourceCode;
+
+  /** Who added the structure, and when — written once, by Add Structure. */
+  @Column(name = "ENTRY_USERID", length = 30, updatable = false)
+  private String entryUserid;
+
+  @Column(name = "ENTRY_TIMESTAMP", updatable = false)
+  private LocalDateTime entryTimestamp;
+
+  /** Legacy's Annual Inspection Required, which no screen sets since; always N on a new one. */
+  @Column(name = "ANNUAL_INSPECTION_REQ_IND", length = 1)
+  private String annualInspectionReqInd;
 
   /**
    * Who last changed the row, as {@code IDIR\jsmith}. Written by archiving — legacy passed back

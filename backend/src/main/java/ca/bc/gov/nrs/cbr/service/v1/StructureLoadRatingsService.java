@@ -148,26 +148,11 @@ public class StructureLoadRatingsService {
   public void updateDetails(long structureId, LoadRatingDetailsRequest request) {
     CrossingStructureEntity structure = structures.findById(structureId)
         .orElseThrow(() -> new StructureNotFoundException(structureId));
-    boolean level2 = loggedUser.canDestroy();
     Map<String, String> errors = new LinkedHashMap<>();
-
-    if (request.reviewRequired() == null) {
-      errors.put("reviewRequired", "Load Rating Review Required is required.");
-    }
+    Long design = validateDetails(errors, structure, request);
     String posting = trimmed(request.loadPostingSignsCode());
-    checkPostingSigns(errors, structure, posting, level2);
     String vehicle = trimmed(request.designVehicleCode());
-    boolean vehicleChanged = !Objects.equals(vehicle, trimmed(structure.getDesignVehicleLoadCode()));
-    if (vehicleChanged && !level2) {
-      errors.put("designVehicleCode", "Design Vehicle Configuration" + LEVEL_2_ONLY);
-    } else if (vehicleChanged && vehicle != null && !vehicles.existsById(vehicle)) {
-      errors.put("designVehicleCode", "Design Vehicle Configuration is not one of the listed values.");
-    }
     String comment = OTHER_VEHICLE.equals(vehicle) ? trimmed(request.designVehicleComment()) : null;
-    if (OTHER_VEHICLE.equals(vehicle)) {
-      checkVehicleComment(errors, structure, comment);
-    }
-    Long design = designRating(errors, structure, request, vehicle, vehicleChanged, level2);
     if (!errors.isEmpty()) {
       throw new FieldValidationException("Load rating details cannot be saved", errors);
     }
@@ -176,6 +161,31 @@ public class StructureLoadRatingsService {
         Boolean.TRUE.equals(request.reviewRequired()) ? YES : NO, vehicle, comment,
         design == null ? null : BigDecimal.valueOf(design), loggedUser.getLoggedUserId());
     log.info("Updated the load rating details of structure {}", structureId);
+  }
+
+  /**
+   * The section's rules, by role, against what the structure has stored — Add Structure passes an
+   * empty one, so every value given counts as a change. Returns the design load rating to save: a
+   * vehicle's fixed one when the vehicle changes, otherwise the one typed.
+   */
+  Long validateDetails(Map<String, String> errors, CrossingStructureEntity stored,
+      LoadRatingDetailsRequest request) {
+    boolean level2 = loggedUser.canDestroy();
+    if (request.reviewRequired() == null) {
+      errors.put("reviewRequired", "Load Rating Review Required is required.");
+    }
+    checkPostingSigns(errors, stored, trimmed(request.loadPostingSignsCode()), level2);
+    String vehicle = trimmed(request.designVehicleCode());
+    boolean vehicleChanged = !Objects.equals(vehicle, trimmed(stored.getDesignVehicleLoadCode()));
+    if (vehicleChanged && !level2) {
+      errors.put("designVehicleCode", "Design Vehicle Configuration" + LEVEL_2_ONLY);
+    } else if (vehicleChanged && vehicle != null && !vehicles.existsById(vehicle)) {
+      errors.put("designVehicleCode", "Design Vehicle Configuration is not one of the listed values.");
+    }
+    if (OTHER_VEHICLE.equals(vehicle)) {
+      checkVehicleComment(errors, stored, trimmed(request.designVehicleComment()));
+    }
+    return designRating(errors, stored, request, vehicle, vehicleChanged, level2);
   }
 
   /** Are Load Posting Signs Warranted?: required, a listed value, changed only at Level 2. */

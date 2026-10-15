@@ -45,6 +45,7 @@ vi.mock('@/routes/routePaths', () => ({
           id: 'Profile',
           path: 'profile',
           isMenuItem: true,
+          activeFor: ['user/:userId'],
         },
       ],
     },
@@ -130,6 +131,21 @@ describe('LayoutSideNav', () => {
     await renderWithProviders('/settings/profile');
     const profileLink = screen.getByText('Profile').closest('a');
     expect(profileLink).toHaveClass('cds--side-nav__link--current');
+  });
+
+  it('marks an entry active on a page that belongs to it, off the menu', async () => {
+    // A structure's page lights Structure Search, as Profile here is lit by a user's page.
+    await renderWithProviders('/settings/user/42');
+
+    expect(screen.getByText('Profile').closest('a')).toHaveClass('cds--side-nav__link--current');
+  });
+
+  it('marks nothing on a page no entry claims', async () => {
+    await renderWithProviders('/settings/elsewhere');
+
+    expect(screen.getByText('Profile').closest('a')).not.toHaveClass(
+      'cds--side-nav__link--current',
+    );
   });
 
   it('marks the SECTION active too, not just the child inside it', async () => {

@@ -25,6 +25,11 @@ type Props = {
    */
   hasBridgeRecord: boolean;
   onClose: () => void;
+  /**
+   * Hands the span to the page instead of saving it — Add Structure keeps its spans until the
+   * structure is saved. A number already on the list is refused here, as the server would.
+   */
+  onSubmit?: (request: SpanRequest) => void;
 };
 
 /** `SPAN_NUMBER NUMBER(5)`. */
@@ -72,7 +77,14 @@ const validate = (values: Values): Errors => {
  * message shows beside Length. A structure with no bridge record can take no span: the dialog says
  * so above its fields, which stay disabled, as it does if the server refuses for that reason.
  */
-const SpanDialog: FC<Props> = ({ structureId, span, spans, hasBridgeRecord, onClose }) => {
+const SpanDialog: FC<Props> = ({
+  structureId,
+  span,
+  spans,
+  hasBridgeRecord,
+  onClose,
+  onSubmit,
+}) => {
   const create = useCreateSpan(structureId);
   const update = useUpdateSpan(structureId);
   const adding = span === null;
@@ -85,8 +97,11 @@ const SpanDialog: FC<Props> = ({ structureId, span, spans, hasBridgeRecord, onCl
     lengthMetres: adding ? '' : number(span.lengthMetres),
   });
   // Checked as the values change; each shown once its field is left, or at Save.
+  const taken =
+    onSubmit !== undefined &&
+    spans.some((each) => each !== span && String(each.number) === values.number.trim());
   const form = useFieldErrors<keyof Values>(
-    validate(values),
+    { ...validate(values), ...(taken ? { number: 'Span Number already exists.' } : {}) },
     adding ? create.fieldErrors : update.fieldErrors,
   );
   const shown: Errors = form.shown;
@@ -104,6 +119,11 @@ const SpanDialog: FC<Props> = ({ structureId, span, spans, hasBridgeRecord, onCl
       number: Number(values.number.trim()),
       lengthMetres: Number(values.lengthMetres.trim()),
     };
+    if (onSubmit) {
+      onSubmit(request);
+      onClose();
+      return;
+    }
     const done = (verb: string) => () => {
       display({ kind: 'success', title: `Span ${request.number} ${verb}`, timeout: 4000 });
       onClose();

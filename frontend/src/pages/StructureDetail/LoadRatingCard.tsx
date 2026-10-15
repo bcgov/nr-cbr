@@ -2,10 +2,6 @@ import { Add, Edit, Scales, TrashCan } from '@carbon/icons-react';
 import {
   Button,
   Checkbox,
-  RadioButton,
-  RadioButtonGroup,
-  Select,
-  SelectItem,
   Table,
   TableBody,
   TableCell,
@@ -13,27 +9,26 @@ import {
   TableHeader,
   TableRow,
   Tag,
-  TextArea,
-  TextInput,
 } from '@carbon/react';
 import { useState } from 'react';
 
 import DestructiveModal from '@/components/core/DestructiveModal';
-import FieldWithCounter from '@/components/core/FieldWithCounter';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
-import { requiredLabel } from '@/utils/requiredLabel';
 
 import Card from './Card';
 import CodeWithOther from './CodeWithOther';
 import { describe, number, yesNo } from './format';
 import LoadRatingDialog from './LoadRatingDialog';
+import LoadRatingFields from './LoadRatingFields';
+import {
+  designRatingOf,
+  loadRatingErrorsOf,
+  toLoadRatingRequest,
+  type LoadRatingValues,
+} from './loadRatingRules';
 
-import type {
-  LoadRatingDetails,
-  LoadRatingDetailsRequest,
-  LoadRatingEntry,
-} from './structureResponse';
-import type { ChangeEvent, FC } from 'react';
+import type { LoadRatingDetails, LoadRatingEntry } from './structureResponse';
+import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
@@ -42,14 +37,6 @@ import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useDeleteLoadRating, useUpdateLoadRatingDetails } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
-import { byteLength, overLimitError } from '@/utils/textLimits';
-
-/** The vehicle that needs words. */
-const OTHER_VEHICLE = 'OTHER';
-/** `DESIGN_LOAD_RATING NUMBER(6)`. */
-const RATING_MAX = 999_999;
-/** `DESIGN_VEHICLE_CMT VARCHAR2(2000)`. */
-const TEXT_MAX = 2000;
 
 /**
  * Whether a load rating predates the superstructure — legacy hides those unless asked
@@ -57,80 +44,6 @@ const TEXT_MAX = 2000;
  */
 const beforeInstall = (entry: LoadRatingEntry, yearBuilt: number | null): boolean =>
   yearBuilt !== null && entry.date !== null && entry.date < `${yearBuilt}-01-01`;
-
-/**
- * Legacy's advice on Load Rating Review Required (`StructureAction.java:716-738`), which never
- * stopped its save: an error when there is no rating and no review asked for, a warning when there
- * is a rating and a review is still asked for.
- */
-const reviewAdvice = (reviewRequired: boolean, hasRatings: boolean) => {
-  if (!reviewRequired && !hasRatings) {
-    return {
-      invalid: true,
-      invalidText: 'Required field: with no load rating, a review should be required.',
-    };
-  }
-  if (reviewRequired && hasRatings) {
-    return {
-      warn: true,
-      warnText: 'Load rating review is required although a rating is recorded.',
-    };
-  }
-  return {};
-};
-
-type Values = {
-  loadPostingSignsCode: string;
-  reviewRequired: boolean;
-  designVehicleCode: string;
-  designVehicleComment: string;
-  designLoadRating: string;
-};
-type Field = keyof Values;
-
-/**
- * The design load rating a chosen vehicle fixes: its own when the vehicle was just chosen, the one
- * stored when it is the vehicle the structure had; null when the vehicle fixes none.
- */
-const fixedRating = (
-  chosen: { designLoadRating: number | null } | undefined,
-  vehicleChanged: boolean,
-  stored: number | null,
-): number | null => {
-  const own = chosen?.designLoadRating ?? null;
-  if (own === null) return null;
-  return vehicleChanged ? own : stored;
-};
-
-/** A typed design load rating's error: a whole number from 1 up to the column's limit. */
-const typedRatingError = (typed: string): string | undefined => {
-  if (!/^\d+$/.test(typed) || Number(typed) > RATING_MAX) {
-    return `Original Design Load Rating must be a whole number up to ${RATING_MAX}.`;
-  }
-  return Number(typed) < 1
-    ? 'Original Design Load Rating GVW (tonnes) must be greater than or equal to 1.'
-    : undefined;
-};
-
-/** The section's blocking rules, checked as the values change. */
-const detailsErrorsOf = (
-  values: Values,
-  other: boolean,
-  typedRating: boolean,
-): Partial<Record<Field, string>> => {
-  const errors: Partial<Record<Field, string>> = {};
-  if (!values.loadPostingSignsCode) {
-    errors.loadPostingSignsCode = 'Are Load Posting Signs Warranted? is required.';
-  }
-  if (other) {
-    errors.designVehicleComment = values.designVehicleComment.trim()
-      ? overLimitError(values.designVehicleComment, TEXT_MAX) || undefined
-      : 'Design Vehicle Configuration Details is required.';
-  }
-  const typed = values.designLoadRating.trim();
-  if (typedRating && typed) errors.designLoadRating = typedRatingError(typed);
-  return errors;
-};
 
 /**
  * The section's four fields as a form, in place of the view, every field where the view has it.
@@ -145,49 +58,38 @@ const DetailsForm: FC<{
   loadRating: LoadRatingDetails;
   onDone: () => void;
 }> = ({ structureId, loadRating, onDone }) => {
-  const { canDelete: level2, isPeng } = useAuthorization();
   const codes = useLoadRatingCodes();
   const update = useUpdateLoadRatingDetails(structureId);
   const { display } = useNotification();
 
-  const [values, setValues] = useState<Values>({
+  const [values, setValues] = useState<LoadRatingValues>({
     loadPostingSignsCode: loadRating.loadPostingSigns.code ?? '',
     reviewRequired: loadRating.reviewRequired,
     designVehicleCode: loadRating.designVehicle.code ?? '',
     designVehicleComment: loadRating.designVehicleComment ?? '',
     designLoadRating: number(loadRating.designLoadRating),
   });
-  const vehicles = codes.data?.designVehicles ?? [];
-  const chosen = vehicles.find((vehicle) => vehicle.code === values.designVehicleCode);
-  // Choosing a vehicle that fixes the design rating sets it; one left as it was keeps the rating
-  // stored, as legacy's page. A vehicle that fixes none leaves it to be typed.
-  const vehicleChanged = values.designVehicleCode !== (loadRating.designVehicle.code ?? '');
-  const fixed = fixedRating(chosen, vehicleChanged, loadRating.designLoadRating);
-  const typedRating = (chosen?.designLoadRating ?? null) === null;
-  const other = values.designVehicleCode === OTHER_VEHICLE;
+  const design = designRatingOf(
+    values,
+    codes.data?.designVehicles ?? [],
+    loadRating.designVehicle.code ?? '',
+    loadRating.designLoadRating,
+  );
 
   // Checked as the values change; each shown once its field is left, or at Save.
-  const form = useFieldErrors<Field>(
-    detailsErrorsOf(values, other, typedRating),
+  const form = useFieldErrors<keyof LoadRatingValues>(
+    loadRatingErrorsOf(values, design),
     update.fieldErrors,
   );
-  const shown = form.shown;
 
-  const change = <K extends Field>(field: K, value: Values[K]) => {
+  const change = <K extends keyof LoadRatingValues>(field: K, value: LoadRatingValues[K]) => {
     setValues((current) => ({ ...current, [field]: value }));
     form.change(field);
   };
 
   const save = () => {
     if (!form.submit()) return;
-    const typed = values.designLoadRating.trim();
-    const typedValue = typed ? Number(typed) : null;
-    const request: LoadRatingDetailsRequest = {
-      ...values,
-      designVehicleComment: other ? values.designVehicleComment : '',
-      designLoadRating: typedRating ? typedValue : fixed,
-    };
-    update.mutate(request, {
+    update.mutate(toLoadRatingRequest(values, design), {
       onSuccess: () => {
         display({ kind: 'success', title: 'Load rating details saved', timeout: 4000 });
         onDone();
@@ -205,120 +107,26 @@ const DetailsForm: FC<{
     });
   };
 
-  const hasRatings = loadRating.history.some((entry) => entry.rating !== null);
-
   return (
     <div className="structure-detail__edit" data-testid="load-rating-details-form">
-      <div className="structure-detail__fields">
-        <ReadOnlyField
-          label="Current Load Rating GVW (tonnes)"
-          value={number(loadRating.currentRating)}
-        />
-        {/* Set from the vehicle when it fixes one; typed, at Level 2, when it does not. */}
-        {!typedRating || !level2 ? (
+      <LoadRatingFields
+        values={values}
+        shown={form.shown}
+        change={change}
+        leave={form.leave}
+        design={design}
+        hasRatings={loadRating.history.some((entry) => entry.rating !== null)}
+        stored={{
+          loadPostingSigns: loadRating.loadPostingSigns,
+          designVehicle: loadRating.designVehicle,
+        }}
+        leading={
           <ReadOnlyField
-            label="Original Design Load Rating GVW (tonnes)"
-            value={typedRating ? values.designLoadRating : number(fixed)}
+            label="Current Load Rating GVW (tonnes)"
+            value={number(loadRating.currentRating)}
           />
-        ) : (
-          <TextInput
-            id="load-rating-design"
-            data-testid="load-rating-design"
-            labelText="Original Design Load Rating GVW (tonnes)"
-            inputMode="numeric"
-            maxLength={6}
-            value={values.designLoadRating}
-            invalid={Boolean(shown.designLoadRating)}
-            invalidText={shown.designLoadRating}
-            onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              change('designLoadRating', event.target.value)
-            }
-            onBlur={() => form.leave('designLoadRating')}
-          />
-        )}
-        {level2 ? (
-          <Select
-            id="load-rating-posting"
-            data-testid="load-rating-posting"
-            labelText={requiredLabel('Are Load Posting Signs Warranted?', true)}
-            value={values.loadPostingSignsCode}
-            disabled={codes.isLoading}
-            invalid={Boolean(shown.loadPostingSignsCode)}
-            invalidText={shown.loadPostingSignsCode}
-            onChange={(event) => change('loadPostingSignsCode', event.target.value)}
-            onBlur={() => form.leave('loadPostingSignsCode')}
-          >
-            <SelectItem value="" text="Choose an answer" />
-            {(codes.data?.loadPostingSigns ?? []).map((option) => (
-              <SelectItem key={option.code} value={option.code} text={option.description} />
-            ))}
-          </Select>
-        ) : (
-          <ReadOnlyField
-            label="Are Load Posting Signs Warranted?"
-            value={describe(loadRating.loadPostingSigns)}
-          />
-        )}
-        <RadioButtonGroup
-          name="load-rating-review"
-          legendText={requiredLabel('Load Rating Review Required', true)}
-          valueSelected={values.reviewRequired ? 'Y' : 'N'}
-          onChange={(selected) => change('reviewRequired', selected === 'Y')}
-          {...reviewAdvice(values.reviewRequired, hasRatings)}
-        >
-          <RadioButton id="load-rating-review-yes" labelText="Yes" value="Y" />
-          <RadioButton id="load-rating-review-no" labelText="No" value="N" />
-        </RadioButtonGroup>
-        {level2 ? (
-          <Select
-            id="load-rating-vehicle"
-            data-testid="load-rating-vehicle"
-            labelText="Design Vehicle Configuration"
-            value={values.designVehicleCode}
-            disabled={codes.isLoading}
-            invalid={Boolean(shown.designVehicleCode)}
-            invalidText={shown.designVehicleCode}
-            onChange={(event) => change('designVehicleCode', event.target.value)}
-            onBlur={() => form.leave('designVehicleCode')}
-          >
-            <SelectItem value="" text="None" />
-            {vehicles.map((option) => (
-              <SelectItem key={option.code} value={option.code} text={option.description} />
-            ))}
-          </Select>
-        ) : (
-          <ReadOnlyField
-            label="Design Vehicle Configuration"
-            value={describe(loadRating.designVehicle)}
-          />
-        )}
-        {other &&
-          (isPeng ? (
-            <FieldWithCounter used={byteLength(values.designVehicleComment)} limit={TEXT_MAX}>
-              <TextArea
-                id="load-rating-vehicle-comment"
-                data-testid="load-rating-vehicle-comment"
-                labelText={requiredLabel('If Other, please specify', true)}
-                rows={2}
-                value={values.designVehicleComment}
-                invalid={Boolean(shown.designVehicleComment)}
-                invalidText={shown.designVehicleComment}
-                onChange={(event) => change('designVehicleComment', event.target.value)}
-                onBlur={() => form.leave('designVehicleComment')}
-              />
-            </FieldWithCounter>
-          ) : (
-            // A P.Eng's words, as legacy: shown, and their absence refused on Save.
-            <div>
-              <ReadOnlyField label="If Other, please specify" value={values.designVehicleComment} />
-              {shown.designVehicleComment && (
-                <p className="structure-detail__upload-error" role="alert">
-                  {shown.designVehicleComment} Only a P.Eng can enter them.
-                </p>
-              )}
-            </div>
-          ))}
-      </div>
+        }
+      />
 
       {/* The form's actions: small, at the right, under the fields. */}
       <div className="structure-detail__edit-actions">

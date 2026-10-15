@@ -1,3 +1,5 @@
+import type { InspectionScheduleRequest } from './inspectionsResponse';
+import type { PierRequest, SpanRequest } from './spansAndPiersResponse';
 /**
  * What `GET /api/v1/structures/{structureId}` answers with — the structure page's header and its
  * Details tab.
@@ -27,6 +29,8 @@ export type OutstandingSection = 'SITE' | 'DETAILS' | 'INSPECTIONS';
  */
 export type OutstandingItem = {
   section: OutstandingSection;
+  /** The section (card) on that tab where the field is: "Replacement Details", "Bridge". */
+  card: string;
   /** What is missing, as the user reads it: "Deck Width", "Estimated Load Restriction (year)". */
   label: string;
 };
@@ -272,4 +276,25 @@ export type CulvertDetailsRequest = {
   openingWidthMm: number | null;
   headwallLocationCode: string;
   openBottomCode: string;
+};
+
+/**
+ * A new structure — Add Structure, the backend's `StructureCreateRequest`. Its sections are the
+ * structure page's own requests.
+ */
+export type StructureCreateRequest = {
+  structureName: string;
+  siteId: string;
+  /** PB or TB (a bridge), CUL or WLC (a culvert). */
+  typeClassCode: string;
+  details: StructureDetailsRequest;
+  bridge: BridgeDetailsRequest | null;
+  culvert: CulvertDetailsRequest | null;
+  spans: SpanRequest[];
+  piers: PierRequest[];
+  loadRating: LoadRatingDetailsRequest;
+  /** A P.Eng's; null for anyone else. */
+  replacement: ReplacementDetailsRequest | null;
+  schedule: InspectionScheduleRequest;
+  comment: string;
 };

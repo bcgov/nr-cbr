@@ -1,39 +1,30 @@
 import { Edit, Pipelines } from '@carbon/icons-react';
-import {
-  Button,
-  RadioButton,
-  RadioButtonGroup,
-  Select,
-  SelectItem,
-  TextArea,
-  TextInput,
-} from '@carbon/react';
+import { Button } from '@carbon/react';
 import { useState } from 'react';
 
-import FieldWithCounter from '@/components/core/FieldWithCounter';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
-import { requiredLabel } from '@/utils/requiredLabel';
 
 import Card from './Card';
 import CodeWithOther from './CodeWithOther';
+import CulvertFields from './CulvertFields';
+import {
+  culvertErrorsOf,
+  culvertWarningsOf,
+  toCulvertRequest,
+  type CulvertStored,
+  type CulvertValues,
+} from './culvertRules';
+import { blankToEmpty } from './formFields';
 import { describe, number } from './format';
 
-import type { CodeValue, CulvertDetails, CulvertDetailsRequest } from './structureResponse';
-import type { CodeOption } from '@/types/configuration';
-import type { ChangeEvent, FC, ReactNode } from 'react';
+import type { CulvertDetails } from './structureResponse';
+import type { FC, ReactNode } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
-import { useCulvertCodes } from '@/hooks/useConfiguration';
 import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useUpdateCulvertDetails } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
-import { byteLength, overLimitError } from '@/utils/textLimits';
-
-const OPEN_BOTTOM = 'OPN';
-const OTHER = 'OTH';
-/** `CULVERT_MATERIAL_COMMENT VARCHAR2(2000)`. */
-const TEXT_MAX = 2000;
 
 /** The culvert's own fields, as the card shows them. Wood log culverts have no type or open bottom. */
 const CulvertView: FC<{ culvert: CulvertDetails; woodLog: boolean; identity: ReactNode }> = ({
@@ -73,173 +64,6 @@ const CulvertView: FC<{ culvert: CulvertDetails; woodLog: boolean; identity: Rea
   </div>
 );
 
-/** The form's values as typed: the numbers are text until saved. */
-type Values = {
-  portable: boolean;
-  culvertNumber: string;
-  lengthMetres: string;
-  gradient: string;
-  culvertTypeCode: string;
-  materialCode: string;
-  materialComment: string;
-  inletCoverDepthMm: string;
-  outletCoverDepthMm: string;
-  openingHeightMm: string;
-  openingWidthMm: string;
-  headwallLocationCode: string;
-  openBottomCode: string;
-};
-type Field = keyof Values;
-type Messages = Partial<Record<Field, string>>;
-type NumberField =
-  | 'culvertNumber'
-  | 'lengthMetres'
-  | 'gradient'
-  | 'inletCoverDepthMm'
-  | 'outletCoverDepthMm'
-  | 'openingHeightMm'
-  | 'openingWidthMm';
-
-/** How each number is typed and what its column holds. */
-const NUMBERS: Record<
-  NumberField,
-  { label: string; pattern: RegExp; max: number; format: string }
-> = {
-  culvertNumber: {
-    label: 'Culvert Number',
-    pattern: /^\d+$/,
-    max: 99_999,
-    format: 'a whole number',
-  },
-  lengthMetres: {
-    label: 'Culvert Length',
-    pattern: /^\d+(\.\d?)?$/,
-    max: 99_999.9,
-    format: 'metres, with up to 1 decimal place',
-  },
-  gradient: {
-    label: 'Gradient',
-    pattern: /^-?\d+(\.\d?)?$/,
-    max: 999.9,
-    format: 'a number with up to 1 decimal place',
-  },
-  inletCoverDepthMm: {
-    label: 'Inlet Cover Depth',
-    pattern: /^\d+$/,
-    max: 9_999_999_999,
-    format: 'whole millimetres',
-  },
-  outletCoverDepthMm: {
-    label: 'Outlet Cover Depth',
-    pattern: /^\d+$/,
-    max: 9_999_999_999,
-    format: 'whole millimetres',
-  },
-  openingHeightMm: {
-    label: 'Opening Height',
-    pattern: /^\d+$/,
-    max: 9_999_999_999,
-    format: 'whole millimetres',
-  },
-  openingWidthMm: {
-    label: 'Opening Width',
-    pattern: /^\d+$/,
-    max: 9_999_999_999,
-    format: 'whole millimetres',
-  },
-};
-
-/** A typed number, null when blank, or NaN when it is not as the field takes it. */
-const toNumber = (field: NumberField, typed: string): number | null => {
-  const trimmed = typed.trim();
-  if (!trimmed) return null;
-  const { pattern, max } = NUMBERS[field];
-  return pattern.test(trimmed) && Math.abs(Number(trimmed)) <= max ? Number(trimmed) : Number.NaN;
-};
-
-/** What was stored, so a field that had a value is required (legacy's tier rule). */
-type Stored = Partial<Record<Field, boolean>>;
-
-/** The numbers: required once stored, and as their columns hold them. */
-const numberErrors = (values: Values, stored: Stored): Messages => {
-  const errors: Messages = {};
-  for (const field of Object.keys(NUMBERS) as NumberField[]) {
-    const value = toNumber(field, values[field]);
-    const { label, format } = NUMBERS[field];
-    if (value === null && stored[field]) errors[field] = `${label} is required.`;
-    else if (Number.isNaN(value))
-      errors[field] = `${label} must be ${format}, as the column holds.`;
-  }
-  return errors;
-};
-
-/** Culvert Type, once stored, and Open Bottom Substructure for an open-bottom culvert. */
-const typeErrors = (values: Values, stored: Stored): Messages => {
-  const errors: Messages = {};
-  if (!values.culvertTypeCode && stored.culvertTypeCode) {
-    errors.culvertTypeCode = 'Culvert Type is required.';
-  }
-  if (values.culvertTypeCode === OPEN_BOTTOM && !values.openBottomCode) {
-    errors.openBottomCode = 'Open Bottom Substructure is required for an open-bottom culvert.';
-  }
-  return errors;
-};
-
-/** Culvert Material, once stored, and an Other's details. */
-const materialErrors = (values: Values, stored: Stored): Messages => {
-  const errors: Messages = {};
-  if (!values.materialCode && stored.materialCode) {
-    errors.materialCode = 'Culvert Material is required.';
-  }
-  if (values.materialCode === OTHER) {
-    errors.materialComment = values.materialComment.trim()
-      ? overLimitError(values.materialComment, TEXT_MAX) || undefined
-      : 'Culvert Details is required.';
-  }
-  return errors;
-};
-
-/** The form's blocking rules — the server's, checked as the values change. */
-const errorsOf = (values: Values, stored: Stored, woodLog: boolean): Messages => ({
-  ...numberErrors(values, stored),
-  // A Wood Log Culvert has no Culvert Type or Open Bottom Substructure.
-  ...(woodLog ? {} : typeErrors(values, stored)),
-  ...materialErrors(values, stored),
-});
-
-/** Legacy's range warnings (`Culvert.validate`), shown as typed; they never stopped its save. */
-const RANGES: Partial<Record<NumberField, [number, number]>> = {
-  culvertNumber: [1, 10],
-  lengthMetres: [5, 100],
-  gradient: [0, 20],
-  inletCoverDepthMm: [300, 5_000],
-  outletCoverDepthMm: [300, 5_000],
-  openingHeightMm: [300, 3_000],
-  openingWidthMm: [300, 6_000],
-};
-
-const warningsOf = (values: Values): Messages => {
-  const warnings: Messages = {};
-  for (const [field, [low, high]] of Object.entries(RANGES) as [NumberField, [number, number]][]) {
-    const value = toNumber(field, values[field]);
-    if (value !== null && !Number.isNaN(value) && (value < low || value > high)) {
-      warnings[field] =
-        `${NUMBERS[field].label} is not in the range ${low.toLocaleString()} through ${high.toLocaleString()}.`;
-    }
-  }
-  return warnings;
-};
-
-/** The current codes, with the culvert's own first when it has since expired. */
-const withStored = (listed: CodeOption[] | undefined, stored: CodeValue): CodeOption[] => {
-  const options = listed ?? [];
-  return stored.code && !options.some((option) => option.code === stored.code)
-    ? [{ code: stored.code, description: stored.description ?? stored.code }, ...options]
-    : options;
-};
-
-const blankToEmpty = (value: number | null) => (value === null ? '' : String(value));
-
 type FormProps = {
   structureId: string;
   culvert: CulvertDetails;
@@ -263,10 +87,9 @@ const CulvertForm: FC<FormProps> = ({
   typeClass,
   onDone,
 }) => {
-  const codes = useCulvertCodes();
   const update = useUpdateCulvertDetails(structureId);
   const { display } = useNotification();
-  const [values, setValues] = useState<Values>({
+  const [values, setValues] = useState<CulvertValues>({
     portable,
     culvertNumber: blankToEmpty(culvert.culvertNumber),
     lengthMetres: blankToEmpty(culvert.lengthMetres),
@@ -282,7 +105,7 @@ const CulvertForm: FC<FormProps> = ({
     openBottomCode: culvert.openBottomSubstructure.code ?? '',
   });
   // Legacy's tier rule: required once the culvert has one.
-  const stored: Stored = {
+  const stored: CulvertStored = {
     culvertNumber: culvert.culvertNumber !== null,
     lengthMetres: culvert.lengthMetres !== null,
     openingHeightMm: culvert.openingHeightMm !== null,
@@ -290,28 +113,19 @@ const CulvertForm: FC<FormProps> = ({
     culvertTypeCode: Boolean(culvert.culvertType.code),
     materialCode: Boolean(culvert.material.code),
   };
-  const form = useFieldErrors<Field>(errorsOf(values, stored, woodLog), update.fieldErrors);
-  const shown = form.shown;
-  const warnings = warningsOf(values);
+  const form = useFieldErrors<keyof CulvertValues>(
+    culvertErrorsOf(values, stored, woodLog),
+    update.fieldErrors,
+  );
 
-  const change = <K extends Field>(field: K, value: Values[K]) => {
+  const change = <K extends keyof CulvertValues>(field: K, value: CulvertValues[K]) => {
     setValues((current) => ({ ...current, [field]: value }));
     form.change(field);
   };
 
   const save = () => {
     if (!form.submit()) return;
-    const request: CulvertDetailsRequest = {
-      ...values,
-      culvertNumber: toNumber('culvertNumber', values.culvertNumber),
-      lengthMetres: toNumber('lengthMetres', values.lengthMetres),
-      gradient: toNumber('gradient', values.gradient),
-      inletCoverDepthMm: toNumber('inletCoverDepthMm', values.inletCoverDepthMm),
-      outletCoverDepthMm: toNumber('outletCoverDepthMm', values.outletCoverDepthMm),
-      openingHeightMm: toNumber('openingHeightMm', values.openingHeightMm),
-      openingWidthMm: toNumber('openingWidthMm', values.openingWidthMm),
-    };
-    update.mutate(request, {
+    update.mutate(toCulvertRequest(values), {
       onSuccess: () => {
         display({ kind: 'success', title: 'Culvert details saved', timeout: 4000 });
         onDone();
@@ -329,104 +143,24 @@ const CulvertForm: FC<FormProps> = ({
     });
   };
 
-  const numberBox = (field: NumberField, label: string, maxLength: number) => (
-    <TextInput
-      id={`culvert-${field}`}
-      data-testid={`culvert-${field}`}
-      labelText={requiredLabel(label, Boolean(stored[field]))}
-      inputMode={field === 'gradient' || field === 'lengthMetres' ? 'decimal' : 'numeric'}
-      maxLength={maxLength}
-      value={values[field]}
-      invalid={Boolean(shown[field])}
-      invalidText={shown[field]}
-      warn={!shown[field] && Boolean(warnings[field])}
-      warnText={warnings[field]}
-      onChange={(event: ChangeEvent<HTMLInputElement>) => change(field, event.target.value)}
-      onBlur={() => form.leave(field)}
-    />
-  );
-
-  const select = (
-    field: 'culvertTypeCode' | 'materialCode' | 'headwallLocationCode' | 'openBottomCode',
-    label: ReactNode,
-    options: CodeOption[],
-  ) => (
-    <Select
-      id={`culvert-${field}`}
-      data-testid={`culvert-${field}`}
-      labelText={label}
-      value={values[field]}
-      disabled={codes.isLoading}
-      invalid={Boolean(shown[field])}
-      invalidText={shown[field]}
-      onChange={(event) => change(field, event.target.value)}
-      onBlur={() => form.leave(field)}
-    >
-      <SelectItem value="" text="None" />
-      {options.map((option) => (
-        <SelectItem key={option.code} value={option.code} text={option.description} />
-      ))}
-    </Select>
-  );
-
   return (
     <div className="structure-detail__edit" data-testid="culvert-details-form">
-      <div className="structure-detail__fields">
-        {typeClass}
-        <RadioButtonGroup
-          name="culvert-portable"
-          legendText={requiredLabel('Portable Structure?', true)}
-          valueSelected={values.portable ? 'Y' : 'N'}
-          onChange={(selected) => change('portable', selected === 'Y')}
-        >
-          <RadioButton id="culvert-portable-yes" labelText="Yes" value="Y" />
-          <RadioButton id="culvert-portable-no" labelText="No" value="N" />
-        </RadioButtonGroup>
-        {numberBox('culvertNumber', 'Culvert Number', 5)}
-        {numberBox('lengthMetres', 'Culvert Length (metres)', 7)}
-        {numberBox('gradient', 'Gradient', 6)}
-        {!woodLog &&
-          select(
-            'culvertTypeCode',
-            requiredLabel('Culvert Type', Boolean(stored.culvertTypeCode)),
-            withStored(codes.data?.culvertTypes, culvert.culvertType),
-          )}
-        {select(
-          'materialCode',
-          requiredLabel('Culvert Material', Boolean(stored.materialCode)),
-          withStored(codes.data?.materials, culvert.material),
-        )}
-        {values.materialCode === OTHER && (
-          <FieldWithCounter used={byteLength(values.materialComment)} limit={TEXT_MAX}>
-            <TextArea
-              id="culvert-materialComment"
-              data-testid="culvert-materialComment"
-              labelText={requiredLabel('If Other, please specify', true)}
-              rows={2}
-              value={values.materialComment}
-              invalid={Boolean(shown.materialComment)}
-              invalidText={shown.materialComment}
-              onChange={(event) => change('materialComment', event.target.value)}
-              onBlur={() => form.leave('materialComment')}
-            />
-          </FieldWithCounter>
-        )}
-        {numberBox('inletCoverDepthMm', 'Inlet Cover Depth (mm)', 10)}
-        {numberBox('outletCoverDepthMm', 'Outlet Cover Depth (mm)', 10)}
-        {numberBox('openingHeightMm', 'Opening Height (mm)', 10)}
-        {numberBox('openingWidthMm', 'Opening Width (mm)', 10)}
-        {select(
-          'headwallLocationCode',
-          'Headwall Location',
-          withStored(codes.data?.headwallLocations, culvert.headwallLocation),
-        )}
-        {!woodLog &&
-          select(
-            'openBottomCode',
-            requiredLabel('Open Bottom Substructure', values.culvertTypeCode === OPEN_BOTTOM),
-            withStored(codes.data?.openBottomSubstructures, culvert.openBottomSubstructure),
-          )}
-      </div>
+      <CulvertFields
+        values={values}
+        shown={form.shown}
+        warnings={culvertWarningsOf(values)}
+        change={change}
+        leave={form.leave}
+        stored={stored}
+        woodLog={woodLog}
+        storedCodes={{
+          culvertType: culvert.culvertType,
+          material: culvert.material,
+          headwallLocation: culvert.headwallLocation,
+          openBottomSubstructure: culvert.openBottomSubstructure,
+        }}
+        leading={typeClass}
+      />
 
       {/* The form's actions: small, at the right, under the fields. */}
       <div className="structure-detail__edit-actions">

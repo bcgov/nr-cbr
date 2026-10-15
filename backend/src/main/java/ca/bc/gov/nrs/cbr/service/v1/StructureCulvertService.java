@@ -132,23 +132,14 @@ public class StructureCulvertService {
     boolean woodLog = WOOD_LOG.equals(structure.getStructureTypeClassCode());
 
     Map<String, String> errors = new LinkedHashMap<>();
-    if (request.portable() == null) {
-      errors.put("portable", "Portable Structure" + IS_REQUIRED);
-    }
-    checkMeasurements(errors, culvert, request);
+    validate(errors, culvert, request, woodLog);
     String type = woodLog ? WOOD_LOG_TYPE : trimmed(request.culvertTypeCode());
     String openBottom = woodLog
         ? culvert.getOpnBtomClvrtSubstrctreCode()
         : trimmed(request.openBottomCode());
-    if (!woodLog) {
-      checkTypeAndOpenBottom(errors, culvert, type, openBottom);
-    }
     String material = trimmed(request.materialCode());
     String materialComment = OTHER.equals(material) ? trimmed(request.materialComment()) : null;
-    checkMaterial(errors, culvert, material, materialComment);
     String headwall = trimmed(request.headwallLocationCode());
-    checkCode(errors, "headwallLocationCode", "Headwall Location", headwall,
-        culvert.getHeadwallLocationCode(), false, headwalls::existsById);
     if (!errors.isEmpty()) {
       throw new FieldValidationException("Culvert details cannot be saved", errors);
     }
@@ -171,6 +162,29 @@ public class StructureCulvertService {
         .opnBtomClvrtSubstrctreCode(openBottom)
         .build());
     log.info("Updated the culvert details of structure {}", structureId);
+  }
+
+  /**
+   * The Culvert card's rules, against what the culvert has stored — Add Structure passes an empty
+   * one, so nothing is "required once it has a value". A Wood Log Culvert has no Culvert Type or
+   * Open Bottom Substructure to check.
+   */
+  void validate(Map<String, String> errors, ForestServiceCulvertEntity stored,
+      CulvertDetailsRequest request, boolean woodLog) {
+    if (request.portable() == null) {
+      errors.put("portable", "Portable Structure" + IS_REQUIRED);
+    }
+    checkMeasurements(errors, stored, request);
+    if (!woodLog) {
+      checkTypeAndOpenBottom(errors, stored, trimmed(request.culvertTypeCode()),
+          trimmed(request.openBottomCode()));
+    }
+    String material = trimmed(request.materialCode());
+    checkMaterial(errors, stored, material,
+        OTHER.equals(material) ? trimmed(request.materialComment()) : null);
+    checkCode(errors, "headwallLocationCode", "Headwall Location",
+        trimmed(request.headwallLocationCode()), stored.getHeadwallLocationCode(), false,
+        headwalls::existsById);
   }
 
   /** Culvert Number, the length and gradient, and the depths and openings. */

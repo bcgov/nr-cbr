@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.model.v1;
 
+import ca.bc.gov.nrs.cbr.model.id.AssignableSequence;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -33,6 +34,7 @@ import lombok.ToString;
 public class ForestServiceBridgeEntity {
 
   @Id
+  @AssignableSequence
   @Column(name = "FOREST_SERVICE_BRIDGE_ID")
   private Long forestServiceBridgeId;
 

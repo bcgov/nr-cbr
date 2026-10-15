@@ -26,6 +26,11 @@ type Props = {
   /** Whether the structure has its `FOREST_SERVICE_BRIDGE` row, which piers hang from. */
   hasBridgeRecord: boolean;
   onClose: () => void;
+  /**
+   * Hands the pier to the page instead of saving it — Add Structure keeps its piers until the
+   * structure is saved. A number already on the list is refused here, as the server would.
+   */
+  onSubmit?: (request: PierRequest) => void;
 };
 
 /** `PIER_NUMBER NUMBER(10)`. */
@@ -65,6 +70,7 @@ const PierDialog: FC<Props> = ({
   spanCount,
   hasBridgeRecord,
   onClose,
+  onSubmit,
 }) => {
   const types = usePierTypeCodes();
   const create = useCreatePier(structureId);
@@ -83,6 +89,10 @@ const PierDialog: FC<Props> = ({
   const form = useFieldErrors<keyof Errors>(
     {
       ...validate(values),
+      ...(onSubmit !== undefined &&
+      piers.some((each) => each !== pier && String(each.number) === values.number.trim())
+        ? { number: 'Pier Number already exists.' }
+        : {}),
       pier: adding && spanCount <= piers.length + 1 ? SPANS_OUTNUMBER_PIERS : undefined,
     },
     adding ? create.fieldErrors : update.fieldErrors,
@@ -111,6 +121,11 @@ const PierDialog: FC<Props> = ({
       number: Number(values.number.trim()),
       typeCode: values.typeCode,
     };
+    if (onSubmit) {
+      onSubmit(request);
+      onClose();
+      return;
+    }
     const done = (verb: string) => () => {
       display({ kind: 'success', title: `Pier ${request.number} ${verb}`, timeout: 4000 });
       onClose();

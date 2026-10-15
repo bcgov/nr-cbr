@@ -1,5 +1,5 @@
 import { fillMissingCoordinates } from '@/components/SiteForm/coordinateSync';
-import { EMPTY_SITE, type SiteFormValues } from '@/components/SiteForm/types';
+import { EMPTY_SITE, SITE_TYPE, type SiteFormValues } from '@/components/SiteForm/types';
 
 /** One crossing site as `/api/v1/sites/{siteId}` returns it. Stored values, not display values. */
 export type SiteDetailResponse = {
@@ -34,7 +34,34 @@ export type SiteDetailResponse = {
   pointOfAccessDescription: string | null;
 };
 
-const asText = (value: string | number | null | undefined): string =>
+/** A stored value as the server sends it: text, a number, or nothing. */
+type StoredValue = string | number | null | undefined;
+
+const blank = (value: StoredValue) =>
+  value === null || value === undefined || String(value).trim() === '';
+
+/**
+ * Whether a structure may be added to the site — legacy's three checks on Site Detail's Add
+ * Structure button, which the server repeats on save: the site is complete (legacy's
+ * `Site.isComplete()`: status, inspection status, district and type set, and a crossing name and
+ * kilometres unless it is a storage site), and it is not Proposed or closed (deactivated).
+ */
+export const canAddStructureTo = (site: SiteDetailResponse): boolean => {
+  if (
+    blank(site.crossingSiteStatusCode) ||
+    blank(site.structureInspectionStatusCode) ||
+    site.orgUnitNo === null ||
+    blank(site.crossingSiteTypeCode)
+  ) {
+    return false;
+  }
+  const complete =
+    site.crossingSiteTypeCode === SITE_TYPE.STORAGE ||
+    (!blank(site.crossingName) && !blank(site.pointOfCommencementDistance));
+  return complete && !['PP', 'DAC'].includes(site.crossingSiteStatusCode ?? '');
+};
+
+const asText = (value: StoredValue): string =>
   value === null || value === undefined ? '' : String(value);
 
 /**
@@ -48,7 +75,7 @@ const asText = (value: string | number | null | undefined): string =>
  * holds: `NUMBER(9,6)` degrees is a shade over a tenth of a second.
  */
 export const toDms = (
-  decimal: string | number | null | undefined,
+  decimal: StoredValue,
 ): { degrees: string; minutes: string; seconds: string } => {
   if (decimal === null || decimal === undefined || decimal === '') {
     return { degrees: '', minutes: '', seconds: '' };

@@ -27,20 +27,21 @@ export const money = (value: number | null | undefined): string =>
 export const number = (value: number | null | undefined): string =>
   value === null || value === undefined ? '' : String(value);
 
-/** Where each section's outstanding items are listed, and what the group is called there. */
-export const SECTION_TITLES: Record<OutstandingSection, string> = {
-  SITE: 'Site',
-  DETAILS: 'Details',
-  INSPECTIONS: 'Inspections',
-};
-
+/**
+ * One tab's outstanding items, grouped by the section (card) they belong to — as nr-frep groups its
+ * checklist's by record — in the order the server lists them.
+ */
 export type OutstandingGroup = { title: string; items: string[] };
 
-/** The items grouped by section, in page order, leaving out sections with nothing outstanding. */
-export const groupOutstanding = (items: OutstandingItem[]): OutstandingGroup[] =>
-  (Object.keys(SECTION_TITLES) as OutstandingSection[])
-    .map((section) => ({
-      title: SECTION_TITLES[section],
-      items: items.filter((item) => item.section === section).map((item) => item.label),
-    }))
-    .filter((group) => group.items.length > 0);
+export const groupOutstanding = (
+  items: OutstandingItem[],
+  section: OutstandingSection,
+): OutstandingGroup[] => {
+  const groups: OutstandingGroup[] = [];
+  for (const item of items.filter((each) => each.section === section)) {
+    const group = groups.find((each) => each.title === item.card);
+    if (group) group.items.push(item.label);
+    else groups.push({ title: item.card, items: [item.label] });
+  }
+  return groups;
+};

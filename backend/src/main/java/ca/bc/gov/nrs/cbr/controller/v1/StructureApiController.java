@@ -14,6 +14,7 @@ import ca.bc.gov.nrs.cbr.service.v1.StructureLoadRatingsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureMonitorsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureRepairsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSearchService;
+import ca.bc.gov.nrs.cbr.service.v1.StructureCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureReplacementsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSpansAndPiersService;
@@ -43,6 +44,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureArchiveResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.ReplacementRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureNameSuggestion;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
@@ -86,6 +88,7 @@ public class StructureApiController implements StructureApiEndpoint {
   private final StructureLoadRatingsService loadRatingsService;
   private final StructureCulvertService culvertService;
   private final StructureReplacementsService replacementsService;
+  private final StructureCreateService createService;
 
   public StructureApiController(
       StructureSearchService structureSearchService,
@@ -102,7 +105,8 @@ public class StructureApiController implements StructureApiEndpoint {
       StructureBridgeService bridgeService,
       StructureLoadRatingsService loadRatingsService,
       StructureCulvertService culvertService,
-      StructureReplacementsService replacementsService) {
+      StructureReplacementsService replacementsService,
+      StructureCreateService createService) {
     this.structureSearchService = structureSearchService;
     this.structureService = structureService;
     this.structureDetailService = structureDetailService;
@@ -118,6 +122,7 @@ public class StructureApiController implements StructureApiEndpoint {
     this.loadRatingsService = loadRatingsService;
     this.culvertService = culvertService;
     this.replacementsService = replacementsService;
+    this.createService = createService;
   }
 
   @Override
@@ -153,6 +158,11 @@ public class StructureApiController implements StructureApiEndpoint {
   @Override
   public StructureSpansAndPiersResponse getSpansAndPiers(long structureId) {
     return spansAndPiersService.findByStructure(structureId);
+  }
+
+  @Override
+  public ResponseEntity<CreatedResponse> createStructure(StructureCreateRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(createService.create(request));
   }
 
   @Override

@@ -8,7 +8,7 @@ import {
   SideNavMenuItem,
 } from '@carbon/react';
 import { type FC } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, matchPath, useLocation } from 'react-router-dom';
 
 import { getMenuEntries, getOfflineMenuEntries, type MenuItem } from '@/routes/routePaths';
 
@@ -47,9 +47,19 @@ export const LayoutSideNav: FC = () => {
     return `${parentPath}${suffix}`;
   };
 
+  /**
+   * Whether the user is on this child's page, or on a page that belongs to it — a structure's page
+   * under Structure Search. Its own page wins: `/inspection/inspection-search` would otherwise also
+   * match Inspection Search's `:inspectionId`, which is harmless, as it is the same entry.
+   */
+  const isOnChild = (route: MenuItem, child: MenuItem) =>
+    childPath(route.path, child) === location.pathname ||
+    (child.activeFor ?? []).some((pattern) =>
+      Boolean(matchPath({ path: `${route.path}/${pattern}`, end: true }, location.pathname)),
+    );
+
   /** The child of this section the user is on, if they are on one. */
-  const activeChild = (route: MenuItem) =>
-    route.children?.find((child) => childPath(route.path, child) === location.pathname);
+  const activeChild = (route: MenuItem) => route.children?.find((child) => isOnChild(route, child));
 
   /** A leaf entry: a link straight to its page. */
   const renderMenuLink = (route: MenuItem) => (
@@ -119,7 +129,7 @@ export const LayoutSideNav: FC = () => {
             key={childRoute.id}
             as={Link}
             to={childPath(route.path, childRoute)}
-            isActive={childPath(route.path, childRoute) === location.pathname}
+            isActive={isOnChild(route, childRoute)}
           >
             {/* The bare label, not a wrapped one. SideNavMenuItem already puts its children inside
                 a `__link-text` span, so anything wrapped here lands nested inside that span — and

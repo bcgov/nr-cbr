@@ -7,6 +7,8 @@ import ReadOnlyField from '@/components/core/ReadOnlyField';
 import { requiredLabel } from '@/utils/requiredLabel';
 
 import Card from './Card';
+import OutstandingPanel from './OutstandingPanel';
+import SiteFields from './SiteFields';
 
 import type {
   CodeValue,
@@ -14,6 +16,7 @@ import type {
   StructureInformationRequest,
   StructureSite,
 } from './structureResponse';
+import type { OutstandingGroup } from './format';
 import type { ChangeEvent, FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
@@ -24,10 +27,12 @@ import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { siteStatusLabel, siteStatusTagType } from '@/utils/siteStatus';
 import { byteLength } from '@/utils/textLimits';
 
-type Props = { structure: StructureDetailResponse };
+type Props = {
+  structure: StructureDetailResponse;
+  /** What is missing in this tab, by section. */
+  outstanding: OutstandingGroup[];
+};
 
-/** Legacy's site type for a recreation site, which shows a district and project of its own. */
-const RECREATION = 'REC';
 /** `CROSSING_STRUCTURE_NAME VARCHAR2(14 BYTE)`. */
 const NAME_MAX = 14;
 /** `CROSSING_SITE_ID VARCHAR2(14)`. */
@@ -45,32 +50,8 @@ const SiteStatusPill: FC<{ site: StructureSite | null; testId: string }> = ({ si
     </Tag>
   ) : null;
 
-/** The site's own fields, as the tab shows them — for the structure's site, or one to move to. */
-const SiteFields: FC<{ site: StructureSite | null }> = ({ site }) => {
-  const recreation = site?.siteTypeCode === RECREATION;
-  const projectFile = [site?.forestFileId, site?.roadSectionId].filter(Boolean).join('-');
-  return (
-    <>
-      <ReadOnlyField
-        label={recreation ? 'Recreation District' : 'Forest District'}
-        value={site?.districtName}
-      />
-      {!recreation && <ReadOnlyField label="Management Area" value={site?.managementAreaName} />}
-      <ReadOnlyField
-        label={recreation ? 'Project Name' : 'Forest Service Road'}
-        value={recreation ? site?.projectName : site?.forestServiceRoad}
-      />
-      <ReadOnlyField label="Project File ID#-Br." value={projectFile} />
-
-      <ReadOnlyField label="Crossing Name" value={site?.crossingName} />
-      <ReadOnlyField label="Kilometres" value={site?.kilometres} />
-      <ReadOnlyField label="Designated Maintainer" value={site?.maintainerLabel} />
-    </>
-  );
-};
-
 /** What the tab shows when it is not being edited. */
-const InformationView: FC<Props> = ({ structure }) => {
+const InformationView: FC<{ structure: StructureDetailResponse }> = ({ structure }) => {
   const site = structure.site;
   return (
     <div className="structure-detail__fields" data-testid="structure-header">
@@ -272,35 +253,38 @@ const siteHelper = (loading: boolean, siteId: string | undefined): string | unde
  * one field here, as on Site Detail. Inspection Status shows its code and description; legacy showed
  * the code alone.
  */
-const InformationTab: FC<Props> = ({ structure }) => {
+const InformationTab: FC<Props> = ({ structure, outstanding }) => {
   const { canEdit } = useAuthorization();
   const [editing, setEditing] = useState(false);
   return (
-    <Card
-      title="Structure and site"
-      icon={Location}
-      testId="structure-information-tab"
-      action={
-        canEdit &&
-        !editing && (
-          <Button
-            kind="tertiary"
-            size="sm"
-            renderIcon={Edit}
-            data-testid="information-edit"
-            onClick={() => setEditing(true)}
-          >
-            Edit structure and site
-          </Button>
-        )
-      }
-    >
-      {editing ? (
-        <InformationForm structure={structure} onDone={() => setEditing(false)} />
-      ) : (
-        <InformationView structure={structure} />
-      )}
-    </Card>
+    <div className="structure-detail__tab-panel">
+      <OutstandingPanel groups={outstanding} />
+      <Card
+        title="Structure and site"
+        icon={Location}
+        testId="structure-information-tab"
+        action={
+          canEdit &&
+          !editing && (
+            <Button
+              kind="tertiary"
+              size="sm"
+              renderIcon={Edit}
+              data-testid="information-edit"
+              onClick={() => setEditing(true)}
+            >
+              Edit structure and site
+            </Button>
+          )
+        }
+      >
+        {editing ? (
+          <InformationForm structure={structure} onDone={() => setEditing(false)} />
+        ) : (
+          <InformationView structure={structure} />
+        )}
+      </Card>
+    </div>
   );
 };
 

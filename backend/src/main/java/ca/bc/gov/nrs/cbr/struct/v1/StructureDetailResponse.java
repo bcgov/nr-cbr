@@ -49,8 +49,11 @@ public record StructureDetailResponse(
   /** The part of the page an outstanding item belongs to. */
   public enum Section { SITE, DETAILS, INSPECTIONS }
 
-  /** One reason the structure counts as incomplete. */
-  public record OutstandingItem(Section section, String label) {}
+  /**
+   * One reason the structure counts as incomplete: the tab it belongs to, the section (card) on that
+   * tab where its field is, and the field.
+   */
+  public record OutstandingItem(Section section, String card, String label) {}
 
   /** The site the structure stands on — the header above the tabs. */
   public record Site(
