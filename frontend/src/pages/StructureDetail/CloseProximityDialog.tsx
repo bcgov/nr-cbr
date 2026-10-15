@@ -18,6 +18,12 @@ type Props = {
   onClose: () => void;
 };
 
+/** The date's error: required, and a date as yyyy/mm/dd. */
+const dateError = (date: string): string | undefined => {
+  if (!date.trim()) return 'Date is required.';
+  return toIso(date) === null ? 'Date must be a date, as yyyy/mm/dd.' : undefined;
+};
+
 /**
  * Records a close proximity inspection that was done — legacy's P.Eng date box and add icon on the
  * Inspections tab, as a dialog like the tab's comments. Any real date; the schedule's next planned
@@ -30,11 +36,7 @@ const CloseProximityDialog: FC<Props> = ({ structureId, onClose }) => {
   // Checked as the date changes; shown once the box is left, or at Save.
   const form = useFieldErrors<'completedDate'>(
     {
-      completedDate: !date.trim()
-        ? 'Date is required.'
-        : toIso(date) === null
-          ? 'Date must be a date, as yyyy/mm/dd.'
-          : undefined,
+      completedDate: dateError(date),
     },
     add.fieldErrors,
   );

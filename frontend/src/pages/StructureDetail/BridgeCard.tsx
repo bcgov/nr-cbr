@@ -121,7 +121,7 @@ type Messages = Partial<Record<Field, string>>;
 const toMetres = (typed: string, scale: number): number | null => {
   const trimmed = typed.trim();
   if (!trimmed) return null;
-  const pattern = new RegExp(`^\\d+(\\.\\d{0,${scale}})?$`);
+  const pattern = new RegExp(String.raw`^\d+(\.\d{0,${scale}})?$`);
   return pattern.test(trimmed) ? Number(trimmed) : Number.NaN;
 };
 

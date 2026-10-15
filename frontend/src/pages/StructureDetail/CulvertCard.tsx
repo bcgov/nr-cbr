@@ -160,8 +160,8 @@ const toNumber = (field: NumberField, typed: string): number | null => {
 /** What was stored, so a field that had a value is required (legacy's tier rule). */
 type Stored = Partial<Record<Field, boolean>>;
 
-/** The form's blocking rules — the server's, checked as the values change. */
-const errorsOf = (values: Values, stored: Stored, woodLog: boolean): Messages => {
+/** The numbers: required once stored, and as their columns hold them. */
+const numberErrors = (values: Values, stored: Stored): Messages => {
   const errors: Messages = {};
   for (const field of Object.keys(NUMBERS) as NumberField[]) {
     const value = toNumber(field, values[field]);
@@ -170,25 +170,42 @@ const errorsOf = (values: Values, stored: Stored, woodLog: boolean): Messages =>
     else if (Number.isNaN(value))
       errors[field] = `${label} must be ${format}, as the column holds.`;
   }
-  if (!woodLog) {
-    if (!values.culvertTypeCode && stored.culvertTypeCode) {
-      errors.culvertTypeCode = 'Culvert Type is required.';
-    }
-    if (values.culvertTypeCode === OPEN_BOTTOM && !values.openBottomCode) {
-      errors.openBottomCode = 'Open Bottom Substructure is required for an open-bottom culvert.';
-    }
+  return errors;
+};
+
+/** Culvert Type, once stored, and Open Bottom Substructure for an open-bottom culvert. */
+const typeErrors = (values: Values, stored: Stored): Messages => {
+  const errors: Messages = {};
+  if (!values.culvertTypeCode && stored.culvertTypeCode) {
+    errors.culvertTypeCode = 'Culvert Type is required.';
   }
+  if (values.culvertTypeCode === OPEN_BOTTOM && !values.openBottomCode) {
+    errors.openBottomCode = 'Open Bottom Substructure is required for an open-bottom culvert.';
+  }
+  return errors;
+};
+
+/** Culvert Material, once stored, and an Other's details. */
+const materialErrors = (values: Values, stored: Stored): Messages => {
+  const errors: Messages = {};
   if (!values.materialCode && stored.materialCode) {
     errors.materialCode = 'Culvert Material is required.';
   }
   if (values.materialCode === OTHER) {
-    if (!values.materialComment.trim()) errors.materialComment = 'Culvert Details is required.';
-    else if (overLimitError(values.materialComment, TEXT_MAX)) {
-      errors.materialComment = overLimitError(values.materialComment, TEXT_MAX);
-    }
+    errors.materialComment = values.materialComment.trim()
+      ? overLimitError(values.materialComment, TEXT_MAX) || undefined
+      : 'Culvert Details is required.';
   }
   return errors;
 };
+
+/** The form's blocking rules — the server's, checked as the values change. */
+const errorsOf = (values: Values, stored: Stored, woodLog: boolean): Messages => ({
+  ...numberErrors(values, stored),
+  // A Wood Log Culvert has no Culvert Type or Open Bottom Substructure.
+  ...(woodLog ? {} : typeErrors(values, stored)),
+  ...materialErrors(values, stored),
+});
 
 /** Legacy's range warnings (`Culvert.validate`), shown as typed; they never stopped its save. */
 const RANGES: Partial<Record<NumberField, [number, number]>> = {

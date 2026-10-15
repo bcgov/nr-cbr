@@ -50,6 +50,59 @@ const deltaOf = (rating: number, current: number | null): string => {
   return 'NOC';
 };
 
+type ReasonOption = NonNullable<ReturnType<typeof useLoadRatingCodes>['data']>['reasons'][number];
+
+/**
+ * The reasons offered. Adding: only those that fit the change from the current rating, and none
+ * until the rating is typed. Editing: every reason, the rating's own kept though since expired.
+ */
+const reasonOptionsOf = (
+  listed: ReasonOption[],
+  entry: LoadRatingEntry | null,
+  rating: number | null,
+  current: LoadRatingEntry | null,
+): ReasonOption[] => {
+  if (entry === null) {
+    if (rating === null || Number.isNaN(rating)) return [];
+    const delta = deltaOf(rating, current?.rating ?? null);
+    return listed.filter(
+      (reason) => reason.deltas.includes(delta) || reason.deltas.includes('UNDEF'),
+    );
+  }
+  const stored = entry.reason;
+  return stored.code && !listed.some((reason) => reason.code === stored.code)
+    ? [{ code: stored.code, description: stored.description ?? stored.code, deltas: [] }, ...listed]
+    : listed;
+};
+
+/** The rating's error: required, whole, in range, and not over the New Structure placeholder. */
+const ratingError = (rating: number | null, placeholder: boolean): string | undefined => {
+  if (rating === null) return 'Load Rating is required.';
+  if (Number.isNaN(rating)) return `Load Rating must be a whole number from 0 to ${RATING_MAX}.`;
+  return placeholder
+    ? 'Edit the 0-tonne New Structure rating rather than adding another.'
+    : undefined;
+};
+
+/** The reason's errors: required, one that fits when adding, and Other's words. */
+const reasonErrors = (
+  values: Values,
+  adding: boolean,
+  reasonOptions: ReasonOption[],
+): Partial<Record<Field, string>> => {
+  const errors: Partial<Record<Field, string>> = {};
+  if (!values.reasonCode) errors.reasonCode = 'Load Rating Reason is required.';
+  else if (adding && !reasonOptions.some((reason) => reason.code === values.reasonCode)) {
+    errors.reasonCode = 'Choose a reason that fits the change in load rating.';
+  }
+  if (values.reasonCode === OTHER) {
+    errors.reasonComment = values.reasonComment.trim()
+      ? overLimitError(values.reasonComment, TEXT_MAX) || undefined
+      : 'Load Rating Reason Comment is required for Other.';
+  }
+  return errors;
+};
+
 /**
  * Adds a manual load rating, or changes one — legacy's Add Load Rating and Edit Manual Load Rating,
  * a P.Eng's.
@@ -74,24 +127,10 @@ const LoadRatingDialog: FC<Props> = ({ structureId, entry, current, onClose }) =
   });
   const rating = toRating(values.rating);
 
-  const reasonOptions = useMemo(() => {
-    const listed = codes.data?.reasons ?? [];
-    if (adding) {
-      if (rating === null || Number.isNaN(rating)) return [];
-      const delta = deltaOf(rating, current?.rating ?? null);
-      return listed.filter(
-        (reason) => reason.deltas.includes(delta) || reason.deltas.includes('UNDEF'),
-      );
-    }
-    // A stored reason since expired is still the rating's, so it stays in the list.
-    const stored = entry.reason;
-    return stored.code && !listed.some((reason) => reason.code === stored.code)
-      ? [
-          { code: stored.code, description: stored.description ?? stored.code, deltas: [] },
-          ...listed,
-        ]
-      : listed;
-  }, [codes.data, adding, rating, current, entry]);
+  const reasonOptions = useMemo(
+    () => reasonOptionsOf(codes.data?.reasons ?? [], entry, rating, current),
+    [codes.data, entry, rating, current],
+  );
 
   const placeholder =
     adding &&
@@ -99,26 +138,14 @@ const LoadRatingDialog: FC<Props> = ({ structureId, entry, current, onClose }) =
     current.rating === 0 &&
     current.reason.code === NEW_STRUCTURE;
 
-  const errors: Partial<Record<Field, string>> = {};
-  if (rating === null) errors.rating = 'Load Rating is required.';
-  else if (Number.isNaN(rating)) {
-    errors.rating = `Load Rating must be a whole number from 0 to ${RATING_MAX}.`;
-  } else if (placeholder) {
-    errors.rating = 'Edit the 0-tonne New Structure rating rather than adding another.';
-  }
-  if (!values.reasonCode) errors.reasonCode = 'Load Rating Reason is required.';
-  else if (adding && !reasonOptions.some((reason) => reason.code === values.reasonCode)) {
-    errors.reasonCode = 'Choose a reason that fits the change in load rating.';
-  }
-  if (values.reasonCode === OTHER) {
-    if (!values.reasonComment.trim()) {
-      errors.reasonComment = 'Load Rating Reason Comment is required for Other.';
-    } else if (overLimitError(values.reasonComment, TEXT_MAX)) {
-      errors.reasonComment = overLimitError(values.reasonComment, TEXT_MAX);
-    }
-  }
   // Checked as the values change; each shown once its field is left, or at Save.
-  const form = useFieldErrors<Field>(errors, adding ? create.fieldErrors : update.fieldErrors);
+  const form = useFieldErrors<Field>(
+    {
+      rating: ratingError(rating, placeholder),
+      ...reasonErrors(values, adding, reasonOptions),
+    },
+    adding ? create.fieldErrors : update.fieldErrors,
+  );
   const shown = form.shown;
 
   const change = (field: Field, value: string) => {

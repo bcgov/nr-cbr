@@ -50,6 +50,21 @@ const toCost = (typed: string): number | null => {
 
 const usable = (year: number | null): year is number => year !== null && !Number.isNaN(year);
 
+/** Estimated Load Restriction not after Estimated Replacement, nor after Estimated Closure. */
+const restrictionOrderError = (
+  restriction: number | null,
+  replacement: number | null,
+  closure: number | null,
+): string | undefined => {
+  if (!usable(restriction)) return undefined;
+  if (usable(replacement) && restriction > replacement) {
+    return 'Estimated Load Restriction must not be after Estimated Replacement.';
+  }
+  return usable(closure) && restriction > closure
+    ? 'Estimated Load Restriction must not be after Estimated Closure.'
+    : undefined;
+};
+
 /** The form's blocking rules — legacy's `StructureForm.validate`, checked as the values change. */
 const errorsOf = (values: Values, restrictionRequired: boolean): Messages => {
   const errors: Messages = {};
@@ -72,15 +87,7 @@ const errorsOf = (values: Values, restrictionRequired: boolean): Messages => {
   if (usable(replacement) && usable(closure) && replacement > closure) {
     errors.replacementYear = 'Estimated Replacement must not be after Estimated Closure.';
   }
-  if (!errors.loadRestrictionYear && usable(restriction)) {
-    if (usable(replacement) && restriction > replacement) {
-      errors.loadRestrictionYear =
-        'Estimated Load Restriction must not be after Estimated Replacement.';
-    } else if (usable(closure) && restriction > closure) {
-      errors.loadRestrictionYear =
-        'Estimated Load Restriction must not be after Estimated Closure.';
-    }
-  }
+  errors.loadRestrictionYear ??= restrictionOrderError(restriction, replacement, closure);
   if (Number.isNaN(toCost(values.cost))) {
     errors.cost = 'Estimated Replacement Cost must be whole dollars from $0 to $99,999,999.';
   }

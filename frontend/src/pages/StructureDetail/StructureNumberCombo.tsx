@@ -18,6 +18,10 @@ type Props = {
   disabled?: boolean;
 };
 
+/** A suggestion as the list shows it: its Structure #, marked when archived. */
+const suggestionLabel = (item: StructureNameSuggestion) =>
+  item.archived ? `${item.structureName} (archived)` : item.structureName;
+
 /**
  * A Structure # box that suggests structures as it is typed in — those whose Structure # starts
  * with the text, archived ones marked. A Structure # typed in full and not picked is kept too;
@@ -56,12 +60,7 @@ const StructureNumberCombo: FC<Props> = ({
         items={value.trim() ? suggestions : []}
         initialSelectedItem={initial}
         itemToString={(item) => item?.structureName ?? ''}
-        itemToElement={(item) => (
-          <span>
-            {item.structureName}
-            {item.archived && ' (archived)'}
-          </span>
-        )}
+        itemToElement={suggestionLabel}
         onInputChange={(text) => onChange(text ?? '')}
         onChange={({ selectedItem }) => {
           // With custom values allowed, Carbon hands back typed text as a string, not an item.

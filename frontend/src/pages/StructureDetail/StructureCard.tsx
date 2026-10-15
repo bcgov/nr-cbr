@@ -129,14 +129,11 @@ const warningsOf = (values: Values): Messages => {
   const warnings: Messages = {};
   const thisYear = new Date().getFullYear();
   const built = toYear(values.yearBuilt);
-  const outside = (year: number | null, low: number, high: number, highText: string) =>
-    year === null || Number.isNaN(year)
-      ? undefined
-      : year > high
-        ? `Must not be greater than ${highText}.`
-        : year < low
-          ? `Must be greater than or equal to ${low}.`
-          : undefined;
+  const outside = (year: number | null, low: number, high: number, highText: string) => {
+    if (year === null || Number.isNaN(year)) return undefined;
+    if (year > high) return `Must not be greater than ${highText}.`;
+    return year < low ? `Must be greater than or equal to ${low}.` : undefined;
+  };
   warnings.yearBuilt = outside(built, 1900, thisYear, 'the current year');
   warnings.yearFabricated = outside(toYear(values.yearFabricated), 1900, thisYear + 1, 'next year');
   warnings.inventoryAddedYear = outside(

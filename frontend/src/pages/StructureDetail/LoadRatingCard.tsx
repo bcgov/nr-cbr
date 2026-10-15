@@ -63,15 +63,21 @@ const beforeInstall = (entry: LoadRatingEntry, yearBuilt: number | null): boolea
  * stopped its save: an error when there is no rating and no review asked for, a warning when there
  * is a rating and a review is still asked for.
  */
-const reviewAdvice = (reviewRequired: boolean, hasRatings: boolean) =>
-  !reviewRequired && !hasRatings
-    ? {
-        invalid: true,
-        invalidText: 'Required field: with no load rating, a review should be required.',
-      }
-    : reviewRequired && hasRatings
-      ? { warn: true, warnText: 'Load rating review is required although a rating is recorded.' }
-      : {};
+const reviewAdvice = (reviewRequired: boolean, hasRatings: boolean) => {
+  if (!reviewRequired && !hasRatings) {
+    return {
+      invalid: true,
+      invalidText: 'Required field: with no load rating, a review should be required.',
+    };
+  }
+  if (reviewRequired && hasRatings) {
+    return {
+      warn: true,
+      warnText: 'Load rating review is required although a rating is recorded.',
+    };
+  }
+  return {};
+};
 
 type Values = {
   loadPostingSignsCode: string;
@@ -81,6 +87,50 @@ type Values = {
   designLoadRating: string;
 };
 type Field = keyof Values;
+
+/**
+ * The design load rating a chosen vehicle fixes: its own when the vehicle was just chosen, the one
+ * stored when it is the vehicle the structure had; null when the vehicle fixes none.
+ */
+const fixedRating = (
+  chosen: { designLoadRating: number | null } | undefined,
+  vehicleChanged: boolean,
+  stored: number | null,
+): number | null => {
+  const own = chosen?.designLoadRating ?? null;
+  if (own === null) return null;
+  return vehicleChanged ? own : stored;
+};
+
+/** A typed design load rating's error: a whole number from 1 up to the column's limit. */
+const typedRatingError = (typed: string): string | undefined => {
+  if (!/^\d+$/.test(typed) || Number(typed) > RATING_MAX) {
+    return `Original Design Load Rating must be a whole number up to ${RATING_MAX}.`;
+  }
+  return Number(typed) < 1
+    ? 'Original Design Load Rating GVW (tonnes) must be greater than or equal to 1.'
+    : undefined;
+};
+
+/** The section's blocking rules, checked as the values change. */
+const detailsErrorsOf = (
+  values: Values,
+  other: boolean,
+  typedRating: boolean,
+): Partial<Record<Field, string>> => {
+  const errors: Partial<Record<Field, string>> = {};
+  if (!values.loadPostingSignsCode) {
+    errors.loadPostingSignsCode = 'Are Load Posting Signs Warranted? is required.';
+  }
+  if (other) {
+    errors.designVehicleComment = values.designVehicleComment.trim()
+      ? overLimitError(values.designVehicleComment, TEXT_MAX) || undefined
+      : 'Design Vehicle Configuration Details is required.';
+  }
+  const typed = values.designLoadRating.trim();
+  if (typedRating && typed) errors.designLoadRating = typedRatingError(typed);
+  return errors;
+};
 
 /**
  * The section's four fields as a form, in place of the view, every field where the view has it.
@@ -112,37 +162,15 @@ const DetailsForm: FC<{
   // Choosing a vehicle that fixes the design rating sets it; one left as it was keeps the rating
   // stored, as legacy's page. A vehicle that fixes none leaves it to be typed.
   const vehicleChanged = values.designVehicleCode !== (loadRating.designVehicle.code ?? '');
-  const fixed =
-    chosen?.designLoadRating === null || chosen?.designLoadRating === undefined
-      ? null
-      : vehicleChanged
-        ? chosen.designLoadRating
-        : loadRating.designLoadRating;
-  const typedRating = chosen === undefined || chosen.designLoadRating === null;
+  const fixed = fixedRating(chosen, vehicleChanged, loadRating.designLoadRating);
+  const typedRating = (chosen?.designLoadRating ?? null) === null;
   const other = values.designVehicleCode === OTHER_VEHICLE;
 
-  const errors: Partial<Record<Field, string>> = {};
-  if (!values.loadPostingSignsCode) {
-    errors.loadPostingSignsCode = 'Are Load Posting Signs Warranted? is required.';
-  }
-  if (other) {
-    if (!values.designVehicleComment.trim()) {
-      errors.designVehicleComment = 'Design Vehicle Configuration Details is required.';
-    } else if (overLimitError(values.designVehicleComment, TEXT_MAX)) {
-      errors.designVehicleComment = overLimitError(values.designVehicleComment, TEXT_MAX);
-    }
-  }
-  if (typedRating && values.designLoadRating.trim()) {
-    const typed = values.designLoadRating.trim();
-    if (!/^\d+$/.test(typed) || Number(typed) > RATING_MAX) {
-      errors.designLoadRating = `Original Design Load Rating must be a whole number up to ${RATING_MAX}.`;
-    } else if (Number(typed) < 1) {
-      errors.designLoadRating =
-        'Original Design Load Rating GVW (tonnes) must be greater than or equal to 1.';
-    }
-  }
   // Checked as the values change; each shown once its field is left, or at Save.
-  const form = useFieldErrors<Field>(errors, update.fieldErrors);
+  const form = useFieldErrors<Field>(
+    detailsErrorsOf(values, other, typedRating),
+    update.fieldErrors,
+  );
   const shown = form.shown;
 
   const change = <K extends Field>(field: K, value: Values[K]) => {
@@ -153,10 +181,11 @@ const DetailsForm: FC<{
   const save = () => {
     if (!form.submit()) return;
     const typed = values.designLoadRating.trim();
+    const typedValue = typed ? Number(typed) : null;
     const request: LoadRatingDetailsRequest = {
       ...values,
       designVehicleComment: other ? values.designVehicleComment : '',
-      designLoadRating: typedRating ? (typed ? Number(typed) : null) : fixed,
+      designLoadRating: typedRating ? typedValue : fixed,
     };
     update.mutate(request, {
       onSuccess: () => {
@@ -471,7 +500,7 @@ const LoadRatingCard: FC<Props> = ({
                   data-testid={`load-rating-${entry.id}`}
                 >
                   <TableCell className="structure-detail__nowrap">
-                    {entry.rating === null ? 'Not recorded' : entry.rating}
+                    {entry.rating ?? 'Not recorded'}
                     {entry.current && (
                       <Tag type="blue" size="sm" className="structure-detail__current-tag">
                         Current

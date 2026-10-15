@@ -209,15 +209,7 @@ const InformationForm: FC<{ structure: StructureDetailResponse; onDone: () => vo
           // As legacy's box: CROSSING_SITE_ID is 14 characters.
           maxLength={SITE_ID_MAX}
           labelText={requiredLabel('Site #', Boolean(currentSiteId))}
-          helperText={
-            !moving
-              ? undefined
-              : loading
-                ? 'Looking up the site…'
-                : preview?.site
-                  ? `Showing site ${preview.site.siteId}.`
-                  : undefined
-          }
+          helperText={moving ? siteHelper(loading, preview?.site?.siteId) : undefined}
           value={values.siteId}
           invalid={Boolean(shown.siteId)}
           invalidText={shown.siteId}
@@ -259,6 +251,12 @@ const InformationForm: FC<{ structure: StructureDetailResponse; onDone: () => vo
       </div>
     </div>
   );
+};
+
+/** Under Site # while it is being changed: the lookup under way, or which site is shown. */
+const siteHelper = (loading: boolean, siteId: string | undefined): string | undefined => {
+  if (loading) return 'Looking up the site…';
+  return siteId ? `Showing site ${siteId}.` : undefined;
 };
 
 /**
