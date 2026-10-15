@@ -59,6 +59,7 @@ public class StructureCreateValidator {
   private static final long PIER_NUMBER_MAX = 9_999_999_999L;
   private static final BigDecimal SPAN_LENGTH_MAX = new BigDecimal("99999.999");
   private static final int SPAN_LENGTH_SCALE = 3;
+  private static final String NAME = "structureName";
   private static final String SPANS = "spans";
   private static final String PIERS = "piers";
 
@@ -171,11 +172,11 @@ public class StructureCreateValidator {
   private void checkName(Map<String, String> errors, String typed) {
     String name = trimmed(typed);
     if (name == null) {
-      errors.put("structureName", "Structure #" + IS_REQUIRED);
+      errors.put(NAME, "Structure #" + IS_REQUIRED);
     } else if (name.getBytes(StandardCharsets.UTF_8).length > NAME_MAX) {
-      errors.put("structureName", "Structure # can be at most " + NAME_MAX + " characters.");
+      errors.put(NAME, "Structure # can be at most " + NAME_MAX + " characters.");
     } else if (structures.findByCrossingStructureName(name.toUpperCase(Locale.ROOT)).isPresent()) {
-      errors.put("structureName", "Structure " + name.toUpperCase(Locale.ROOT)
+      errors.put(NAME, "Structure " + name.toUpperCase(Locale.ROOT)
           + " already exists.");
     }
   }

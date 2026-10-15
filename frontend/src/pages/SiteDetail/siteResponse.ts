@@ -34,7 +34,10 @@ export type SiteDetailResponse = {
   pointOfAccessDescription: string | null;
 };
 
-const blank = (value: string | number | null | undefined) =>
+/** A stored value as the server sends it: text, a number, or nothing. */
+type StoredValue = string | number | null | undefined;
+
+const blank = (value: StoredValue) =>
   value === null || value === undefined || String(value).trim() === '';
 
 /**
@@ -58,7 +61,7 @@ export const canAddStructureTo = (site: SiteDetailResponse): boolean => {
   return complete && !['PP', 'DAC'].includes(site.crossingSiteStatusCode ?? '');
 };
 
-const asText = (value: string | number | null | undefined): string =>
+const asText = (value: StoredValue): string =>
   value === null || value === undefined ? '' : String(value);
 
 /**
@@ -72,7 +75,7 @@ const asText = (value: string | number | null | undefined): string =>
  * holds: `NUMBER(9,6)` degrees is a shade over a tenth of a second.
  */
 export const toDms = (
-  decimal: string | number | null | undefined,
+  decimal: StoredValue,
 ): { degrees: string; minutes: string; seconds: string } => {
   if (decimal === null || decimal === undefined || decimal === '') {
     return { degrees: '', minutes: '', seconds: '' };

@@ -442,16 +442,16 @@ public class StructureDetailService {
 
   // ─── What is missing ─────────────────────────────────────────────────
 
-  /**
-   * Why the structure is incomplete, item by item — legacy's structure page {@code isComplete()}
-   * (Structure.java:813-852, Bridge.java:830-859, Culvert.java:609-631). The same rules as
-   * Structure Search's "Incomplete Data?" filter, so the two always agree.
-   */
   /** The Details tab's cards an outstanding item can belong to, as the cards are titled. */
   private static final String LOAD_RATING_CARD = "Load Rating Details";
   private static final String BRIDGE_CARD = "Bridge";
   private static final String CULVERT_CARD = "Culvert";
 
+  /**
+   * Why the structure is incomplete, item by item — legacy's structure page {@code isComplete()}
+   * (Structure.java:813-852, Bridge.java:830-859, Culvert.java:609-631). The same rules as
+   * Structure Search's "Incomplete Data?" filter, so the two always agree.
+   */
   private static List<OutstandingItem> outstanding(
       CrossingStructureEntity structure,
       CrossingSiteEntity site,

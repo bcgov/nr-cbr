@@ -155,10 +155,6 @@ public class CrossingStructureEntity {
   @Column(name = "STRUCTURE_SOURCE_CODE", length = 10)
   private String structureSourceCode;
 
-  /**
-   * Who last changed the row, as {@code IDIR\jsmith}. Written by archiving — legacy passed back
-   * the values it had read, so an archive never recorded who did it.
-   */
   /** Who added the structure, and when — written once, by Add Structure. */
   @Column(name = "ENTRY_USERID", length = 30, updatable = false)
   private String entryUserid;
@@ -170,6 +166,10 @@ public class CrossingStructureEntity {
   @Column(name = "ANNUAL_INSPECTION_REQ_IND", length = 1)
   private String annualInspectionReqInd;
 
+  /**
+   * Who last changed the row, as {@code IDIR\jsmith}. Written by archiving — legacy passed back
+   * the values it had read, so an archive never recorded who did it.
+   */
   @Column(name = "UPDATE_USERID", length = 30)
   private String updateUserid;
 

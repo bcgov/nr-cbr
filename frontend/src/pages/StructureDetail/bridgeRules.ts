@@ -34,7 +34,6 @@ export type BridgeValues = {
   abutmentComment: string;
 };
 type Field = keyof BridgeValues;
-type Messages = BridgeMessages;
 
 /** A typed length as a number, null when blank, or NaN when it is not a number with ≤ `scale` decimals. */
 export const toMetres = (typed: string, scale: number): number | null => {
@@ -48,8 +47,8 @@ export const toMetres = (typed: string, scale: number): number | null => {
 export type BridgeStored = { [K in Field]?: boolean };
 
 /** The form's blocking rules — the server's, checked as the values change. */
-export const bridgeErrorsOf = (values: BridgeValues, stored: BridgeStored): Messages => {
-  const errors: Messages = {};
+export const bridgeErrorsOf = (values: BridgeValues, stored: BridgeStored): BridgeMessages => {
+  const errors: BridgeMessages = {};
   const durable = values.typeClassCode === DURABLE;
   const metres = (field: Field, label: string, scale: number, max: number) => {
     const value = toMetres(values[field] as string, scale);
@@ -120,8 +119,8 @@ export const bridgeErrorsOf = (values: BridgeValues, stored: BridgeStored): Mess
 };
 
 /** Legacy's range warnings, shown beside a field; they never stopped its save. */
-export const bridgeWarningsOf = (values: BridgeValues): Messages => {
-  const warnings: Messages = {};
+export const bridgeWarningsOf = (values: BridgeValues): BridgeMessages => {
+  const warnings: BridgeMessages = {};
   const length = toMetres(values.totalBridgeLength, 3);
   if (length !== null && !Number.isNaN(length) && length > 400) {
     warnings.totalBridgeLength = 'Bridge Length is not in the range 0 through 400.';

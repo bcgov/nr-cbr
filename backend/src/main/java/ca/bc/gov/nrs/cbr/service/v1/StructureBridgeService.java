@@ -210,11 +210,10 @@ public class StructureBridgeService {
     BigDecimal length = request.totalBridgeLength();
     checkMetres(errors, LENGTH, "Bridge Length", length, bridge.getTotalBridgeLength(),
         LENGTH_MAX, 3);
-    if (length != null && !errors.containsKey(LENGTH)) {
-      if (length.compareTo(spanTotal) < 0) {
-        errors.put(LENGTH, "Bridge Length must be at least the spans' total of "
-            + spanTotal.stripTrailingZeros().toPlainString() + " metres.");
-      }
+    if (length != null && length.compareTo(spanTotal) < 0) {
+      // Not over the length's own error, if it has one.
+      errors.putIfAbsent(LENGTH, "Bridge Length must be at least the spans' total of "
+          + spanTotal.stripTrailingZeros().toPlainString() + " metres.");
     }
     checkMetres(errors, "deckWidth", "Deck Width", request.deckWidth(), bridge.getDeckWidth(),
         WIDTH_MAX, 2);
