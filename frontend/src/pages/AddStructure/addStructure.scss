@@ -1,0 +1,28 @@
+@use '@carbon/react/scss/spacing' as *;
+
+// As Add Site's: the buttons keep their width, and a long title wraps instead. At the far right:
+// the structure page's styles, which this page shares, size the heading to its text rather than
+// stretching it across the row, so the buttons push themselves over.
+.add-structure__header-actions {
+  display: flex;
+  align-self: center;
+  flex-shrink: 0;
+  gap: $spacing-03;
+  margin-inline-start: auto;
+}
+
+// The sections run down the page without boxes, a rule between each — not the structure page's
+// outlined cards.
+.add-structure__sections .structure-detail__card {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+}
+
+.add-structure__divider {
+  width: 100%;
+  margin: 0;
+  border: none;
+  border-block-start: 1px solid var(--cds-border-subtle-01);
+}

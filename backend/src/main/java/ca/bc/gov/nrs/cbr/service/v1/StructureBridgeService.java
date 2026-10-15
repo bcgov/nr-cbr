@@ -129,21 +129,19 @@ public class StructureBridgeService {
             "Structure " + structureId + " has no bridge record, so it has no bridge details."));
 
     Map<String, String> errors = new LinkedHashMap<>();
+    BigDecimal spanTotal = spans
+        .findByForestServiceBridgeIdOrderBySpanNumberAsc(bridge.getForestServiceBridgeId())
+        .stream()
+        .map(ForestServiceBridgeSpanEntity::getSpanLength)
+        .filter(Objects::nonNull)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    validate(errors, bridge, request, spanTotal);
     String typeClass = trimmed(request.typeClassCode());
-    boolean durable = DURABLE.equals(typeClass);
     String superstructure = trimmed(request.superstructureTypeCode());
     String deckType = trimmed(request.deckTypeCode());
     String curb = trimmed(request.curbTypeCode());
     String left = trimmed(request.leftAbutmentCode());
     String right = trimmed(request.rightAbutmentCode());
-
-    checkIdentity(errors, typeClass, request);
-    checkDimensions(errors, bridge, request);
-    checkCodes(errors, bridge, request, durable);
-    checkPortable(errors, request, superstructure);
-    if (durable) {
-      checkDurable(errors, superstructure, left, right);
-    }
     if (!errors.isEmpty()) {
       throw new FieldValidationException("Bridge details cannot be saved", errors);
     }
@@ -170,6 +168,25 @@ public class StructureBridgeService {
     log.info("Updated the bridge details of structure {}", structureId);
   }
 
+  /**
+   * The Bridge card's rules, against what the bridge has stored and the spans' total — Add
+   * Structure passes an empty bridge, so nothing is "required once it has a value".
+   */
+  void validate(Map<String, String> errors, ForestServiceBridgeEntity stored,
+      BridgeDetailsRequest request, BigDecimal spanTotal) {
+    String typeClass = trimmed(request.typeClassCode());
+    boolean durable = DURABLE.equals(typeClass);
+    String superstructure = trimmed(request.superstructureTypeCode());
+    checkIdentity(errors, typeClass, request);
+    checkDimensions(errors, stored, request, spanTotal);
+    checkCodes(errors, stored, request, durable);
+    checkPortable(errors, request, superstructure);
+    if (durable) {
+      checkDurable(errors, superstructure, trimmed(request.leftAbutmentCode()),
+          trimmed(request.rightAbutmentCode()));
+    }
+  }
+
   /** Type/Class — Durable or Non-Durable only — and the two yes/no questions. */
   private static void checkIdentity(Map<String, String> errors, String typeClass,
       BridgeDetailsRequest request) {
@@ -188,18 +205,12 @@ public class StructureBridgeService {
   }
 
   /** Bridge Length — at least the spans' total — and Deck Width. */
-  private void checkDimensions(Map<String, String> errors, ForestServiceBridgeEntity bridge,
-      BridgeDetailsRequest request) {
+  private static void checkDimensions(Map<String, String> errors,
+      ForestServiceBridgeEntity bridge, BridgeDetailsRequest request, BigDecimal spanTotal) {
     BigDecimal length = request.totalBridgeLength();
     checkMetres(errors, LENGTH, "Bridge Length", length, bridge.getTotalBridgeLength(),
         LENGTH_MAX, 3);
     if (length != null && !errors.containsKey(LENGTH)) {
-      BigDecimal spanTotal = spans
-          .findByForestServiceBridgeIdOrderBySpanNumberAsc(bridge.getForestServiceBridgeId())
-          .stream()
-          .map(ForestServiceBridgeSpanEntity::getSpanLength)
-          .filter(Objects::nonNull)
-          .reduce(BigDecimal.ZERO, BigDecimal::add);
       if (length.compareTo(spanTotal) < 0) {
         errors.put(LENGTH, "Bridge Length must be at least the spans' total of "
             + spanTotal.stripTrailingZeros().toPlainString() + " metres.");
@@ -248,7 +259,7 @@ public class StructureBridgeService {
   private static void checkPortable(Map<String, String> errors, BridgeDetailsRequest request,
       String superstructure) {
     if (Boolean.TRUE.equals(request.portable())
-        && !PORTABLE_SUPERSTRUCTURES.contains(superstructure)) {
+        && !isOneOf(PORTABLE_SUPERSTRUCTURES, superstructure)) {
       errors.putIfAbsent(SUPERSTRUCTURE, "Only Steel Box Beam, Steel I-beam, "
           + "Steel Truss/Bailey/Acrow, Timber - Untreated Stringers and Timber - Treated Stringers "
           + "are allowed when Portable Structure is checked.");
@@ -259,15 +270,15 @@ public class StructureBridgeService {
   private static void checkDurable(Map<String, String> errors, String superstructure,
       String left, String right) {
     // Each only where its field has no error yet.
-    if (TEMPORARY_SUPERSTRUCTURES.contains(superstructure)) {
+    if (isOneOf(TEMPORARY_SUPERSTRUCTURES, superstructure)) {
       errors.putIfAbsent(SUPERSTRUCTURE,
           "Superstructure: temporary materials are not permitted in a Durable Bridge.");
     }
-    if (TEMPORARY_ABUTMENTS.contains(left)) {
+    if (isOneOf(TEMPORARY_ABUTMENTS, left)) {
       errors.putIfAbsent(LEFT,
           "Left Abutment: temporary materials are not permitted in a Durable Bridge.");
     }
-    if (TEMPORARY_ABUTMENTS.contains(right)) {
+    if (isOneOf(TEMPORARY_ABUTMENTS, right)) {
       errors.putIfAbsent(RIGHT,
           "Right Abutment: temporary materials are not permitted in a Durable Bridge.");
     }
@@ -323,6 +334,11 @@ public class StructureBridgeService {
   /** A comment kept only with its Other. */
   private static String otherComment(String code, String comment) {
     return OTHER.equals(code) ? trimmed(comment) : null;
+  }
+
+  /** Whether a code, possibly none, is in the set — {@code Set.of} refuses to look up null. */
+  private static boolean isOneOf(Set<String> codes, String code) {
+    return code != null && codes.contains(code);
   }
 
   /** The value without surrounding spaces, or null when nothing is left. */

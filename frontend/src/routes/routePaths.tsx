@@ -46,9 +46,15 @@ export type RouteDescription = {
   isSideMenu: boolean;
   children?: RouteDescription[];
   roles?: ROLE_TYPE[];
+  /**
+   * Pages off the menu that belong to this entry, as route patterns relative to the parent — the
+   * side nav highlights the entry on them too: a structure's page under Structure Search, a site's
+   * under Site Search.
+   */
+  activeFor?: string[];
 } & RouteObject;
 
-export type MenuItem = Pick<RouteDescription, 'id' | 'path' | 'icon'> & {
+export type MenuItem = Pick<RouteDescription, 'id' | 'path' | 'icon' | 'activeFor'> & {
   children?: MenuItem[];
 };
 
@@ -145,6 +151,8 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
       {
         path: 'site-search',
         id: 'Site Search',
+        // A site's page, and Add Structure from it.
+        activeFor: ['site/:siteId', 'site/:siteId/add-structure'],
         element: (
           <ProtectedRoute>
             <Layout>
@@ -183,6 +191,8 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         // Third in the legacy Inventory menu, after Add Site (cbr-navigation.local.md §1).
         path: 'structure-search',
         id: 'Structure Search',
+        // A structure's page.
+        activeFor: ['structure/:structureId'],
         element: (
           <ProtectedRoute>
             <Layout>
@@ -195,8 +205,7 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         roles: [...ROLE_CAPABILITIES.read],
       },
       {
-        // Reached from Site Detail's Add Structure button, not from the side menu. A placeholder
-        // for now — see the page.
+        // Reached from Site Detail's Add Structure button, not from the side menu.
         path: 'site/:siteId/add-structure',
         id: 'Add Structure',
         element: (
@@ -207,8 +216,9 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
           </ProtectedRoute>
         ),
         isSideMenu: false,
-        // Legacy gate: /level1Access, the same one Site Detail shows the button behind.
-        roles: [...ROLE_CAPABILITIES.write],
+        // Level 2 and up: legacy showed the button at Level 1 (/level1Access), but only Level 2
+        // could type the Structure # it needs. Site Detail shows the button to the same roles.
+        roles: [...ROLE_CAPABILITIES.destructive],
       },
       {
         // Reached from a structure number in Structure Search, not from the side menu. The
@@ -263,6 +273,8 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
       {
         path: 'inspection-search',
         id: 'Inspection Search',
+        // An inspection's page, and a new inspection.
+        activeFor: ['new', ':inspectionId'],
         element: (
           <ProtectedRoute>
             <Layout>
@@ -431,10 +443,11 @@ export const getMenuEntries = (roles: string[]): MenuItem[] => {
         children: children
           ?.filter((child) => child.isSideMenu)
           .filter(permitted)
-          .map(({ id: childId, path: childPath, icon: childIcon }) => ({
+          .map(({ id: childId, path: childPath, icon: childIcon, activeFor }) => ({
             id: childId,
             path: childPath,
             icon: childIcon,
+            activeFor,
           })),
       }))
       // A parent whose children are all filtered out is dropped rather than rendered empty. The

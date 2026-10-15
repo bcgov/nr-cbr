@@ -29,6 +29,7 @@ import type {
   LoadRatingRequest,
   ReplacementDetailsRequest,
   ReplacementRequest,
+  StructureCreateRequest,
   StructureDetailsRequest,
   StructureInformationRequest,
 } from '@/pages/StructureDetail/structureResponse';
@@ -439,6 +440,15 @@ export const useSitePreview = (siteId: string, currentSiteId: string | null) => 
   // Settled only once the typing has stopped on the number asked about.
   const settled = asked && debounced === siteId.trim();
   return { preview: settled ? query.data : undefined, loading: asked && query.isFetching };
+};
+
+/** Adds a structure. What the server refused comes back as `fieldErrors`, keyed by field. */
+export const useCreateStructure = () => {
+  const mutation = useMutation({
+    mutationFn: (request: StructureCreateRequest) =>
+      API.structureSearch.createStructure(request),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
 
 /** The fewest characters the Structure # type-ahead searches on — the backend's own minimum. */

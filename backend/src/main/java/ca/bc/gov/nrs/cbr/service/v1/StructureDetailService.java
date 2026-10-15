@@ -447,6 +447,11 @@ public class StructureDetailService {
    * (Structure.java:813-852, Bridge.java:830-859, Culvert.java:609-631). The same rules as
    * Structure Search's "Incomplete Data?" filter, so the two always agree.
    */
+  /** The Details tab's cards an outstanding item can belong to, as the cards are titled. */
+  private static final String LOAD_RATING_CARD = "Load Rating Details";
+  private static final String BRIDGE_CARD = "Bridge";
+  private static final String CULVERT_CARD = "Culvert";
+
   private static List<OutstandingItem> outstanding(
       CrossingStructureEntity structure,
       CrossingSiteEntity site,
@@ -455,21 +460,23 @@ public class StructureDetailService {
       LoadRating loadRating) {
     List<OutstandingItem> items = new ArrayList<>();
     if (loadRating.history().isEmpty() && !loadRating.reviewRequired()) {
-      items.add(new OutstandingItem(Section.DETAILS,
+      items.add(new OutstandingItem(Section.DETAILS, LOAD_RATING_CARD,
           "A load rating, or Load Rating Review Required"));
     }
     boolean recreation = site != null && RECREATION.equals(site.getCrossingSiteTypeCode());
     if (structure.getFullLogHaulReplacementYear() == null && !recreation) {
-      items.add(new OutstandingItem(Section.DETAILS, "Estimated Load Restriction (year)"));
+      items.add(new OutstandingItem(Section.DETAILS, "Replacement Details",
+          "Estimated Load Restriction (year)"));
     }
     if (structure.getNextPlannedInspectionDate() == null) {
-      items.add(new OutstandingItem(Section.INSPECTIONS, "Next Planned Routine Inspection"));
+      items.add(new OutstandingItem(Section.INSPECTIONS, "Inspection Schedule",
+          "Next Planned Routine Inspection"));
     }
     if (isBlank(structure.getStructureSourceCode())) {
-      items.add(new OutstandingItem(Section.DETAILS, "Source"));
+      items.add(new OutstandingItem(Section.DETAILS, "Structure", "Source"));
     }
     if (isBlank(structure.getCrossingSiteId())) {
-      items.add(new OutstandingItem(Section.SITE, "Site #"));
+      items.add(new OutstandingItem(Section.SITE, "Structure and site", "Site #"));
     }
     String typeClass = structure.getStructureTypeClassCode();
     if (BRIDGE_TYPE_CLASSES.contains(typeClass)) {
@@ -484,40 +491,44 @@ public class StructureDetailService {
   private static void bridgeOutstanding(
       Optional<ForestServiceBridgeEntity> found, List<OutstandingItem> items) {
     if (found.isEmpty()) {
-      items.add(new OutstandingItem(Section.DETAILS, "Bridge details"));
+      items.add(new OutstandingItem(Section.DETAILS, BRIDGE_CARD, "Bridge details"));
       return;
     }
     ForestServiceBridgeEntity bridge = found.get();
-    missing(items, bridge.getTotalBridgeLength() == null, "Bridge Length (metres)");
-    missing(items, bridge.getDeckWidth() == null, "Deck Width (metres)");
-    missing(items, isBlank(bridge.getRunningSurfaceCode()), "Running Surface");
-    missing(items, isBlank(bridge.getDeckTypeCode()), "Deck Type");
-    missing(items, isBlank(bridge.getSuperstructureTypeCode()), "Superstructure");
+    missing(items, BRIDGE_CARD, bridge.getTotalBridgeLength() == null,
+        "Bridge Length (metres)");
+    missing(items, BRIDGE_CARD, bridge.getDeckWidth() == null, "Deck Width (metres)");
+    missing(items, BRIDGE_CARD, isBlank(bridge.getRunningSurfaceCode()), "Running Surface");
+    missing(items, BRIDGE_CARD, isBlank(bridge.getDeckTypeCode()), "Deck Type");
+    missing(items, BRIDGE_CARD, isBlank(bridge.getSuperstructureTypeCode()), "Superstructure");
     // Both abutments, unless the portable superstructure is in storage.
     if (!IN_STORAGE.equals(bridge.getPortableSuperstructureStatusCode())) {
-      missing(items, isBlank(bridge.getLeftAbutmentCode()), "Left Abutment");
-      missing(items, isBlank(bridge.getRightAbutmentCode()), "Right Abutment");
+      missing(items, BRIDGE_CARD, isBlank(bridge.getLeftAbutmentCode()), "Left Abutment");
+      missing(items, BRIDGE_CARD, isBlank(bridge.getRightAbutmentCode()), "Right Abutment");
     }
   }
 
   private static void culvertOutstanding(
       Optional<ForestServiceCulvertEntity> found, List<OutstandingItem> items) {
     if (found.isEmpty()) {
-      items.add(new OutstandingItem(Section.DETAILS, "Culvert details"));
+      items.add(new OutstandingItem(Section.DETAILS, CULVERT_CARD, "Culvert details"));
       return;
     }
     ForestServiceCulvertEntity culvert = found.get();
-    missing(items, culvert.getCulvertNumber() == null, "Culvert Number");
-    missing(items, culvert.getCulvertLength() == null, "Culvert Length (metres)");
-    missing(items, culvert.getOpeningHeight() == null, "Opening Height (mm)");
-    missing(items, culvert.getOpeningWidth() == null, "Opening Width (mm)");
-    missing(items, isBlank(culvert.getEngineeredCulvertMaterialCode()), "Culvert Material");
-    missing(items, isBlank(culvert.getEngineeredCulvertTypeCode()), "Culvert Type");
+    missing(items, CULVERT_CARD, culvert.getCulvertNumber() == null, "Culvert Number");
+    missing(items, CULVERT_CARD, culvert.getCulvertLength() == null,
+        "Culvert Length (metres)");
+    missing(items, CULVERT_CARD, culvert.getOpeningHeight() == null, "Opening Height (mm)");
+    missing(items, CULVERT_CARD, culvert.getOpeningWidth() == null, "Opening Width (mm)");
+    missing(items, CULVERT_CARD, isBlank(culvert.getEngineeredCulvertMaterialCode()),
+        "Culvert Material");
+    missing(items, CULVERT_CARD, isBlank(culvert.getEngineeredCulvertTypeCode()), "Culvert Type");
   }
 
-  private static void missing(List<OutstandingItem> items, boolean isMissing, String label) {
+  private static void missing(List<OutstandingItem> items, String card, boolean isMissing,
+      String label) {
     if (isMissing) {
-      items.add(new OutstandingItem(Section.DETAILS, label));
+      items.add(new OutstandingItem(Section.DETAILS, card, label));
     }
   }
 

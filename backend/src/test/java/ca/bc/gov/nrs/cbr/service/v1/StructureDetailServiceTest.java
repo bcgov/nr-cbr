@@ -441,12 +441,15 @@ class StructureDetailServiceTest {
       givenBridge(70L, 7L, bridge -> bridge.deckWidth(null).rightAbutmentCode(null));
 
       assertThat(read(7L).outstanding()).containsExactly(
-          new OutstandingItem(Section.DETAILS, "A load rating, or Load Rating Review Required"),
-          new OutstandingItem(Section.DETAILS, "Estimated Load Restriction (year)"),
-          new OutstandingItem(Section.INSPECTIONS, "Next Planned Routine Inspection"),
-          new OutstandingItem(Section.DETAILS, "Source"),
-          new OutstandingItem(Section.DETAILS, "Deck Width (metres)"),
-          new OutstandingItem(Section.DETAILS, "Right Abutment"));
+          new OutstandingItem(Section.DETAILS, "Load Rating Details",
+              "A load rating, or Load Rating Review Required"),
+          new OutstandingItem(Section.DETAILS, "Replacement Details",
+              "Estimated Load Restriction (year)"),
+          new OutstandingItem(Section.INSPECTIONS, "Inspection Schedule",
+              "Next Planned Routine Inspection"),
+          new OutstandingItem(Section.DETAILS, "Structure", "Source"),
+          new OutstandingItem(Section.DETAILS, "Bridge", "Deck Width (metres)"),
+          new OutstandingItem(Section.DETAILS, "Bridge", "Right Abutment"));
     }
 
     @Test
@@ -490,7 +493,7 @@ class StructureDetailServiceTest {
       givenStructure(7L, "B100", "SITE-1", s -> { });
 
       assertThat(read(7L).outstanding())
-          .containsExactly(new OutstandingItem(Section.DETAILS, "Bridge details"));
+          .containsExactly(new OutstandingItem(Section.DETAILS, "Bridge", "Bridge details"));
     }
   }
 }

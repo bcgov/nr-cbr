@@ -1,5 +1,5 @@
 import { fillMissingCoordinates } from '@/components/SiteForm/coordinateSync';
-import { EMPTY_SITE, type SiteFormValues } from '@/components/SiteForm/types';
+import { EMPTY_SITE, SITE_TYPE, type SiteFormValues } from '@/components/SiteForm/types';
 
 /** One crossing site as `/api/v1/sites/{siteId}` returns it. Stored values, not display values. */
 export type SiteDetailResponse = {
@@ -32,6 +32,30 @@ export type SiteDetailResponse = {
   utmEasting: number | null;
   utmNorthing: number | null;
   pointOfAccessDescription: string | null;
+};
+
+const blank = (value: string | number | null | undefined) =>
+  value === null || value === undefined || String(value).trim() === '';
+
+/**
+ * Whether a structure may be added to the site — legacy's three checks on Site Detail's Add
+ * Structure button, which the server repeats on save: the site is complete (legacy's
+ * `Site.isComplete()`: status, inspection status, district and type set, and a crossing name and
+ * kilometres unless it is a storage site), and it is not Proposed or closed (deactivated).
+ */
+export const canAddStructureTo = (site: SiteDetailResponse): boolean => {
+  if (
+    blank(site.crossingSiteStatusCode) ||
+    blank(site.structureInspectionStatusCode) ||
+    site.orgUnitNo === null ||
+    blank(site.crossingSiteTypeCode)
+  ) {
+    return false;
+  }
+  const complete =
+    site.crossingSiteTypeCode === SITE_TYPE.STORAGE ||
+    (!blank(site.crossingName) && !blank(site.pointOfCommencementDistance));
+  return complete && !['PP', 'DAC'].includes(site.crossingSiteStatusCode ?? '');
 };
 
 const asText = (value: string | number | null | undefined): string =>

@@ -36,6 +36,7 @@ import type {
   SitePreviewResponse,
   StructureDetailResponse,
   StructureNameSuggestion,
+  StructureCreateRequest,
   ReplacementRequest,
   BridgeDetailsRequest,
   CulvertDetailsRequest,
@@ -300,6 +301,15 @@ export class StructureSearchService extends HttpClient {
       method: 'PUT',
       url: '/v1/structures/{structureId}/culvert-details',
       path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Adds a structure to a site. 400 with `fieldErrors` keyed by field (`bridge.deckWidth`, …). */
+  createStructure(request: StructureCreateRequest): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures',
       body: request,
     });
   }

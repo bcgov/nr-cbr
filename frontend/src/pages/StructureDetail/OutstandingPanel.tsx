@@ -9,11 +9,12 @@ type Props = {
 };
 
 /**
- * What the structure is missing, behind a disclosure at the top of the tab.
+ * What the structure is missing in this tab, behind a disclosure at the top of it — nr-frep's
+ * pattern.
  *
  * <p>Open by default, because it is the answer to the banner above the tabs. Collapsing it is a
- * per-visit choice. Grouped by the part of the page each item belongs to; until the Inspections tab
- * exists its items are listed here too, under their own heading.
+ * per-visit choice. Grouped by the section (card) of the tab each field is in, so the list says
+ * where to go: "Replacement Details — Estimated Load Restriction (year)".
  */
 const OutstandingPanel: FC<Props> = ({ groups }) => {
   const [open, setOpen] = useState(true);
@@ -32,7 +33,7 @@ const OutstandingPanel: FC<Props> = ({ groups }) => {
         aria-controls={contentId}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
-        Outstanding
+        Outstanding in this tab
         <span className="cds--visually-hidden">{` (${total} ${noun})`}</span>
         {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>

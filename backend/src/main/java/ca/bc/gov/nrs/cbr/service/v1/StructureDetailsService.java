@@ -92,11 +92,28 @@ public class StructureDetailsService {
   public void updateStructure(long structureId, StructureDetailsRequest request) {
     CrossingStructureEntity structure = structures.findById(structureId)
         .orElseThrow(() -> new StructureNotFoundException(structureId));
-    String builtBy = trimmed(request.builtByCode());
-    String source = trimmed(request.sourceCode());
-
     Map<String, String> errors = new LinkedHashMap<>();
-    if (builtBy != null && !builtBy.equals(structure.getBuiltByCode())
+    validateStructure(errors, structure, request);
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Structure details cannot be saved", errors);
+    }
+
+    structures.updateStructureDetails(structureId, trimmed(request.builtByCode()),
+        request.yearFabricated(), request.yearBuilt(), request.inventoryAddedYear(),
+        trimmed(request.sourceCode()), request.endOfDesignLifeYear(),
+        Objects.equals(request.asBuiltInfoOnFile(), Boolean.TRUE) ? YES : NO,
+        request.installationCost(), request.materialCost(), loggedUser.getLoggedUserId());
+    log.info("Updated the structure details of structure {}", structureId);
+  }
+
+  /**
+   * The Structure card's rules, against what the structure has stored — Add Structure passes an
+   * empty one, so nothing is "required once it has a value".
+   */
+  void validateStructure(Map<String, String> errors, CrossingStructureEntity stored,
+      StructureDetailsRequest request) {
+    String builtBy = trimmed(request.builtByCode());
+    if (builtBy != null && !builtBy.equals(stored.getBuiltByCode())
         && !builtByCodes.existsById(builtBy)) {
       errors.put("builtByCode", "Built For is not one of the listed values.");
     }
@@ -105,21 +122,12 @@ public class StructureDetailsService {
     checkYear(errors, INVENTORY_ADDED, "Year Added to Inventory", request.inventoryAddedYear());
     checkYear(errors, "endOfDesignLifeYear", "End of Design Life", request.endOfDesignLifeYear());
     checkFabricated(errors, request);
-    checkSource(errors, structure, source, request);
+    checkSource(errors, stored, trimmed(request.sourceCode()), request);
     if (request.asBuiltInfoOnFile() == null) {
       errors.put("asBuiltInfoOnFile", "As Built Information on File is required.");
     }
     checkCost(errors, "installationCost", "Installation Cost", request.installationCost());
     checkCost(errors, "materialCost", "Material Cost", request.materialCost());
-    if (!errors.isEmpty()) {
-      throw new FieldValidationException("Structure details cannot be saved", errors);
-    }
-
-    structures.updateStructureDetails(structureId, builtBy, request.yearFabricated(),
-        request.yearBuilt(), request.inventoryAddedYear(), source, request.endOfDesignLifeYear(),
-        Objects.equals(request.asBuiltInfoOnFile(), Boolean.TRUE) ? YES : NO,
-        request.installationCost(), request.materialCost(), loggedUser.getLoggedUserId());
-    log.info("Updated the structure details of structure {}", structureId);
   }
 
   /** Year Superstructure Fabricated: not after this year, nor after the year installed. */
@@ -176,11 +184,28 @@ public class StructureDetailsService {
     CrossingStructureEntity structure = structures.findById(structureId)
         .orElseThrow(() -> new StructureNotFoundException(structureId));
     Map<String, String> errors = new LinkedHashMap<>();
+    validateReplacement(errors, structure, request);
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Replacement details cannot be saved", errors);
+    }
+    structures.updateReplacementDetails(structureId, request.closureYear(),
+        request.replacementYear(), request.loadRestrictionYear(), request.cost(),
+        trimmed(request.costComment()),
+        loggedUser.getLoggedUserId());
+    log.info("Updated the replacement details of structure {}", structureId);
+  }
+
+  /**
+   * Replacement Details' rules, against what the structure has stored — Add Structure passes an
+   * empty one, so Estimated Load Restriction is not required there.
+   */
+  void validateReplacement(Map<String, String> errors, CrossingStructureEntity stored,
+      ReplacementDetailsRequest request) {
     checkYear(errors, CLOSURE, "Estimated Closure", request.closureYear());
     checkYear(errors, REPLACEMENT, "Estimated Replacement", request.replacementYear());
     checkYear(errors, LOAD_RESTRICTION, "Estimated Load Restriction",
         request.loadRestrictionYear());
-    if (request.loadRestrictionYear() == null && structure.getFullLogHaulReplacementYear() != null) {
+    if (request.loadRestrictionYear() == null && stored.getFullLogHaulReplacementYear() != null) {
       errors.put(LOAD_RESTRICTION, "Estimated Load Restriction is required.");
     }
     checkReplacementOrder(errors, request);
@@ -193,13 +218,6 @@ public class StructureDetailsService {
       errors.put("costComment", "Replacement Cost Comments can be at most " + TEXT_MAX
           + " characters.");
     }
-    if (!errors.isEmpty()) {
-      throw new FieldValidationException("Replacement details cannot be saved", errors);
-    }
-    structures.updateReplacementDetails(structureId, request.closureYear(),
-        request.replacementYear(), request.loadRestrictionYear(), cost, comment,
-        loggedUser.getLoggedUserId());
-    log.info("Updated the replacement details of structure {}", structureId);
   }
 
   /**

@@ -759,3 +759,8 @@ $page-bottom: 2rem;
     margin-block-end: 0;
   }
 }
+
+// A 2000-character box in a fields grid — an Other's details — takes the whole row, not one column.
+.structure-detail__fields > .cbr-field {
+  grid-column: 1 / -1;
+}

@@ -7,7 +7,7 @@ import PageTitle from '@/components/core/PageTitle';
 import RoadSearchModal from '@/components/RoadSearchModal';
 import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
 
-import { toFormValues } from './siteResponse';
+import { canAddStructureTo, toFormValues } from './siteResponse';
 
 import type { StructureLinkState } from '@/pages/StructureDetail';
 import type { FC } from 'react';
@@ -336,13 +336,15 @@ const SiteDetailPage: FC = () => {
       >
         <div className="site-detail__header-actions">
           {/* Shown only once the site is on screen, as legacy's `structuresButton` div is
-              `display:none` until `actionType` is UPDATE. Add Structure opens a placeholder page.
+              `display:none` until `actionType` is UPDATE.
               Display Structures opens the structure itself when the site has one, and Structure
               Search filtered to the site when it has several — legacy always opens the search.
               With none there is nothing to display, so the button is not shown. */}
           {mode === 'view' && loaded.data && (
             <>
-              {canEdit && (
+              {/* Level 2 and up, on a site a structure may be added to — hidden, not disabled,
+                  where legacy disabled it. */}
+              {canDelete && canAddStructureTo(loaded.data) && (
                 <Button
                   kind="tertiary"
                   size="md"

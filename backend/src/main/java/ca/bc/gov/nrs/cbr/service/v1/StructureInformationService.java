@@ -151,12 +151,20 @@ public class StructureInformationService {
       }
       return;
     }
-    // Not Optional.map: a site with nothing wrong maps to null, which map() would take for "none".
-    Optional<CrossingSiteEntity> site = sites.findById(siteId);
-    String problem = site.isPresent() ? problemWith(site.get()) : notFound(siteId);
+    String problem = siteProblem(siteId);
     if (problem != null) {
       errors.put(SITE, problem);
     }
+  }
+
+  /**
+   * Why a structure cannot stand on this site — it does not exist, is incomplete, or is Proposed —
+   * or null when it can. Shared with Add Structure.
+   */
+  String siteProblem(String siteId) {
+    // Not Optional.map: a site with nothing wrong maps to null, which map() would take for "none".
+    Optional<CrossingSiteEntity> site = sites.findById(siteId);
+    return site.isPresent() ? problemWith(site.get()) : notFound(siteId);
   }
 
   /**

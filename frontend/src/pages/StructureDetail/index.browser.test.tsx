@@ -534,10 +534,10 @@ describe('StructureDetailPage — loading', () => {
     );
   });
 
-  it('stays marked under construction until its other tabs exist', async () => {
+  it('is no longer marked under construction: every tab is built', async () => {
     await showing(bridge());
 
-    expect(screen.getByText('Under construction')).toBeInTheDocument();
+    expect(screen.queryByText('Under construction')).not.toBeInTheDocument();
   });
 });
 
@@ -1356,9 +1356,17 @@ describe('StructureDetailPage — incomplete data', () => {
   const incomplete = () =>
     bridge({
       outstanding: [
-        { section: 'DETAILS', label: 'Deck Width' },
-        { section: 'DETAILS', label: 'Estimated Load Restriction (year)' },
-        { section: 'INSPECTIONS', label: 'Next Planned Routine Inspection' },
+        { section: 'DETAILS', card: 'Bridge', label: 'Deck Width' },
+        {
+          section: 'DETAILS',
+          card: 'Replacement Details',
+          label: 'Estimated Load Restriction (year)',
+        },
+        {
+          section: 'INSPECTIONS',
+          card: 'Inspection Schedule',
+          label: 'Next Planned Routine Inspection',
+        },
       ],
     });
 
@@ -1370,20 +1378,31 @@ describe('StructureDetailPage — incomplete data', () => {
     );
   });
 
-  it('badges the Details tab with the count', async () => {
+  it("badges each tab with its own count, as nr-frep's tab strip", async () => {
     await showing(incomplete());
 
-    expect(screen.getByRole('img', { name: 'Details: 3 items outstanding' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Details: 2 items outstanding' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Inspections: 1 item outstanding' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /^Information:/ })).not.toBeInTheDocument();
   });
 
-  it('lists what is missing at the top of the tab, grouped by where it belongs', async () => {
+  it('lists what is missing in each tab, under the section it is in', async () => {
     await showing(incomplete());
 
-    const panel = screen.getByTestId('structure-outstanding-panel');
-    expect(panel).toMatchTextContent('Details');
-    expect(panel).toMatchTextContent('Deck Width');
-    expect(panel).toMatchTextContent('Inspections');
-    expect(panel).toMatchTextContent('Next Planned Routine Inspection');
+    const details = within(screen.getByTestId('structure-details-tab')).getByTestId(
+      'structure-outstanding-panel',
+    );
+    expect(details).toMatchTextContent(/Outstanding in this tab/);
+    expect(details).toMatchTextContent(/BridgeDeck Width/);
+    expect(details).toMatchTextContent(/Replacement DetailsEstimated Load Restriction \(year\)/);
+    expect(details).not.toMatchTextContent(/Next Planned Routine Inspection/);
+
+    const inspections = within(screen.getByTestId('structure-inspections-tab')).getByTestId(
+      'structure-outstanding-panel',
+    );
+    expect(inspections).toMatchTextContent(/Inspection ScheduleNext Planned Routine Inspection/);
   });
 
   it('folds the list away on request', async () => {
@@ -2546,7 +2565,9 @@ describe('StructureDetailPage — Inspections', () => {
     it('waits until the structure is complete, as legacy, and says why', async () => {
       authorization.canWriteInspection = true;
       authorization.canEdit = true;
-      await showing(bridge({ outstanding: [{ section: 'DETAILS', label: 'Deck Width' }] }));
+      await showing(
+        bridge({ outstanding: [{ section: 'DETAILS', card: 'Bridge', label: 'Deck Width' }] }),
+      );
       await openInspections();
 
       expect(await screen.findByTestId('inspection-add-routine')).toBeDisabled();

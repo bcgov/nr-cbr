@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import ExternalLink from '@/components/core/ExternalLink';
 
 import Card from './Card';
+import OutstandingPanel from './OutstandingPanel';
 import CloseProximityDialog from './CloseProximityDialog';
 import CommentDialog from './CommentDialog';
 import CommentsCard from './CommentsCard';
@@ -27,6 +28,7 @@ import ScheduleCard from './ScheduleCard';
 
 import type { InspectionScheduleResponse, StructureInspection } from './inspectionsResponse';
 import type { StructureComment } from './structureResponse';
+import type { OutstandingGroup } from './format';
 import type { FC } from 'react';
 
 import { useAuthorization } from '@/hooks/useAuthorization';
@@ -44,6 +46,8 @@ type Props = {
   opened: boolean;
   /** True when the structure has nothing outstanding — legacy's `isComplete()`. */
   complete: boolean;
+  /** What is missing in this tab, by section. */
+  outstanding: OutstandingGroup[];
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -302,7 +306,7 @@ const InspectionsCard: FC<{
  * the planned-inspection comments' Add and Edit, and the inspections' Add Routine and Add Unplanned
  * Inspection, which open the (placeholder) new-inspection page.
  */
-const InspectionsTab: FC<Props> = ({ structureId, opened, complete }) => {
+const InspectionsTab: FC<Props> = ({ structureId, opened, complete, outstanding }) => {
   const schedule = useStructureInspectionSchedule(structureId, opened);
   /** The card being edited, if any — one at a time. */
   const [editing, setEditing] = useState<'schedule' | null>(null);
@@ -315,6 +319,7 @@ const InspectionsTab: FC<Props> = ({ structureId, opened, complete }) => {
 
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-inspections-tab">
+      <OutstandingPanel groups={outstanding} />
       {schedule.isError && (
         <InlineNotification
           kind="error"

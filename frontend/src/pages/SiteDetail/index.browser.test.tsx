@@ -246,22 +246,33 @@ describe('SiteDetailPage — the structure actions', () => {
   it('offers both once the site is on screen', async () => {
     // Legacy keeps its `structuresButton` div hidden until the site exists — on a blank Add Site
     // form there are no structures to add one to or list.
-    await renderPage({ canEdit: true });
+    await renderPage({ canEdit: true, canDelete: true });
 
     expect(screen.getByTestId('site-detail-add-structure')).toBeInTheDocument();
     expect(screen.getByTestId('site-detail-structures')).toBeInTheDocument();
   });
 
-  it('withholds Add Structure from someone who cannot create one', async () => {
-    // Legacy wraps it in `/level1Access` and leaves Display Structures ungated.
-    await renderPage();
+  it('offers Add Structure from Level 2 only', async () => {
+    // Legacy showed it at Level 1, but only Level 2 could type the Structure # it needs.
+    await renderPage({ canEdit: true });
 
     expect(screen.queryByTestId('site-detail-add-structure')).not.toBeInTheDocument();
     expect(screen.getByTestId('site-detail-structures')).toBeInTheDocument();
   });
 
+  it.each([
+    ['Proposed', { crossingSiteStatusCode: 'PP' }],
+    ['closed (deactivated)', { crossingSiteStatusCode: 'DAC' }],
+    ['incomplete', { crossingName: null }],
+  ])('hides Add Structure on a %s site, as legacy kept it from one', async (_, change) => {
+    siteApi.getSite.mockResolvedValue({ ...response, ...change });
+    await renderPage({ canEdit: true, canDelete: true });
+
+    expect(screen.queryByTestId('site-detail-add-structure')).not.toBeInTheDocument();
+  });
+
   it('opens Add Structure for this site', async () => {
-    await renderPage({ canEdit: true });
+    await renderPage({ canEdit: true, canDelete: true });
 
     fireEvent.click(screen.getByTestId('site-detail-add-structure'));
 

@@ -65,6 +65,15 @@ class StructureApiEndpointTest {
   }
 
   @Test
+  @DisplayName("Add Structure is POST /api/v1/structures, gated on DESTRUCTIVE (Level 2)")
+  void createStructureIsMappedAndGated() {
+    Method create = method("createStructure");
+    assertThat(create.getAnnotation(PostMapping.class).value()).isEmpty();
+    assertThat(create.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.DESTRUCTIVE);
+  }
+
+  @Test
   @DisplayName("site preview is GET /site-preview, gated on READ")
   void sitePreviewIsMappedAndGated() {
     Method preview = method("previewSite");

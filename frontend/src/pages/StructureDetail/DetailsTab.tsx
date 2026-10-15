@@ -122,7 +122,6 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
         structureId={structure.id}
         replacement={replacement}
         yearBuilt={details.yearBuilt}
-        recreation={structure.site?.siteTypeCode === 'REC'}
         editing={editing === 'replacement'}
         otherEditing={editing !== null && editing !== 'replacement'}
         onEdit={() => setEditing('replacement')}
