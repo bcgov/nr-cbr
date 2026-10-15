@@ -1,18 +1,27 @@
 import { Button, Modal } from '@carbon/react';
 import { useState } from 'react';
 
+import { requiredLabel } from '@/utils/requiredLabel';
+
 import { toIso } from './dateBox';
 import DateField from './DateField';
 
 import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useAddCloseProximityInspection } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 
 type Props = {
   structureId: string;
   onClose: () => void;
+};
+
+/** The date's error: required, and a date as yyyy/mm/dd. */
+const dateError = (date: string): string | undefined => {
+  if (!date.trim()) return 'Date is required.';
+  return toIso(date) === null ? 'Date must be a date, as yyyy/mm/dd.' : undefined;
 };
 
 /**
@@ -24,17 +33,18 @@ const CloseProximityDialog: FC<Props> = ({ structureId, onClose }) => {
   const add = useAddCloseProximityInspection(structureId);
   const { display } = useNotification();
   const [date, setDate] = useState('');
-  /** The form's own error, set on Save and cleared as the date changes. */
-  const [error, setError] = useState<string>();
-  const shown = error ?? add.fieldErrors.completedDate;
+  // Checked as the date changes; shown once the box is left, or at Save.
+  const form = useFieldErrors<'completedDate'>(
+    {
+      completedDate: dateError(date),
+    },
+    add.fieldErrors,
+  );
+  const shown = form.shown.completedDate;
 
   const save = () => {
     const completedDate = toIso(date);
-    let found: string | undefined;
-    if (!date.trim()) found = 'Date is required.';
-    else if (completedDate === null) found = 'Date must be a date, as yyyy/mm/dd.';
-    setError(found);
-    if (completedDate === null || found) return;
+    if (!form.submit() || completedDate === null) return;
     add.mutate(
       { completedDate },
       {
@@ -76,21 +86,29 @@ const CloseProximityDialog: FC<Props> = ({ structureId, onClose }) => {
       <div className="structure-detail__edit-cell">
         <DateField
           id="close-proximity-date"
-          labelText="Date completed"
+          labelText={requiredLabel('Date completed', true)}
           value={date}
           invalidText={shown}
           onChange={(value) => {
             setDate(value);
-            setError(undefined);
+            form.change('completedDate');
           }}
+          onBlur={() => form.leave('completedDate')}
         />
       </div>
 
       <div className="structure-detail__dialog-actions">
-        <Button kind="tertiary" size="md" onClick={onClose} disabled={add.isPending}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          size="md"
+          onClick={onClose}
+          disabled={add.isPending}
+        >
           Cancel
         </Button>
         <Button
+          onMouseDown={holdFocus}
           kind="primary"
           size="md"
           onClick={save}

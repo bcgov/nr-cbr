@@ -11,6 +11,7 @@ import {
 import { useState } from 'react';
 
 import FieldWithCounter from '@/components/core/FieldWithCounter';
+import { requiredLabel } from '@/utils/requiredLabel';
 
 import { toBox, toIso } from './dateBox';
 import DateField from './DateField';
@@ -19,6 +20,7 @@ import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { useDocumentExtensions, useFileAttachmentTypeCodes } from '@/hooks/useConfiguration';
+import { holdFocus } from '@/hooks/useFieldErrors';
 import { useAddDocuments, type DocumentUploadOutcome } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { byteLength, overLimitError } from '@/utils/textLimits';
@@ -127,8 +129,12 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
 
   const [rows, setRows] = useState<Row[]>([]);
   const [nextKey, setNextKey] = useState(0);
-  /** The form's own errors, by row key, set on Add and cleared field by field as each changes. */
-  const [errors, setErrors] = useState<Record<number, RowErrors>>({});
+  /**
+   * The row fields the user has left, as `key.field` — each one's error shows from then on. A
+   * file's own problem shows as soon as it is picked; everything shows once Add is pressed.
+   */
+  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set());
+  const [submitted, setSubmitted] = useState(false);
   /** What the server refused, by row key, cleared field by field as each changes. */
   const [serverErrors, setServerErrors] = useState<Record<number, RowErrors>>({});
   /** A problem with the whole batch: none chosen, too many, or some not added. */
@@ -136,10 +142,18 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
   /** While adding: how many have been sent, of how many. */
   const [progress, setProgress] = useState<{ sent: number; total: number }>();
 
-  // The form's own message wins where it has one; a field it found nothing wrong with is left to
-  // the server's.
+  const leave = (key: number, field: Field) =>
+    setVisited((current) => new Set(current).add(`${key}.${field}`));
+
+  // The rows checked as they change; the form's own message wins where it has one shown, and a
+  // field it found nothing wrong with is left to the server's.
   const shownFor = (key: number): RowErrors => {
-    const own = Object.entries(errors[key] ?? {}).filter(([, message]) => message);
+    const row = rows.find((each) => each.key === key);
+    const live = row ? rowErrors(row, extensions) : {};
+    const own = Object.entries(live).filter(
+      ([field, message]) =>
+        message && (submitted || field === 'file' || visited.has(`${key}.${field}`)),
+    );
     return { ...serverErrors[key], ...Object.fromEntries(own) };
   };
 
@@ -156,21 +170,14 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
     setNextKey(nextKey + files.length);
     setRows((current) => [...current, ...added]);
     setBatchError(undefined);
-    // A file the server would refuse — wrong type, too big, empty — is flagged on its row now, as
-    // it is picked, rather than after Add.
-    setErrors((current) => ({
-      ...current,
-      ...Object.fromEntries(
-        added.map((row) => [row.key, { file: fileError(row.file, extensions) }]),
-      ),
-    }));
+    // A file the server would refuse — wrong type, too big, empty — is flagged on its row as it is
+    // picked, rather than after Add: `shownFor` shows a file's own problem at once.
   };
 
   const change = (key: number, field: Exclude<Field, 'file'>, value: string) => {
     setRows((current) =>
       current.map((row) => (row.key === key ? { ...row, [field]: value } : row)),
     );
-    setErrors((current) => ({ ...current, [key]: { ...current[key], [field]: undefined } }));
     setServerErrors((current) => ({
       ...current,
       [key]: { ...current[key], [field]: undefined },
@@ -224,11 +231,11 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
     else if (rows.length > MAX_FILES) {
       batch = `At most ${MAX_FILES} files can be added at a time.`;
     }
-    const found = Object.fromEntries(rows.map((row) => [row.key, rowErrors(row, extensions)]));
+    const found = rows.map((row) => rowErrors(row, extensions));
     setBatchError(batch);
-    setErrors(found);
+    setSubmitted(true);
     setServerErrors({});
-    if (batch || Object.values(found).some(hasErrors)) return;
+    if (batch || found.some(hasErrors)) return;
 
     const uploads = rows.map((row) => ({
       key: row.key,
@@ -259,12 +266,8 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
       className="structure-detail__upload-dialog"
     >
       <Stack gap={5}>
-        <p className="structure-detail__upload-intro">
-          All fields are required unless marked optional.
-        </p>
-
         <div>
-          <span className="structure-detail__upload-label">Files</span>
+          <span className="structure-detail__upload-label">{requiredLabel('Files', true)}</span>
           <p className="structure-detail__upload-helper">Up to {MAX_FILES} files, 10 MB each.</p>
           <FileUploaderDropContainer
             labelText="Drag and drop files here or click to upload"
@@ -325,12 +328,13 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
               <Select
                 id={`upload-type-${row.key}`}
                 data-testid={`upload-type-${row.key}`}
-                labelText="Photo View"
+                labelText={requiredLabel('Photo View', true)}
                 value={row.attachmentTypeCode}
                 disabled={types.isLoading}
                 invalid={Boolean(shown.attachmentTypeCode)}
                 invalidText={shown.attachmentTypeCode}
                 onChange={(event) => change(row.key, 'attachmentTypeCode', event.target.value)}
+                onBlur={() => leave(row.key, 'attachmentTypeCode')}
               >
                 <SelectItem value="" text="— Select Photo View —" />
                 {(types.data ?? []).map((option) => (
@@ -339,23 +343,23 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
               </Select>
               <DateField
                 id={`upload-created-${row.key}`}
-                labelText="Photo/Doc Created"
+                labelText={requiredLabel('Photo/Doc Created', true)}
                 value={row.createdDate}
                 invalidText={shown.createdDate}
                 onChange={(value) => change(row.key, 'createdDate', value)}
+                onBlur={() => leave(row.key, 'createdDate')}
               />
               <FieldWithCounter used={byteLength(row.description)} limit={TEXT_MAX}>
                 <TextArea
                   id={`upload-description-${row.key}`}
                   data-testid={`upload-description-${row.key}`}
-                  labelText={
-                    row.attachmentTypeCode === OTHER ? 'Description' : 'Description (optional)'
-                  }
+                  labelText={requiredLabel('Description', row.attachmentTypeCode === OTHER)}
                   rows={3}
                   value={row.description}
                   invalid={Boolean(shown.description)}
                   invalidText={shown.description}
                   onChange={(event) => change(row.key, 'description', event.target.value)}
+                  onBlur={() => leave(row.key, 'description')}
                 />
               </FieldWithCounter>
             </section>
@@ -364,10 +368,16 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
       </Stack>
 
       <div className="structure-detail__upload-actions">
-        <Button kind="tertiary" onClick={onClose} disabled={add.isPending}>
+        <Button onMouseDown={holdFocus} kind="tertiary" onClick={onClose} disabled={add.isPending}>
           Cancel
         </Button>
-        <Button kind="primary" onClick={save} disabled={add.isPending} data-testid="upload-save">
+        <Button
+          onMouseDown={holdFocus}
+          kind="primary"
+          onClick={save}
+          disabled={add.isPending}
+          data-testid="upload-save"
+        >
           {progress ? `Adding ${progress.sent + 1} of ${progress.total}…` : 'Add documents'}
         </Button>
       </div>

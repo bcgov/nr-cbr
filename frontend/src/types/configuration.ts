@@ -37,3 +37,29 @@ export type StatusTagType =
   | 'gray'
   | 'cool-gray'
   | 'warm-gray';
+
+/** The Details tab's Bridge card lists — the backend's `BridgeCodesResponse`, current codes only. */
+export type BridgeCodes = {
+  superstructureTypes: CodeOption[];
+  deckTypes: CodeOption[];
+  runningSurfaces: CodeOption[];
+  curbTypes: CodeOption[];
+  abutments: CodeOption[];
+};
+
+/** Load Rating Details' lists — the backend's `LoadRatingCodesResponse`, current codes only. */
+export type LoadRatingCodes = {
+  loadPostingSigns: CodeOption[];
+  /** Each with the design load rating it fixes, or null when that rating is typed. */
+  designVehicles: (CodeOption & { designLoadRating: number | null })[];
+  /** Each with the changes of rating it is offered for when adding: INC, DEC, NOC, or UNDEF. */
+  reasons: (CodeOption & { deltas: string[] })[];
+};
+
+/** The Details tab's Culvert card lists — the backend's `CulvertCodesResponse`, current codes only. */
+export type CulvertCodes = {
+  culvertTypes: CodeOption[];
+  materials: CodeOption[];
+  headwallLocations: CodeOption[];
+  openBottomSubstructures: CodeOption[];
+};

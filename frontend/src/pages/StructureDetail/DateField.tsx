@@ -13,6 +13,8 @@ type Props = {
   onChange: (value: string) => void;
   disabled?: boolean;
   invalidText?: string;
+  /** When the box is left — for showing its error from then on. */
+  onBlur?: () => void;
 };
 
 /**
@@ -21,7 +23,15 @@ type Props = {
  * <p>Only a whole date (or none) goes back to the picker: flatpickr parses the value it is handed,
  * and handing it each half-typed keystroke would rewrite the box under the user's cursor.
  */
-const DateField: FC<Props> = ({ id, labelText, value, onChange, disabled, invalidText }) => {
+const DateField: FC<Props> = ({
+  id,
+  labelText,
+  value,
+  onChange,
+  disabled,
+  invalidText,
+  onBlur,
+}) => {
   const pickerDate = useRef('');
   if (!value || toIso(value) !== null) {
     pickerDate.current = value;
@@ -46,6 +56,7 @@ const DateField: FC<Props> = ({ id, labelText, value, onChange, disabled, invali
         invalid={Boolean(invalidText)}
         invalidText={invalidText}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
+        onBlur={onBlur}
       />
     </DatePicker>
   );

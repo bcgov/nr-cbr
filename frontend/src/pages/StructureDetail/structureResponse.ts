@@ -195,3 +195,81 @@ export type StructureInformationRequest = { structureName: string; siteId: strin
  * is no such site.
  */
 export type SitePreviewResponse = { site: StructureSite | null; problem: string | null };
+
+/** A structure offered as a Structure # is typed — the backend's `StructureNameSuggestion`. */
+export type StructureNameSuggestion = { id: string; structureName: string; archived: boolean };
+
+/** The Details tab's Structure card edit — the backend's `StructureDetailsRequest`. */
+export type StructureDetailsRequest = {
+  builtByCode: string;
+  yearFabricated: number | null;
+  yearBuilt: number | null;
+  inventoryAddedYear: number | null;
+  sourceCode: string;
+  endOfDesignLifeYear: number | null;
+  asBuiltInfoOnFile: boolean;
+  installationCost: number | null;
+  materialCost: number | null;
+};
+
+/** The Details tab's Bridge card edit — the backend's `BridgeDetailsRequest`. */
+export type BridgeDetailsRequest = {
+  /** `PB` Durable Bridge or `TB` Non-Durable Bridge. */
+  typeClassCode: string;
+  portable: boolean;
+  needleBeams: boolean;
+  totalBridgeLength: number | null;
+  superstructureTypeCode: string;
+  superstructureComment: string;
+  deckTypeCode: string;
+  deckTypeComment: string;
+  deckWidth: number | null;
+  runningSurfaceCode: string;
+  curbTypeCode: string;
+  curbTypeComment: string;
+  leftAbutmentCode: string;
+  rightAbutmentCode: string;
+  abutmentComment: string;
+};
+
+/** The fields of the Details tab's Load Rating Details — the backend's `LoadRatingDetailsRequest`. */
+export type LoadRatingDetailsRequest = {
+  loadPostingSignsCode: string;
+  reviewRequired: boolean;
+  designVehicleCode: string;
+  designVehicleComment: string;
+  designLoadRating: number | null;
+};
+
+/** A manual load rating to add, or its new values — the backend's `LoadRatingRequest`. */
+export type LoadRatingRequest = { rating: number; reasonCode: string; reasonComment: string };
+
+/** The Details tab's Replacement Details edit — the backend's `ReplacementDetailsRequest`. */
+export type ReplacementDetailsRequest = {
+  closureYear: number | null;
+  replacementYear: number | null;
+  loadRestrictionYear: number | null;
+  cost: number | null;
+  costComment: string;
+};
+
+/** A structure this one replaced, added — the backend's `ReplacementRequest`, by Structure #. */
+export type ReplacementRequest = { replacedName: string };
+
+/** The Details tab's Culvert card edit — the backend's `CulvertDetailsRequest`. */
+export type CulvertDetailsRequest = {
+  portable: boolean;
+  culvertNumber: number | null;
+  lengthMetres: number | null;
+  gradient: number | null;
+  /** Ignored on a Wood Log Culvert, which is saved as BOX. */
+  culvertTypeCode: string;
+  materialCode: string;
+  materialComment: string;
+  inletCoverDepthMm: number | null;
+  outletCoverDepthMm: number | null;
+  openingHeightMm: number | null;
+  openingWidthMm: number | null;
+  headwallLocationCode: string;
+  openBottomCode: string;
+};

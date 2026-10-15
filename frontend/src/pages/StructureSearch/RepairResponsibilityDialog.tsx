@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import ClientCombo from '@/components/core/ClientCombo';
 import Modal from '@/components/Modal';
+import { requiredLabel } from '@/utils/requiredLabel';
 
 import { sites, structures } from './selection';
 
@@ -12,6 +13,7 @@ import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { useClientLocations } from '@/hooks/useClientSearch';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useUpdateRepairResponsibility } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
 import { clientLabel, locationLabel } from '@/utils/clientSearch';
@@ -48,8 +50,6 @@ const RepairResponsibilityDialog: FC<Props> = ({ open, selected, onClose, onUpda
 
   const [maintainer, setMaintainer] = useState<Maintainer>(NO_MAINTAINER);
   const [location, setLocation] = useState('');
-  /** Set by the first Update, so the fields are not marked before the user has had a go. */
-  const [attempted, setAttempted] = useState(false);
 
   const locations = useClientLocations(maintainer.clientNumber);
 
@@ -58,16 +58,19 @@ const RepairResponsibilityDialog: FC<Props> = ({ open, selected, onClose, onUpda
   );
   const siteless = [...selected.values()].filter(({ siteId }) => siteId === null).length;
 
-  const maintainerError =
-    attempted && maintainer.clientNumber === '' ? 'Designated Maintainer is required.' : undefined;
-  const locationError =
-    attempted && maintainer.clientNumber !== '' && location === ''
-      ? 'Maintainer Location is required.'
-      : undefined;
+  // Checked as the values change; each shown once its field is left, or at Update.
+  const form = useFieldErrors<'maintainer' | 'location'>({
+    maintainer: maintainer.clientNumber === '' ? 'Designated Maintainer is required.' : undefined,
+    location:
+      maintainer.clientNumber !== '' && location === ''
+        ? 'Maintainer Location is required.'
+        : undefined,
+  });
+  const maintainerError = form.shown.maintainer;
+  const locationError = form.shown.location;
 
   const submit = () => {
-    setAttempted(true);
-    if (maintainer.clientNumber === '' || location === '') {
+    if (!form.submit()) {
       return;
     }
     const chosen = `${maintainer.clientNumber}-${location}`;
@@ -130,35 +133,39 @@ const RepairResponsibilityDialog: FC<Props> = ({ open, selected, onClose, onUpda
       )}
 
       <div className="structure-search__dialog-fields">
-        <ClientCombo
-          id="repair-responsibility-maintainer"
-          titleText="Designated Maintainer"
-          selectedLabel={maintainer.label}
-          invalid={maintainerError !== undefined}
-          invalidText={maintainerError}
-          onSelect={(client: ClientSuggestion | null) => {
-            setMaintainer(
-              client
-                ? { clientNumber: client.clientNumber ?? '', label: clientLabel(client) }
-                : NO_MAINTAINER,
-            );
-            setLocation('');
-          }}
-          // Text that is not a pick names no maintainer, so it clears the one picked before.
-          onTermChange={() => {
-            setMaintainer(NO_MAINTAINER);
-            setLocation('');
-          }}
-        />
+        {/* A wrapper's onBlur, which React bubbles: the combo box is several elements. */}
+        <div onBlur={() => form.leave('maintainer')}>
+          <ClientCombo
+            id="repair-responsibility-maintainer"
+            titleText={requiredLabel('Designated Maintainer', true)}
+            selectedLabel={maintainer.label}
+            invalid={maintainerError !== undefined}
+            invalidText={maintainerError}
+            onSelect={(client: ClientSuggestion | null) => {
+              setMaintainer(
+                client
+                  ? { clientNumber: client.clientNumber ?? '', label: clientLabel(client) }
+                  : NO_MAINTAINER,
+              );
+              setLocation('');
+            }}
+            // Text that is not a pick names no maintainer, so it clears the one picked before.
+            onTermChange={() => {
+              setMaintainer(NO_MAINTAINER);
+              setLocation('');
+            }}
+          />
+        </div>
         <Select
           id="repair-responsibility-location"
           data-testid="repair-responsibility-location"
-          labelText="Maintainer Location"
+          labelText={requiredLabel('Maintainer Location', true)}
           disabled={maintainer.clientNumber === '' || locations.isFetching}
           value={location}
           invalid={locationError !== undefined}
           invalidText={locationError}
           onChange={(event) => setLocation(event.target.value)}
+          onBlur={() => form.leave('location')}
         >
           <SelectItem
             value=""
@@ -175,10 +182,22 @@ const RepairResponsibilityDialog: FC<Props> = ({ open, selected, onClose, onUpda
       </div>
 
       <div className="structure-search__dialog-actions">
-        <Button kind="tertiary" size="md" onClick={onClose} disabled={update.isPending}>
+        <Button
+          kind="tertiary"
+          size="md"
+          onMouseDown={holdFocus}
+          onClick={onClose}
+          disabled={update.isPending}
+        >
           Cancel
         </Button>
-        <Button kind="primary" size="md" onClick={submit} disabled={update.isPending}>
+        <Button
+          kind="primary"
+          size="md"
+          onMouseDown={holdFocus}
+          onClick={submit}
+          disabled={update.isPending}
+        >
           Update
         </Button>
       </div>

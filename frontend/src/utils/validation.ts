@@ -31,12 +31,11 @@ export type ValidationMode = 'typing' | 'settled';
 export const isNumberInProgress = (text: string): boolean => /^[+-]?(?:\d*\.)?$/.test(text.trim());
 
 /**
- * The errors to show for fields the user has finished with: those on a field that has been left
- * <em>and</em> holds a value.
+ * The errors to show for fields the user has finished with: those on a field that has been left.
  *
- * <p>The value test is what keeps this from nagging. A blank field is a gap — reported at Save,
- * never because the user tabbed past it — while a field with something in it has been given an
- * answer, so telling them that answer will not store is help rather than interruption.
+ * <p>A required field left empty says so as soon as it is left — the app's one rule for inline
+ * errors (see `useFieldErrors`): a field the user has not been in stays quiet until Save, one they
+ * have been in and left shows what is wrong with it, blank included.
  *
  * <p>Fed the `'settled'` error set, since that is the full check; the caller merges the result over
  * whatever `'typing'` already had to say.
@@ -44,10 +43,7 @@ export const isNumberInProgress = (text: string): boolean => /^[+-]?(?:\d*\.)?$/
 export const errorsForSettledFields = <T extends string>(
   settledErrors: Partial<Record<T, string>>,
   settled: ReadonlySet<string>,
-  valueOf: (key: T) => string | undefined,
 ): Partial<Record<T, string>> =>
-  Object.fromEntries(
-    Object.entries(settledErrors).filter(
-      ([key]) => settled.has(key) && (valueOf(key as T) ?? '').trim() !== '',
-    ),
-  ) as Partial<Record<T, string>>;
+  Object.fromEntries(Object.entries(settledErrors).filter(([key]) => settled.has(key))) as Partial<
+    Record<T, string>
+  >;

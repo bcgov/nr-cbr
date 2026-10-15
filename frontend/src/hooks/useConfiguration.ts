@@ -4,7 +4,13 @@ import { useEffect } from 'react';
 import useDebounce from '@/hooks/useDebounce';
 
 import type { RecreationProjectResponse } from '@/services/configuration.service';
-import type { CodeOption, OrgUnitOption } from '@/types/configuration';
+import type {
+  BridgeCodes,
+  CodeOption,
+  CulvertCodes,
+  LoadRatingCodes,
+  OrgUnitOption,
+} from '@/types/configuration';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 import { THREE_HOURS } from '@/config/react-query/TimeUnits';
@@ -132,6 +138,36 @@ export const fileAttachmentTypeCodesQuery = queryOptions({
 export const documentExtensionsQuery = queryOptions({
   queryKey: [CONFIGURATION_QUERY_KEY, 'document-extensions'],
   queryFn: () => API.configuration.getDocumentExtensions(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const loadRatingCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'load-rating-codes'],
+  queryFn: () => API.configuration.getLoadRatingCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const culvertCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'culvert-codes'],
+  queryFn: () => API.configuration.getCulvertCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const bridgeCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'bridge-codes'],
+  queryFn: () => API.configuration.getBridgeCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const builtByCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'built-by-codes'],
+  queryFn: () => API.configuration.getBuiltByCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const structureSourceCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'structure-source-codes'],
+  queryFn: () => API.configuration.getStructureSourceCodes(),
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
@@ -417,3 +453,20 @@ export const useDocumentExtensions = (): UseQueryResult<string[]> =>
 
 /** The Type select on a pier: current types, by description. */
 export const usePierTypeCodes = (): UseQueryResult<CodeOption[]> => useQuery(pierTypeCodesQuery);
+
+/** The Built For select on the Details tab's Structure card. */
+export const useBuiltByCodes = (): UseQueryResult<CodeOption[]> => useQuery(builtByCodesQuery);
+
+/** The Source select on the Details tab's Structure card. */
+export const useStructureSourceCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(structureSourceCodesQuery);
+
+/** The Details tab's Bridge card lists: superstructure, deck type, running surface, curb, abutment. */
+export const useBridgeCodes = (): UseQueryResult<BridgeCodes> => useQuery(bridgeCodesQuery);
+
+/** Load Rating Details' lists: posting signs, design vehicles with their ratings, reasons. */
+export const useLoadRatingCodes = (): UseQueryResult<LoadRatingCodes> =>
+  useQuery(loadRatingCodesQuery);
+
+/** The Details tab's Culvert card lists: culvert type, material, headwall location, open bottom. */
+export const useCulvertCodes = (): UseQueryResult<CulvertCodes> => useQuery(culvertCodesQuery);

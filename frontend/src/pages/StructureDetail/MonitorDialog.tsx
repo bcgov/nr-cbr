@@ -12,6 +12,7 @@ import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import { useMonitorFrequencyCodes, useMonitoringStatusCodes } from '@/hooks/useConfiguration';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useCreateStructureMonitor, useUpdateStructureMonitor } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { byteLength, overLimitError } from '@/utils/textLimits';
@@ -79,9 +80,12 @@ const MonitorDialog: FC<Props> = ({ structureId, monitor, onClose }) => {
     frequencyComment: monitor?.frequencyComment ?? '',
     description: monitor?.description ?? '',
   });
-  /** The form's own errors, set on Save and cleared field by field as each is changed. */
-  const [errors, setErrors] = useState<Errors>({});
-  const shown: Errors = { ...(adding ? create.fieldErrors : update.fieldErrors), ...errors };
+  // Checked as the values change; each shown once its field is left, or at Save.
+  const form = useFieldErrors<keyof MonitorUpdateRequest>(
+    validate(values),
+    adding ? create.fieldErrors : update.fieldErrors,
+  );
+  const shown: Errors = form.shown;
 
   // A new item starts at legacy's default frequency, once the list shows it exists — a code the
   // list does not offer would be refused on save, and the select could not show it.
@@ -96,7 +100,7 @@ const MonitorDialog: FC<Props> = ({ structureId, monitor, onClose }) => {
   const change = <K extends keyof MonitorUpdateRequest>(field: K, value: string) => {
     if (field === 'frequencyCode') frequencyTouched.current = true;
     setValues((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
+    form.change(field);
   };
 
   const failed = (error: unknown) => {
@@ -111,9 +115,7 @@ const MonitorDialog: FC<Props> = ({ structureId, monitor, onClose }) => {
   };
 
   const save = () => {
-    const found = validate(values);
-    setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
+    if (!form.submit()) return;
     // The comment goes only with Other, as the server keeps it only then.
     const frequencyComment =
       values.frequencyCode === OTHER_FREQUENCY ? values.frequencyComment : '';
@@ -193,6 +195,7 @@ const MonitorDialog: FC<Props> = ({ structureId, monitor, onClose }) => {
             invalid={Boolean(shown.statusCode)}
             invalidText={shown.statusCode}
             onChange={(event) => change('statusCode', event.target.value)}
+            onBlur={() => form.leave('statusCode')}
           >
             {(statuses.data ?? []).map((option) => (
               <SelectItem key={option.code} value={option.code} text={option.description} />
@@ -208,6 +211,7 @@ const MonitorDialog: FC<Props> = ({ structureId, monitor, onClose }) => {
           invalid={Boolean(shown.frequencyCode)}
           invalidText={shown.frequencyCode}
           onChange={(event) => change('frequencyCode', event.target.value)}
+          onBlur={() => form.leave('frequencyCode')}
         >
           <SelectItem value="" text="None" />
           {(frequencies.data ?? []).map((option) => (
@@ -228,6 +232,7 @@ const MonitorDialog: FC<Props> = ({ structureId, monitor, onClose }) => {
               invalid={Boolean(shown.frequencyComment)}
               invalidText={shown.frequencyComment}
               onChange={(event) => change('frequencyComment', event.target.value)}
+              onBlur={() => form.leave('frequencyComment')}
             />
           </FieldWithCounter>
         </div>
@@ -244,15 +249,23 @@ const MonitorDialog: FC<Props> = ({ structureId, monitor, onClose }) => {
             invalid={Boolean(shown.description)}
             invalidText={shown.description}
             onChange={(event) => change('description', event.target.value)}
+            onBlur={() => form.leave('description')}
           />
         </FieldWithCounter>
       </div>
 
       <div className="structure-detail__dialog-actions">
-        <Button kind="tertiary" size="md" onClick={onClose} disabled={saving}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          size="md"
+          onClick={onClose}
+          disabled={saving}
+        >
           Cancel
         </Button>
         <Button
+          onMouseDown={holdFocus}
           kind="primary"
           size="md"
           onClick={save}

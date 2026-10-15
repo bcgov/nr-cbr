@@ -35,6 +35,14 @@ import type {
   CommentRequest,
   SitePreviewResponse,
   StructureDetailResponse,
+  StructureNameSuggestion,
+  ReplacementRequest,
+  BridgeDetailsRequest,
+  CulvertDetailsRequest,
+  LoadRatingDetailsRequest,
+  LoadRatingRequest,
+  ReplacementDetailsRequest,
+  StructureDetailsRequest,
   StructureInformationRequest,
 } from '@/pages/StructureDetail/structureResponse';
 import type { ItemListing } from '@/pages/StructureDetail/UserAudits';
@@ -176,6 +184,132 @@ export class StructureSearchService extends HttpClient {
       url: '/v1/structures/{structureId}/documents/{fileId}/file',
       path: { structureId, fileId },
       responseType: 'blob',
+    });
+  }
+
+  /** Saves the Details tab's Structure card. 400 with `fieldErrors` keyed by the request's fields. */
+  updateStructureDetails(
+    structureId: string,
+    request: StructureDetailsRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/structure-details',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Saves the Details tab's Bridge card. 400 with `fieldErrors` keyed by the request's fields. */
+  updateBridgeDetails(structureId: string, request: BridgeDetailsRequest): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/bridge-details',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Saves the fields of Load Rating Details. 400 with `fieldErrors` keyed by the request's fields. */
+  updateLoadRatingDetails(
+    structureId: string,
+    request: LoadRatingDetailsRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/load-rating-details',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Adds a manual load rating. 400 with `fieldErrors` keyed `rating`, `reasonCode`, `reasonComment`. */
+  createLoadRating(
+    structureId: string,
+    request: LoadRatingRequest,
+  ): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/load-ratings',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Changes a manual load rating. 400 with `fieldErrors` when a field is refused. */
+  updateLoadRating(
+    structureId: string,
+    loadRatingId: string,
+    request: LoadRatingRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/load-ratings/{loadRatingId}',
+      path: { structureId, loadRatingId },
+      body: request,
+    });
+  }
+
+  /** Deletes a manual load rating. */
+  deleteLoadRating(structureId: string, loadRatingId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/load-ratings/{loadRatingId}',
+      path: { structureId, loadRatingId },
+    });
+  }
+
+  /** Records that this structure replaced another. 400 with `fieldErrors` keyed `replacedName`. */
+  createReplacement(structureId: string, request: ReplacementRequest): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/replacements',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Deletes that this structure replaced another, named by its id. */
+  deleteReplacement(structureId: string, replacedId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/structures/{structureId}/replacements/{replacedId}',
+      path: { structureId, replacedId },
+    });
+  }
+
+  /** Saves Replacement Details. 400 with `fieldErrors` keyed by the request's fields. */
+  updateReplacementDetails(
+    structureId: string,
+    request: ReplacementDetailsRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/replacement-details',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Saves the Details tab's Culvert card. 400 with `fieldErrors` keyed by the request's fields. */
+  updateCulvertDetails(
+    structureId: string,
+    request: CulvertDetailsRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/structures/{structureId}/culvert-details',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Structures whose Structure # starts with the term — at most 20, archived ones marked. */
+  suggestStructureNames(term: string): CancelablePromise<StructureNameSuggestion[]> {
+    return this.doRequest<StructureNameSuggestion[]>(this.config, {
+      method: 'GET',
+      url: '/v1/structures/name-suggestions',
+      query: { term },
     });
   }
 
@@ -333,6 +467,19 @@ export class StructureSearchService extends HttpClient {
     return this.doRequest<CreatedResponse>(this.config, {
       method: 'POST',
       url: '/v1/structures/{structureId}/close-proximity-inspections',
+      path: { structureId },
+      body: request,
+    });
+  }
+
+  /** Adds a general comment — the Details tab's. 400 with `fieldErrors` keyed `comment`. */
+  addStructureComment(
+    structureId: string,
+    request: CommentRequest,
+  ): CancelablePromise<CreatedResponse> {
+    return this.doRequest<CreatedResponse>(this.config, {
+      method: 'POST',
+      url: '/v1/structures/{structureId}/comments',
       path: { structureId },
       body: request,
     });

@@ -3,6 +3,7 @@ import { Button, RadioButton, RadioButtonGroup, Select, SelectItem } from '@carb
 import { useState } from 'react';
 
 import ReadOnlyField from '@/components/core/ReadOnlyField';
+import { requiredLabel } from '@/utils/requiredLabel';
 
 import Card from './Card';
 import { addYears, toBox, toIso } from './dateBox';
@@ -15,6 +16,7 @@ import type { FC } from 'react';
 import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
 import { useSpecialEquipmentCodes } from '@/hooks/useConfiguration';
+import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useUpdateInspectionSchedule } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
@@ -81,8 +83,9 @@ const ScheduleView: FC<{ schedule: InspectionScheduleResponse }> = ({ schedule }
 /**
  * The card's values as a form, in place of the view.
  *
- * <p>Grey fields in sized cells on the white card, "All
- * fields are required unless marked optional." over them, and the yes/no question as a radio pair.
+ * <p>Grey fields in sized cells on the white card, required ones marked with a red asterisk, and
+ * the yes/no question as a radio pair. Each error shows once its field is left, then as it is
+ * corrected.
  *
  * <p>As legacy, by role: Level 2 and up change all of it; Level 1 the frequency alone, the rest
  * shown read-only. A new frequency moves the next planned routine inspection to the latest reviewed
@@ -108,15 +111,13 @@ const ScheduleForm: FC<{
     nextRoutineDate: toBox(schedule.nextRoutineDate),
     routineFrequencyYears: number(schedule.routineFrequencyYears),
   });
-  /** The form's own errors, set on Save and cleared field by field as each is changed. */
-  const [errors, setErrors] = useState<Errors>({});
-  const shown: Errors = { ...update.fieldErrors, ...errors };
+
   // Legacy's rule: required once the structure has one.
   const routineRequired = schedule.nextRoutineDate !== null;
 
   const change = <K extends keyof Values>(field: K, value: Values[K]) => {
     setValues((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
+    form.change(field);
   };
 
   const changeFrequency = (frequency: string) => {
@@ -146,10 +147,12 @@ const ScheduleForm: FC<{
     return found;
   };
 
+  // Checked as the values change; each shown once its field is left, or at Save.
+  const form = useFieldErrors<keyof Values>(validate(), update.fieldErrors);
+  const shown: Errors = form.shown;
+
   const save = () => {
-    const found = validate();
-    setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
+    if (!form.submit()) return;
     const request: InspectionScheduleRequest = {
       closeProximityRequired: values.closeProximityRequired,
       closeProximityEquipmentCode: values.closeProximityEquipmentCode,
@@ -179,11 +182,12 @@ const ScheduleForm: FC<{
     <Select
       id="schedule-frequency"
       data-testid="schedule-frequency"
-      labelText="Routine Inspection Frequency (years)"
+      labelText={requiredLabel('Routine Inspection Frequency (years)', true)}
       value={values.routineFrequencyYears}
       invalid={Boolean(shown.routineFrequencyYears)}
       invalidText={shown.routineFrequencyYears}
       onChange={(event) => changeFrequency(event.target.value)}
+      onBlur={() => form.leave('routineFrequencyYears')}
     >
       {!values.routineFrequencyYears && <SelectItem value="" text="Choose a frequency" />}
       {FREQUENCIES.map((years) => (
@@ -194,14 +198,11 @@ const ScheduleForm: FC<{
 
   return (
     <div className="structure-detail__edit" data-testid="schedule-form">
-      <p className="structure-detail__edit-intro">
-        All fields are required unless marked optional.
-      </p>
       {canSetAll ? (
         <>
           <RadioButtonGroup
             name="schedule-close-proximity"
-            legendText="Is a close proximity inspection required?"
+            legendText={requiredLabel('Is a close proximity inspection required?', true)}
             valueSelected={values.closeProximityRequired ? 'Y' : 'N'}
             onChange={(selected) => change('closeProximityRequired', selected === 'Y')}
           >
@@ -214,7 +215,7 @@ const ScheduleForm: FC<{
                 <Select
                   id="schedule-equipment"
                   data-testid="schedule-equipment"
-                  labelText="Close Proximity Special Equipment Requirements (optional)"
+                  labelText="Close Proximity Special Equipment Requirements"
                   value={values.closeProximityEquipmentCode}
                   disabled={equipment.isLoading}
                   invalid={Boolean(shown.closeProximityEquipmentCode)}
@@ -230,10 +231,11 @@ const ScheduleForm: FC<{
               <div className="structure-detail__edit-cell">
                 <DateField
                   id="schedule-next-close-proximity"
-                  labelText="Next Planned Close Proximity Inspection (optional)"
+                  labelText="Next Planned Close Proximity Inspection"
                   value={values.nextCloseProximityDate}
                   invalidText={shown.nextCloseProximityDate}
                   onChange={(value) => change('nextCloseProximityDate', value)}
+                  onBlur={() => form.leave('nextCloseProximityDate')}
                 />
               </div>
             </div>
@@ -242,14 +244,11 @@ const ScheduleForm: FC<{
             <div className="structure-detail__edit-cell">
               <DateField
                 id="schedule-next-routine"
-                labelText={
-                  routineRequired
-                    ? 'Next Planned Routine Inspection'
-                    : 'Next Planned Routine Inspection (optional)'
-                }
+                labelText={requiredLabel('Next Planned Routine Inspection', routineRequired)}
                 value={values.nextRoutineDate}
                 invalidText={shown.nextRoutineDate}
                 onChange={(value) => change('nextRoutineDate', value)}
+                onBlur={() => form.leave('nextRoutineDate')}
               />
             </div>
             <div className="structure-detail__edit-cell">{frequency}</div>
@@ -289,10 +288,17 @@ const ScheduleForm: FC<{
 
       {/* The form's actions: small, at the right, under the fields. */}
       <div className="structure-detail__edit-actions">
-        <Button kind="tertiary" size="sm" onClick={onDone} disabled={update.isPending}>
+        <Button
+          onMouseDown={holdFocus}
+          kind="tertiary"
+          size="sm"
+          onClick={onDone}
+          disabled={update.isPending}
+        >
           Cancel
         </Button>
         <Button
+          onMouseDown={holdFocus}
           kind="primary"
           size="sm"
           onClick={save}

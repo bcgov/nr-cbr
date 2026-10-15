@@ -23,6 +23,13 @@ import type {
 import type { PierRequest, SpanRequest } from '@/pages/StructureDetail/spansAndPiersResponse';
 import type {
   CommentRequest,
+  BridgeDetailsRequest,
+  CulvertDetailsRequest,
+  LoadRatingDetailsRequest,
+  LoadRatingRequest,
+  ReplacementDetailsRequest,
+  ReplacementRequest,
+  StructureDetailsRequest,
   StructureInformationRequest,
 } from '@/pages/StructureDetail/structureResponse';
 import type { DeleteTarget } from '@/pages/StructureSearch/selection';
@@ -92,6 +99,18 @@ export const useAddCloseProximityInspection = (structureId: string) => {
       queryClient.invalidateQueries({
         queryKey: [STRUCTURE_QUERY_KEY, structureId, 'inspection-schedule'],
       }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Adds a general comment — the Details tab's. What the server refused comes back as `fieldErrors`. */
+export const useAddStructureComment = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: CommentRequest) =>
+      API.structureSearch.addStructureComment(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId], exact: true }),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -274,6 +293,131 @@ export const useUpdateStructureInformation = (structureId: string) => {
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
 
+/**
+ * Saves the Details tab's Structure card, then refreshes everything the page shows of the
+ * structure: Year Superstructure Installed decides what several tabs hide as from before it went
+ * in. What the server refused comes back as `fieldErrors`.
+ */
+export const useUpdateStructureDetails = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: StructureDetailsRequest) =>
+      API.structureSearch.updateStructureDetails(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * Saves the Details tab's Bridge card, then refreshes the structure: Type/Class decides which tabs
+ * the page shows. What the server refused comes back as `fieldErrors`.
+ */
+export const useUpdateBridgeDetails = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: BridgeDetailsRequest) =>
+      API.structureSearch.updateBridgeDetails(structureId, request),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** After a load rating change: the structure, whose Details tab holds them. */
+const refreshStructure = (queryClient: QueryClient, structureId: string) =>
+  queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId], exact: true });
+
+/** Saves the fields of Load Rating Details. What the server refused comes back as `fieldErrors`. */
+export const useUpdateLoadRatingDetails = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: LoadRatingDetailsRequest) =>
+      API.structureSearch.updateLoadRatingDetails(structureId, request),
+    onSuccess: () => refreshStructure(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Adds a manual load rating. What the server refused comes back as `fieldErrors`. */
+export const useCreateLoadRating = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: LoadRatingRequest) =>
+      API.structureSearch.createLoadRating(structureId, request),
+    onSuccess: () => refreshStructure(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Changes a manual load rating. What the server refused comes back as `fieldErrors`. */
+export const useUpdateLoadRating = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ loadRatingId, request }: { loadRatingId: string; request: LoadRatingRequest }) =>
+      API.structureSearch.updateLoadRating(structureId, loadRatingId, request),
+    onSuccess: () => refreshStructure(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Deletes a manual load rating. */
+export const useDeleteLoadRating = (
+  structureId: string,
+): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (loadRatingId: string) =>
+      API.structureSearch.deleteLoadRating(structureId, loadRatingId),
+    onSuccess: () => refreshStructure(queryClient, structureId),
+  });
+};
+
+/** Records that this structure replaced another. What the server refused comes back as `fieldErrors`. */
+export const useCreateReplacement = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: ReplacementRequest) =>
+      API.structureSearch.createReplacement(structureId, request),
+    onSuccess: () => refreshStructure(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Deletes that this structure replaced another, given that one's id. */
+export const useDeleteReplacement = (
+  structureId: string,
+): UseMutationResult<void, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (replacedId: string) =>
+      API.structureSearch.deleteReplacement(structureId, replacedId),
+    onSuccess: () => refreshStructure(queryClient, structureId),
+  });
+};
+
+/** Saves Replacement Details. What the server refused comes back as `fieldErrors`. */
+export const useUpdateReplacementDetails = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: ReplacementDetailsRequest) =>
+      API.structureSearch.updateReplacementDetails(structureId, request),
+    onSuccess: () => refreshStructure(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Saves the Details tab's Culvert card. What the server refused comes back as `fieldErrors`. */
+export const useUpdateCulvertDetails = (structureId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: CulvertDetailsRequest) =>
+      API.structureSearch.updateCulvertDetails(structureId, request),
+    onSuccess: () => refreshStructure(queryClient, structureId),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
 /** Long enough that typing a site number is one request rather than one a keystroke. */
 const SITE_PREVIEW_DEBOUNCE_MS = 400;
 
@@ -295,6 +439,24 @@ export const useSitePreview = (siteId: string, currentSiteId: string | null) => 
   // Settled only once the typing has stopped on the number asked about.
   const settled = asked && debounced === siteId.trim();
   return { preview: settled ? query.data : undefined, loading: asked && query.isFetching };
+};
+
+/** The fewest characters the Structure # type-ahead searches on — the backend's own minimum. */
+export const STRUCTURE_NAME_MIN = 2;
+
+/**
+ * Structures whose Structure # starts with what is typed — Replacement Details' type-ahead.
+ * Debounced, cached by term, and the last list kept while the next loads, as the client combo.
+ */
+export const useStructureNameSuggestions = (term: string) => {
+  const debounced = useDebounce(term.trim(), 300);
+  return useQuery({
+    queryKey: [STRUCTURE_QUERY_KEY, 'name-suggestions', debounced],
+    queryFn: () => API.structureSearch.suggestStructureNames(debounced),
+    enabled: debounced.length >= STRUCTURE_NAME_MIN,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
 };
 
 /**

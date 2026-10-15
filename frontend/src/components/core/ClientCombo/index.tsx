@@ -1,5 +1,5 @@
 import { ComboBox, Loading } from '@carbon/react';
-import { useRef, useState, type FC } from 'react';
+import { useRef, useState, type FC, type ReactNode } from 'react';
 
 import type { ClientScope } from '@/services/client.service';
 import type { ClientSuggestion } from '@/types/client';
@@ -11,7 +11,7 @@ import './clientCombo.scss';
 
 type Props = {
   id: string;
-  titleText: string;
+  titleText: ReactNode;
   /**
    * The label of the currently-picked suggestion, or `''` when nothing is picked.
    *
