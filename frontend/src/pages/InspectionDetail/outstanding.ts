@@ -89,45 +89,49 @@ const blocksOf = (
   ]);
 };
 
+/** Where an answer is kept: its group, question, span, pier and stringer. */
+const keyOf = (
+  subsection: string,
+  question: string,
+  where: { spanId: string | null; pierId: string | null; stringerNumber: number | null },
+) => [subsection, question, where.spanId, where.pierId, where.stringerNumber].join('|');
+
 /**
- * The Condition tab's outstanding items — legacy's rules only: a Poor or Unrated answer needs a
- * comment, and a comment needs an answer. An unanswered question is not required, in legacy or
- * here. Grouped as the cards head them.
+ * What is wrong with one answer by legacy's two rules, or nothing: a comment needs an answer, and a
+ * Poor or Unrated answer needs a comment. A question left unanswered is allowed.
+ */
+const problemOf = (question: InspectionQuestion, item: InspectionItem | undefined) => {
+  if (item === undefined) return null;
+  if (blank(item.answer) && !blank(item.comment)) return `${question.description} — answer`;
+  if (NEEDS_COMMENT.has(item.answer ?? '') && blank(item.comment)) {
+    return `${question.description} — comment`;
+  }
+  return null;
+};
+
+/**
+ * The Condition tab's outstanding items — legacy's rules only (see {@link problemOf}) — grouped as
+ * the cards head them.
  */
 const conditionOutstanding = (
   inspection: InspectionDetailResponse,
   form: InspectionFormResponse,
 ): OutstandingGroup[] => {
   const answered = new Map(
-    inspection.items.map((item) => [
-      [item.subsectionCode, item.questionCode, item.spanId, item.pierId, item.stringerNumber].join(
-        '|',
-      ),
-      item,
-    ]),
+    inspection.items.map((item) => [keyOf(item.subsectionCode, item.questionCode, item), item]),
   );
-  const groups: OutstandingGroup[] = [];
-  for (const subsection of form.subsections) {
-    for (const block of blocksOf(subsection, form, inspection.items)) {
-      const items: string[] = [];
-      for (const question of block.questions) {
-        const item = answered.get(
-          [subsection.code, question.code, block.spanId, block.pierId, block.stringerNumber].join(
-            '|',
-          ),
-        );
-        if (item === undefined) continue;
-        // Legacy's two rules; a question left unanswered is allowed, and shows "—" in its card.
-        if (blank(item.answer) && !blank(item.comment)) {
-          items.push(`${question.description} — answer`);
-        } else if (NEEDS_COMMENT.has(item.answer ?? '') && blank(item.comment)) {
-          items.push(`${question.description} — comment`);
-        }
-      }
-      if (items.length > 0) groups.push({ title: block.title, items });
-    }
-  }
-  return groups;
+  return form.subsections.flatMap((subsection) =>
+    blocksOf(subsection, form, inspection.items)
+      .map((block) => ({
+        title: block.title,
+        items: block.questions
+          .map((question) =>
+            problemOf(question, answered.get(keyOf(subsection.code, question.code, block))),
+          )
+          .filter((problem): problem is string => problem !== null),
+      }))
+      .filter((group) => group.items.length > 0),
+  );
 };
 
 /**

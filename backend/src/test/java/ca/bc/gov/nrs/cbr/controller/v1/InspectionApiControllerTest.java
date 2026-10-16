@@ -39,7 +39,7 @@ class InspectionApiControllerTest {
   void getDelegates() {
     controller.getInspection(42L);
 
-    org.mockito.Mockito.verify(detailService).findById(42L);
+    verify(detailService).findById(42L);
   }
 
   @Test

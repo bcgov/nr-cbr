@@ -85,23 +85,15 @@ public class StructureMonitorsService {
    * from before the superstructure went in are left out unless {@code includeBeforeInstall} —
    * legacy's "Show Inspections before the Superstructure Install Date".
    *
-   * @param view       outstanding only, or all
-   * @param pageNumber zero-based
-   * @param pageSize   held to between 1 and 100
-   * @throws StructureNotFoundException if there is no such structure
-   */
-  @Transactional(readOnly = true)
-  public Listing monitors(long structureId, View view, int pageNumber, int pageSize,
-      boolean includeBeforeInstall) {
-    return monitors(structureId, view, null, pageNumber, pageSize, includeBeforeInstall);
-  }
-
-  /**
-   * As {@link #monitors(long, View, int, int, boolean)}, from an inspection's page: there, legacy's
+   * <p>From an inspection's page ({@code inspectionId} given), legacy's
    * "Current Inspection Items" ({@link View#CURRENT}) lists every item the inspection raised,
    * whenever it was inspected.
    *
-   * @param inspectionId the inspection whose page asks; needed for {@link View#CURRENT}
+   * @param view         outstanding only, all, or the inspection's (CURRENT)
+   * @param inspectionId the inspection whose page asks; needed for {@link View#CURRENT}, else null
+   * @param pageNumber   zero-based
+   * @param pageSize     held to between 1 and 100
+   * @throws StructureNotFoundException if there is no such structure
    * @throws ResponseStatusException 400 for {@link View#CURRENT} without an inspection
    */
   @Transactional(readOnly = true)

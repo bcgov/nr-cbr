@@ -33,6 +33,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.server.ResponseStatusException;
 
 /** The Monitoring tab's data, against the database: a filtered, ordered page and its decodes. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
@@ -95,7 +96,7 @@ class StructureMonitorsServiceTest {
   private PagedResponse<Monitor> monitors(View view) {
     entityManager.flush();
     entityManager.clear();
-    return service.monitors(7L, view, 0, 10, false).page();
+    return service.monitors(7L, view, null, 0, 10, false).page();
   }
 
   @Test
@@ -116,7 +117,7 @@ class StructureMonitorsServiceTest {
         .containsExactlyInAnyOrder(1L, 2L);
     assertThat(listing.beforeInstallCount()).isZero();
     assertThatThrownBy(() -> service.monitors(7L, View.CURRENT, null, 0, 10, false))
-        .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        .isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
@@ -159,7 +160,7 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    PagedResponse<Monitor> second = service.monitors(7L, View.ALL, 1, 10, false).page();
+    PagedResponse<Monitor> second = service.monitors(7L, View.ALL, null, 1, 10, false).page();
 
     assertThat(second.content()).extracting(Monitor::number).containsExactly(2L, 1L);
     assertThat(second.totalElements()).isEqualTo(12);
@@ -206,8 +207,8 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var shown = service.monitors(7L, View.ALL, 0, 10, false);
-    var all = service.monitors(7L, View.ALL, 0, 10, true);
+    var shown = service.monitors(7L, View.ALL, null, 0, 10, false);
+    var all = service.monitors(7L, View.ALL, null, 0, 10, true);
 
     // 1 January of the install year is not "after" it; no inspection is always listed.
     assertThat(shown.page().content()).extracting(Monitor::number)
@@ -225,7 +226,7 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var listing = service.monitors(7L, View.ALL, 0, 10, false);
+    var listing = service.monitors(7L, View.ALL, null, 0, 10, false);
 
     assertThat(listing.page().content()).hasSize(1);
     assertThat(listing.beforeInstallCount()).isZero();
@@ -395,7 +396,7 @@ class StructureMonitorsServiceTest {
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors())
                 .containsOnlyKeys("frequencyComment", "description"));
-    assertThat(service.monitors(7L, View.ALL, 0, 10, true).page().content()).isEmpty();
+    assertThat(service.monitors(7L, View.ALL, null, 0, 10, true).page().content()).isEmpty();
   }
 
   @Test
@@ -418,7 +419,7 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThat(service.monitors(7L, View.ALL, 0, 10, false).page().content())
+    assertThat(service.monitors(7L, View.ALL, null, 0, 10, false).page().content())
         .extracting(Monitor::number).containsExactly(2L);
   }
 
@@ -438,7 +439,7 @@ class StructureMonitorsServiceTest {
   @Test
   @DisplayName("refuses a structure that does not exist")
   void missingStructure() {
-    assertThatThrownBy(() -> service.monitors(404L, View.ALL, 0, 10, false))
+    assertThatThrownBy(() -> service.monitors(404L, View.ALL, null, 0, 10, false))
         .isInstanceOf(StructureNotFoundException.class);
   }
 }

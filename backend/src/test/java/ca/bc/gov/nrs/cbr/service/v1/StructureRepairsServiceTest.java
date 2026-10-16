@@ -38,6 +38,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.server.ResponseStatusException;
 
 /** The Repairs tab's data, against the database: a filtered, ordered page and its decodes. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
@@ -98,7 +99,7 @@ class StructureRepairsServiceTest {
   private PagedResponse<Repair> repairs(View view) {
     entityManager.flush();
     entityManager.clear();
-    return service.repairs(7L, view, 0, 10, false).page();
+    return service.repairs(7L, view, null, 0, 10, false).page();
   }
 
   @Test
@@ -133,7 +134,7 @@ class StructureRepairsServiceTest {
     assertThat(listing.page().content()).extracting(Repair::number).containsExactly(1L);
     assertThat(listing.beforeInstallCount()).isZero();
     assertThatThrownBy(() -> service.repairs(7L, View.CURRENT, null, 0, 10, false))
-        .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        .isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
@@ -161,7 +162,7 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    PagedResponse<Repair> second = service.repairs(7L, View.ALL, 1, 10, false).page();
+    PagedResponse<Repair> second = service.repairs(7L, View.ALL, null, 1, 10, false).page();
 
     assertThat(second.content()).extracting(Repair::number).containsExactly(11L, 12L);
     assertThat(second.totalElements()).isEqualTo(12);
@@ -231,8 +232,8 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var shown = service.repairs(7L, View.ALL, 0, 10, false);
-    var all = service.repairs(7L, View.ALL, 0, 10, true);
+    var shown = service.repairs(7L, View.ALL, null, 0, 10, false);
+    var all = service.repairs(7L, View.ALL, null, 0, 10, true);
 
     // 1 January of the install year is not "after" it; no inspection is always listed.
     assertThat(shown.page().content()).extracting(Repair::number)
@@ -250,7 +251,7 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var listing = service.repairs(7L, View.ALL, 0, 10, false);
+    var listing = service.repairs(7L, View.ALL, null, 0, 10, false);
 
     assertThat(listing.page().content()).hasSize(1);
     assertThat(listing.beforeInstallCount()).isZero();
@@ -269,7 +270,7 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThat(service.repairs(7L, View.ALL, 0, 10, true).page().content())
+    assertThat(service.repairs(7L, View.ALL, null, 0, 10, true).page().content())
         .extracting(Repair::number).containsExactly(2L);
   }
 
@@ -574,7 +575,7 @@ class StructureRepairsServiceTest {
         .isInstanceOfSatisfying(FieldValidationException.class, refused ->
             assertThat(refused.getFieldErrors())
                 .containsOnlyKeys("priorityCode", "estimate", "description"));
-    assertThat(service.repairs(7L, View.ALL, 0, 10, true).page().content()).isEmpty();
+    assertThat(service.repairs(7L, View.ALL, null, 0, 10, true).page().content()).isEmpty();
   }
 
   @Test
@@ -588,7 +589,7 @@ class StructureRepairsServiceTest {
   @Test
   @DisplayName("refuses a structure that does not exist")
   void missingStructure() {
-    assertThatThrownBy(() -> service.repairs(404L, View.ALL, 0, 10, false))
+    assertThatThrownBy(() -> service.repairs(404L, View.ALL, null, 0, 10, false))
         .isInstanceOf(StructureNotFoundException.class);
   }
 }

@@ -114,9 +114,7 @@ type Props = {
  * form, or on its own where a page gives it a card ({@link Props.withoutDetails}).
  */
 export const SiteDetailsField: FC<
-  Pick<Props, 'values' | 'errors' | 'onChange' | 'onSettle'> & {
-    isEditable?: Props['isEditable'];
-  }
+  Pick<Props, 'values' | 'errors' | 'onChange' | 'onSettle' | 'isEditable'>
 > = ({ values, errors, onChange, onSettle, isEditable = () => true }) => (
   <div className="site-form__wide">
     {/* Counted, not capped. A `maxLength` would silently swallow the tail of anything pasted
