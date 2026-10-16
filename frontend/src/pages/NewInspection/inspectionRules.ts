@@ -122,35 +122,48 @@ export const toMetres = (typed: string): number | null => {
 
 type Messages = Record<string, string | undefined>;
 
+/** Past In Progress, the date, inspector and company are required — legacy's rule. */
+const requiredErrorsOf = (values: InspectionValues): Messages => {
+  const errors: Messages = {};
+  if (!values.typeCode) errors.typeCode = 'Inspection Type is required.';
+  if (!values.statusCode) errors.statusCode = 'Inspection Report Status is required.';
+  if (!values.statusCode || values.statusCode === IN_PROGRESS) return errors;
+  if (!values.inspectionDate.trim()) errors.inspectionDate = 'Date of Inspection is required.';
+  if (!values.inspectorName.trim()) errors.inspectorName = 'Inspector Name is required.';
+  if (!values.inspectorCompanyName.trim()) {
+    errors.inspectorCompanyName = 'Inspection Company Name is required.';
+  }
+  return errors;
+};
+
+/** A date as typed: a real date, and not after today. */
+const dateErrorOf = (typed: string): string | undefined => {
+  if (!typed.trim()) return undefined;
+  const iso = toIso(typed);
+  if (iso === null) return 'Date of Inspection must be a date, as yyyy/mm/dd.';
+  return new Date(`${iso}T00:00`) > new Date()
+    ? 'Date of Inspection must not be after today.'
+    : undefined;
+};
+
+/** "Inspector Name can be at most 255 characters.", or nothing when it fits. */
+const nameErrorOf = (typed: string, label: string): string | undefined =>
+  byteLength(typed.trim()) > NAME_MAX
+    ? `${label} can be at most ${NAME_MAX} characters.`
+    : undefined;
+
 /**
  * The Inspection tab's rules — legacy's: In Progress, the date, inspector and company may wait;
  * Submitted, they are required.
  */
 export const inspectionErrorsOf = (values: InspectionValues): Messages => {
-  const errors: Messages = {};
-  if (!values.typeCode) errors.typeCode = 'Inspection Type is required.';
-  if (!values.statusCode) errors.statusCode = 'Inspection Report Status is required.';
-  if (values.statusCode && values.statusCode !== IN_PROGRESS) {
-    if (!values.inspectionDate.trim()) errors.inspectionDate = 'Date of Inspection is required.';
-    if (!values.inspectorName.trim()) errors.inspectorName = 'Inspector Name is required.';
-    if (!values.inspectorCompanyName.trim()) {
-      errors.inspectorCompanyName = 'Inspection Company Name is required.';
-    }
-  }
-  if (values.inspectionDate.trim()) {
-    const iso = toIso(values.inspectionDate);
-    if (iso === null) {
-      errors.inspectionDate = 'Date of Inspection must be a date, as yyyy/mm/dd.';
-    } else if (new Date(`${iso}T00:00`) > new Date()) {
-      errors.inspectionDate = 'Date of Inspection must not be after today.';
-    }
-  }
-  if (byteLength(values.inspectorName.trim()) > NAME_MAX) {
-    errors.inspectorName = `Inspector Name can be at most ${NAME_MAX} characters.`;
-  }
-  if (byteLength(values.inspectorCompanyName.trim()) > NAME_MAX) {
-    errors.inspectorCompanyName = `Inspection Company Name can be at most ${NAME_MAX} characters.`;
-  }
+  const errors = requiredErrorsOf(values);
+  const date = dateErrorOf(values.inspectionDate);
+  if (date) errors.inspectionDate = date;
+  const name = nameErrorOf(values.inspectorName, 'Inspector Name');
+  if (name) errors.inspectorName = name;
+  const company = nameErrorOf(values.inspectorCompanyName, 'Inspection Company Name');
+  if (company) errors.inspectorCompanyName = company;
   if (Number.isNaN(toCost(values.cost))) {
     errors.cost = 'Cost of Inspection must be whole dollars from $0 to $999,999.';
   }

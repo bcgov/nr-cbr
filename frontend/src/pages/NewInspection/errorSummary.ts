@@ -16,6 +16,26 @@ export const tabOf = (key: string): TabKey => {
   return 'inspection';
 };
 
+/** Every message still standing — the page's own and the server's — dropping the empty ones. */
+export const outstandingOf = (
+  ...sources: Record<string, string | undefined>[]
+): Record<string, string> => {
+  const outstanding: Record<string, string> = {};
+  for (const source of sources) {
+    for (const [key, message] of Object.entries(source)) {
+      if (message) outstanding[key] = message;
+    }
+  }
+  return outstanding;
+};
+
+/** How many messages each tab holds. */
+export const countByTab = (messages: Record<string, string>): Record<TabKey, number> => {
+  const counts: Record<TabKey, number> = { inspection: 0, condition: 0, hazards: 0 };
+  for (const key of Object.keys(messages)) counts[tabOf(key)] += 1;
+  return counts;
+};
+
 /** Where a message shows: the card's title, and the line under it. */
 type Placed = { card: string; order: number; item: string };
 

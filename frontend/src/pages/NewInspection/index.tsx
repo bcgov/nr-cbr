@@ -25,7 +25,7 @@ import OutstandingPanel from '@/pages/StructureDetail/OutstandingPanel';
 import TabCount from '@/pages/StructureDetail/TabCount';
 
 import ConditionSection from './ConditionSection';
-import { errorGroups, tabOf, type TabKey } from './errorSummary';
+import { countByTab, errorGroups, outstandingOf, type TabKey } from './errorSummary';
 import InformationSection from './InformationSection';
 import { HazardFields, InspectionFields } from './InspectionFields';
 import {
@@ -62,6 +62,29 @@ const TABS: { key: TabKey; label: string; icon: CarbonIconType }[] = [
   { key: 'condition', label: 'Condition', icon: Report },
   { key: 'hazards', label: 'Hydraulic Hazards', icon: WaveDirection },
 ];
+
+/** Structure #'s message: none chosen, or one that is incomplete and so cannot be inspected. */
+const structureErrorOf = (
+  structureId: string | null,
+  incomplete: boolean,
+  structureName: string | null | undefined,
+): string | undefined => {
+  if (!structureId) return 'Structure # is required.';
+  if (!incomplete) return undefined;
+  return `Structure ${structureName ?? ''} is incomplete. Complete it on its structure page before it can be inspected.`;
+};
+
+/** Whether the Inspection tab differs from how it opened — its type as the link set it. */
+const hasChanged = (inspection: InspectionValues, fromType: string | null): boolean =>
+  inspection.typeCode !== (fromType ?? '') ||
+  Object.entries(inspection).some(
+    ([field, value]) =>
+      field !== 'typeCode' && value !== EMPTY_INSPECTION_VALUES[field as keyof InspectionValues],
+  );
+
+/** Whether any question has an answer or a comment. */
+const hasAnswers = (answers: Answers): boolean =>
+  Object.values(answers).some((entry) => entry.answer.trim() || entry.comment.trim());
 
 /**
  * Add Inspection — legacy's blank inspection form, in the structure page's tabs: Inspection (the
@@ -103,11 +126,7 @@ const NewInspectionPage: FC = () => {
 
   const incomplete = (structure.data?.outstanding.length ?? 0) > 0;
   const errors: Record<string, string | undefined> = {
-    structureId: structureId
-      ? incomplete
-        ? `Structure ${structure.data?.structureName ?? ''} is incomplete. Complete it on its structure page before it can be inspected.`
-        : undefined
-      : 'Structure # is required.',
+    structureId: structureErrorOf(structureId, incomplete, structure.data?.structureName),
     ...inspectionErrorsOf(inspection),
     ...hazardErrorsOf(hazards),
     ...answerErrorsOf(answers, subsections),
@@ -121,13 +140,9 @@ const NewInspectionPage: FC = () => {
    * counts and each tab's list are the map of what is left, shown before any field is touched. The
    * server's refusals join them.
    */
-  const outstanding: Record<string, string> = {};
-  for (const [key, message] of Object.entries({ ...errors, ...created.fieldErrors })) {
-    if (message) outstanding[key] = message;
-  }
+  const outstanding = outstandingOf(errors, created.fieldErrors);
   const outstandingTotal = Object.keys(outstanding).length;
-  const counts: Record<TabKey, number> = { inspection: 0, condition: 0, hazards: 0 };
-  for (const key of Object.keys(outstanding)) counts[tabOf(key)] += 1;
+  const counts = countByTab(outstanding);
   const tabsWithOutstanding = Object.values(counts).filter((count) => count > 0).length;
   const tone = refused ? 'error' : 'neutral';
 
@@ -147,13 +162,9 @@ const NewInspectionPage: FC = () => {
 
   const isDirty =
     structureId !== fromStructure ||
-    inspection.typeCode !== (fromType ?? '') ||
-    Object.entries(inspection).some(
-      ([field, value]) =>
-        field !== 'typeCode' && value !== EMPTY_INSPECTION_VALUES[field as keyof InspectionValues],
-    ) ||
+    hasChanged(inspection, fromType) ||
     hazards !== EMPTY_HAZARD_VALUES ||
-    Object.values(answers).some((entry) => entry.answer.trim() || entry.comment.trim());
+    hasAnswers(answers);
   useUnsavedChangesPrompt(isDirty && !saved);
 
   const save = () => {

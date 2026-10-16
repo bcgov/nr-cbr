@@ -39,23 +39,24 @@ const OutstandingPanel: FC<Props> = ({
   const total = groups.reduce((sum, group) => sum + group.items.length, 0);
   if (total === 0) return null;
   const noun = total === 1 ? 'item' : 'items';
+  const blockingNote = tone === 'error' ? `, blocking ${blocking}` : '';
+  const toggleClass =
+    tone === 'error'
+      ? 'structure-detail__outstanding-toggle structure-detail__outstanding-toggle--error'
+      : 'structure-detail__outstanding-toggle';
 
   return (
     <div className="structure-detail__outstanding" data-testid={testId}>
       <button
         type="button"
-        className={`structure-detail__outstanding-toggle${
-          tone === 'error' ? ' structure-detail__outstanding-toggle--error' : ''
-        }`}
+        className={toggleClass}
         aria-expanded={open}
         aria-controls={contentId}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
         {tone === 'error' && <ErrorFilled size={16} />}
         {heading}
-        <span className="cds--visually-hidden">
-          {` (${total} ${noun}${tone === 'error' ? `, blocking ${blocking}` : ''})`}
-        </span>
+        <span className="cds--visually-hidden">{` (${total} ${noun}${blockingNote})`}</span>
         {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
       {open && (

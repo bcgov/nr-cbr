@@ -25,12 +25,13 @@ const TabCount: FC<Props> = ({
   blocking = 'save',
 }) => {
   if (count === 0) return null;
+  const blockingNote = tone === 'error' ? `, blocking ${blocking}` : '';
+  const items = count === 1 ? 'item' : 'items';
+  const errors = count === 1 ? 'error' : 'errors';
   const label =
     kind === 'errors'
-      ? `${section}: ${count} ${count === 1 ? 'error' : 'errors'}`
-      : `${section}: ${count} ${count === 1 ? 'item' : 'items'} outstanding${
-          tone === 'error' ? `, blocking ${blocking}` : ''
-        }`;
+      ? `${section}: ${count} ${errors}`
+      : `${section}: ${count} ${items} outstanding${blockingNote}`;
   return (
     <svg
       className="structure-detail__tab-count"
