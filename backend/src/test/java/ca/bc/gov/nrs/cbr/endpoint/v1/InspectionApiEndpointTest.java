@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
@@ -96,6 +97,28 @@ class InspectionApiEndpointTest {
 
     assertThat(get.getAnnotation(GetMapping.class).value()).containsExactly("/{inspectionId}");
     assertThat(get.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
+  }
+
+  @Test
+  @DisplayName("its repairs and monitors: Level 0 adds and edits, Level 2 deletes")
+  void followUpIsMappedAndGated() {
+    for (String kind : new String[] {"Repair", "Monitor"}) {
+      String path = "/{inspectionId}/" + kind.toLowerCase() + "s";
+      String item = path + "/{" + kind.toLowerCase() + "Id}";
+      Method add = method("add" + kind);
+      Method update = method("update" + kind);
+      Method delete = method("delete" + kind);
+
+      assertThat(add.getAnnotation(PostMapping.class).value()).containsExactly(path);
+      assertThat(update.getAnnotation(PutMapping.class).value()).containsExactly(item);
+      assertThat(delete.getAnnotation(DeleteMapping.class).value()).containsExactly(item);
+      assertThat(add.getAnnotation(PreAuthorize.class).value())
+          .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+      assertThat(update.getAnnotation(PreAuthorize.class).value())
+          .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+      assertThat(delete.getAnnotation(PreAuthorize.class).value())
+          .isEqualTo(CbrAuthorities.DESTRUCTIVE);
+    }
   }
 
   @Test

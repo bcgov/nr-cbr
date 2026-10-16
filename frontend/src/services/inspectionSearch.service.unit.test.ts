@@ -147,4 +147,20 @@ describe('InspectionSearchService', () => {
     expect(urlOf(request)).toContain('/api/v1/inspections');
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', data: body }));
   });
+
+  it.each([
+    ['addInspectionRepair', ['41', {}], 'POST', '/api/v1/inspections/41/repairs'],
+    ['updateInspectionRepair', ['41', '3', {}], 'PUT', '/api/v1/inspections/41/repairs/3'],
+    ['deleteInspectionRepair', ['41', '3'], 'DELETE', '/api/v1/inspections/41/repairs/3'],
+    ['addInspectionMonitor', ['41', {}], 'POST', '/api/v1/inspections/41/monitors'],
+    ['updateInspectionMonitor', ['41', '6', {}], 'PUT', '/api/v1/inspections/41/monitors/6'],
+    ['deleteInspectionMonitor', ['41', '6'], 'DELETE', '/api/v1/inspections/41/monitors/6'],
+  ] as const)('%s calls %s %s', async (name, args, method, url) => {
+    const { service, request } = withMockedRequest();
+
+    await (service[name] as (...values: unknown[]) => Promise<unknown>)(...args);
+
+    expect(urlOf(request)).toContain(url);
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ method }));
+  });
 });

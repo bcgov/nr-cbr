@@ -23,7 +23,12 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
 }));
 
-const inspectionApi = vi.hoisted(() => ({ getInspection: vi.fn(), getInspectionForm: vi.fn() }));
+const inspectionApi = vi.hoisted(() => ({
+  getInspection: vi.fn(),
+  getInspectionForm: vi.fn(),
+  deleteInspectionRepair: vi.fn(),
+  deleteInspectionMonitor: vi.fn(),
+}));
 const structureApi = vi.hoisted(() => ({
   getStructure: vi.fn(),
   getDocuments: vi.fn(),
@@ -359,6 +364,79 @@ describe('InspectionDetailPage', () => {
     await openTab('documents');
     await waitFor(() => expect(structureApi.getDocuments).toHaveBeenCalledWith('7'));
     expect(screen.queryByText('Add documents')).not.toBeInTheDocument();
+  });
+
+  describe('changing its repairs and monitoring items', () => {
+    const repairRow = {
+      id: '3',
+      number: 3,
+      status: { code: 'SUG', description: 'Suggested' },
+      type: { code: 'DECK', description: 'Deck planks' },
+      suggested: null,
+      required: null,
+      completed: null,
+      inspectionId: '41',
+      inspectionDate: '2024-05-01',
+      priority: { code: 'H', description: 'High' },
+      completedDate: null,
+      estimate: null,
+      actualCost: null,
+      quantity: null,
+      unit: null,
+      description: null,
+    };
+    const inProgress = () => inspection({ status: { code: 'PRO', description: 'In Progress' } });
+
+    it('lets Level 0 add and edit, as legacy, and Level 2 delete — through the inspection', async () => {
+      authorization.canEdit = false;
+      authorization.canDelete = true;
+      inspectionApi.getInspection.mockResolvedValue(inProgress());
+      inspectionApi.deleteInspectionRepair.mockResolvedValue(undefined);
+      structureApi.getStructureRepairs.mockResolvedValue(page([repairRow]));
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('repairs');
+
+      expect(await screen.findByTestId('structure-repair-add')).toBeInTheDocument();
+      expect(await screen.findByTestId('structure-repair-edit-3')).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId('structure-repair-delete-3'));
+      await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+      await waitFor(() =>
+        expect(inspectionApi.deleteInspectionRepair).toHaveBeenCalledWith('41', '3'),
+      );
+      expect(
+        within(screen.getByTestId('structure-monitoring-tab')).getByTestId('structure-monitor-add'),
+      ).toBeInTheDocument();
+      authorization.canEdit = true;
+    });
+
+    it('offers no Delete below Level 2', async () => {
+      authorization.canDelete = false;
+      inspectionApi.getInspection.mockResolvedValue(inProgress());
+      structureApi.getStructureRepairs.mockResolvedValue(page([repairRow]));
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('repairs');
+
+      expect(await screen.findByTestId('structure-repair-edit-3')).toBeInTheDocument();
+      expect(screen.queryByTestId('structure-repair-delete-3')).not.toBeInTheDocument();
+      authorization.canDelete = true;
+    });
+
+    it('changes nothing once the inspection is reviewed, and says why', async () => {
+      structureApi.getStructureRepairs.mockResolvedValue(page([repairRow]));
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('repairs');
+
+      expect(await screen.findByTestId('structure-repairs-locked')).toMatchTextContent(
+        /has been reviewed/,
+      );
+      expect(screen.queryByTestId('structure-repair-add')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('structure-repair-edit-3')).not.toBeInTheDocument();
+      expect(screen.getByTestId('structure-monitors-locked')).toBeInTheDocument();
+    });
   });
 
   it('says when the inspection does not exist', async () => {

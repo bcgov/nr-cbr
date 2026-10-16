@@ -39,6 +39,8 @@ import { byteLength, overLimitError } from '@/utils/textLimits';
 
 type Props = {
   structureId: string;
+  /** From an inspection's page: saved through it, and an added one raised by it. */
+  inspectionId?: string;
   /**
    * The repair being edited, or null to add one. The dialog is mounted only while it is open, so it
    * opens fresh each time.
@@ -140,15 +142,15 @@ const typesFor = (options: RepairTypeOption[], groups: ReadonlySet<string>) => {
  * <p>Errors sit beside their fields — the form's own rules on Save, then whatever the server refused.
  * A save that fails for no field's sake is a toast, as the app's other actions report one.
  */
-const RepairDialog: FC<Props> = ({ structureId, repair, onClose }) => {
+const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose }) => {
   const { isPeng } = useAuthorization();
   const statuses = useRepairStatusCodes();
   const priorities = useRepairPriorityCodes();
   const groups = useRepairGroupCodes();
   const types = useStructureRepairTypes(structureId);
   const adding = repair === null;
-  const create = useCreateStructureRepair(structureId);
-  const update = useUpdateStructureRepair(structureId);
+  const create = useCreateStructureRepair(structureId, inspectionId);
+  const update = useUpdateStructureRepair(structureId, inspectionId);
   const saving = create.isPending || update.isPending;
   const { display } = useNotification();
 

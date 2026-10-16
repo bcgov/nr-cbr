@@ -152,14 +152,17 @@ public class StructureMonitorsService {
    *
    * <p>As legacy: the item is Suggested, stamped Suggested by the user; it takes the structure's
    * next number, and its id from {@code STRUCTURE_MONITOR_ITEMS_SEQ} through the entity's
-   * generator; it belongs to no inspection.
+   * generator; it belongs to the inspection it was added from — legacy's Repairs & Monitoring tab —
+   * or, from the structure page, to none.
    * The description and frequency are checked as an edit checks them.
    *
+   * @param inspectionId the inspection it was added from, or null from the structure page
    * @throws StructureNotFoundException if there is no such structure
    * @throws FieldValidationException   with a message for each field at fault
    */
   @Transactional
-  public MonitorCreatedResponse create(long structureId, MonitorCreateRequest request) {
+  public MonitorCreatedResponse create(long structureId, Long inspectionId,
+      MonitorCreateRequest request) {
     if (!structures.existsById(structureId)) {
       throw new StructureNotFoundException(structureId);
     }
@@ -173,6 +176,7 @@ public class StructureMonitorsService {
     long number = monitors.findHighestNumber(structureId) + 1;
     StructureMonitorItemEntity saved = monitors.save(StructureMonitorItemEntity.builder()
         .crossingStructureId(structureId)
+        .inspectionId(inspectionId)
         .monitorNumber(number)
         .monitoringStatusCode(SUGGESTED)
         .monitorFrequencyCode(frequency)
