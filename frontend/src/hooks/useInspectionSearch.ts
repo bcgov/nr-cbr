@@ -74,6 +74,14 @@ export const useDeleteInspection = (): UseMutationResult<void, Error, string> =>
 };
 
 /** The questions an inspection of the structure asks — Add Inspection's Condition tab. */
+/** One inspection, for its page. */
+export const useInspection = (inspectionId: string | undefined) =>
+  useQuery({
+    queryKey: ['inspection', inspectionId],
+    queryFn: () => API.inspectionSearch.getInspection(inspectionId as string),
+    enabled: Boolean(inspectionId),
+  });
+
 export const useInspectionForm = (structureId: string | null) =>
   useQuery({
     queryKey: ['inspection-form', structureId],

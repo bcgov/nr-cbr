@@ -60,6 +60,13 @@ class StructureMonitorsServiceTest {
         .activeInd("Y").closeProximityInd("N").portableStructureInd("N").build());
   }
 
+  /** The superstructure went in in 2000: earlier inspections are hidden by default. */
+  private void givenStructureBuilt() {
+    entityManager.flush();
+    entityManager.createQuery("UPDATE CrossingStructureEntity s SET s.yearBuilt = 2000")
+        .executeUpdate();
+  }
+
   private void givenInspection(long id, LocalDate date) {
     entityManager.persist(StructureInspectionEntity.builder()
         .inspectionId(id).crossingStructureId(7L).inspectionDate(date).build());
@@ -89,6 +96,27 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
     return service.monitors(7L, view, 0, 10, false).page();
+  }
+
+  @Test
+  @DisplayName("from an inspection's page, Current Inspection Items lists every item it raised, "
+      + "however early it was, as legacy's getCurrentMonitors")
+  void currentInspection() {
+    givenStructureBuilt();
+    givenInspection(10L, LocalDate.of(1990, 6, 1));
+    givenInspection(11L, LocalDate.of(2023, 6, 1));
+    givenMonitor(1L, 10L, "REQ");
+    givenMonitor(2L, 10L, "COMP");
+    givenMonitor(3L, 11L, "REQ");
+    entityManager.flush();
+    entityManager.clear();
+
+    var listing = service.monitors(7L, View.CURRENT, 10L, 0, 10, false);
+    assertThat(listing.page().content()).extracting(Monitor::number)
+        .containsExactlyInAnyOrder(1L, 2L);
+    assertThat(listing.beforeInstallCount()).isZero();
+    assertThatThrownBy(() -> service.monitors(7L, View.CURRENT, null, 0, 10, false))
+        .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
   }
 
   @Test

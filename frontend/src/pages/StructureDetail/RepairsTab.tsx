@@ -37,6 +37,13 @@ type Props = {
   structureId: string;
   /** True once the tab has been opened; nothing is fetched before. */
   opened: boolean;
+  /**
+   * On an inspection's page: the inspection, which adds legacy's third viewing option, Current
+   * Inspection Items.
+   */
+  inspectionId?: string;
+  /** Shown, not changed: no Add, Edit or Delete — the inspection page, until it is editable. */
+  readOnly?: boolean;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -60,7 +67,13 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, 
   if (rows.length === 0) {
     return (
       <p className="structure-detail__empty">
-        {view === 'OUTSTANDING' ? 'No outstanding repairs.' : 'No repairs have been recorded.'}
+        {
+          {
+            OUTSTANDING: 'No outstanding repairs.',
+            ALL: 'No repairs have been recorded.',
+            CURRENT: 'No outstanding repairs for this inspection.',
+          }[view]
+        }
       </p>
     );
   }
@@ -102,7 +115,7 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, 
                 {/* Its own tab, as the inspection table opens one. */}
                 {repair.inspectionId ? (
                   <ExternalLink to={`/inspection/${repair.inspectionId}`}>
-                    {formatShortDate(repair.inspectionDate) || repair.inspectionId}
+                    {formatShortDate(repair.inspectionDate) || 'No date yet'}
                   </ExternalLink>
                 ) : null}
               </TableCell>
@@ -163,8 +176,10 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, 
  * all of them, a page at a time from the server. Edit (Level 1 and up) and Delete (Level 2 and
  * up) from each row's Actions; Add (Level 1 and up) over the table.
  */
-const RepairsTab: FC<Props> = ({ structureId, opened }) => {
-  const { canEdit, canDelete } = useAuthorization();
+const RepairsTab: FC<Props> = ({ structureId, opened, inspectionId, readOnly = false }) => {
+  const authorization = useAuthorization();
+  const canEdit = authorization.canEdit && !readOnly;
+  const canDelete = authorization.canDelete && !readOnly;
   const { display } = useNotification();
   const deleteRepair = useDeleteStructureRepair(structureId);
   /** The repair whose delete is being confirmed, if any. */
@@ -184,6 +199,7 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
     page - 1,
     pageSize,
     includeBeforeInstall,
+    inspectionId,
   );
 
   return (
@@ -206,6 +222,13 @@ const RepairsTab: FC<Props> = ({ structureId, opened }) => {
               value="OUTSTANDING"
             />
             <RadioButton id="structure-repairs-all" labelText="All Items" value="ALL" />
+            {inspectionId !== undefined && (
+              <RadioButton
+                id="structure-repairs-current"
+                labelText="Current Inspection Items"
+                value="CURRENT"
+              />
+            )}
           </RadioButtonGroup>
         </div>
 

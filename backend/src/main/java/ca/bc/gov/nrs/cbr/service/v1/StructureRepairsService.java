@@ -44,6 +44,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -118,12 +120,32 @@ public class StructureRepairsService {
   @Transactional(readOnly = true)
   public Listing repairs(long structureId, View view, int pageNumber, int pageSize,
       boolean includeBeforeInstall) {
+    return repairs(structureId, view, null, pageNumber, pageSize, includeBeforeInstall);
+  }
+
+  /**
+   * As {@link #repairs(long, View, int, int, boolean)}, from an inspection's page: there, legacy's
+   * "Current Inspection Items" ({@link View#CURRENT}) lists the inspection's own outstanding
+   * repairs, whenever it was inspected.
+   *
+   * @param inspectionId the inspection whose page asks; needed for {@link View#CURRENT}
+   * @throws ResponseStatusException 400 for {@link View#CURRENT} without an inspection
+   */
+  @Transactional(readOnly = true)
+  public Listing repairs(long structureId, View view, Long inspectionId, int pageNumber,
+      int pageSize, boolean includeBeforeInstall) {
     InstallCutoff cutoff = InstallCutoff.of(structures.findById(structureId)
         .orElseThrow(() -> new StructureNotFoundException(structureId)));
-    boolean outstandingOnly = view == View.OUTSTANDING;
+    boolean current = view == View.CURRENT;
+    if (current && inspectionId == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "Current Inspection Items needs the inspection.");
+    }
+    // Legacy's getCurrentRepairs: the inspection's outstanding ones.
+    boolean outstandingOnly = view != View.ALL;
     Page<StructureRepairEntity> page = repairs.findPageByStructure(
-        structureId, outstandingOnly, OUTSTANDING_STATUSES,
-        includeBeforeInstall || cutoff.none(), cutoff.installed(),
+        structureId, current ? inspectionId : null, outstandingOnly, OUTSTANDING_STATUSES,
+        includeBeforeInstall || cutoff.none() || current, cutoff.installed(),
         PageRequest.of(Math.max(pageNumber, 0), Math.clamp(pageSize, 1, MAX_PAGE_SIZE)));
     List<StructureRepairEntity> rows = page.getContent();
 
@@ -164,7 +186,7 @@ public class StructureRepairsService {
     return new Listing(
         new PagedResponse<>(content, page.getTotalElements(), page.getTotalPages(),
             page.getNumber(), page.getSize()),
-        cutoff.none()
+        cutoff.none() || current
             ? 0
             : repairs.countBeforeInstall(
                 structureId, outstandingOnly, OUTSTANDING_STATUSES, cutoff.installed()));

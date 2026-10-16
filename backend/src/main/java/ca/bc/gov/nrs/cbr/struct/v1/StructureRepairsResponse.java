@@ -26,7 +26,12 @@ public final class StructureRepairsResponse {
   public enum View {
     /** Suggested, required or carried forward, and not carried forward again. Legacy's default. */
     OUTSTANDING,
-    ALL
+    ALL,
+    /**
+     * This inspection's outstanding repairs — legacy's "Current Inspection Items". Needs the
+     * inspection.
+     */
+    CURRENT
   }
 
   /**

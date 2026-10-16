@@ -76,17 +76,26 @@ class InspectionApiEndpointTest {
   }
 
   @Test
-  @DisplayName("Add Inspection's questions are GET /form and its save POST, both Level 0 and up")
+  @DisplayName("the questions are GET /form for any reader; the save POST, Level 0 and up")
   void addInspectionIsMappedAndGated() {
     Method form = method("inspectionForm");
     Method create = method("createInspection");
 
     assertThat(form.getAnnotation(GetMapping.class).value()).containsExactly("/form");
     assertThat(create.getAnnotation(PostMapping.class).value()).isEmpty();
-    assertThat(form.getAnnotation(PreAuthorize.class).value())
-        .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+    // An inspection's page shows every question asked, to whoever may read it.
+    assertThat(form.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
     assertThat(create.getAnnotation(PreAuthorize.class).value())
         .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+  }
+
+  @Test
+  @DisplayName("one inspection is GET /{inspectionId}, for any reader")
+  void getIsMappedAndGated() {
+    Method get = method("getInspection");
+
+    assertThat(get.getAnnotation(GetMapping.class).value()).containsExactly("/{inspectionId}");
+    assertThat(get.getAnnotation(PreAuthorize.class).value()).isEqualTo(CbrAuthorities.READ);
   }
 
   @Test

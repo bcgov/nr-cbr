@@ -37,6 +37,8 @@ type Props = {
   opened: boolean;
   /** The year the superstructure was installed; files from before it are hidden until asked. */
   yearBuilt: number | null;
+  /** Shown, not changed: no Add, Edit or Delete — the inspection page, until it is editable. */
+  readOnly?: boolean;
 };
 
 /** The documents of one folder — the structure's own, or one inspection's. */
@@ -60,7 +62,7 @@ const groupDocuments = (documents: StructureDocument[]): Group[] => {
         title:
           document.inspectionId === null
             ? 'Structure Documents & Photos'
-            : `Inspection: ${formatShortDate(document.inspectionDate) || document.inspectionId}`,
+            : `Inspection: ${formatShortDate(document.inspectionDate) || 'No date yet'}`,
         documents: [],
       });
     }
@@ -213,13 +215,15 @@ const DocumentsTable: FC<TableProps> = ({
  * files added here are the structure's own. Each row offers Edit (its Photo View and description,
  * Level 1 up) and Delete (Level 2 up), an inspection's files too, as legacy's tab did.
  */
-const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt }) => {
+const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt, readOnly = false }) => {
   const loaded = useStructureDocuments(structureId, opened);
   const [showEarly, setShowEarly] = useState(false);
   /** The file being fetched, so its link can say so and not be pressed twice. */
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
-  const { canEdit, canDelete } = useAuthorization();
+  const authorization = useAuthorization();
+  const canEdit = authorization.canEdit && !readOnly;
+  const canDelete = authorization.canDelete && !readOnly;
   const { display } = useNotification();
   const deleteDocument = useDeleteDocument(structureId);
   const [uploading, setUploading] = useState(false);

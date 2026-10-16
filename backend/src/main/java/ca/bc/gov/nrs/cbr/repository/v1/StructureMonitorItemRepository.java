@@ -45,6 +45,7 @@ public interface StructureMonitorItemRepository
         FROM StructureMonitorItemEntity monitor
         LEFT JOIN FETCH monitor.inspection inspection
        WHERE monitor.crossingStructureId = :structureId
+         AND (:inspectionId IS NULL OR monitor.inspectionId = :inspectionId)
          AND (:outstandingOnly = FALSE OR monitor.monitoringStatusCode IN :outstandingStatuses)
          AND (:includeBeforeInstall = TRUE
               OR inspection IS NULL
@@ -59,6 +60,7 @@ public interface StructureMonitorItemRepository
         FROM StructureMonitorItemEntity monitor
         LEFT JOIN monitor.inspection inspection
        WHERE monitor.crossingStructureId = :structureId
+         AND (:inspectionId IS NULL OR monitor.inspectionId = :inspectionId)
          AND (:outstandingOnly = FALSE OR monitor.monitoringStatusCode IN :outstandingStatuses)
          AND (:includeBeforeInstall = TRUE
               OR inspection IS NULL
@@ -67,6 +69,7 @@ public interface StructureMonitorItemRepository
       """)
   Page<StructureMonitorItemEntity> findPageByStructure(
       @Param("structureId") Long structureId,
+      @Param("inspectionId") Long inspectionId,
       @Param("outstandingOnly") boolean outstandingOnly,
       @Param("outstandingStatuses") Collection<String> outstandingStatuses,
       @Param("includeBeforeInstall") boolean includeBeforeInstall,

@@ -1,4 +1,5 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
+import type { InspectionDetailResponse } from '@/pages/InspectionDetail/inspectionDetail';
 import type {
   InspectionSearchCriteria,
   InspectionSearchResult,
@@ -52,6 +53,16 @@ export class InspectionSearchService extends HttpClient {
       query: { ...populated(criteria), pageNumber, pageSize, ...sortParams(sort) },
     });
   }
+
+  /** One inspection, for its page. 404 when there is no such inspection. */
+  getInspection(inspectionId: string): CancelablePromise<InspectionDetailResponse> {
+    return this.doRequest<InspectionDetailResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/inspections/{inspectionId}',
+      path: { inspectionId },
+    });
+  }
+
   /** The questions an inspection of the structure asks, and its spans and piers. */
   getInspectionForm(structureId: string): CancelablePromise<InspectionFormResponse> {
     return this.doRequest<InspectionFormResponse>(this.config, {

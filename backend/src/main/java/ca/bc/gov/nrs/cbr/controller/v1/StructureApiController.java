@@ -372,9 +372,10 @@ public class StructureApiController implements StructureApiEndpoint {
 
   @Override
   public StructureRepairsResponse.Listing getRepairs(long structureId,
-      StructureRepairsResponse.View view, int pageNumber, int pageSize,
+      StructureRepairsResponse.View view, Long inspectionId, int pageNumber, int pageSize,
       boolean includeBeforeInstall) {
-    return repairsService.repairs(structureId, view, pageNumber, pageSize, includeBeforeInstall);
+    return repairsService.repairs(
+        structureId, view, inspectionId, pageNumber, pageSize, includeBeforeInstall);
   }
 
   @Override
@@ -404,10 +405,10 @@ public class StructureApiController implements StructureApiEndpoint {
 
   @Override
   public StructureMonitorsResponse.Listing getMonitors(long structureId,
-      StructureMonitorsResponse.View view, int pageNumber, int pageSize,
+      StructureMonitorsResponse.View view, Long inspectionId, int pageNumber, int pageSize,
       boolean includeBeforeInstall) {
     return monitorsService.monitors(
-        structureId, view, pageNumber, pageSize, includeBeforeInstall);
+        structureId, view, inspectionId, pageNumber, pageSize, includeBeforeInstall);
   }
 
   @Override

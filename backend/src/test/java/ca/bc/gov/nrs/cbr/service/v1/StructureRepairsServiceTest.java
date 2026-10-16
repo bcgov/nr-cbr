@@ -67,6 +67,13 @@ class StructureRepairsServiceTest {
         .activeInd("Y").closeProximityInd("N").portableStructureInd("N").build());
   }
 
+  /** The superstructure went in in 2000: earlier inspections are hidden by default. */
+  private void givenStructureBuilt() {
+    entityManager.flush();
+    entityManager.createQuery("UPDATE CrossingStructureEntity s SET s.yearBuilt = 2000")
+        .executeUpdate();
+  }
+
   private void givenInspection(long id, LocalDate date) {
     entityManager.persist(StructureInspectionEntity.builder()
         .inspectionId(id).crossingStructureId(7L).inspectionDate(date).build());
@@ -107,6 +114,26 @@ class StructureRepairsServiceTest {
     assertThat(repairs(View.OUTSTANDING).content()).extracting(Repair::number)
         .containsExactlyInAnyOrder(1L, 2L, 3L);
     assertThat(repairs(View.ALL).content()).hasSize(5);
+  }
+
+  @Test
+  @DisplayName("from an inspection's page, Current Inspection Items lists its outstanding repairs, "
+      + "however early it was, as legacy's getCurrentRepairs")
+  void currentInspection() {
+    givenStructureBuilt();
+    givenInspection(10L, LocalDate.of(1990, 6, 1));
+    givenInspection(11L, LocalDate.of(2023, 6, 1));
+    givenRepair(1L, 10L, "REQ", "P1");
+    givenRepair(2L, 10L, "COMP", "P1");
+    givenRepair(3L, 11L, "REQ", "P1");
+    entityManager.flush();
+    entityManager.clear();
+
+    var listing = service.repairs(7L, View.CURRENT, 10L, 0, 10, false);
+    assertThat(listing.page().content()).extracting(Repair::number).containsExactly(1L);
+    assertThat(listing.beforeInstallCount()).isZero();
+    assertThatThrownBy(() -> service.repairs(7L, View.CURRENT, null, 0, 10, false))
+        .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
   }
 
   @Test

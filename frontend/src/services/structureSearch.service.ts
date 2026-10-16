@@ -577,12 +577,14 @@ export class StructureSearchService extends HttpClient {
     pageNumber: number,
     pageSize: number,
     includeBeforeInstall: boolean,
+    /** The inspection whose page asks — needed for the `CURRENT` view. */
+    inspectionId?: string,
   ): CancelablePromise<ItemListing<StructureRepair>> {
     return this.doRequest<ItemListing<StructureRepair>>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/repairs',
       path: { structureId },
-      query: { view, pageNumber, pageSize, includeBeforeInstall },
+      query: { view, pageNumber, pageSize, includeBeforeInstall, inspectionId },
     });
   }
 
@@ -599,12 +601,14 @@ export class StructureSearchService extends HttpClient {
     pageNumber: number,
     pageSize: number,
     includeBeforeInstall: boolean,
+    /** The inspection whose page asks — needed for the `CURRENT` view. */
+    inspectionId?: string,
   ): CancelablePromise<ItemListing<StructureMonitor>> {
     return this.doRequest<ItemListing<StructureMonitor>>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/monitors',
       path: { structureId },
-      query: { view, pageNumber, pageSize, includeBeforeInstall },
+      query: { view, pageNumber, pageSize, includeBeforeInstall, inspectionId },
     });
   }
 

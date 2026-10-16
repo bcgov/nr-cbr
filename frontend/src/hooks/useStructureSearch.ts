@@ -220,6 +220,8 @@ export const useStructureRepairs = (
   pageNumber: number,
   pageSize: number,
   includeBeforeInstall: boolean,
+  /** On an inspection's page: the inspection, for the `CURRENT` view. */
+  inspectionId?: string,
 ) =>
   useQuery({
     queryKey: [
@@ -230,15 +232,25 @@ export const useStructureRepairs = (
       pageNumber,
       pageSize,
       includeBeforeInstall,
+      inspectionId,
     ],
     queryFn: () =>
-      API.structureSearch.getStructureRepairs(
-        structureId as string,
-        view,
-        pageNumber,
-        pageSize,
-        includeBeforeInstall,
-      ),
+      inspectionId === undefined
+        ? API.structureSearch.getStructureRepairs(
+            structureId as string,
+            view,
+            pageNumber,
+            pageSize,
+            includeBeforeInstall,
+          )
+        : API.structureSearch.getStructureRepairs(
+            structureId as string,
+            view,
+            pageNumber,
+            pageSize,
+            includeBeforeInstall,
+            inspectionId,
+          ),
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
@@ -256,6 +268,8 @@ export const useStructureMonitors = (
   pageNumber: number,
   pageSize: number,
   includeBeforeInstall: boolean,
+  /** On an inspection's page: the inspection, for the `CURRENT` view. */
+  inspectionId?: string,
 ) =>
   useQuery({
     queryKey: [
@@ -266,15 +280,25 @@ export const useStructureMonitors = (
       pageNumber,
       pageSize,
       includeBeforeInstall,
+      inspectionId,
     ],
     queryFn: () =>
-      API.structureSearch.getStructureMonitors(
-        structureId as string,
-        view,
-        pageNumber,
-        pageSize,
-        includeBeforeInstall,
-      ),
+      inspectionId === undefined
+        ? API.structureSearch.getStructureMonitors(
+            structureId as string,
+            view,
+            pageNumber,
+            pageSize,
+            includeBeforeInstall,
+          )
+        : API.structureSearch.getStructureMonitors(
+            structureId as string,
+            view,
+            pageNumber,
+            pageSize,
+            includeBeforeInstall,
+            inspectionId,
+          ),
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
@@ -445,8 +469,7 @@ export const useSitePreview = (siteId: string, currentSiteId: string | null) => 
 /** Adds a structure. What the server refused comes back as `fieldErrors`, keyed by field. */
 export const useCreateStructure = () => {
   const mutation = useMutation({
-    mutationFn: (request: StructureCreateRequest) =>
-      API.structureSearch.createStructure(request),
+    mutationFn: (request: StructureCreateRequest) => API.structureSearch.createStructure(request),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };

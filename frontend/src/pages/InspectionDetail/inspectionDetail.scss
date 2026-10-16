@@ -1,0 +1,21 @@
+@use '@carbon/react/scss/spacing' as *;
+
+// Free text — the comments — as written, its line breaks kept.
+.inspection-detail__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+// A heading inside a card, above a part of it: Comments, Status History.
+.inspection-detail__subheading {
+  margin: $spacing-07 0 $spacing-04;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+// An answer's comment on the Condition tab, as written.
+.inspection-detail__comment {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -37,6 +37,13 @@ type Props = {
   structureId: string;
   /** True once the tab has been opened; nothing is fetched before. */
   opened: boolean;
+  /**
+   * On an inspection's page: the inspection, which adds legacy's third viewing option, Current
+   * Inspection Items.
+   */
+  inspectionId?: string;
+  /** Shown, not changed: no Add, Edit or Delete — the inspection page, until it is editable. */
+  readOnly?: boolean;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -60,9 +67,13 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit,
   if (rows.length === 0) {
     return (
       <p className="structure-detail__empty">
-        {view === 'OUTSTANDING'
-          ? 'No outstanding monitoring items.'
-          : 'No monitoring items have been recorded.'}
+        {
+          {
+            OUTSTANDING: 'No outstanding monitoring items.',
+            ALL: 'No monitoring items have been recorded.',
+            CURRENT: 'No monitoring items for this inspection.',
+          }[view]
+        }
       </p>
     );
   }
@@ -94,7 +105,7 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit,
                 {/* Its own tab, as the inspection table opens one. */}
                 {monitor.inspectionId ? (
                   <ExternalLink to={`/inspection/${monitor.inspectionId}`}>
-                    {formatShortDate(monitor.inspectionDate) || monitor.inspectionId}
+                    {formatShortDate(monitor.inspectionDate) || 'No date yet'}
                   </ExternalLink>
                 ) : null}
               </TableCell>
@@ -156,8 +167,10 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit,
  * <p>Legacy's one viewing option drove both this tab and Repairs; each tab has its own here, so
  * choosing All on one does not change what the other lists.
  */
-const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
-  const { canEdit, canDelete } = useAuthorization();
+const MonitoringTab: FC<Props> = ({ structureId, opened, inspectionId, readOnly = false }) => {
+  const authorization = useAuthorization();
+  const canEdit = authorization.canEdit && !readOnly;
+  const canDelete = authorization.canDelete && !readOnly;
   /**
    * The open dialog, if any: an item to edit, or `'new'` to add one. The dialog is mounted only
    * while it is open.
@@ -180,6 +193,7 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
     page - 1,
     pageSize,
     includeBeforeInstall,
+    inspectionId,
   );
 
   return (
@@ -202,6 +216,13 @@ const MonitoringTab: FC<Props> = ({ structureId, opened }) => {
               value="OUTSTANDING"
             />
             <RadioButton id="structure-monitors-all" labelText="All Items" value="ALL" />
+            {inspectionId !== undefined && (
+              <RadioButton
+                id="structure-monitors-current"
+                labelText="Current Inspection Items"
+                value="CURRENT"
+              />
+            )}
           </RadioButtonGroup>
         </div>
 

@@ -309,7 +309,7 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
       },
       {
         // Reached from an inspection in Inspection Search or on a structure's Inspections tab, not
-        // from the side menu. The parameter is INSPECTION_ID. A placeholder for now — see the page.
+        // from the side menu. The parameter is INSPECTION_ID. Read only for now — see the page.
         path: ':inspectionId',
         id: 'Inspection Detail',
         element: (
