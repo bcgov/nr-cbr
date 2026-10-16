@@ -1,11 +1,25 @@
-import { Save } from '@carbon/icons-react';
-import { Button, Column, Grid, InlineNotification } from '@carbon/react';
+import { Document, Location, Save, TableOfContents } from '@carbon/icons-react';
+import {
+  Button,
+  Column,
+  Grid,
+  InlineNotification,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+} from '@carbon/react';
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
 import RoadSearchModal from '@/components/RoadSearchModal';
-import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
+import SiteForm, { FORM_ID, SiteDetailsField, type SiteCodeTables } from '@/components/SiteForm';
+import Card from '@/pages/StructureDetail/Card';
+import OutstandingPanel from '@/pages/StructureDetail/OutstandingPanel';
+import OutstandingSummary from '@/pages/StructureDetail/OutstandingSummary';
+import TabCount from '@/pages/StructureDetail/TabCount';
 
 import type { FC } from 'react';
 
@@ -40,6 +54,7 @@ import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt';
 import { apiErrorMessage } from '@/utils/apiError';
 import { errorsForSettledFields } from '@/utils/validation';
 
+import '@/pages/StructureDetail/structureDetail.scss';
 import './addSite.scss';
 
 /**
@@ -84,6 +99,8 @@ const AddSitePage: FC = () => {
   const [site, setSite] = useState<SiteFormValues>(EMPTY_SITE);
   /** Whether Save has been pressed — see the note above on when messages appear. */
   const [submitted, setSubmitted] = useState(false);
+  /** A Save has been refused for what is outstanding: the notice, count and list turn red. */
+  const [refused, setRefused] = useState(false);
   /**
    * Whether the site has been stored.
    *
@@ -223,6 +240,45 @@ const AddSitePage: FC = () => {
   const errors = withRoadErrors(merged, site.crossingSiteTypeCode, road);
 
   /**
+   * Everything that would stop the save, from the first render — nr-frep's pattern, as Add
+   * Inspection's and Add Structure's: the notice, the tab's count and its list are the map of what
+   * is left, while each box's own message still waits for the box to be left, or for Save.
+   */
+  const outstandingByField = Object.entries(
+    withRoadErrors(
+      {
+        ...settledErrors,
+        ...conflicts,
+        ...(siteNumberTaken ? { siteId: 'A site with this number already exists.' } : {}),
+        ...created.fieldErrors,
+      },
+      site.crossingSiteTypeCode,
+      road,
+    ),
+  ).filter((entry): entry is [string, string] => Boolean(entry[1]));
+  const outstanding = outstandingByField.map(([, message]) => message);
+  /** The tab's list, by card: Site Details' own, and the rest under Site. */
+  const outstandingGroups = [
+    {
+      title: 'Site',
+      items: [
+        ...new Set(
+          outstandingByField
+            .filter(([field]) => field !== 'pointOfAccessDescription')
+            .map(([, message]) => message),
+        ),
+      ],
+    },
+    {
+      title: 'Site Details',
+      items: outstandingByField
+        .filter(([field]) => field === 'pointOfAccessDescription')
+        .map(([, message]) => message),
+    },
+  ].filter((group) => group.items.length > 0);
+  const tone = refused ? 'error' : 'neutral';
+
+  /**
    * The amber tier, which never waits for Save.
    *
    * <p>Legacy shows these the moment they become true — its live `validate` call returns warnings
@@ -249,9 +305,11 @@ const AddSitePage: FC = () => {
       Object.keys(settledErrors).length > 0 ||
       Object.keys(crossFieldErrors(site)).length > 0
     ) {
+      setRefused(true);
       return;
     }
     created.mutate(toCreateRequest(site), {
+      onError: () => setRefused(true),
       // To the site that was stored, not the one that was sent: the server upper-cases the number
       // and fills in the road name and maintainer, so the detail page should read the record.
       // Marked as saved on the way out: the guard learns the form is clean only after the next
@@ -301,7 +359,7 @@ const AddSitePage: FC = () => {
   }, [navigate]);
 
   return (
-    <Grid fullWidth className="default-grid">
+    <Grid fullWidth className="default-grid structure-detail add-site">
       <PageTitle
         title="Add Site"
         subtitle="Record a new crossing site."
@@ -364,23 +422,78 @@ const AddSitePage: FC = () => {
         </Column>
       )}
 
+      {/* nr-frep's summary above the tabs, as Add Inspection's and Add Structure's: how much is
+          outstanding — informational until a Save is refused, then red. */}
+      {outstanding.length > 0 && (
+        <Column sm={4} md={8} lg={16}>
+          <OutstandingSummary
+            total={outstanding.length}
+            tabs={1}
+            refused={refused}
+            subtitle="The site can be saved once these are complete."
+            refusedTitle="Site not saved"
+            refusedSubtitle="All outstanding items must be complete before it can be saved. The tab count shows what is still outstanding."
+            testId="add-site-outstanding-summary"
+          />
+        </Column>
+      )}
+
       <Column sm={4} md={8} lg={16}>
-        <SiteForm
-          values={site}
-          errors={errors}
-          warnings={warnings}
-          codeTables={codeTables}
-          codeTablesLoading={referenceData.isLoading}
-          managementAreasLoading={managementAreas.isFetching}
-          onChange={update}
-          onSettle={markSettled}
-          onSave={save}
-          onFindRoad={() => setFindingRoad(true)}
-          forestServiceRoad={road.forestServiceRoad}
-          forestServiceRoadLoading={road.forestServiceRoadLoading}
-          roadResolved={road.roadResolved}
-          isEditable={isEditableOnCreate}
-        />
+        {/* One tab, so the page reads as Add Structure's and Add Inspection's: the tab strip with
+            its count, the grey pane, the site as a white card on it. */}
+        <div className="structure-detail__tabs">
+          <Tabs>
+            <TabList aria-label="Site sections" contained>
+              <Tab renderIcon={TableOfContents} data-testid="add-site-tab-information">
+                <span className="structure-detail__tab-label">
+                  Information
+                  <TabCount count={outstanding.length} section="Information" tone={tone} />
+                </span>
+              </Tab>
+            </TabList>
+            <TabPanels>
+              <TabPanel>
+                <div className="structure-detail__tab-panel" data-testid="add-site-panel">
+                  <OutstandingPanel
+                    groups={outstandingGroups}
+                    tone={tone}
+                    testId="add-site-outstanding"
+                  />
+                  {/* The two cards together, apart from the list above them. */}
+                  <div className="structure-detail__tab-panel" data-testid="add-site-cards">
+                    <Card title="Site" icon={Location} testId="add-site-card">
+                      <SiteForm
+                        values={site}
+                        errors={errors}
+                        warnings={warnings}
+                        codeTables={codeTables}
+                        codeTablesLoading={referenceData.isLoading}
+                        managementAreasLoading={managementAreas.isFetching}
+                        onChange={update}
+                        onSettle={markSettled}
+                        onSave={save}
+                        onFindRoad={() => setFindingRoad(true)}
+                        forestServiceRoad={road.forestServiceRoad}
+                        forestServiceRoadLoading={road.forestServiceRoadLoading}
+                        roadResolved={road.roadResolved}
+                        isEditable={isEditableOnCreate}
+                        withoutDetails
+                      />
+                    </Card>
+                    <Card title="Site Details" icon={Document} testId="add-site-details-card">
+                      <SiteDetailsField
+                        values={site}
+                        errors={errors}
+                        onChange={update}
+                        onSettle={markSettled}
+                      />
+                    </Card>
+                  </div>
+                </div>
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        </div>
       </Column>
 
       {/* Mounted only while open. Carbon keeps a closed modal's content in the document, and a

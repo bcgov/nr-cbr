@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -310,18 +310,22 @@ describe('SiteDetailPage — the structure actions', () => {
   });
 });
 
-describe('SiteDetailPage — the panel', () => {
-  it('sets the values on a grey panel, in the reading style until Edit is pressed', async () => {
-    // Grey over white; bold labels with their values close under them while reading. Editing keeps
-    // the form's own spacing, which lines a read-only value up with the input beside it.
+describe('SiteDetailPage — the card', () => {
+  it('shows the site as one card, as the structure page, with Edit in its header', async () => {
+    // Bold labels with their values close under them while reading; editing keeps the form's own
+    // spacing, and puts Cancel and Save under the fields.
     await renderPage({ canEdit: true });
-    const panel = screen.getByTestId('site-detail-panel');
+    const card = screen.getByTestId('site-detail-card');
 
-    expect(panel).toHaveClass('site-detail__panel', 'site-detail__panel--view');
+    expect(within(card).getByTestId('site-detail-edit')).toMatchTextContent('Edit site');
+    expect(card.querySelector('.site-detail__card--view')).not.toBeNull();
 
     edit();
 
-    expect(panel).not.toHaveClass('site-detail__panel--view');
+    expect(card.querySelector('.site-detail__card--view')).toBeNull();
+    expect(within(card).queryByTestId('site-detail-edit')).not.toBeInTheDocument();
+    expect(within(card).getByTestId('site-detail-save')).toMatchTextContent('Save changes');
+    expect(within(card).getByTestId('site-detail-cancel')).toBeInTheDocument();
   });
 });
 

@@ -102,7 +102,53 @@ type Props = {
    * control is absent rather than present and inert.
    */
   onFindRoad?: () => void;
+  /**
+   * Leaves Site Details out, for a page that shows it in a card of its own — Add Site, with
+   * {@link SiteDetailsField}.
+   */
+  withoutDetails?: boolean;
 };
+
+/**
+ * Site Details — how to reach the site, and anything else worth knowing on arrival. Part of the
+ * form, or on its own where a page gives it a card ({@link Props.withoutDetails}).
+ */
+export const SiteDetailsField: FC<
+  Pick<Props, 'values' | 'errors' | 'onChange' | 'onSettle'> & {
+    isEditable?: Props['isEditable'];
+  }
+> = ({ values, errors, onChange, onSettle, isEditable = () => true }) => (
+  <div className="site-form__wide">
+    {/* Counted, not capped. A `maxLength` would silently swallow the tail of anything pasted
+          in — which is how someone loses the end of a paragraph without noticing — so the
+          count turns red, the field goes invalid, and Save refuses instead. */}
+    {!isEditable('pointOfAccessDescription') ? (
+      <ReadOnlyField label="Site Details" value={values.pointOfAccessDescription} />
+    ) : (
+      <FieldWithCounter
+        used={byteLength(values.pointOfAccessDescription)}
+        limit={SITE_TEXT_LIMITS.pointOfAccessDescription}
+      >
+        <TextArea
+          id="site-form-pointOfAccessDescription"
+          data-testid="site-form-pointOfAccessDescription"
+          labelText="Site Details"
+          helperText="How to reach the site, and anything else worth knowing on arrival."
+          // Six, where legacy sets five and this form used to set four. The field spans the
+          // width of the form, so 255 bytes rarely fills even three lines — the extra height
+          // is for the writing rather than the result: this is the one box on the screen that
+          // takes a sentence, and a short one invites a short answer.
+          rows={6}
+          value={values.pointOfAccessDescription}
+          invalid={'pointOfAccessDescription' in errors}
+          invalidText={errors.pointOfAccessDescription}
+          onChange={(event) => onChange('pointOfAccessDescription', event.target.value)}
+          onBlur={() => onSettle('pointOfAccessDescription')}
+        />
+      </FieldWithCounter>
+    )}
+  </div>
+);
 
 /**
  * The form's own id, so the Save button beside the page heading can submit it from outside.
@@ -197,6 +243,7 @@ const SiteForm: FC<Props> = ({
   forestServiceRoadLoading = false,
   roadResolved = false,
   onFindRoad,
+  withoutDetails = false,
 }) => {
   const isRecreation = values.crossingSiteTypeCode === SITE_TYPE.RECREATION;
   const recreationDistricts = codeTables.recreationDistricts;
@@ -667,36 +714,15 @@ const SiteForm: FC<Props> = ({
           </>
         )}
 
-        <div className="site-form__wide">
-          {/* Counted, not capped. A `maxLength` would silently swallow the tail of anything pasted
-              in — which is how someone loses the end of a paragraph without noticing — so the
-              count turns red, the field goes invalid, and Save refuses instead. */}
-          {!isEditable('pointOfAccessDescription') ? (
-            <ReadOnlyField label="Site Details" value={values.pointOfAccessDescription} />
-          ) : (
-            <FieldWithCounter
-              used={byteLength(values.pointOfAccessDescription)}
-              limit={SITE_TEXT_LIMITS.pointOfAccessDescription}
-            >
-              <TextArea
-                id="site-form-pointOfAccessDescription"
-                data-testid="site-form-pointOfAccessDescription"
-                labelText="Site Details"
-                helperText="How to reach the site, and anything else worth knowing on arrival."
-                // Six, where legacy sets five and this form used to set four. The field spans the
-                // width of the form, so 255 bytes rarely fills even three lines — the extra height
-                // is for the writing rather than the result: this is the one box on the screen that
-                // takes a sentence, and a short one invites a short answer.
-                rows={6}
-                value={values.pointOfAccessDescription}
-                invalid={'pointOfAccessDescription' in errors}
-                invalidText={errors.pointOfAccessDescription}
-                onChange={(event) => onChange('pointOfAccessDescription', event.target.value)}
-                onBlur={() => onSettle('pointOfAccessDescription')}
-              />
-            </FieldWithCounter>
-          )}
-        </div>
+        {!withoutDetails && (
+          <SiteDetailsField
+            values={values}
+            errors={errors}
+            onChange={onChange}
+            onSettle={onSettle}
+            isEditable={isEditable}
+          />
+        )}
       </div>
     </form>
   );
