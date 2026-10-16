@@ -1,4 +1,17 @@
-import { Calendar, Forum, Pipelines, Renew, Road, Save, Scales } from '@carbon/icons-react';
+import {
+  Calendar,
+  Forum,
+  Inspection as InspectionIcon,
+  Location,
+  Pipelines,
+  Renew,
+  Report,
+  Road,
+  RulerAlt,
+  Save,
+  Scales,
+  TableOfContents,
+} from '@carbon/icons-react';
 import {
   Button,
   Column,
@@ -6,6 +19,11 @@ import {
   InlineNotification,
   Select,
   SelectItem,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
   TextArea,
   TextInput,
 } from '@carbon/react';
@@ -18,16 +36,21 @@ import BridgeFields from '@/pages/StructureDetail/BridgeFields';
 import Card from '@/pages/StructureDetail/Card';
 import CulvertFields from '@/pages/StructureDetail/CulvertFields';
 import LoadRatingFields from '@/pages/StructureDetail/LoadRatingFields';
+import OutstandingPanel from '@/pages/StructureDetail/OutstandingPanel';
+import OutstandingSummary from '@/pages/StructureDetail/OutstandingSummary';
 import ReplacementFields from '@/pages/StructureDetail/ReplacementFields';
 import ScheduleFields from '@/pages/StructureDetail/ScheduleFields';
 import SiteFields from '@/pages/StructureDetail/SiteFields';
 import StructureFields from '@/pages/StructureDetail/StructureFields';
+import TabCount from '@/pages/StructureDetail/TabCount';
 import { requiredLabel } from '@/utils/requiredLabel';
 
+import { countByTab, groupsOf, outstandingOf, type AddStructureTab } from './addStructureTabs';
 import SpansAndPiersSection from './SpansAndPiersSection';
 
 import type { BridgePier, BridgeSpan } from '@/pages/StructureDetail/spansAndPiersResponse';
 import type { StructureCreateRequest } from '@/pages/StructureDetail/structureResponse';
+import type { CarbonIconType } from '@carbon/icons-react';
 import type { ChangeEvent, FC } from 'react';
 
 import { WORK_SAVED } from '@/context/unsavedChanges/workSaved';
@@ -95,12 +118,25 @@ const NAME_MAX = 14;
 /** `STRUCTURE_COMMENT VARCHAR2(2000)`. */
 const COMMENT_MAX = 2000;
 
+/** Each tab's label and icon, as the structure page's. */
+const TAB_LABELS: Record<AddStructureTab, { label: string; icon: CarbonIconType }> = {
+  'information': { label: 'Information', icon: TableOfContents },
+  'details': { label: 'Details', icon: Report },
+  'spans-and-piers': { label: 'Spans & Piers', icon: RulerAlt },
+  'inspections': { label: 'Inspections', icon: InspectionIcon },
+};
+
 type Top = { structureName: string; siteId: string; typeClassCode: string; comment: string };
 
 /**
  * Add Structure — legacy's blank structure page, reached from Site Detail's Add Structure button,
- * as one page in the Add Site pattern: Cancel and Save in the header, the structure page's cards
- * below, each with the fields and rules of its card on the structure page.
+ * laid out as Add Inspection: Cancel and Save in the header, then the structure page's tabs —
+ * Information, Details, Spans & Piers (a bridge's), Inspections — each card with the fields and
+ * rules of its card on the structure page.
+ *
+ * <p>What is outstanding shows from the start, nr-frep's pattern: a notice above the tabs, a count
+ * on each tab and a list at its top — red once a Save is refused. Each message itself sits beside
+ * its field once the field is left, and all of them on Save.
  *
  * <p>What a structure needs to be complete is required here, so none is born incomplete: Structure
  * #, Site #, Type/Class, Source, the bridge's or culvert's measurements and codes, at least one span
@@ -137,6 +173,9 @@ const AddStructurePage: FC = () => {
   const [initialSchedule] = useState(schedule);
   /** Set once stored, so the unsaved-changes guard lets the page go to the new structure. */
   const [saved, setSaved] = useState(false);
+  const [selectedTab, setSelectedTab] = useState(0);
+  /** A Save has been refused for what is outstanding: the banner, counts and lists turn red. */
+  const [refused, setRefused] = useState(false);
 
   const isBridge = BRIDGE_TYPES.includes(top.typeClassCode);
   const isCulvert = top.typeClassCode === 'CUL' || top.typeClassCode === WOOD_LOG;
@@ -163,7 +202,27 @@ const AddStructurePage: FC = () => {
     comment: overLimitError(top.comment, COMMENT_MAX) || undefined,
   };
   const form = useFieldErrors<string>(errors, created.fieldErrors);
+  /** Beside each field: once it is left, then live; all of them once Save is pressed. */
   const shown = form.shown;
+
+  /**
+   * Everything still outstanding, from the first render — nr-frep's pattern, as Add Inspection's:
+   * the banner, the tab counts and each tab's list are the map of what is left, shown before any
+   * field is touched. The server's refusals join them.
+   */
+  const outstanding = outstandingOf(errors, created.fieldErrors);
+  const outstandingTotal = Object.keys(outstanding).length;
+  const counts = countByTab(outstanding);
+  const tabsWithOutstanding = Object.values(counts).filter((count) => count > 0).length;
+  const tone = refused ? 'error' : 'neutral';
+  // The tabs are drawn from one list of keys: Carbon numbers tabs by their place, and Spans & Piers
+  // is there for a bridge only.
+  const tabs: AddStructureTab[] = [
+    'information',
+    'details',
+    ...(isBridge ? (['spans-and-piers'] as const) : []),
+    'inspections',
+  ];
 
   /** A section's `change` and `leave`, keyed `section.field` in the page's form. */
   const section = <V,>(name: string, set: (update: (current: V) => V) => void) => ({
@@ -211,7 +270,10 @@ const AddStructurePage: FC = () => {
   useUnsavedChangesPrompt(isDirty && !saved);
 
   const save = () => {
-    if (!form.submit()) return;
+    if (!form.submit()) {
+      setRefused(true);
+      return;
+    }
     const request: StructureCreateRequest = {
       structureName: top.structureName.trim(),
       siteId: top.siteId.trim(),
@@ -231,6 +293,7 @@ const AddStructurePage: FC = () => {
       comment: top.comment,
     };
     created.mutate(request, {
+      onError: () => setRefused(true),
       // Marked as saved on the way out, so the guard does not ask about work already stored.
       onSuccess: (stored) => {
         setSaved(true);
@@ -251,7 +314,7 @@ const AddStructurePage: FC = () => {
   const scheduleSection = section<ScheduleValues>('schedule', setSchedule);
 
   return (
-    <Grid fullWidth className="default-grid structure-detail">
+    <Grid fullWidth className="default-grid structure-detail add-structure">
       <PageTitle
         title="Add Structure"
         subtitle={`A new structure for site ${fromSite}.`}
@@ -300,174 +363,245 @@ const AddStructurePage: FC = () => {
         </Column>
       )}
 
+      {/* nr-frep's summary above the tabs, as Add Inspection's: how much is outstanding and across
+          how many tabs — informational until a Save is refused, then red. Each message itself sits
+          beside its field and in its tab's list. */}
+      {outstandingTotal > 0 && (
+        <Column sm={4} md={8} lg={16}>
+          <OutstandingSummary
+            total={outstandingTotal}
+            tabs={tabsWithOutstanding}
+            refused={refused}
+            subtitle="The structure can be saved once these are complete."
+            refusedTitle="Structure not saved"
+            refusedSubtitle="All outstanding items must be complete before it can be saved. The tab counts show what is still outstanding."
+            testId="add-structure-outstanding-summary"
+          />
+        </Column>
+      )}
+
       <Column sm={4} md={8} lg={16}>
-        <div
-          className="structure-detail__tab-panel add-structure__sections"
-          data-testid="add-structure-form"
-        >
-          {/* The first section, untitled: the page's own heading says what it is. */}
-          <section className="structure-detail__card" data-testid="add-structure-structure">
-            <div className="structure-detail__edit">
-              <div className="structure-detail__fields">
-                <TextInput
-                  id="add-structure-name"
-                  data-testid="add-structure-name"
-                  labelText={requiredLabel('Structure #', true)}
-                  maxLength={NAME_MAX}
-                  value={top.structureName}
-                  invalid={Boolean(shown.structureName)}
-                  invalidText={shown.structureName}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    changeTop('structureName', event.target.value)
-                  }
-                  onBlur={() => form.leave('structureName')}
-                />
-                <TextInput
-                  id="add-structure-site"
-                  data-testid="add-structure-site"
-                  labelText={requiredLabel('Site #', true)}
-                  maxLength={NAME_MAX}
-                  helperText={siteLoading ? 'Looking up the site…' : undefined}
-                  value={top.siteId}
-                  invalid={Boolean(shown.siteId)}
-                  invalidText={shown.siteId}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    changeTop('siteId', event.target.value)
-                  }
-                  onBlur={() => form.leave('siteId')}
-                />
-                <Select
-                  id="add-structure-type"
-                  data-testid="add-structure-type"
-                  labelText={requiredLabel('Type/Class', true)}
-                  value={top.typeClassCode}
-                  disabled={typeClasses.isLoading}
-                  invalid={Boolean(shown.typeClassCode)}
-                  invalidText={shown.typeClassCode}
-                  onChange={(event) => changeTop('typeClassCode', event.target.value)}
-                  onBlur={() => form.leave('typeClassCode')}
-                >
-                  <SelectItem value="" text="Choose a type" />
-                  {typeOptions.map((option) => (
-                    <SelectItem key={option.code} value={option.code} text={option.description} />
-                  ))}
-                </Select>
-                <SiteFields site={preview?.site ?? null} />
-              </div>
-              <StructureFields
-                values={details}
-                warnings={structureWarningsOf(details)}
-                sourceRequired
-                {...detailsSection}
-              />
-            </div>
-          </section>
-
-          <hr className="add-structure__divider" />
-
-          {isBridge && (
-            <>
-              <Card title="Bridge" icon={Road} testId="add-structure-bridge">
-                <div className="structure-detail__edit">
-                  <BridgeFields
-                    values={bridgeValues}
-                    warnings={bridgeWarningsOf(bridgeValues)}
-                    stored={NEW_BRIDGE_REQUIRED}
-                    {...bridgeSection}
-                  />
-                </div>
-              </Card>
-              <hr className="add-structure__divider" />
-              <SpansAndPiersSection
-                spans={spans}
-                piers={piers}
-                onSpans={(next) => {
-                  setSpans(next);
-                  form.change('spans');
-                }}
-                onPiers={(next) => {
-                  setPiers(next);
-                  form.change('spans');
-                  form.change('piers');
-                }}
-                spansError={shown.spans}
-                piersError={shown.piers}
-              />
-            </>
-          )}
-
-          {isBridge && <hr className="add-structure__divider" />}
-
-          {isCulvert && (
-            <Card title="Culvert" icon={Pipelines} testId="add-structure-culvert">
-              <div className="structure-detail__edit">
-                <CulvertFields
-                  values={culvert}
-                  warnings={culvertWarningsOf(culvert)}
-                  stored={NEW_CULVERT_REQUIRED}
-                  woodLog={woodLog}
-                  {...culvertSection}
-                />
-              </div>
-            </Card>
-          )}
-          {isCulvert && <hr className="add-structure__divider" />}
-
-          <Card title="Load Rating Details" icon={Scales} testId="add-structure-load-rating">
-            <div className="structure-detail__edit">
-              <LoadRatingFields
-                values={loadRating}
-                design={design}
-                hasRatings={false}
-                {...loadRatingSection}
-              />
-            </div>
-          </Card>
-
-          <hr className="add-structure__divider" />
-
-          <Card title="Replacement Details" icon={Renew} testId="add-structure-replacement">
-            {isPeng ? (
-              <div className="structure-detail__edit">
-                <ReplacementFields
-                  values={replacement}
-                  warnings={replacementWarningsOf(replacement, Number(details.yearBuilt) || null)}
-                  restrictionRequired={false}
-                  {...replacementSection}
-                />
-              </div>
-            ) : (
-              <p className="structure-detail__empty" data-testid="add-structure-replacement-peng">
-                Replacement Details are entered by a P.Eng, on the structure page once it is saved.
-              </p>
-            )}
-          </Card>
-
-          <hr className="add-structure__divider" />
-
-          <Card title="Inspection Schedule" icon={Calendar} testId="add-structure-schedule">
-            <div className="structure-detail__edit">
-              <ScheduleFields values={schedule} routineRequired {...scheduleSection} />
-            </div>
-          </Card>
-
-          <hr className="add-structure__divider" />
-
-          <Card title="Comment" icon={Forum} testId="add-structure-comment">
-            <FieldWithCounter used={byteLength(top.comment)} limit={COMMENT_MAX}>
-              <TextArea
-                id="add-structure-comment-text"
-                data-testid="add-structure-comment-text"
-                labelText="Comment"
-                rows={3}
-                value={top.comment}
-                invalid={Boolean(shown.comment)}
-                invalidText={shown.comment}
-                onChange={(event) => changeTop('comment', event.target.value)}
-                onBlur={() => form.leave('comment')}
-              />
-            </FieldWithCounter>
-          </Card>
+        {/* A wrapper the grey pane is styled from, as the structure page's. */}
+        <div className="structure-detail__tabs" data-testid="add-structure-form">
+          <Tabs
+            selectedIndex={Math.min(selectedTab, tabs.length - 1)}
+            onChange={({ selectedIndex }) => setSelectedTab(selectedIndex)}
+          >
+            <TabList aria-label="Structure sections" contained>
+              {tabs.map((key) => {
+                const { label, icon } = TAB_LABELS[key];
+                return (
+                  <Tab key={key} renderIcon={icon} data-testid={`add-structure-tab-${key}`}>
+                    <span className="structure-detail__tab-label">
+                      {label}
+                      <TabCount count={counts[key]} section={label} tone={tone} />
+                    </span>
+                  </Tab>
+                );
+              })}
+            </TabList>
+            <TabPanels>
+              {tabs.map((key) => (
+                <TabPanel key={key}>
+                  <div
+                    className="structure-detail__tab-panel"
+                    data-testid={`add-structure-panel-${key}`}
+                  >
+                    <OutstandingPanel
+                      groups={groupsOf(outstanding, key)}
+                      tone={tone}
+                      testId={`add-structure-${key}-outstanding`}
+                    />
+                    {key === 'information' && (
+                      <Card
+                        title="Structure and site"
+                        icon={Location}
+                        testId="add-structure-structure"
+                      >
+                        <div className="structure-detail__edit">
+                          <div className="structure-detail__fields">
+                            <TextInput
+                              id="add-structure-name"
+                              data-testid="add-structure-name"
+                              labelText={requiredLabel('Structure #', true)}
+                              maxLength={NAME_MAX}
+                              value={top.structureName}
+                              invalid={Boolean(shown.structureName)}
+                              invalidText={shown.structureName}
+                              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                changeTop('structureName', event.target.value)
+                              }
+                              onBlur={() => form.leave('structureName')}
+                            />
+                            <TextInput
+                              id="add-structure-site"
+                              data-testid="add-structure-site"
+                              labelText={requiredLabel('Site #', true)}
+                              maxLength={NAME_MAX}
+                              helperText={siteLoading ? 'Looking up the site…' : undefined}
+                              value={top.siteId}
+                              invalid={Boolean(shown.siteId)}
+                              invalidText={shown.siteId}
+                              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                changeTop('siteId', event.target.value)
+                              }
+                              onBlur={() => form.leave('siteId')}
+                            />
+                            <SiteFields site={preview?.site ?? null} />
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+                    {key === 'details' && (
+                      <>
+                        <Card title="Structure" icon={Report} testId="add-structure-details">
+                          <div className="structure-detail__edit">
+                            <div className="structure-detail__fields">
+                              <Select
+                                id="add-structure-type"
+                                data-testid="add-structure-type"
+                                labelText={requiredLabel('Type/Class', true)}
+                                value={top.typeClassCode}
+                                disabled={typeClasses.isLoading}
+                                invalid={Boolean(shown.typeClassCode)}
+                                invalidText={shown.typeClassCode}
+                                onChange={(event) => changeTop('typeClassCode', event.target.value)}
+                                onBlur={() => form.leave('typeClassCode')}
+                              >
+                                <SelectItem value="" text="Choose a type" />
+                                {typeOptions.map((option) => (
+                                  <SelectItem
+                                    key={option.code}
+                                    value={option.code}
+                                    text={option.description}
+                                  />
+                                ))}
+                              </Select>
+                            </div>
+                            <StructureFields
+                              values={details}
+                              warnings={structureWarningsOf(details)}
+                              sourceRequired
+                              {...detailsSection}
+                            />
+                          </div>
+                        </Card>
+                        {isBridge && (
+                          <Card title="Bridge" icon={Road} testId="add-structure-bridge">
+                            <div className="structure-detail__edit">
+                              <BridgeFields
+                                values={bridgeValues}
+                                warnings={bridgeWarningsOf(bridgeValues)}
+                                stored={NEW_BRIDGE_REQUIRED}
+                                {...bridgeSection}
+                              />
+                            </div>
+                          </Card>
+                        )}
+                        {isCulvert && (
+                          <Card title="Culvert" icon={Pipelines} testId="add-structure-culvert">
+                            <div className="structure-detail__edit">
+                              <CulvertFields
+                                values={culvert}
+                                warnings={culvertWarningsOf(culvert)}
+                                stored={NEW_CULVERT_REQUIRED}
+                                woodLog={woodLog}
+                                {...culvertSection}
+                              />
+                            </div>
+                          </Card>
+                        )}
+                        <Card
+                          title="Load Rating Details"
+                          icon={Scales}
+                          testId="add-structure-load-rating"
+                        >
+                          <div className="structure-detail__edit">
+                            <LoadRatingFields
+                              values={loadRating}
+                              design={design}
+                              hasRatings={false}
+                              {...loadRatingSection}
+                            />
+                          </div>
+                        </Card>
+                        <Card
+                          title="Replacement Details"
+                          icon={Renew}
+                          testId="add-structure-replacement"
+                        >
+                          {isPeng ? (
+                            <div className="structure-detail__edit">
+                              <ReplacementFields
+                                values={replacement}
+                                warnings={replacementWarningsOf(
+                                  replacement,
+                                  Number(details.yearBuilt) || null,
+                                )}
+                                restrictionRequired={false}
+                                {...replacementSection}
+                              />
+                            </div>
+                          ) : (
+                            <p
+                              className="structure-detail__empty"
+                              data-testid="add-structure-replacement-peng"
+                            >
+                              Replacement Details are entered by a P.Eng, on the structure page once
+                              it is saved.
+                            </p>
+                          )}
+                        </Card>
+                        <Card title="Comment" icon={Forum} testId="add-structure-comment">
+                          <FieldWithCounter used={byteLength(top.comment)} limit={COMMENT_MAX}>
+                            <TextArea
+                              id="add-structure-comment-text"
+                              data-testid="add-structure-comment-text"
+                              labelText="Comment"
+                              rows={3}
+                              value={top.comment}
+                              invalid={Boolean(shown.comment)}
+                              invalidText={shown.comment}
+                              onChange={(event) => changeTop('comment', event.target.value)}
+                              onBlur={() => form.leave('comment')}
+                            />
+                          </FieldWithCounter>
+                        </Card>
+                      </>
+                    )}
+                    {key === 'spans-and-piers' && (
+                      <SpansAndPiersSection
+                        spans={spans}
+                        piers={piers}
+                        onSpans={(next) => {
+                          setSpans(next);
+                          form.change('spans');
+                        }}
+                        onPiers={(next) => {
+                          setPiers(next);
+                          form.change('spans');
+                          form.change('piers');
+                        }}
+                        spansError={shown.spans}
+                        piersError={shown.piers}
+                      />
+                    )}
+                    {key === 'inspections' && (
+                      <Card
+                        title="Inspection Schedule"
+                        icon={Calendar}
+                        testId="add-structure-schedule"
+                      >
+                        <div className="structure-detail__edit">
+                          <ScheduleFields values={schedule} routineRequired {...scheduleSection} />
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                </TabPanel>
+              ))}
+            </TabPanels>
+          </Tabs>
         </div>
       </Column>
     </Grid>

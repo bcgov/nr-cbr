@@ -11,18 +11,10 @@
   margin-inline-start: auto;
 }
 
-// The sections run down the page without boxes, a rule between each — not the structure page's
-// outlined cards.
-.add-structure__sections .structure-detail__card {
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background-color: transparent;
-}
-
-.add-structure__divider {
-  width: 100%;
-  margin: 0;
-  border: none;
-  border-block-start: 1px solid var(--cds-border-subtle-01);
+// Every card on this page is a form, so every field is grey (field-01) on the white card, as Add
+// Inspection's and a structure-page card's once it is edited.
+.add-structure .structure-detail__card {
+  --cds-field: var(--cds-field-01);
+  --cds-field-hover: var(--cds-field-hover-01);
+  --cds-border-subtle: var(--cds-border-subtle-01);
 }

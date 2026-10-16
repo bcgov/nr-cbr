@@ -11,6 +11,9 @@ type Props = {
   refused?: boolean;
   /** What the items stand in the way of — the structure's: adding an inspection. */
   subtitle?: string;
+  /** Once refused: what was refused, and why — the structure's: adding an inspection. */
+  refusedTitle?: string;
+  refusedSubtitle?: string;
   testId?: string;
 };
 
@@ -28,6 +31,8 @@ const OutstandingSummary: FC<Props> = ({
   tabs,
   refused = false,
   subtitle = 'Inspections can be added once these are complete.',
+  refusedTitle = 'Inspection cannot be added',
+  refusedSubtitle = 'All outstanding items must be complete first. The tab counts show what is still outstanding.',
   testId = 'structure-outstanding-summary',
 }) => {
   if (total === 0) return null;
@@ -38,8 +43,8 @@ const OutstandingSummary: FC<Props> = ({
         kind="error"
         lowContrast
         hideCloseButton
-        title="Inspection cannot be added"
-        subtitle="All outstanding items must be complete first. The tab counts show what is still outstanding."
+        title={refusedTitle}
+        subtitle={refusedSubtitle}
         data-testid={testId}
       />
     );
