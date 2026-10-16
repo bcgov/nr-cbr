@@ -30,13 +30,8 @@ import RepairsTab from '@/pages/StructureDetail/RepairsTab';
 import TabCount from '@/pages/StructureDetail/TabCount';
 
 import ConditionView from './ConditionView';
-import {
-  HazardsCard,
-  InspectionCards,
-  ReviewCards,
-  StatusTag,
-  StructureCard,
-} from './InspectionViews';
+import HazardsTab from './HazardsTab';
+import { InspectionCards, ReviewCards, StatusTag, StructureCard } from './InspectionViews';
 import { countOf, outstandingOf, type OutstandingTab } from './outstanding';
 
 import type { CarbonIconType } from '@carbon/icons-react';
@@ -222,7 +217,7 @@ const InspectionDetailPage: FC = () => {
                       groups={outstanding?.hazards ?? []}
                       testId="inspection-hazards-outstanding"
                     />
-                    <HazardsCard inspection={inspection} />
+                    <HazardsTab inspection={inspection} />
                   </div>
                 </TabPanel>
                 <TabPanel>

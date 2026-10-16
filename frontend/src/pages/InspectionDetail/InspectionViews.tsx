@@ -15,7 +15,7 @@ import SiteFields from '@/pages/StructureDetail/SiteFields';
 
 import type { InspectionDetailResponse } from './inspectionDetail';
 import type { CodeValue, StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 
 import { describe, money, number, yesNo } from '@/pages/StructureDetail/format';
 import { formatDateTime, formatShortDate } from '@/utils/date';
@@ -106,10 +106,19 @@ export const InspectionCards: FC<{ inspection: InspectionDetailResponse }> = ({ 
 );
 
 /** The Hydraulic Hazards tab: the channel's measurements, the hazards and their comments. */
-export const HazardsCard: FC<{ inspection: InspectionDetailResponse }> = ({ inspection }) => {
+export const HazardsCard: FC<{
+  inspection: InspectionDetailResponse;
+  /** The card's Edit, when the user may change the hazards. */
+  action?: ReactNode;
+}> = ({ inspection, action }) => {
   const { hazards } = inspection;
   return (
-    <Card title="Hydraulic Hazards" icon={WaveDirection} testId="inspection-section-hazards">
+    <Card
+      title="Hydraulic Hazards"
+      icon={WaveDirection}
+      testId="inspection-section-hazards"
+      action={action}
+    >
       <div className="structure-detail__fields">
         <ReadOnlyField
           label="Estimated Present Water Level Depth"

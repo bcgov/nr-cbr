@@ -40,7 +40,7 @@ import org.hibernate.annotations.JoinFormula;
 @EqualsAndHashCode(of = "inspectionId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class StructureInspectionEntity {
 
   @Id

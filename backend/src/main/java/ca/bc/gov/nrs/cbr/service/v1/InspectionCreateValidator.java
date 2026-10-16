@@ -245,7 +245,7 @@ public class InspectionCreateValidator {
     return id != null && parts.stream().anyMatch(part -> part.id().equals(String.valueOf(id)));
   }
 
-  private static void metres(Map<String, String> errors, String field, String label,
+  static void metres(Map<String, String> errors, String field, String label,
       BigDecimal value) {
     if (value != null && (value.signum() < 0 || value.stripTrailingZeros().scale() > 1
         || value.compareTo(METRES_MAX) > 0)) {
@@ -253,7 +253,7 @@ public class InspectionCreateValidator {
     }
   }
 
-  private static void tooLong(Map<String, String> errors, String field, String label,
+  static void tooLong(Map<String, String> errors, String field, String label,
       String value, int max) {
     String text = trimmed(value);
     if (text != null && bytes(text) > max) {

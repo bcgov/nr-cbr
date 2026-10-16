@@ -140,6 +140,17 @@ class InspectionApiEndpointTest {
   }
 
   @Test
+  @DisplayName("its hazards are PUT /{inspectionId}/hazards, Level 0 and up, as legacy")
+  void hazardsAreMappedAndGated() {
+    Method update = method("updateHazards");
+
+    assertThat(update.getAnnotation(PutMapping.class).value())
+        .containsExactly("/{inspectionId}/hazards");
+    assertThat(update.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+  }
+
+  @Test
   @DisplayName("delete is DELETE /api/v1/inspections/{inspectionId}")
   void deleteIsMapped() {
     assertThat(deleteInspection().getAnnotation(DeleteMapping.class).value())

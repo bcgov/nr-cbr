@@ -10,6 +10,7 @@ import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionHazardsService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
@@ -34,9 +35,18 @@ class InspectionApiControllerTest {
   private final InspectionCreateService createService = mock(InspectionCreateService.class);
   private final InspectionDetailService detailService = mock(InspectionDetailService.class);
   private final InspectionFollowUpService followUpService = mock(InspectionFollowUpService.class);
+  private final InspectionHazardsService hazardsService = mock(InspectionHazardsService.class);
   private final InspectionApiController controller = new InspectionApiController(
       searchService, inspectionService, formService, createService, detailService,
-      followUpService);
+      followUpService, hazardsService);
+
+  @Test
+  @DisplayName("saving the hazards reaches the hazards service: 204")
+  void hazardsDelegate() {
+    assertThat(controller.updateHazards(42L, null).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    verify(hazardsService).update(42L, null);
+  }
 
   @Test
   @DisplayName("the inspection's repairs and monitors reach the follow-up service")
