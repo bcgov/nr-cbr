@@ -14,7 +14,8 @@ export type Audited = {
 };
 
 /** Which items the Repairs and Monitoring tabs list — legacy's "Choose Viewing Option". */
-export type ItemView = 'OUTSTANDING' | 'ALL';
+/** Legacy's "Choose Viewing Option"; Current Inspection Items only on an inspection's page. */
+export type ItemView = 'OUTSTANDING' | 'ALL' | 'CURRENT';
 
 /**
  * A page of repairs or monitoring items, and how many the table leaves out because they predate

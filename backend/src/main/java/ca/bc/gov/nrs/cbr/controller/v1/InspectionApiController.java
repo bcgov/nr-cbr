@@ -2,11 +2,13 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.InspectionApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
@@ -33,14 +35,17 @@ public class InspectionApiController implements InspectionApiEndpoint {
   private final InspectionService inspectionService;
   private final InspectionFormService formService;
   private final InspectionCreateService createService;
+  private final InspectionDetailService detailService;
 
   public InspectionApiController(
       InspectionSearchService inspectionSearchService, InspectionService inspectionService,
-      InspectionFormService formService, InspectionCreateService createService) {
+      InspectionFormService formService, InspectionCreateService createService,
+      InspectionDetailService detailService) {
     this.inspectionSearchService = inspectionSearchService;
     this.inspectionService = inspectionService;
     this.formService = formService;
     this.createService = createService;
+    this.detailService = detailService;
   }
 
   @Override
@@ -65,5 +70,10 @@ public class InspectionApiController implements InspectionApiEndpoint {
   @Override
   public ResponseEntity<CreatedResponse> createInspection(InspectionCreateRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED).body(createService.create(request));
+  }
+
+  @Override
+  public InspectionDetailResponse getInspection(long inspectionId) {
+    return detailService.findById(inspectionId);
   }
 }

@@ -27,7 +27,9 @@ public final class StructureMonitorsResponse {
   public enum View {
     /** Suggested or required. Legacy's default. */
     OUTSTANDING,
-    ALL
+    ALL,
+    /** Every item this inspection raised — legacy's "Current Inspection Items". Needs it. */
+    CURRENT
   }
 
   /**

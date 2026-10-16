@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -162,6 +162,9 @@ beforeEach(() => {
   });
 });
 
+/** The site's cards — where each field's own message is, apart from the outstanding list. */
+const inCard = () => within(screen.getByTestId('add-site-cards'));
+
 describe('AddSitePage — the form', () => {
   it('offers every field the legacy form does', async () => {
     // Field-for-field with site.jsp. A missing one is data someone can no longer record, and there
@@ -312,18 +315,18 @@ describe('AddSitePage — validation', () => {
 
     save();
 
-    expect(await screen.findByText('Site # is required.')).toBeInTheDocument();
+    expect(await inCard().findByText('Site # is required.')).toBeInTheDocument();
     expect(field('siteId')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('follows the corrections live once it has spoken', async () => {
     await renderPage();
     save();
-    expect(await screen.findByText('Site # is required.')).toBeInTheDocument();
+    expect(await inCard().findByText('Site # is required.')).toBeInTheDocument();
 
     type('siteId', 'BOWRON-001');
 
-    expect(screen.queryByText('Site # is required.')).not.toBeInTheDocument();
+    expect(inCard().queryByText('Site # is required.')).not.toBeInTheDocument();
   });
 
   it('excuses a storage site its crossing name and kilometre mark', async () => {
@@ -336,8 +339,8 @@ describe('AddSitePage — validation', () => {
 
     save();
 
-    expect(screen.queryByText('Crossing Name is required.')).not.toBeInTheDocument();
-    expect(screen.queryByText('Kilometres is required.')).not.toBeInTheDocument();
+    expect(inCard().queryByText('Crossing Name is required.')).not.toBeInTheDocument();
+    expect(inCard().queryByText('Kilometres is required.')).not.toBeInTheDocument();
   });
 
   it('marks the Inspection Status box when it disagrees with the status, without waiting for Save', async () => {
@@ -348,7 +351,7 @@ describe('AddSitePage — validation', () => {
     type('structureInspectionStatusCode', 'DNI');
 
     expect(
-      await screen.findByText(
+      await inCard().findByText(
         /An Active or Barricaded\/Closed Crossing site must be set to Inspect/,
       ),
     ).toBeInTheDocument();
@@ -358,15 +361,45 @@ describe('AddSitePage — validation', () => {
     await renderPage();
     await fillRequired();
     type('structureInspectionStatusCode', 'DNI');
-    expect(await screen.findByText(/must be set to Inspect/)).toBeInTheDocument();
+    expect(await inCard().findByText(/must be set to Inspect/)).toBeInTheDocument();
 
     type('structureInspectionStatusCode', 'INS');
 
-    expect(screen.queryByText(/must be set to Inspect/)).not.toBeInTheDocument();
+    expect(inCard().queryByText(/must be set to Inspect/)).not.toBeInTheDocument();
+  });
+});
+
+describe('AddSitePage — outstanding', () => {
+  it("shows what is outstanding from the start, nr-frep's pattern, and turns it red when refused", async () => {
+    await renderPage();
+
+    const summary = screen.getByTestId('add-site-outstanding-summary');
+    expect(summary).toMatchTextContent(/required items outstanding across 1 tab/);
+    expect(screen.getByTestId('add-site-outstanding')).toMatchTextContent(
+      /Site\s*Site # is required\./,
+    );
+    // Beside the box only once it is left, or on Save.
+    expect(inCard().queryByText('Site # is required.')).not.toBeInTheDocument();
+
+    save();
+    await waitFor(() => expect(summary).toMatchTextContent(/Site not saved/));
+    expect(
+      screen.getByRole('img', { name: /Information: \d+ items outstanding, blocking save/ }),
+    ).toBeInTheDocument();
   });
 });
 
 describe('AddSitePage — Site Details', () => {
+  it('has a card of its own, after the site', async () => {
+    await renderPage();
+
+    const card = screen.getByTestId('add-site-details-card');
+    expect(card).toContainElement(field('pointOfAccessDescription'));
+    expect(screen.getByTestId('add-site-card')).not.toContainElement(
+      field('pointOfAccessDescription'),
+    );
+  });
+
   const details = () => field('pointOfAccessDescription');
 
   it('counts what has been used against the column limit, live', async () => {
@@ -407,7 +440,7 @@ describe('AddSitePage — Site Details', () => {
     save();
 
     expect(
-      await screen.findByText('Too long — the limit is 255 and this entry uses 256.'),
+      await inCard().findByText('Too long — the limit is 255 and this entry uses 256.'),
     ).toBeInTheDocument();
   });
 
@@ -418,7 +451,7 @@ describe('AddSitePage — Site Details', () => {
 
     save();
 
-    expect(screen.queryByText(/Too long/)).not.toBeInTheDocument();
+    expect(inCard().queryByText(/Too long/)).not.toBeInTheDocument();
   });
 });
 
@@ -457,7 +490,7 @@ describe('AddSitePage — inline validation', () => {
 
     type('pointOfCommencementDistance', 'abc');
 
-    expect(await screen.findByText('Must be a number, e.g. 12.5')).toBeInTheDocument();
+    expect(await inCard().findByText('Must be a number, e.g. 12.5')).toBeInTheDocument();
   });
 
   it('leaves a number the user is part-way through writing alone', async () => {
@@ -467,7 +500,7 @@ describe('AddSitePage — inline validation', () => {
 
     type('pointOfCommencementDistance', '12.');
 
-    expect(screen.queryByText('Must be a number, e.g. 12.5')).not.toBeInTheDocument();
+    expect(inCard().queryByText('Must be a number, e.g. 12.5')).not.toBeInTheDocument();
   });
 
   it('says a required field is required once the user leaves it empty', async () => {
@@ -476,14 +509,14 @@ describe('AddSitePage — inline validation', () => {
 
     blur('siteId');
 
-    expect(await screen.findByText('Site # is required.')).toBeInTheDocument();
+    expect(await inCard().findByText('Site # is required.')).toBeInTheDocument();
     expect(field('siteId')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('says nothing about a field the user has not been in', async () => {
     await renderPage();
 
-    expect(screen.queryByText('Site # is required.')).not.toBeInTheDocument();
+    expect(inCard().queryByText('Site # is required.')).not.toBeInTheDocument();
     expect(field('siteId')).not.toHaveAttribute('aria-invalid', 'true');
   });
 
@@ -493,7 +526,7 @@ describe('AddSitePage — inline validation', () => {
     type('pointOfCommencementDistance', '12.');
     blur('pointOfCommencementDistance');
 
-    expect(await screen.findByText('Must be a number, e.g. 12.5')).toBeInTheDocument();
+    expect(await inCard().findByText('Must be a number, e.g. 12.5')).toBeInTheDocument();
   });
 
   it('will not save a site with no position on the map', async () => {
@@ -507,17 +540,19 @@ describe('AddSitePage — inline validation', () => {
     save();
 
     expect(
-      await screen.findByText('Longitude is required — degrees, minutes and seconds.'),
+      await inCard().findByText('Longitude is required — degrees, minutes and seconds.'),
     ).toBeInTheDocument();
   });
 
   it('marks both coordinates as required on the form', async () => {
     await renderPage();
 
-    expect(screen.getByText(/^Longitude/).textContent).toContain('*');
-    expect(screen.getByText(/^Latitude/).textContent).toContain('*');
+    // The labels, not the outstanding list's "Longitude is required — …".
+    const legend = (name: RegExp) => inCard().getByText(name, { selector: 'legend' });
+    expect(legend(/^Longitude/).textContent).toContain('*');
+    expect(legend(/^Latitude/).textContent).toContain('*');
     // UTM is not — legacy checks it for being numeric and nothing more.
-    expect(screen.getByText(/^UTM/).textContent).not.toContain('*');
+    expect(legend(/^UTM/).textContent).not.toContain('*');
   });
 
   it('still reports everything missing at Save', async () => {
@@ -525,7 +560,7 @@ describe('AddSitePage — inline validation', () => {
 
     save();
 
-    expect(await screen.findByText('Site # is required.')).toBeInTheDocument();
+    expect(await inCard().findByText('Site # is required.')).toBeInTheDocument();
   });
 });
 
@@ -776,7 +811,7 @@ describe('AddSitePage — the site type', () => {
     await waitFor(() => {
       expect(roadApi.getRoadSection).toHaveBeenCalled();
     });
-    expect(screen.queryByText(/No road section/)).not.toBeInTheDocument();
+    expect(inCard().queryByText(/No road section/)).not.toBeInTheDocument();
   });
 
   it('does not require a district for a recreation site', async () => {
@@ -787,7 +822,7 @@ describe('AddSitePage — the site type', () => {
 
     save();
 
-    expect(screen.queryByText('Forest District is required.')).not.toBeInTheDocument();
+    expect(inCard().queryByText('Forest District is required.')).not.toBeInTheDocument();
   });
 
   it('says on Project File ID# when the pair names no road, and does not save', async () => {
@@ -815,11 +850,13 @@ describe('AddSitePage — the site type', () => {
     // slow runner the first sighting was found and then detached before it could be checked.
     await waitFor(() => {
       expect(roadApi.getRoadSection).toHaveBeenLastCalledWith('tess', '0');
-      expect(screen.getByText('No road matches this Project File ID# and Br.')).toBeInTheDocument();
+      expect(
+        inCard().getByText('No road matches this Project File ID# and Br.'),
+      ).toBeInTheDocument();
     });
     save();
     expect(siteApi.createSite).not.toHaveBeenCalled();
-    expect(screen.queryByText('Forest District is required.')).not.toBeInTheDocument();
+    expect(inCard().queryByText('Forest District is required.')).not.toBeInTheDocument();
   });
 
   it('drops the message once the pair names a road again', async () => {
@@ -837,13 +874,13 @@ describe('AddSitePage — the site type', () => {
     type('crossingSiteTypeCode', 'CRS');
     type('forestFileId', 'tess');
     type('roadSectionId', '01');
-    await screen.findByText('No road matches this Project File ID# and Br.');
+    await inCard().findByText('No road matches this Project File ID# and Br.');
 
     type('forestFileId', 'R00123');
 
     await waitFor(() => {
       expect(
-        screen.queryByText('No road matches this Project File ID# and Br.'),
+        inCard().queryByText('No road matches this Project File ID# and Br.'),
       ).not.toBeInTheDocument();
     });
   });
@@ -866,7 +903,7 @@ describe('AddSitePage — the site type', () => {
     save();
 
     expect(
-      await screen.findByText('This road has no Forest District on record.'),
+      await inCard().findByText('This road has no Forest District on record.'),
     ).toBeInTheDocument();
     expect(siteApi.createSite).not.toHaveBeenCalled();
   });
@@ -911,7 +948,7 @@ describe('AddSitePage — the rest of the screen', () => {
 
     save();
 
-    expect(await screen.findByText('Server says no.')).toBeInTheDocument();
+    expect(await inCard().findByText('Server says no.')).toBeInTheDocument();
     expect(screen.queryByTestId('add-site-save-error')).not.toBeInTheDocument();
   });
 
@@ -936,7 +973,9 @@ describe('AddSitePage — the rest of the screen', () => {
 
     save();
 
-    await waitFor(() => expect(screen.getByText('Crossing Name is required.')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(inCard().getByText('Crossing Name is required.')).toBeInTheDocument(),
+    );
     expect(siteApi.createSite).not.toHaveBeenCalled();
   });
 

@@ -1,11 +1,23 @@
-import { Add, Edit, ListChecked, Save } from '@carbon/icons-react';
-import { Button, Column, Grid, InlineNotification, Layer, SkeletonText } from '@carbon/react';
+import { Add, Edit, ListChecked, Location, TableOfContents } from '@carbon/icons-react';
+import {
+  Button,
+  Column,
+  Grid,
+  InlineNotification,
+  SkeletonText,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+} from '@carbon/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
 import RoadSearchModal from '@/components/RoadSearchModal';
 import SiteForm, { FORM_ID, type SiteCodeTables } from '@/components/SiteForm';
+import Card from '@/pages/StructureDetail/Card';
 
 import { canAddStructureTo, toFormValues } from './siteResponse';
 
@@ -44,6 +56,7 @@ import { useUpdateSite } from '@/hooks/useUpdateSite';
 import { apiErrorMessage } from '@/utils/apiError';
 import { errorsForSettledFields } from '@/utils/validation';
 
+import '@/pages/StructureDetail/structureDetail.scss';
 import './siteDetail.scss';
 
 /**
@@ -316,7 +329,7 @@ const SiteDetailPage: FC = () => {
     });
   }, [road.noRoad, site, siteDetailsOnly, stored.errors, updated]);
 
-  const saveLabel = updated.isPending ? 'Saving…' : 'Save';
+  const saveLabel = updated.isPending ? 'Saving…' : 'Save changes';
 
   const cancelEdit = useCallback(() => {
     setMode('view');
@@ -325,7 +338,7 @@ const SiteDetailPage: FC = () => {
   }, [updated]);
 
   return (
-    <Grid fullWidth className="default-grid">
+    <Grid fullWidth className="default-grid structure-detail site-detail">
       <PageTitle
         title={`Site ${siteId ?? ''}`.trim()}
         subtitle="Location, tenure and access for this crossing site."
@@ -376,41 +389,6 @@ const SiteDetailPage: FC = () => {
               )}
             </>
           )}
-          {mode === 'view'
-            ? canEditSomething && (
-                <Button
-                  kind="primary"
-                  size="md"
-                  renderIcon={Edit}
-                  data-testid="site-detail-edit"
-                  onClick={() => setMode('edit')}
-                >
-                  Edit
-                </Button>
-              )
-            : [
-                <Button
-                  key="cancel"
-                  kind="secondary"
-                  size="md"
-                  data-testid="site-detail-cancel"
-                  onClick={cancelEdit}
-                >
-                  Cancel
-                </Button>,
-                <Button
-                  key="save"
-                  kind="primary"
-                  size="md"
-                  type="submit"
-                  form={FORM_ID}
-                  renderIcon={Save}
-                  disabled={updated.isPending}
-                  data-testid="site-detail-save"
-                >
-                  {saveLabel}
-                </Button>,
-              ]}
         </div>
       </PageTitle>
 
@@ -461,31 +439,91 @@ const SiteDetailPage: FC = () => {
           // which is a different answer from "not read yet".
           <SkeletonText paragraph lineCount={10} data-testid="site-detail-loading" />
         ) : (
-          // Grey over white, as Carbon lays a page out: the site's values on a layer-01 panel. Inside
-          // Carbon's Layer, so the inputs Edit brings up are white on the grey, as fields on a
-          // raised layer are.
-          <div
-            className={`site-detail__panel${mode === 'view' ? ' site-detail__panel--view' : ''}`}
-            data-testid="site-detail-panel"
-          >
-            <Layer>
-              <SiteForm
-                values={site}
-                errors={errors}
-                warnings={warnings}
-                codeTables={codeTables}
-                codeTablesLoading={referenceData.isLoading}
-                managementAreasLoading={managementAreas.isFetching}
-                isEditable={isEditable}
-                onChange={update}
-                onSettle={markSettled}
-                onSave={save}
-                onFindRoad={() => setFindingRoad(true)}
-                forestServiceRoad={forestServiceRoad}
-                forestServiceRoadLoading={road.forestServiceRoadLoading}
-                roadResolved={road.roadResolved}
-              />
-            </Layer>
+          // The structure page's layout: one tab over the grey pane, the site a white card on it,
+          // with its Edit in the card's header — and Cancel and Save under the fields while editing.
+          <div className="structure-detail__tabs">
+            <Tabs>
+              <TabList aria-label="Site sections" contained>
+                <Tab renderIcon={TableOfContents} data-testid="site-detail-tab-information">
+                  Information
+                </Tab>
+              </TabList>
+              <TabPanels>
+                <TabPanel>
+                  <div className="structure-detail__tab-panel" data-testid="site-detail-panel">
+                    <Card
+                      title="Site"
+                      icon={Location}
+                      testId="site-detail-card"
+                      action={
+                        mode === 'view' &&
+                        canEditSomething && (
+                          <Button
+                            kind="tertiary"
+                            size="sm"
+                            renderIcon={Edit}
+                            data-testid="site-detail-edit"
+                            onClick={() => setMode('edit')}
+                          >
+                            Edit site
+                          </Button>
+                        )
+                      }
+                    >
+                      <div
+                        className={
+                          mode === 'view'
+                            ? 'site-detail__card site-detail__card--view'
+                            : 'site-detail__card structure-detail__edit'
+                        }
+                      >
+                        <SiteForm
+                          values={site}
+                          errors={errors}
+                          warnings={warnings}
+                          codeTables={codeTables}
+                          codeTablesLoading={referenceData.isLoading}
+                          managementAreasLoading={managementAreas.isFetching}
+                          isEditable={isEditable}
+                          onChange={update}
+                          onSettle={markSettled}
+                          onSave={save}
+                          onFindRoad={() => setFindingRoad(true)}
+                          forestServiceRoad={forestServiceRoad}
+                          forestServiceRoadLoading={road.forestServiceRoadLoading}
+                          roadResolved={road.roadResolved}
+                        />
+                        {mode === 'edit' && (
+                          // The form's actions, as the structure page's cards: small, at the right,
+                          // under the fields. Save submits the form, so Enter in a box saves too.
+                          <div className="structure-detail__edit-actions">
+                            <Button
+                              kind="tertiary"
+                              size="sm"
+                              data-testid="site-detail-cancel"
+                              onClick={cancelEdit}
+                              disabled={updated.isPending}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              kind="primary"
+                              size="sm"
+                              type="submit"
+                              form={FORM_ID}
+                              disabled={updated.isPending}
+                              data-testid="site-detail-save"
+                            >
+                              {saveLabel}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
           </div>
         )}
       </Column>

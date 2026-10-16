@@ -33,6 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,20 +85,32 @@ public class StructureMonitorsService {
    * from before the superstructure went in are left out unless {@code includeBeforeInstall} —
    * legacy's "Show Inspections before the Superstructure Install Date".
    *
-   * @param view       outstanding only, or all
-   * @param pageNumber zero-based
-   * @param pageSize   held to between 1 and 100
+   * <p>From an inspection's page ({@code inspectionId} given), legacy's
+   * "Current Inspection Items" ({@link View#CURRENT}) lists every item the inspection raised,
+   * whenever it was inspected.
+   *
+   * @param view         outstanding only, all, or the inspection's (CURRENT)
+   * @param inspectionId the inspection whose page asks; needed for {@link View#CURRENT}, else null
+   * @param pageNumber   zero-based
+   * @param pageSize     held to between 1 and 100
    * @throws StructureNotFoundException if there is no such structure
+   * @throws ResponseStatusException 400 for {@link View#CURRENT} without an inspection
    */
   @Transactional(readOnly = true)
-  public Listing monitors(long structureId, View view, int pageNumber, int pageSize,
-      boolean includeBeforeInstall) {
+  public Listing monitors(long structureId, View view, Long inspectionId, int pageNumber,
+      int pageSize, boolean includeBeforeInstall) {
     InstallCutoff cutoff = InstallCutoff.of(structures.findById(structureId)
         .orElseThrow(() -> new StructureNotFoundException(structureId)));
+    boolean current = view == View.CURRENT;
+    if (current && inspectionId == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "Current Inspection Items needs the inspection.");
+    }
+    // Legacy's getCurrentMonitors: all of the inspection's, whatever their status.
     boolean outstandingOnly = view == View.OUTSTANDING;
     Page<StructureMonitorItemEntity> page = monitors.findPageByStructure(
-        structureId, outstandingOnly, OUTSTANDING_STATUSES,
-        includeBeforeInstall || cutoff.none(), cutoff.installed(),
+        structureId, current ? inspectionId : null, outstandingOnly, OUTSTANDING_STATUSES,
+        includeBeforeInstall || cutoff.none() || current, cutoff.installed(),
         PageRequest.of(Math.max(pageNumber, 0), Math.clamp(pageSize, 1, MAX_PAGE_SIZE)));
     List<StructureMonitorItemEntity> rows = page.getContent();
 
@@ -126,7 +140,7 @@ public class StructureMonitorsService {
     return new Listing(
         new PagedResponse<>(content, page.getTotalElements(), page.getTotalPages(),
             page.getNumber(), page.getSize()),
-        cutoff.none()
+        cutoff.none() || current
             ? 0
             : monitors.countBeforeInstall(
                 structureId, outstandingOnly, OUTSTANDING_STATUSES, cutoff.installed()));

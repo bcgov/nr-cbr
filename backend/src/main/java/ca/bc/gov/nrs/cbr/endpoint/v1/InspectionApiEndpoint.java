@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
@@ -105,17 +106,17 @@ public interface InspectionApiEndpoint {
    * The questions an inspection of the structure asks — Add Inspection's Condition tab — and the
    * spans and piers to answer them for.
    *
-   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — whoever may add an inspection.
-   * <b>404</b> when there is no such structure.
+   * <p>Gated on {@link CbrAuthorities#READ}: an inspection's page shows every question asked, to
+   * whoever may read it, as Add Inspection asks them. <b>404</b> when there is no such structure.
    *
    * @param structureId the {@code CROSSING_STRUCTURE_ID}
    */
-  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/form")
   InspectionFormResponse inspectionForm(@RequestParam(name = "structureId") long structureId);
 
   /**
-   * Adds an inspection, In Progress — Add Inspection.
+   * Adds an inspection, In Progress or Submitted — Add Inspection.
    *
    * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
    * {@code /saveInspection}; a Routine inspection needs Level 1, checked by the service. <b>201</b>
@@ -125,4 +126,16 @@ public interface InspectionApiEndpoint {
   @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
   @PostMapping
   ResponseEntity<CreatedResponse> createInspection(@RequestBody InspectionCreateRequest request);
+
+  /**
+   * One inspection — its page, read only: the inspection, its status history, its review and load
+   * rating, its hazards and its answers.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such inspection.
+   *
+   * @param inspectionId the {@code STRUCTURE_INSPECTION.INSPECTION_ID}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/{inspectionId}")
+  InspectionDetailResponse getInspection(@PathVariable("inspectionId") long inspectionId);
 }

@@ -666,7 +666,9 @@ public interface StructureApiEndpoint {
    * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
    *
    * @param structureId the {@code CROSSING_STRUCTURE_ID}
-   * @param view        {@code OUTSTANDING} or {@code ALL} — legacy's "Choose Viewing Option"
+   * @param view        {@code OUTSTANDING}, {@code ALL}, or — from an inspection's page —
+   *                    {@code CURRENT}: legacy's "Choose Viewing Option"
+   * @param inspectionId the inspection whose page asks; needed for {@code CURRENT} (400 without)
    * @param pageNumber  zero-based
    * @param pageSize    held to between 1 and 100
    * @param includeBeforeInstall legacy's "Show Inspections before the Superstructure Install Date"
@@ -676,6 +678,7 @@ public interface StructureApiEndpoint {
   StructureRepairsResponse.Listing getRepairs(
       @PathVariable("structureId") long structureId,
       @RequestParam(name = "view", defaultValue = "OUTSTANDING") StructureRepairsResponse.View view,
+      @RequestParam(name = "inspectionId", required = false) Long inspectionId,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
       @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
       @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
@@ -748,7 +751,9 @@ public interface StructureApiEndpoint {
    * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
    *
    * @param structureId the {@code CROSSING_STRUCTURE_ID}
-   * @param view        {@code OUTSTANDING} or {@code ALL} — legacy's "Choose Viewing Option"
+   * @param view        {@code OUTSTANDING}, {@code ALL}, or — from an inspection's page —
+   *                    {@code CURRENT}: legacy's "Choose Viewing Option"
+   * @param inspectionId the inspection whose page asks; needed for {@code CURRENT} (400 without)
    * @param pageNumber  zero-based
    * @param pageSize    held to between 1 and 100
    * @param includeBeforeInstall legacy's "Show Inspections before the Superstructure Install Date"
@@ -759,6 +764,7 @@ public interface StructureApiEndpoint {
       @PathVariable("structureId") long structureId,
       @RequestParam(name = "view", defaultValue = "OUTSTANDING")
       StructureMonitorsResponse.View view,
+      @RequestParam(name = "inspectionId", required = false) Long inspectionId,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
       @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
       @RequestParam(name = "includeBeforeInstall", defaultValue = "false")

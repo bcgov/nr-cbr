@@ -8,3 +8,16 @@
   flex-shrink: 0;
   gap: $spacing-03;
 }
+
+// The site card is a form, so its fields are grey (field-01) on the white card, as Add
+// Inspection's and Add Structure's.
+.add-site .structure-detail__card {
+  --cds-field: var(--cds-field-01);
+  --cds-field-hover: var(--cds-field-hover-01);
+  --cds-border-subtle: var(--cds-border-subtle-01);
+}
+
+// The structure page's styles size the heading to its text; the buttons push themselves over.
+.add-site .add-site__header-actions {
+  margin-inline-start: auto;
+}

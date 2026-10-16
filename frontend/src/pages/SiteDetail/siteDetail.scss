@@ -11,21 +11,10 @@
   gap: $spacing-03;
 }
 
-// The site's values on a grey panel over the white page — Carbon's layering, layer-01 on the
-// background, as its dashboards set their tiles.
-.site-detail__panel {
-  padding: $spacing-06 $spacing-05;
-  background-color: var(--cds-layer-01);
-
-  @include breakpoint(md) {
-    padding: $spacing-07 $spacing-07;
-  }
-}
-
 // Reading a site, not editing it: each label bold in the primary text colour, its value 0.5rem
 // under it — the structure page's Information tab. Not while editing, where a read-only value has
 // to sit level with the input boxes beside it (see ReadOnlyField).
-.site-detail__panel--view {
+.site-detail__card--view {
   .read-only-field {
     gap: 0.5rem;
   }
@@ -45,4 +34,9 @@
   .site-form__fields {
     row-gap: $spacing-07;
   }
+}
+
+// The structure page's styles size the heading to its text; the buttons push themselves over.
+.site-detail .site-detail__header-actions {
+  margin-inline-start: auto;
 }

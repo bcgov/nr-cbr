@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
@@ -29,8 +30,17 @@ class InspectionApiControllerTest {
   private final InspectionService inspectionService = mock(InspectionService.class);
   private final InspectionFormService formService = mock(InspectionFormService.class);
   private final InspectionCreateService createService = mock(InspectionCreateService.class);
-  private final InspectionApiController controller =
-      new InspectionApiController(searchService, inspectionService, formService, createService);
+  private final InspectionDetailService detailService = mock(InspectionDetailService.class);
+  private final InspectionApiController controller = new InspectionApiController(
+      searchService, inspectionService, formService, createService, detailService);
+
+  @Test
+  @DisplayName("reading an inspection reaches the detail service")
+  void getDelegates() {
+    controller.getInspection(42L);
+
+    verify(detailService).findById(42L);
+  }
 
   @Test
   @DisplayName("deleting answers 204 with no body, because nothing is left to return")

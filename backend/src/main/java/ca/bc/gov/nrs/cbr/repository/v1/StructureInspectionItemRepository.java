@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionItemEntity;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,6 +11,9 @@ public interface StructureInspectionItemRepository
     extends JpaRepository<StructureInspectionItemEntity, Long> {
 
   void deleteByInspectionId(Long inspectionId);
+
+  /** An inspection's answers. */
+  List<StructureInspectionItemEntity> findByInspectionId(Long inspectionId);
 
   /**
    * Whether any inspection answered a question about this span — legacy's

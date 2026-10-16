@@ -51,6 +51,7 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
         FROM StructureRepairEntity repair
         LEFT JOIN FETCH repair.inspection inspection
        WHERE repair.crossingStructureId = :structureId
+         AND (:inspectionId IS NULL OR repair.inspectionId = :inspectionId)
          AND (:outstandingOnly = FALSE
               OR (repair.repairStatusCode IN :outstandingStatuses
                   AND repair.carriedForwardInd = 'N'))
@@ -68,6 +69,7 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
         FROM StructureRepairEntity repair
         LEFT JOIN repair.inspection inspection
        WHERE repair.crossingStructureId = :structureId
+         AND (:inspectionId IS NULL OR repair.inspectionId = :inspectionId)
          AND (:outstandingOnly = FALSE
               OR (repair.repairStatusCode IN :outstandingStatuses
                   AND repair.carriedForwardInd = 'N'))
@@ -78,6 +80,7 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
       """)
   Page<StructureRepairEntity> findPageByStructure(
       @Param("structureId") Long structureId,
+      @Param("inspectionId") Long inspectionId,
       @Param("outstandingOnly") boolean outstandingOnly,
       @Param("outstandingStatuses") Collection<String> outstandingStatuses,
       @Param("includeBeforeInstall") boolean includeBeforeInstall,
