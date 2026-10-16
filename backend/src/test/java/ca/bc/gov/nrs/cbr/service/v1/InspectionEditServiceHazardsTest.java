@@ -27,15 +27,15 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-/** An inspection's Hydraulic Hazards, edited on its page, with legacy's rules. */
+/** An inspection's Hydraulic Hazards, edited on its page — {@link InspectionEditService}. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import(InspectionHazardsService.class)
-class InspectionHazardsServiceTest {
+@Import(InspectionEditService.class)
+class InspectionEditServiceHazardsTest {
 
   private static final LocalDateTime PAST = LocalDateTime.of(2000, 1, 1, 0, 0);
 
   @Autowired
-  private InspectionHazardsService service;
+  private InspectionEditService service;
 
   @Autowired
   private EntityManager entityManager;
@@ -78,7 +78,7 @@ class InspectionHazardsServiceTest {
 
   private Map<String, String> refused(long id, HazardsUpdateRequest request) {
     try {
-      service.update(id, request);
+      service.updateHazards(id, request);
     } catch (FieldValidationException refusal) {
       return refusal.getFieldErrors();
     }
@@ -90,7 +90,7 @@ class InspectionHazardsServiceTest {
   void saves() {
     inspection(41L, "SUB", null);
 
-    service.update(41L, hazards("1.5", "12", "3.2"));
+    service.updateHazards(41L, hazards("1.5", "12", "3.2"));
     entityManager.flush();
     entityManager.clear();
 
@@ -109,7 +109,7 @@ class InspectionHazardsServiceTest {
   void inProgress() {
     inspection(41L, "PRO", new BigDecimal("2"));
 
-    service.update(41L, new HazardsUpdateRequest(new BigDecimal("2"), null, null, null, null,
+    service.updateHazards(41L, new HazardsUpdateRequest(new BigDecimal("2"), null, null, null, null,
         null, null, null, null));
     assertThat(refused(41L, hazards(null, null, null))).containsOnly(
         Map.entry("presentWaterDepth", "Estimated Present Water Level Depth is required."));
@@ -139,13 +139,13 @@ class InspectionHazardsServiceTest {
     inspection(43L, "REJ", null);
     HazardsUpdateRequest request = hazards("1", "2", "3");
 
-    assertThatThrownBy(() -> service.update(41L, request))
+    assertThatThrownBy(() -> service.updateHazards(41L, request))
         .isInstanceOf(InspectionLockedException.class)
-        .hasMessageContaining("its hydraulic hazards can no longer be changed");
-    assertThatThrownBy(() -> service.update(42L, request))
+        .hasMessageContaining("can no longer be changed from its page");
+    assertThatThrownBy(() -> service.updateHazards(42L, request))
         .isInstanceOf(InspectionLockedException.class);
-    service.update(43L, request);
-    assertThatThrownBy(() -> service.update(404L, request))
+    service.updateHazards(43L, request);
+    assertThatThrownBy(() -> service.updateHazards(404L, request))
         .isInstanceOf(InspectionNotFoundException.class);
   }
 }

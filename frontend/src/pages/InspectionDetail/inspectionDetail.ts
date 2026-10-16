@@ -39,6 +39,17 @@ export type InspectionHazardsRequest = Omit<InspectionHazards, 'comment'> & {
   comment: string | null;
 };
 
+/** The Inspection card as saved — the backend's `InspectionUpdateRequest`. */
+export type InspectionUpdateRequest = {
+  statusCode: string;
+  /** `yyyy-MM-dd`. */
+  inspectionDate: string | null;
+  inspectorName: string;
+  inspectorCompanyName: string;
+  cost: number | null;
+  professionalInspectionRequired: boolean;
+};
+
 /** One answered question, where it was asked: a span, a pier, a stringer. */
 export type InspectionItem = {
   subsectionCode: string;

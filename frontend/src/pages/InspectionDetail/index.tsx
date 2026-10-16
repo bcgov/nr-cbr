@@ -31,7 +31,8 @@ import TabCount from '@/pages/StructureDetail/TabCount';
 
 import ConditionView from './ConditionView';
 import HazardsTab from './HazardsTab';
-import { InspectionCards, ReviewCards, StatusTag, StructureCard } from './InspectionViews';
+import InspectionTab from './InspectionTab';
+import { ReviewCards, StatusTag } from './InspectionViews';
 import { countOf, outstandingOf, type OutstandingTab } from './outstanding';
 
 import type { CarbonIconType } from '@carbon/icons-react';
@@ -194,8 +195,7 @@ const InspectionDetailPage: FC = () => {
                       groups={outstanding?.inspection ?? []}
                       testId="inspection-inspection-outstanding"
                     />
-                    <StructureCard inspection={inspection} structure={structure.data} />
-                    <InspectionCards inspection={inspection} />
+                    <InspectionTab inspection={inspection} structure={structure.data} />
                   </div>
                 </TabPanel>
                 <TabPanel>

@@ -5,8 +5,10 @@ import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
@@ -243,4 +245,27 @@ public interface InspectionApiEndpoint {
   @PutMapping("/{inspectionId}/hazards")
   ResponseEntity<Void> updateHazards(@PathVariable("inspectionId") long inspectionId,
       @RequestBody HazardsUpdateRequest request);
+
+  /**
+   * Saves the inspection's Inspection card — legacy's Inspection tab: status (In Progress or
+   * Submitted), date, inspector, company, cost and Professional Inspection Required.
+   *
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
+   * {@code /level0Access}; Professional Inspection Required is a Level 2 user's, checked by the
+   * service. <b>204</b>; <b>404</b> when there is no such inspection; <b>409</b> once it is
+   * Reviewed or Accepted; <b>400</b> with {@code fieldErrors}.
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PutMapping("/{inspectionId}")
+  ResponseEntity<Void> updateInspection(@PathVariable("inspectionId") long inspectionId,
+      @RequestBody InspectionUpdateRequest request);
+
+  /**
+   * Saves the inspector's comments. Level 0 and up; <b>204</b>, <b>404</b>, <b>409</b> or
+   * <b>400</b> as the Inspection card.
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PutMapping("/{inspectionId}/comment")
+  ResponseEntity<Void> updateInspectionComment(@PathVariable("inspectionId") long inspectionId,
+      @RequestBody InspectionCommentRequest request);
 }

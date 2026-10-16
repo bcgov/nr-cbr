@@ -75,10 +75,23 @@ export const StructureCard: FC<{
   </Card>
 );
 
-/** The Inspection tab's own cards: the inspection, then the inspector's comments. */
-export const InspectionCards: FC<{ inspection: InspectionDetailResponse }> = ({ inspection }) => (
-  <>
-    <Card title="Inspection" icon={InspectionIcon} testId="inspection-section-inspection">
+type CardProps = {
+  inspection: InspectionDetailResponse;
+  /** The card's Edit, when the user may change it. */
+  action?: ReactNode;
+  /** The card's form while it is being edited, in place of its values. */
+  children?: ReactNode;
+};
+
+/** The Inspection card: type, status, date, who inspected and at what cost. */
+export const InspectionCard: FC<CardProps> = ({ inspection, action, children }) => (
+  <Card
+    title="Inspection"
+    icon={InspectionIcon}
+    testId="inspection-section-inspection"
+    action={action}
+  >
+    {children ?? (
       <div className="structure-detail__fields">
         <ReadOnlyField label="Inspection Type" value={describe(inspection.type)} />
         <ReadOnlyField
@@ -98,11 +111,20 @@ export const InspectionCards: FC<{ inspection: InspectionDetailResponse }> = ({ 
           value={yesNo(inspection.professionalInspectionRequired)}
         />
       </div>
-    </Card>
-    <Card title="Inspection Comments" icon={Forum} testId="inspection-section-comments">
-      <Text value={inspection.inspectionComment} testId="inspection-comment" />
-    </Card>
-  </>
+    )}
+  </Card>
+);
+
+/** The inspector's comments. */
+export const InspectionCommentsCard: FC<CardProps> = ({ inspection, action, children }) => (
+  <Card
+    title="Inspection Comments"
+    icon={Forum}
+    testId="inspection-section-comments"
+    action={action}
+  >
+    {children ?? <Text value={inspection.inspectionComment} testId="inspection-comment" />}
+  </Card>
 );
 
 /** The Hydraulic Hazards tab: the channel's measurements, the hazards and their comments. */

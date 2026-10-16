@@ -8,9 +8,9 @@ import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionEditService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
-import ca.bc.gov.nrs.cbr.service.v1.InspectionHazardsService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
@@ -35,17 +35,28 @@ class InspectionApiControllerTest {
   private final InspectionCreateService createService = mock(InspectionCreateService.class);
   private final InspectionDetailService detailService = mock(InspectionDetailService.class);
   private final InspectionFollowUpService followUpService = mock(InspectionFollowUpService.class);
-  private final InspectionHazardsService hazardsService = mock(InspectionHazardsService.class);
+  private final InspectionEditService editService = mock(InspectionEditService.class);
   private final InspectionApiController controller = new InspectionApiController(
       searchService, inspectionService, formService, createService, detailService,
-      followUpService, hazardsService);
+      followUpService, editService);
 
   @Test
-  @DisplayName("saving the hazards reaches the hazards service: 204")
+  @DisplayName("saving the Inspection card and its comments reaches the edit service: 204")
+  void editDelegates() {
+    assertThat(controller.updateInspection(42L, null).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(controller.updateInspectionComment(42L, null).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    verify(editService).update(42L, null);
+    verify(editService).updateComment(42L, null);
+  }
+
+  @Test
+  @DisplayName("saving the hazards reaches the edit service: 204")
   void hazardsDelegate() {
     assertThat(controller.updateHazards(42L, null).getStatusCode())
         .isEqualTo(HttpStatus.NO_CONTENT);
-    verify(hazardsService).update(42L, null);
+    verify(editService).updateHazards(42L, null);
   }
 
   @Test
