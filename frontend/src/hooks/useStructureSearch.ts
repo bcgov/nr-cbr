@@ -720,22 +720,23 @@ export const useAddDocuments = (structureId: string, inspectionId?: string) => {
       onProgress?: (sent: number) => void;
     }): Promise<DocumentUploadOutcome> => {
       const outcome: DocumentUploadOutcome = { added: [], failed: [] };
-      for (const [sent, upload] of uploads.entries()) {
+      // From an inspection's page, the inspection's — its own endpoint.
+      const send = (upload: DocumentUpload) =>
+        inspectionId === undefined
+          ? API.structureSearch.addDocument(structureId, upload.file, upload.details)
+          : API.inspectionSearch.addInspectionDocument(inspectionId, upload.file, upload.details);
+      // One at a time, each after the last: every request stays under the WAF's body limit, the
+      // progress counts file by file, and a refused file does not stop the rest.
+      await uploads.reduce(async (previous, upload, sent) => {
+        await previous;
         onProgress?.(sent);
         try {
-          // From an inspection's page, the inspection's — its own endpoint.
-          await (inspectionId === undefined
-            ? API.structureSearch.addDocument(structureId, upload.file, upload.details)
-            : API.inspectionSearch.addInspectionDocument(
-                inspectionId,
-                upload.file,
-                upload.details,
-              ));
+          await send(upload);
           outcome.added.push(upload.key);
         } catch (error) {
           outcome.failed.push({ key: upload.key, error });
         }
-      }
+      }, Promise.resolve());
       return outcome;
     },
     onSuccess: ({ added }) =>

@@ -205,10 +205,13 @@ class InspectionFollowUpServiceTest {
     inspection(42L, "ACC");
     inspection(43L, "REJ");
 
-    assertThatThrownBy(() -> service.addDocument(41L, photo(), details()))
+    // Built first, so each refusal comes from the one call under test.
+    MockMultipartFile photo = photo();
+    DocumentDetailsRequest details = details();
+    assertThatThrownBy(() -> service.addDocument(41L, photo, details))
         .isInstanceOf(InspectionLockedException.class)
         .hasMessageContaining("documents and photos can no longer be added");
-    assertThatThrownBy(() -> service.addDocument(42L, photo(), details()))
+    assertThatThrownBy(() -> service.addDocument(42L, photo, details))
         .isInstanceOf(InspectionLockedException.class);
     long id = Long.parseLong(service.addDocument(43L, photo(), details()));
 
