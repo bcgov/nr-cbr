@@ -236,7 +236,7 @@ class StructureDocumentsServiceTest {
 
   private Map<String, String> uploadRefused(MultipartFile part, DocumentDetailsRequest row) {
     try {
-      service.upload(7L, part, row);
+      service.upload(7L, null, part, row);
     } catch (FieldValidationException refused) {
       return refused.getFieldErrors();
     }
@@ -248,7 +248,7 @@ class StructureDocumentsServiceTest {
   void uploads() {
     MultipartFile photo = new MockMultipartFile("file", " deck.jpg ", "image/jpeg",
         "jpeg bytes".getBytes());
-    String id = service.upload(7L, photo, row(" PHOTO ", "  North abutment.  "));
+    String id = service.upload(7L, null, photo, row(" PHOTO ", "  North abutment.  "));
 
     CrossingStructureFileDetailEntity detail = storedDetail(Long.parseLong(id));
     assertThat(detail.getCrossingStructureId()).isEqualTo(7L);
@@ -268,8 +268,8 @@ class StructureDocumentsServiceTest {
   @Test
   @DisplayName("gives each file its own id, its extension read from its name")
   void uploadsEachFile() {
-    String photo = service.upload(7L, part("deck.jpg", 10), row("PHOTO", null));
-    String plan = service.upload(7L, part("plan.PDF", 10), row("OTH", "As-built plan"));
+    String photo = service.upload(7L, null, part("deck.jpg", 10), row("PHOTO", null));
+    String plan = service.upload(7L, null, part("plan.PDF", 10), row("OTH", "As-built plan"));
 
     assertThat(plan).isNotEqualTo(photo);
     assertThat(storedDetail(Long.parseLong(plan)).getEfileExtensionCode()).isEqualTo("PDF");
@@ -315,7 +315,7 @@ class StructureDocumentsServiceTest {
     MultipartFile part = part("a.jpg", 1);
     DocumentDetailsRequest row = row("PHOTO", null);
 
-    assertThatThrownBy(() -> service.upload(404L, part, row))
+    assertThatThrownBy(() -> service.upload(404L, null, part, row))
         .isInstanceOf(StructureNotFoundException.class);
   }
 

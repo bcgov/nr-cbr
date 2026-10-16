@@ -313,7 +313,7 @@ public class StructureApiController implements StructureApiEndpoint {
   public ResponseEntity<CreatedResponse> addDocument(
       long structureId, MultipartFile file, DocumentDetailsRequest details) {
     return ResponseEntity.status(HttpStatus.CREATED).body(new CreatedResponse(
-        documentsService.upload(structureId, file, details)));
+        documentsService.upload(structureId, null, file, details)));
   }
 
   @Override

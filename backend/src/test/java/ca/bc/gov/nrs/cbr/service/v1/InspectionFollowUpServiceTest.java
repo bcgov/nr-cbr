@@ -7,6 +7,11 @@ import static org.mockito.Mockito.when;
 import ca.bc.gov.nrs.cbr.exception.InspectionLockedException;
 import ca.bc.gov.nrs.cbr.exception.InspectionNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
+import org.springframework.mock.web.MockMultipartFile;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
+import ca.bc.gov.nrs.cbr.model.v1.FileMimeTypeXrefEntity;
+import ca.bc.gov.nrs.cbr.model.v1.FileAttachmentTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileDetailEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitorFrequencyCodeEntity;
@@ -36,7 +41,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 /** Repairs and monitoring items changed from an inspection's page. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
 @Import({InspectionFollowUpService.class, StructureRepairsService.class,
-    StructureMonitorsService.class})
+    StructureMonitorsService.class, StructureDocumentsService.class})
 class InspectionFollowUpServiceTest {
 
   private static final LocalDateTime PAST = LocalDateTime.of(2000, 1, 1, 0, 0);
@@ -68,7 +73,10 @@ class InspectionFollowUpServiceTest {
         .structureRepairTypeCode("DECK").description("Deck").build());
     entityManager.persist(MonitorFrequencyCodeEntity.builder()
         .monitorFrequencyCode("ANN").description("Annual").build());
-    for (String status : List.of("PRO", "SUB", "RVD", "REJ")) {
+    entityManager.persist(FileAttachmentTypeCodeEntity.builder()
+        .fileAttachmentTypeCode("PHOTO").description("Photograph").build());
+    entityManager.persist(new FileMimeTypeXrefEntity(new FileMimeTypeXrefEntity.Key("JPG", "JPG")));
+    for (String status : List.of("PRO", "SUB", "RVD", "ACC", "REJ")) {
       entityManager.persist(InspectionReportStatusCodeEntity.builder()
           .inspectionReportStatusCode(status).description(status).effectiveDate(PAST)
           .expiryDate(PAST.plusYears(999)).updateTimestamp(PAST).build());
@@ -143,5 +151,51 @@ class InspectionFollowUpServiceTest {
         .hasMessageContaining("is Rejected");
     assertThatThrownBy(() -> service.addRepair(404L, repair))
         .isInstanceOf(InspectionNotFoundException.class);
+  }
+
+  private static MockMultipartFile photo() {
+    return new MockMultipartFile("file", "deck.jpg", "image/jpeg", "jpeg bytes".getBytes());
+  }
+
+  private static DocumentDetailsRequest details() {
+    return new DocumentDetailsRequest("PHOTO", LocalDate.of(2024, 5, 1), "North abutment");
+  }
+
+  @Test
+  @DisplayName("adds a document as the inspection's, and deletes any of the structure's")
+  void documents() {
+    inspection(41L, "SUB");
+
+    long id = Long.parseLong(service.addDocument(41L, photo(), details()));
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(entityManager.find(CrossingStructureFileDetailEntity.class, id).getInspectionId())
+        .isEqualTo(41L);
+
+    service.deleteDocument(41L, id);
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(entityManager.find(CrossingStructureFileDetailEntity.class, id)).isNull();
+  }
+
+  @Test
+  @DisplayName("as legacy: no document added once Reviewed or Accepted, but one may be once "
+      + "Rejected, and deleted at any status")
+  void documentsLockAsLegacy() {
+    inspection(41L, "RVD");
+    inspection(42L, "ACC");
+    inspection(43L, "REJ");
+
+    assertThatThrownBy(() -> service.addDocument(41L, photo(), details()))
+        .isInstanceOf(InspectionLockedException.class)
+        .hasMessageContaining("documents and photos can no longer be added");
+    assertThatThrownBy(() -> service.addDocument(42L, photo(), details()))
+        .isInstanceOf(InspectionLockedException.class);
+    long id = Long.parseLong(service.addDocument(43L, photo(), details()));
+
+    service.deleteDocument(41L, id);
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(entityManager.find(CrossingStructureFileDetailEntity.class, id)).isNull();
   }
 }

@@ -28,6 +28,7 @@ const inspectionApi = vi.hoisted(() => ({
   getInspectionForm: vi.fn(),
   deleteInspectionRepair: vi.fn(),
   deleteInspectionMonitor: vi.fn(),
+  deleteInspectionDocument: vi.fn(),
 }));
 const structureApi = vi.hoisted(() => ({
   getStructure: vi.fn(),
@@ -363,6 +364,7 @@ describe('InspectionDetailPage', () => {
 
     await openTab('documents');
     await waitFor(() => expect(structureApi.getDocuments).toHaveBeenCalledWith('7'));
+    // Reviewed: no Add, as legacy.
     expect(screen.queryByText('Add documents')).not.toBeInTheDocument();
   });
 
@@ -436,6 +438,57 @@ describe('InspectionDetailPage', () => {
       expect(screen.queryByTestId('structure-repair-add')).not.toBeInTheDocument();
       expect(screen.queryByTestId('structure-repair-edit-3')).not.toBeInTheDocument();
       expect(screen.getByTestId('structure-monitors-locked')).toBeInTheDocument();
+    });
+  });
+
+  describe('changing its documents and photos, as legacy', () => {
+    const doc = (id: string, inspectionId: string | null) => ({
+      id,
+      inspectionId,
+      inspectionDate: inspectionId ? '2023-06-01' : null,
+      attachmentType: { code: 'PHOTO', description: 'Photograph' },
+      created: '2023-06-01',
+      extension: 'JPG',
+      description: 'Deck',
+      filename: `${id}.jpg`,
+    });
+
+    it("adds to this inspection's folder from Level 1, deletes any file at Level 2, never edits", async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'SUB', description: 'Submitted' } }),
+      );
+      inspectionApi.deleteInspectionDocument.mockResolvedValue(undefined);
+      structureApi.getDocuments.mockResolvedValue({ documents: [doc('1', null), doc('2', '30')] });
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('documents');
+
+      // This inspection's folder is there to hold Add, with its date — and first.
+      const folder = await screen.findByTestId('structure-documents-41');
+      const cards = screen.getAllByTestId(/^structure-documents-(structure|\d+)$/);
+      expect(cards[0]).toBe(folder);
+      expect(folder).toMatchTextContent(/Inspection: May 1, 2024/);
+      expect(within(folder).getByTestId('structure-documents-add')).toBeInTheDocument();
+      expect(screen.queryByTestId('structure-document-edit-1')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByTestId('structure-document-delete-2'));
+      await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+      await waitFor(() =>
+        expect(inspectionApi.deleteInspectionDocument).toHaveBeenCalledWith('41', '2'),
+      );
+    });
+
+    it('adds nothing once Reviewed, and says why — but still deletes, as legacy', async () => {
+      structureApi.getDocuments.mockResolvedValue({ documents: [doc('1', null)] });
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('documents');
+
+      expect(await screen.findByTestId('structure-documents-locked')).toMatchTextContent(
+        /can no longer be added/,
+      );
+      expect(screen.queryByTestId('structure-documents-add')).not.toBeInTheDocument();
+      expect(screen.getByTestId('structure-document-delete-1')).toBeInTheDocument();
     });
   });
 

@@ -10,6 +10,7 @@ import type {
   InspectionCreateRequest,
   InspectionFormResponse,
 } from '@/pages/NewInspection/inspectionForm';
+import type { DocumentDetailsRequest } from '@/pages/StructureDetail/documentsResponse';
 import type {
   MonitorCreateRequest,
   MonitorUpdateRequest,
@@ -182,6 +183,36 @@ export class InspectionSearchService extends HttpClient {
       method: 'DELETE',
       url: '/v1/inspections/{inspectionId}/monitors/{monitorId}',
       path: { inspectionId, monitorId },
+    });
+  }
+
+  /**
+   * Adds a document or photo from an inspection's page, the inspection's. Multipart, as the
+   * structure page's. 409 once it is Reviewed or Accepted.
+   */
+  addInspectionDocument(
+    inspectionId: string,
+    file: File,
+    details: DocumentDetailsRequest,
+  ): CancelablePromise<{ id: string }> {
+    return this.doRequest<{ id: string }>(this.config, {
+      method: 'POST',
+      url: '/v1/inspections/{inspectionId}/documents',
+      path: { inspectionId },
+      formData: {
+        file,
+        // A Blob, so the part carries its JSON type and the server reads it as the object it is.
+        details: new Blob([JSON.stringify(details)], { type: 'application/json' }),
+      },
+    });
+  }
+
+  /** Deletes one of the structure's documents, from an inspection's page. */
+  deleteInspectionDocument(inspectionId: string, fileId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/inspections/{inspectionId}/documents/{fileId}',
+      path: { inspectionId, fileId },
     });
   }
 }

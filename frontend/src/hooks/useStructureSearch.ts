@@ -709,7 +709,7 @@ export type DocumentUploadOutcome = {
  * `file`, `attachmentTypeCode`, `createdDate` or `description` — and the rest are still sent.
  * `onProgress` is told how many have been sent before each request.
  */
-export const useAddDocuments = (structureId: string) => {
+export const useAddDocuments = (structureId: string, inspectionId?: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -723,7 +723,14 @@ export const useAddDocuments = (structureId: string) => {
       for (const [sent, upload] of uploads.entries()) {
         onProgress?.(sent);
         try {
-          await API.structureSearch.addDocument(structureId, upload.file, upload.details);
+          // From an inspection's page, the inspection's — its own endpoint.
+          await (inspectionId === undefined
+            ? API.structureSearch.addDocument(structureId, upload.file, upload.details)
+            : API.inspectionSearch.addInspectionDocument(
+                inspectionId,
+                upload.file,
+                upload.details,
+              ));
           outcome.added.push(upload.key);
         } catch (error) {
           outcome.failed.push({ key: upload.key, error });
@@ -753,10 +760,16 @@ export const useUpdateDocument = (structureId: string) => {
 };
 
 /** Deletes a document and its file, then refreshes the structure's documents. */
-export const useDeleteDocument = (structureId: string): UseMutationResult<void, Error, string> => {
+export const useDeleteDocument = (
+  structureId: string,
+  inspectionId?: string,
+): UseMutationResult<void, Error, string> => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (fileId: string) => API.structureSearch.deleteDocument(structureId, fileId),
+    mutationFn: (fileId: string) =>
+      inspectionId === undefined
+        ? API.structureSearch.deleteDocument(structureId, fileId)
+        : API.inspectionSearch.deleteInspectionDocument(inspectionId, fileId),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'documents'] }),
   });

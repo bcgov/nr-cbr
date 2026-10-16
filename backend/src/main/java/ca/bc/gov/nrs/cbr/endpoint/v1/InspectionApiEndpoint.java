@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
@@ -19,6 +20,9 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -197,4 +201,30 @@ public interface InspectionApiEndpoint {
   @DeleteMapping("/{inspectionId}/monitors/{monitorId}")
   ResponseEntity<Void> deleteMonitor(@PathVariable("inspectionId") long inspectionId,
       @PathVariable("monitorId") long monitorId);
+
+  /**
+   * Adds a document or photo from the inspection's page — legacy's Add on its Documents &amp;
+   * Photos tab, the inspection's. Multipart: {@code file}, and {@code details} (type, date,
+   * description), as the structure page's.
+   *
+   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, legacy's multi-file uploader.
+   * <b>201</b> with the new id; <b>404</b> when there is no such inspection; <b>409</b> once it is
+   * Reviewed or Accepted (legacy disables Add then); <b>400</b> with {@code fieldErrors}.
+   */
+  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
+  @PostMapping(value = "/{inspectionId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  ResponseEntity<CreatedResponse> addDocument(
+      @PathVariable("inspectionId") long inspectionId,
+      @RequestPart("file") MultipartFile file,
+      @RequestPart("details") DocumentDetailsRequest details);
+
+  /**
+   * Deletes one of the structure's documents from the inspection's page — any, at any status, as
+   * legacy's delete icon. Gated on {@link CbrAuthorities#DESTRUCTIVE} — Level 2, legacy's regional
+   * engineer. <b>204</b>; <b>404</b> when there is no such inspection or document.
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{inspectionId}/documents/{fileId}")
+  ResponseEntity<Void> deleteDocument(@PathVariable("inspectionId") long inspectionId,
+      @PathVariable("fileId") long fileId);
 }

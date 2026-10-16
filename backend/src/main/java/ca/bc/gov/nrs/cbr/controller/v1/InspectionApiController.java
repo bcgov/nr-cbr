@@ -9,6 +9,7 @@ import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
@@ -23,6 +24,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -123,6 +125,19 @@ public class InspectionApiController implements InspectionApiEndpoint {
   @Override
   public ResponseEntity<Void> deleteMonitor(long inspectionId, long monitorId) {
     followUpService.deleteMonitor(inspectionId, monitorId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<CreatedResponse> addDocument(long inspectionId, MultipartFile file,
+      DocumentDetailsRequest details) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(new CreatedResponse(followUpService.addDocument(inspectionId, file, details)));
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteDocument(long inspectionId, long fileId) {
+    followUpService.deleteDocument(inspectionId, fileId);
     return ResponseEntity.noContent().build();
   }
 }

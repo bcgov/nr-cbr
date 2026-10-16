@@ -155,6 +155,13 @@ describe('InspectionSearchService', () => {
     ['addInspectionMonitor', ['41', {}], 'POST', '/api/v1/inspections/41/monitors'],
     ['updateInspectionMonitor', ['41', '6', {}], 'PUT', '/api/v1/inspections/41/monitors/6'],
     ['deleteInspectionMonitor', ['41', '6'], 'DELETE', '/api/v1/inspections/41/monitors/6'],
+    [
+      'addInspectionDocument',
+      ['41', new File(['x'], 'x.jpg'), {}],
+      'POST',
+      '/api/v1/inspections/41/documents',
+    ],
+    ['deleteInspectionDocument', ['41', '9'], 'DELETE', '/api/v1/inspections/41/documents/9'],
   ] as const)('%s calls %s %s', async (name, args, method, url) => {
     const { service, request } = withMockedRequest();
 

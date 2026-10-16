@@ -37,8 +37,13 @@ type Props = {
   opened: boolean;
   /** The year the superstructure was installed; files from before it are hidden until asked. */
   yearBuilt: number | null;
-  /** Shown, not changed: no Add, Edit or Delete — the inspection page, until it is editable. */
-  readOnly?: boolean;
+  /**
+   * On an inspection's page: the inspection. Add then sits on its folder and files go to it;
+   * there is no Edit, as legacy's inspection tab has none.
+   */
+  inspection?: { id: string; date: string | null };
+  /** On an inspection's page: Reviewed or Accepted, so no Add — Delete stays, as legacy. */
+  addLocked?: boolean;
 };
 
 /** The documents of one folder — the structure's own, or one inspection's. */
@@ -214,18 +219,32 @@ const DocumentsTable: FC<TableProps> = ({
  * <p>"Add documents" sits in the structure folder's header, from Level 2 up, as legacy's button —
  * files added here are the structure's own. Each row offers Edit (its Photo View and description,
  * Level 1 up) and Delete (Level 2 up), an inspection's files too, as legacy's tab did.
+ *
+ * <p>On an inspection's page, legacy's inspection tab: Add (Level 1 up) on the inspection's folder,
+ * shown first, its files the inspection's; Delete (Level 2 up) on any file, at any status; no Edit. Add goes
+ * once the inspection is Reviewed or Accepted, as legacy disables its button.
  */
-const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt, readOnly = false }) => {
+const DocumentsTab: FC<Props> = ({
+  structureId,
+  opened,
+  yearBuilt,
+  inspection,
+  addLocked = false,
+}) => {
   const loaded = useStructureDocuments(structureId, opened);
   const [showEarly, setShowEarly] = useState(false);
   /** The file being fetched, so its link can say so and not be pressed twice. */
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
   const authorization = useAuthorization();
-  const canEdit = authorization.canEdit && !readOnly;
-  const canDelete = authorization.canDelete && !readOnly;
+  // On an inspection's page, legacy's: Add from Level 1 (its uploader), Delete Level 2, no Edit.
+  // On the structure page: Add and Delete Level 2, Edit Level 1.
+  const canAdd =
+    !addLocked && (inspection === undefined ? authorization.canDelete : authorization.canEdit);
+  const canEdit = inspection === undefined && authorization.canEdit;
+  const canDelete = authorization.canDelete;
   const { display } = useNotification();
-  const deleteDocument = useDeleteDocument(structureId);
+  const deleteDocument = useDeleteDocument(structureId, inspection?.id);
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<StructureDocument | null>(null);
   const [pendingDelete, setPendingDelete] = useState<StructureDocument | null>(null);
@@ -256,12 +275,27 @@ const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt, readOnly = fa
   const hidden = all.filter((document) => beforeInstall(document, yearBuilt)).length;
   const shown = showEarly ? all : all.filter((document) => !beforeInstall(document, yearBuilt));
   const groups = groupDocuments(shown);
-  // Add belongs to the structure's own folder, so that card is there to hold it even before the
-  // structure has a file of its own.
-  if (canDelete && groups.length > 0 && groups[0].key !== 'structure') {
-    groups.unshift({ key: 'structure', title: 'Structure Documents & Photos', documents: [] });
+  // Add belongs to the folder files are added to — the structure's own, or on an inspection's page
+  // the inspection's — so that card is there to hold it even before it has a file.
+  const addKey = inspection?.id ?? 'structure';
+  if (canAdd && groups.length > 0 && !groups.some((group) => group.key === addKey)) {
+    groups.unshift(
+      inspection
+        ? {
+            key: inspection.id,
+            title: `Inspection: ${formatShortDate(inspection.date) || 'No date yet'}`,
+            documents: [],
+          }
+        : { key: 'structure', title: 'Structure Documents & Photos', documents: [] },
+    );
   }
-  const addButton = canDelete && (
+  // On an inspection's page, its own folder first — the one its files go into — then legacy's
+  // order: the structure's, then each other inspection's.
+  if (inspection) {
+    const own = groups.findIndex((group) => group.key === inspection.id);
+    if (own > 0) groups.unshift(...groups.splice(own, 1));
+  }
+  const addButton = canAdd && (
     <Button
       kind="tertiary"
       size="sm"
@@ -289,6 +323,12 @@ const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt, readOnly = fa
 
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-documents-tab">
+      {/* Why there is no Add, where its absence alone would not say. */}
+      {addLocked && authorization.canEdit && (
+        <p className="structure-detail__card-note" data-testid="structure-documents-locked">
+          This inspection has been reviewed: documents and photos can no longer be added to it.
+        </p>
+      )}
       {hidden > 0 && (
         <Checkbox
           id="structure-show-early-documents"
@@ -325,7 +365,7 @@ const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt, readOnly = fa
             title={group.title}
             icon={Folder}
             testId={`structure-documents-${group.key}`}
-            action={group.key === 'structure' ? addButton : undefined}
+            action={group.key === addKey ? addButton : undefined}
           >
             {group.documents.length === 0 ? (
               <p className="structure-detail__empty">
@@ -346,7 +386,11 @@ const DocumentsTab: FC<Props> = ({ structureId, opened, yearBuilt, readOnly = fa
       )}
 
       {uploading && (
-        <UploadDocumentsDialog structureId={structureId} onClose={() => setUploading(false)} />
+        <UploadDocumentsDialog
+          structureId={structureId}
+          inspectionId={inspection?.id}
+          onClose={() => setUploading(false)}
+        />
       )}
       {editing !== null && (
         <EditDocumentDialog
