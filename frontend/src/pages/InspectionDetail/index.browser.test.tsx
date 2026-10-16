@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,6 +30,8 @@ const inspectionApi = vi.hoisted(() => ({
   deleteInspectionMonitor: vi.fn(),
   deleteInspectionDocument: vi.fn(),
   updateInspectionHazards: vi.fn(),
+  updateInspection: vi.fn(),
+  updateInspectionComment: vi.fn(),
 }));
 const structureApi = vi.hoisted(() => ({
   getStructure: vi.fn(),
@@ -37,8 +39,15 @@ const structureApi = vi.hoisted(() => ({
   getStructureRepairs: vi.fn(),
   getStructureMonitors: vi.fn(),
 }));
+const configurationApi = vi.hoisted(() => ({
+  getInspectionReportStatusCodes: vi.fn(),
+}));
 vi.mock('@/services/APIs', () => ({
-  default: { inspectionSearch: inspectionApi, structureSearch: structureApi },
+  default: {
+    inspectionSearch: inspectionApi,
+    structureSearch: structureApi,
+    configuration: configurationApi,
+  },
 }));
 
 const inspection = (
@@ -162,6 +171,12 @@ const page = (content: object[]) => ({
 });
 
 beforeEach(() => {
+  configurationApi.getInspectionReportStatusCodes.mockResolvedValue([
+    { code: 'PRO', description: 'In Progress' },
+    { code: 'REJ', description: 'Rejected' },
+    { code: 'RVD', description: 'Reviewed' },
+    { code: 'SUB', description: 'Submitted' },
+  ]);
   inspectionApi.getInspection.mockReset();
   inspectionApi.getInspection.mockResolvedValue(inspection());
   inspectionApi.getInspectionForm.mockResolvedValue(form);
@@ -557,6 +572,111 @@ describe('InspectionDetailPage', () => {
 
       expect(screen.getByTestId('inspection-section-hazards')).toBeInTheDocument();
       expect(screen.queryByTestId('hazards-edit')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('editing the Inspection tab, as legacy', () => {
+    const inProgress = () =>
+      inspection({
+        status: { code: 'PRO', description: 'In Progress' },
+        inspectorCompanyName: null,
+      });
+
+    it('submits it: In Progress or Submitted, and Submitted needs the company', async () => {
+      inspectionApi.getInspection.mockResolvedValue(inProgress());
+      inspectionApi.updateInspection.mockResolvedValue(undefined);
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      const status = screen.getByTestId('inspection-edit-statusCode');
+      await waitFor(() =>
+        expect(
+          within(status)
+            .getAllByRole('option')
+            .map((option) => option.textContent),
+        ).toEqual(['In Progress', 'Submitted']),
+      );
+      // One card at a time.
+      expect(screen.queryByTestId('comments-edit')).not.toBeInTheDocument();
+
+      fireEvent.change(status, { target: { value: 'SUB' } });
+      await userEvent.click(screen.getByTestId('inspection-save'));
+      expect(screen.getByTestId('inspection-section-inspection')).toMatchTextContent(
+        /Inspection Company Name is required\./,
+      );
+      expect(inspectionApi.updateInspection).not.toHaveBeenCalled();
+
+      await userEvent.type(screen.getByTestId('inspection-edit-inspectorCompanyName'), 'Bridges');
+      await userEvent.click(screen.getByTestId('inspection-save'));
+      await waitFor(() =>
+        expect(inspectionApi.updateInspection).toHaveBeenCalledWith(
+          '41',
+          expect.objectContaining({
+            statusCode: 'SUB',
+            inspectionDate: '2024-05-01',
+            inspectorName: 'Jo Smith',
+            inspectorCompanyName: 'Bridges',
+            cost: 1200,
+          }),
+        ),
+      );
+    });
+
+    it('will not blank what was given, even In Progress', async () => {
+      inspectionApi.getInspection.mockResolvedValue(inProgress());
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      await userEvent.clear(screen.getByTestId('inspection-edit-inspectorName'));
+      await userEvent.click(screen.getByTestId('inspection-save'));
+
+      expect(screen.getByTestId('inspection-section-inspection')).toMatchTextContent(
+        /Inspector Name is required\./,
+      );
+      await userEvent.click(screen.getByTestId('inspection-cancel'));
+      expect(screen.getByTestId('inspection-section-inspection')).toMatchTextContent(/Jo Smith/);
+    });
+
+    it('saves the comments', async () => {
+      inspectionApi.getInspection.mockResolvedValue(inProgress());
+      inspectionApi.updateInspectionComment.mockResolvedValue(undefined);
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      await userEvent.click(screen.getByTestId('comments-edit'));
+      const box = screen.getByTestId('inspection-edit-comment');
+      await userEvent.clear(box);
+      await userEvent.type(box, 'Deck re-planked.');
+      await userEvent.click(screen.getByTestId('inspection-comment-save'));
+
+      await waitFor(() =>
+        expect(inspectionApi.updateInspectionComment).toHaveBeenCalledWith(
+          '41',
+          'Deck re-planked.',
+        ),
+      );
+    });
+
+    it("shows a Rejected one's status read-only to all but a P.Eng", async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'REJ', description: 'Rejected' } }),
+      );
+      authorization.isPeng = false;
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      expect(screen.queryByTestId('inspection-edit-statusCode')).not.toBeInTheDocument();
+      authorization.isPeng = true;
+    });
+
+    it('offers no Edit once Reviewed, as legacy disables its page', async () => {
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      expect(screen.queryByTestId('inspection-edit')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('comments-edit')).not.toBeInTheDocument();
     });
   });
 

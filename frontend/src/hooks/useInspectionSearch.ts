@@ -1,6 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { InspectionHazardsRequest } from '@/pages/InspectionDetail/inspectionDetail';
+import type {
+  InspectionHazardsRequest,
+  InspectionUpdateRequest,
+} from '@/pages/InspectionDetail/inspectionDetail';
 import type {
   InspectionSearchCriteria,
   InspectionSearchResult,
@@ -89,6 +92,28 @@ export const useUpdateInspectionHazards = (inspectionId: string) => {
   const mutation = useMutation({
     mutationFn: (request: InspectionHazardsRequest) =>
       API.inspectionSearch.updateInspectionHazards(inspectionId, request),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Saves an inspection's Inspection card, then reads the inspection again. */
+export const useUpdateInspection = (inspectionId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: InspectionUpdateRequest) =>
+      API.inspectionSearch.updateInspection(inspectionId, request),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Saves an inspection's comments, then reads the inspection again. */
+export const useUpdateInspectionComment = (inspectionId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (comment: string) =>
+      API.inspectionSearch.updateInspectionComment(inspectionId, comment),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };

@@ -151,6 +151,21 @@ class InspectionApiEndpointTest {
   }
 
   @Test
+  @DisplayName("its Inspection card is PUT /{inspectionId}, its comments PUT …/comment, Level 0")
+  void editIsMappedAndGated() {
+    Method update = method("updateInspection");
+    Method comment = method("updateInspectionComment");
+
+    assertThat(update.getAnnotation(PutMapping.class).value()).containsExactly("/{inspectionId}");
+    assertThat(comment.getAnnotation(PutMapping.class).value())
+        .containsExactly("/{inspectionId}/comment");
+    assertThat(update.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+    assertThat(comment.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+  }
+
+  @Test
   @DisplayName("delete is DELETE /api/v1/inspections/{inspectionId}")
   void deleteIsMapped() {
     assertThat(deleteInspection().getAnnotation(DeleteMapping.class).value())

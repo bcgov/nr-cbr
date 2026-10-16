@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 import ca.bc.gov.nrs.cbr.endpoint.v1.InspectionApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionEditService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionHazardsService;
@@ -12,8 +13,10 @@ import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
@@ -49,12 +52,13 @@ public class InspectionApiController implements InspectionApiEndpoint {
   private final InspectionDetailService detailService;
   private final InspectionFollowUpService followUpService;
   private final InspectionHazardsService hazardsService;
+  private final InspectionEditService editService;
 
   public InspectionApiController(
       InspectionSearchService inspectionSearchService, InspectionService inspectionService,
       InspectionFormService formService, InspectionCreateService createService,
       InspectionDetailService detailService, InspectionFollowUpService followUpService,
-      InspectionHazardsService hazardsService) {
+      InspectionHazardsService hazardsService, InspectionEditService editService) {
     this.inspectionSearchService = inspectionSearchService;
     this.inspectionService = inspectionService;
     this.formService = formService;
@@ -62,6 +66,7 @@ public class InspectionApiController implements InspectionApiEndpoint {
     this.detailService = detailService;
     this.followUpService = followUpService;
     this.hazardsService = hazardsService;
+    this.editService = editService;
   }
 
   @Override
@@ -149,6 +154,20 @@ public class InspectionApiController implements InspectionApiEndpoint {
   @Override
   public ResponseEntity<Void> updateHazards(long inspectionId, HazardsUpdateRequest request) {
     hazardsService.update(inspectionId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> updateInspection(long inspectionId,
+      InspectionUpdateRequest request) {
+    editService.update(inspectionId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> updateInspectionComment(long inspectionId,
+      InspectionCommentRequest request) {
+    editService.updateComment(inspectionId, request);
     return ResponseEntity.noContent().build();
   }
 }

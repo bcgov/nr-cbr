@@ -139,4 +139,20 @@ public interface StructureInspectionRepository
          AND (status IS NULL OR status.inspectionReportStatusCode <> 'OFL')
       """)
   boolean existsOnDate(@Param("structureId") Long structureId, @Param("date") LocalDate date);
+
+  /**
+   * As {@link #existsOnDate}, leaving out the inspection being edited — legacy's same-date rule on
+   * its update, which skipped the inspection itself.
+   */
+  @Query("""
+      SELECT COUNT(inspection) > 0
+        FROM StructureInspectionEntity inspection
+        LEFT JOIN inspection.currentStatus status
+       WHERE inspection.crossingStructureId = :structureId
+         AND inspection.inspectionDate = :date
+         AND inspection.inspectionId <> :inspectionId
+         AND (status IS NULL OR status.inspectionReportStatusCode <> 'OFL')
+      """)
+  boolean existsOnDateExcept(@Param("structureId") Long structureId,
+      @Param("date") LocalDate date, @Param("inspectionId") Long inspectionId);
 }

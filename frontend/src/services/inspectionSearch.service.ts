@@ -2,6 +2,7 @@ import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type {
   InspectionDetailResponse,
   InspectionHazardsRequest,
+  InspectionUpdateRequest,
 } from '@/pages/InspectionDetail/inspectionDetail';
 import type {
   InspectionSearchCriteria,
@@ -229,6 +230,29 @@ export class InspectionSearchService extends HttpClient {
       url: '/v1/inspections/{inspectionId}/hazards',
       path: { inspectionId },
       body: request,
+    });
+  }
+
+  /** Saves an inspection's Inspection card. 400 with `fieldErrors`; 409 once it is reviewed. */
+  updateInspection(
+    inspectionId: string,
+    request: InspectionUpdateRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/inspections/{inspectionId}',
+      path: { inspectionId },
+      body: request,
+    });
+  }
+
+  /** Saves an inspection's comments. 400 with `fieldErrors`; 409 once it is reviewed. */
+  updateInspectionComment(inspectionId: string, comment: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/inspections/{inspectionId}/comment',
+      path: { inspectionId },
+      body: { comment },
     });
   }
 }
