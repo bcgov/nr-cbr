@@ -709,7 +709,7 @@ export type DocumentUploadOutcome = {
  * `file`, `attachmentTypeCode`, `createdDate` or `description` — and the rest are still sent.
  * `onProgress` is told how many have been sent before each request.
  */
-export const useAddDocuments = (structureId: string) => {
+export const useAddDocuments = (structureId: string, inspectionId?: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -720,15 +720,23 @@ export const useAddDocuments = (structureId: string) => {
       onProgress?: (sent: number) => void;
     }): Promise<DocumentUploadOutcome> => {
       const outcome: DocumentUploadOutcome = { added: [], failed: [] };
-      for (const [sent, upload] of uploads.entries()) {
+      // From an inspection's page, the inspection's — its own endpoint.
+      const send = (upload: DocumentUpload) =>
+        inspectionId === undefined
+          ? API.structureSearch.addDocument(structureId, upload.file, upload.details)
+          : API.inspectionSearch.addInspectionDocument(inspectionId, upload.file, upload.details);
+      // One at a time, each after the last: every request stays under the WAF's body limit, the
+      // progress counts file by file, and a refused file does not stop the rest.
+      await uploads.reduce(async (previous, upload, sent) => {
+        await previous;
         onProgress?.(sent);
         try {
-          await API.structureSearch.addDocument(structureId, upload.file, upload.details);
+          await send(upload);
           outcome.added.push(upload.key);
         } catch (error) {
           outcome.failed.push({ key: upload.key, error });
         }
-      }
+      }, Promise.resolve());
       return outcome;
     },
     onSuccess: ({ added }) =>
@@ -753,10 +761,16 @@ export const useUpdateDocument = (structureId: string) => {
 };
 
 /** Deletes a document and its file, then refreshes the structure's documents. */
-export const useDeleteDocument = (structureId: string): UseMutationResult<void, Error, string> => {
+export const useDeleteDocument = (
+  structureId: string,
+  inspectionId?: string,
+): UseMutationResult<void, Error, string> => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (fileId: string) => API.structureSearch.deleteDocument(structureId, fileId),
+    mutationFn: (fileId: string) =>
+      inspectionId === undefined
+        ? API.structureSearch.deleteDocument(structureId, fileId)
+        : API.inspectionSearch.deleteInspectionDocument(inspectionId, fileId),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'documents'] }),
   });

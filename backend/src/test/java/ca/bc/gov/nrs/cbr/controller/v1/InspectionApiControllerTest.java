@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
@@ -50,7 +51,15 @@ class InspectionApiControllerTest {
     assertThat(controller.deleteMonitor(42L, 6L).getStatusCode())
         .isEqualTo(HttpStatus.NO_CONTENT);
 
+    when(followUpService.addDocument(42L, null, null)).thenReturn("9");
+    var added = controller.addDocument(42L, null, null);
+    assertThat(added.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(added.getBody().id()).isEqualTo("9");
+    assertThat(controller.deleteDocument(42L, 9L).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+
     verify(followUpService).addRepair(42L, null);
+    verify(followUpService).deleteDocument(42L, 9L);
     verify(followUpService).deleteRepair(42L, 5L);
     verify(followUpService).deleteMonitor(42L, 6L);
   }

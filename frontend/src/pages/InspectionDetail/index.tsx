@@ -66,6 +66,8 @@ const TABS: { key: TabKey; label: string; icon: CarbonIconType }[] = [
 
 /** The statuses after which an inspection is no longer changed from its page — the server's too. */
 const LOCKING_STATUSES = new Set(['RVD', 'ACC', 'REJ']);
+/** The statuses after which no document is added from its page — legacy's, the server's too. */
+const DOCUMENT_LOCKING_STATUSES = new Set(['RVD', 'ACC']);
 
 const isOutstandingTab = (key: TabKey): key is OutstandingTab =>
   key === 'inspection' || key === 'condition' || key === 'hazards';
@@ -103,6 +105,8 @@ const InspectionDetailPage: FC = () => {
   const notFound = (loaded.error as { status?: number } | null)?.status === 404;
   /** Reviewed, Accepted or Rejected: its repairs and monitoring items are no longer changed here. */
   const locked = LOCKING_STATUSES.has(inspection?.status.code ?? '');
+  /** Reviewed or Accepted: no document added any more — legacy disables its Add then, not on Rejected. */
+  const documentsLocked = DOCUMENT_LOCKING_STATUSES.has(inspection?.status.code ?? '');
   /** What it still lacks, by tab — legacy's submit rules and every unanswered question. */
   const outstanding = inspection ? outstandingOf(inspection, form.data) : null;
   const counts = {
@@ -227,7 +231,8 @@ const InspectionDetailPage: FC = () => {
                       structureId={structureId}
                       opened={openedTabs.has('documents')}
                       yearBuilt={structure.data?.details.yearBuilt ?? null}
-                      readOnly
+                      inspection={{ id: inspection.id, date: inspection.inspectionDate }}
+                      addLocked={documentsLocked}
                     />
                   )}
                 </TabPanel>

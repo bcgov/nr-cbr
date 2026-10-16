@@ -27,6 +27,8 @@ import { byteLength, overLimitError } from '@/utils/textLimits';
 
 type Props = {
   structureId: string;
+  /** From an inspection's page: the files are the inspection's. */
+  inspectionId?: string;
   onClose: () => void;
 };
 
@@ -120,11 +122,11 @@ const hasErrors = (errors: RowErrors) => Object.values(errors).some(Boolean);
  * <p>Every rule is checked here before anything is sent; whatever the server still refuses lands
  * beside the file's field.
  */
-const UploadDocumentsDialog: FC<Props> = ({ structureId, onClose }) => {
+const UploadDocumentsDialog: FC<Props> = ({ structureId, inspectionId, onClose }) => {
   const types = useFileAttachmentTypeCodes();
   const extensionList = useDocumentExtensions();
   const extensions = new Set(extensionList.data ?? []);
-  const add = useAddDocuments(structureId);
+  const add = useAddDocuments(structureId, inspectionId);
   const { display } = useNotification();
 
   const [rows, setRows] = useState<Row[]>([]);

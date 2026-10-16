@@ -122,6 +122,24 @@ class InspectionApiEndpointTest {
   }
 
   @Test
+  @DisplayName("its documents: Level 1 adds, Level 2 deletes — legacy's, with no edit")
+  void documentsAreMappedAndGated() {
+    Method add = method("addDocument");
+    Method delete = method("deleteDocument");
+
+    assertThat(add.getAnnotation(PostMapping.class).value())
+        .containsExactly("/{inspectionId}/documents");
+    assertThat(delete.getAnnotation(DeleteMapping.class).value())
+        .containsExactly("/{inspectionId}/documents/{fileId}");
+    assertThat(add.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.CONTENT_EDIT);
+    assertThat(delete.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.DESTRUCTIVE);
+    assertThat(Arrays.stream(InspectionApiEndpoint.class.getDeclaredMethods())
+        .map(Method::getName)).doesNotContain("updateDocument");
+  }
+
+  @Test
   @DisplayName("delete is DELETE /api/v1/inspections/{inspectionId}")
   void deleteIsMapped() {
     assertThat(deleteInspection().getAnnotation(DeleteMapping.class).value())

@@ -9,9 +9,12 @@ import org.springframework.web.server.ResponseStatusException;
  */
 public class InspectionLockedException extends ResponseStatusException {
 
-  public InspectionLockedException(Long inspectionId, String status) {
+  /**
+   * @param status what it is — "Reviewed"
+   * @param what   what is refused — "its repairs … can no longer be changed from it"
+   */
+  public InspectionLockedException(Long inspectionId, String status, String what) {
     super(HttpStatus.CONFLICT,
-        "Inspection " + inspectionId + " is " + status + ": its repairs and monitoring items can "
-            + "no longer be changed from it.");
+        "Inspection " + inspectionId + " is " + status + ": " + what + ".");
   }
 }

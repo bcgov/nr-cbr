@@ -230,7 +230,8 @@ public class StructureDocumentsService {
   /**
    * Adds one file to the structure — legacy's Add on the Documents &amp; Photos tab
    * ({@code UploadAction}, {@code CBR.INSERT_FILE_ATTACHMENT_DETAIL} and
-   * {@code SET_FILE_ATTACHMENT}), as the structure's own: no inspection, as legacy's tab adds.
+   * {@code SET_FILE_ATTACHMENT}): the structure's own from its page, no inspection, as legacy's tab
+   * adds; from an inspection's page, the inspection's, as legacy's uploader is called with it.
    *
    * <p>The file comes with its details: a type ("Photo View"), the date it was made, and a
    * description, required for Other. At most 10 MB and of an extension in
@@ -241,13 +242,15 @@ public class StructureDocumentsService {
    * stays under the frontend WAF's body limit. As legacy, which committed file by file, a batch can
    * therefore be partly stored; the page keeps the files that were not.
    *
+   * @param inspectionId the inspection it was added from, or null from the structure page
    * @return the new document's id
    * @throws StructureNotFoundException if there is no such structure
    * @throws FieldValidationException   with a message for each field at fault, keyed {@code file},
    *     {@code attachmentTypeCode}, {@code createdDate} or {@code description}
    */
   @Transactional
-  public String upload(long structureId, MultipartFile part, DocumentDetailsRequest request) {
+  public String upload(long structureId, Long inspectionId, MultipartFile part,
+      DocumentDetailsRequest request) {
     if (!structures.existsById(structureId)) {
       throw new StructureNotFoundException(structureId);
     }
@@ -258,6 +261,7 @@ public class StructureDocumentsService {
     String name = part.getOriginalFilename().trim();
     CrossingStructureFileDetailEntity detail = CrossingStructureFileDetailEntity.builder()
         .crossingStructureId(structureId)
+        .inspectionId(inspectionId)
         .filename(name)
         .fileCreateDate(request.createdDate().atStartOfDay())
         .efileExtensionCode(extension(name))
