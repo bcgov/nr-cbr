@@ -24,6 +24,7 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import jakarta.persistence.EntityManager;
@@ -134,6 +135,24 @@ class InspectionFollowUpServiceTest {
     service.deleteRepair(41L, id);
     entityManager.flush();
     assertThat(entityManager.find(StructureRepairEntity.class, id)).isNull();
+  }
+
+  @Test
+  @DisplayName("edits and deletes any of the structure's monitoring items")
+  void editsAnyMonitor() {
+    inspection(41L, "PRO");
+    long id = Long.parseLong(
+        service.addMonitor(41L, new MonitorCreateRequest("ANN", null, "Watch scour")).id());
+
+    service.updateMonitor(41L, id, new MonitorUpdateRequest("SUG", "ANN", null, "Watch the scour"));
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(entityManager.find(StructureMonitorItemEntity.class, id).getDescription())
+        .isEqualTo("Watch the scour");
+
+    service.deleteMonitor(41L, id);
+    entityManager.flush();
+    assertThat(entityManager.find(StructureMonitorItemEntity.class, id)).isNull();
   }
 
   @Test
