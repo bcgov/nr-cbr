@@ -6,9 +6,11 @@ import type {
   InspectionSort,
   PagedResponse,
 } from '@/pages/InspectionSearch/types';
+import type { InspectionCreateRequest } from '@/pages/NewInspection/inspectionForm';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
+import { apiFieldErrors } from '@/utils/apiError';
 
 export const INSPECTION_SEARCH_QUERY_KEY = 'inspection-search';
 
@@ -69,4 +71,21 @@ export const useDeleteInspection = (): UseMutationResult<void, Error, string> =>
     mutationFn: (inspectionId: string) => API.inspectionSearch.deleteInspection(inspectionId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [INSPECTION_SEARCH_QUERY_KEY] }),
   });
+};
+
+/** The questions an inspection of the structure asks — Add Inspection's Condition tab. */
+export const useInspectionForm = (structureId: string | null) =>
+  useQuery({
+    queryKey: ['inspection-form', structureId],
+    queryFn: () => API.inspectionSearch.getInspectionForm(structureId as string),
+    enabled: Boolean(structureId),
+  });
+
+/** Adds an inspection. What the server refused comes back as `fieldErrors`, keyed by field. */
+export const useCreateInspection = () => {
+  const mutation = useMutation({
+    mutationFn: (request: InspectionCreateRequest) =>
+      API.inspectionSearch.createInspection(request),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };

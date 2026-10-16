@@ -210,6 +210,23 @@ class StructureInspectionsServiceTest {
     }
 
     @Test
+    @DisplayName("lists an inspection not dated yet first, never with the early ones")
+    void undatedFirst() {
+      givenStructure(7L, structure -> structure.yearBuilt(2010));
+      givenInspection(1L, 7L, LocalDate.of(2005, 6, 1));
+      givenInspection(2L, 7L, LocalDate.of(2015, 6, 1));
+      givenInspection(3L, 7L, null);
+      settle();
+
+      StructureInspectionsResponse response = service.inspections(7L, 0, 10, false);
+
+      assertThat(response.page().content()).extracting(Inspection::id).containsExactly("3", "2");
+      assertThat(response.beforeInstallCount()).isEqualTo(1);
+      assertThat(service.inspections(7L, 0, 10, true).page().content())
+          .extracting(Inspection::id).containsExactly("3", "2", "1");
+    }
+
+    @Test
     @DisplayName("lists every inspection when asked")
     void everyInspectionWhenAsked() {
       givenStructure(7L, structure -> structure.yearBuilt(2010));

@@ -174,9 +174,11 @@ const InspectionSearchResults: FC<Props> = ({
                   {/* The application's date format, not legacy's `yyyy/MM/dd`. This column used to
                       carry its own formatter for parity with `<fmt:formatDate>`; one format across
                       every screen is worth more than matching a table users are leaving behind.
-                      `formatShortDate` also returns '' for a missing date, which this column needs —
-                      `INSPECTION_DATE` is nullable. */}
-                  <TableCell>{formatShortDate(inspection.inspectionDate)}</TableCell>
+                      `INSPECTION_DATE` is nullable — an In Progress inspection may wait for its
+                      date — and says so, as the structure's Inspections table does. */}
+                  <TableCell>
+                    {formatShortDate(inspection.inspectionDate) || 'No date yet'}
+                  </TableCell>
                   {/* The site the structure sat at when the inspection happened, which is not
                       necessarily where it sits now — so it links to that site, not to the
                       structure's current one. */}

@@ -31,6 +31,8 @@ type Props = {
   structure: StructureDetailResponse;
   /** What is missing in this tab, by section. */
   outstanding: OutstandingGroup[];
+  /** `error` once adding an inspection has been refused for what is outstanding. */
+  outstandingTone?: 'neutral' | 'error';
 };
 
 /** `CROSSING_STRUCTURE_NAME VARCHAR2(14 BYTE)`. */
@@ -253,12 +255,16 @@ const siteHelper = (loading: boolean, siteId: string | undefined): string | unde
  * one field here, as on Site Detail. Inspection Status shows its code and description; legacy showed
  * the code alone.
  */
-const InformationTab: FC<Props> = ({ structure, outstanding }) => {
+const InformationTab: FC<Props> = ({ structure, outstanding, outstandingTone }) => {
   const { canEdit } = useAuthorization();
   const [editing, setEditing] = useState(false);
   return (
     <div className="structure-detail__tab-panel">
-      <OutstandingPanel groups={outstanding} />
+      <OutstandingPanel
+        groups={outstanding}
+        tone={outstandingTone}
+        blocking="adding an inspection"
+      />
       <Card
         title="Structure and site"
         icon={Location}

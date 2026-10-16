@@ -48,6 +48,10 @@ type Props = {
   complete: boolean;
   /** What is missing in this tab, by section. */
   outstanding: OutstandingGroup[];
+  /** `error` once adding an inspection has been refused for what is outstanding. */
+  outstandingTone?: 'neutral' | 'error';
+  /** Add Routine / Unplanned pressed while the structure is incomplete. */
+  onAddRefused: () => void;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -130,7 +134,8 @@ const InspectionsTable: FC<{ rows: StructureInspection[] }> = ({ rows }) => {
       </TableHead>
       <TableBody>
         {rows.map((inspection) => {
-          const date = formatShortDate(inspection.inspectionDate) || inspection.id;
+          // An In Progress inspection may wait for its date; it is listed first, and says so.
+          const date = formatShortDate(inspection.inspectionDate) || 'No date yet';
           return (
             <TableRow key={inspection.id} data-testid={`structure-inspection-${inspection.id}`}>
               <TableCell className="structure-detail__nowrap">
@@ -178,8 +183,8 @@ const InspectionsTable: FC<{ rows: StructureInspection[] }> = ({ rows }) => {
  */
 /**
  * The structure's inspections, with legacy's Add Routine Inspection (Level 1) and Add Unplanned
- * Inspection (Level 0) in the header. As legacy, both wait until the structure is complete; they
- * open a new inspection, saved only from there — a placeholder page until the form is built.
+ * Inspection (Level 0) in the header. As legacy, both wait until the structure is complete — pressed
+ * before then, the page's outstanding items turn red; once complete, they open Add Inspection.
  */
 const InspectionsCard: FC<{
   structureId: string;
@@ -187,7 +192,8 @@ const InspectionsCard: FC<{
   complete: boolean;
   /** Held while another card on the tab is being edited. */
   addDisabled: boolean;
-}> = ({ structureId, opened, complete, addDisabled }) => {
+  onAddRefused: () => void;
+}> = ({ structureId, opened, complete, addDisabled, onAddRefused }) => {
   const { canEdit, canWriteInspection } = useAuthorization();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
@@ -219,8 +225,16 @@ const InspectionsCard: FC<{
   const rows = response?.page.content ?? [];
   const hidden = response?.beforeInstallCount ?? 0;
 
-  const addInspection = (type: 'ROUT' | 'UNP') =>
-    navigate(`/inspection/new?structureId=${encodeURIComponent(structureId)}&type=${type}`);
+  // As legacy, a new inspection waits until the structure is complete. The buttons stay live, as
+  // nr-frep's submit does: pressed too early, the page's outstanding banner, counts and lists turn
+  // red and say why, where a disabled button would say nothing.
+  const addInspection = (type: 'ROUT' | 'UNP') => {
+    if (!complete) {
+      onAddRefused();
+      return;
+    }
+    void navigate(`/inspection/new?structureId=${encodeURIComponent(structureId)}&type=${type}`);
+  };
   const actions = (canEdit || canWriteInspection) && (
     <div className="structure-detail__card-actions">
       {canEdit && (
@@ -228,7 +242,7 @@ const InspectionsCard: FC<{
           kind="tertiary"
           size="sm"
           renderIcon={Add}
-          disabled={!complete || addDisabled}
+          disabled={addDisabled}
           data-testid="inspection-add-routine"
           onClick={() => addInspection('ROUT')}
         >
@@ -239,7 +253,7 @@ const InspectionsCard: FC<{
         kind="tertiary"
         size="sm"
         renderIcon={Add}
-        disabled={!complete || addDisabled}
+        disabled={addDisabled}
         data-testid="inspection-add-unplanned"
         onClick={() => addInspection('UNP')}
       >
@@ -304,9 +318,16 @@ const InspectionsCard: FC<{
  * legacy has them first, as the Details tab ends on its comments. Each card carries its own edit:
  * the schedule's Edit, the completed close proximity inspections' Add, and
  * the planned-inspection comments' Add and Edit, and the inspections' Add Routine and Add Unplanned
- * Inspection, which open the (placeholder) new-inspection page.
+ * Inspection, which open Add Inspection for this structure and type.
  */
-const InspectionsTab: FC<Props> = ({ structureId, opened, complete, outstanding }) => {
+const InspectionsTab: FC<Props> = ({
+  structureId,
+  opened,
+  complete,
+  outstanding,
+  outstandingTone,
+  onAddRefused,
+}) => {
   const schedule = useStructureInspectionSchedule(structureId, opened);
   /** The card being edited, if any — one at a time. */
   const [editing, setEditing] = useState<'schedule' | null>(null);
@@ -319,7 +340,11 @@ const InspectionsTab: FC<Props> = ({ structureId, opened, complete, outstanding 
 
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-inspections-tab">
-      <OutstandingPanel groups={outstanding} />
+      <OutstandingPanel
+        groups={outstanding}
+        tone={outstandingTone}
+        blocking="adding an inspection"
+      />
       {schedule.isError && (
         <InlineNotification
           kind="error"
@@ -357,6 +382,7 @@ const InspectionsTab: FC<Props> = ({ structureId, opened, complete, outstanding 
         opened={opened}
         complete={complete}
         addDisabled={editing !== null}
+        onAddRefused={onAddRefused}
       />
       {/* Last, as the Details tab ends on its comments. */}
       {schedule.data && (

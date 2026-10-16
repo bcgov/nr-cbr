@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from '@carbon/icons-react';
+import { ChevronDown, ChevronUp, ErrorFilled } from '@carbon/icons-react';
 import { useId, useState } from 'react';
 
 import type { OutstandingGroup } from './format';
@@ -6,6 +6,16 @@ import type { FC } from 'react';
 
 type Props = {
   groups: OutstandingGroup[];
+  /** The disclosure's wording; what the structure is missing by default. */
+  heading?: string;
+  testId?: string;
+  /**
+   * `error` once a save has been refused for these items: the line turns red with an error icon,
+   * in step with the tab counts and the banner — nr-frep's pattern. The items keep their colour.
+   */
+  tone?: 'neutral' | 'error';
+  /** What the red items are blocking, for screen readers: `save` by default. */
+  blocking?: string;
 };
 
 /**
@@ -16,25 +26,37 @@ type Props = {
  * per-visit choice. Grouped by the section (card) of the tab each field is in, so the list says
  * where to go: "Replacement Details — Estimated Load Restriction (year)".
  */
-const OutstandingPanel: FC<Props> = ({ groups }) => {
+const OutstandingPanel: FC<Props> = ({
+  groups,
+  heading = 'Outstanding in this tab',
+  testId = 'structure-outstanding-panel',
+  tone = 'neutral',
+  blocking = 'save',
+}) => {
   const [open, setOpen] = useState(true);
   const contentId = useId();
 
   const total = groups.reduce((sum, group) => sum + group.items.length, 0);
   if (total === 0) return null;
   const noun = total === 1 ? 'item' : 'items';
+  const blockingNote = tone === 'error' ? `, blocking ${blocking}` : '';
+  const toggleClass =
+    tone === 'error'
+      ? 'structure-detail__outstanding-toggle structure-detail__outstanding-toggle--error'
+      : 'structure-detail__outstanding-toggle';
 
   return (
-    <div className="structure-detail__outstanding" data-testid="structure-outstanding-panel">
+    <div className="structure-detail__outstanding" data-testid={testId}>
       <button
         type="button"
-        className="structure-detail__outstanding-toggle"
+        className={toggleClass}
         aria-expanded={open}
         aria-controls={contentId}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
-        Outstanding in this tab
-        <span className="cds--visually-hidden">{` (${total} ${noun})`}</span>
+        {tone === 'error' && <ErrorFilled size={16} />}
+        {heading}
+        <span className="cds--visually-hidden">{` (${total} ${noun}${blockingNote})`}</span>
         {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
       {open && (

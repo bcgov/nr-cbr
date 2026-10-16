@@ -128,4 +128,23 @@ describe('InspectionSearchService', () => {
       expect.objectContaining({ url: '/api/v1/inspections/42', method: 'DELETE' }),
     );
   });
+
+  it("asks for a structure's inspection questions", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getInspectionForm('7');
+
+    expect(urlOf(request)).toContain('/api/v1/inspections/form?structureId=7');
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ method: 'GET' }));
+  });
+
+  it('posts a new inspection', async () => {
+    const { service, request } = withMockedRequest();
+    const body = { structureId: 7, typeCode: 'UNP', statusCode: 'PRO' };
+
+    await service.createInspection(body as Parameters<typeof service.createInspection>[0]);
+
+    expect(urlOf(request)).toContain('/api/v1/inspections');
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', data: body }));
+  });
 });

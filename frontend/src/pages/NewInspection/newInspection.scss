@@ -1,0 +1,111 @@
+@use '@carbon/react/scss/spacing' as *;
+
+// As Add Site's and Add Structure's: Cancel and Save at the right of the heading.
+.new-inspection__header-actions {
+  display: flex;
+  align-self: center;
+  flex-shrink: 0;
+  gap: $spacing-03;
+  margin-inline-start: auto;
+}
+
+// A question: its wording, its answer and its comment on one row; stacked on a narrow screen.
+.new-inspection__questions {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-04;
+}
+
+.new-inspection__question {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 2fr);
+  align-items: start;
+  gap: $spacing-05;
+
+  @media (max-width: 671px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.new-inspection__comment {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-02;
+
+  > :last-child {
+    flex: 1;
+    min-inline-size: 0;
+  }
+}
+
+// A fixed slot, so the comment boxes line up whether or not one is marked required.
+.new-inspection__comment-mark {
+  inline-size: 0.5rem;
+  padding-block-start: $spacing-03;
+}
+
+.new-inspection__question-label {
+  padding-block-start: $spacing-03;
+}
+
+// A span's or pier's block in a card: a rule and a clear heading above each, so one ends visibly
+// before the next begins.
+.new-inspection__part {
+  margin-block-start: $spacing-07;
+  padding-block-start: $spacing-06;
+  border-block-start: 1px solid var(--cds-border-subtle-01);
+}
+
+.new-inspection__part-title {
+  margin: 0 0 $spacing-05;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+// A span's stringers, each a block headed "Stringer N", indented under the span.
+.new-inspection__stringers {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-06;
+  margin-block-start: $spacing-07;
+}
+
+.new-inspection__stringer {
+  padding-inline-start: $spacing-05;
+  border-inline-start: 3px solid var(--cds-border-subtle-01);
+}
+
+.new-inspection__stringer-title {
+  margin: 0 0 $spacing-04;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+// The five hazards in a row, each as wide as its label. The card's own gap spaces the rows, so no
+// margin of its own; Carbon's checkbox wrappers grow to share the row and offset the first one —
+// both undone.
+.new-inspection__hazards {
+  margin: 0;
+  border: none;
+  padding: 0;
+
+  .new-inspection__hazard-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-03 $spacing-07;
+  }
+
+  .cds--checkbox-wrapper {
+    flex: none;
+    margin: 0;
+  }
+}
+
+// Every card on this page is a form, so every field is grey (field-01) on the white card, as a
+// structure-page card's fields are once it is edited — the Structure # and the Condition answers too.
+.new-inspection .structure-detail__card {
+  --cds-field: var(--cds-field-01);
+  --cds-field-hover: var(--cds-field-hover-01);
+  --cds-border-subtle: var(--cds-border-subtle-01);
+}

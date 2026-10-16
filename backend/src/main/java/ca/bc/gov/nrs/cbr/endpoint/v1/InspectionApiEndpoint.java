@@ -1,6 +1,9 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
@@ -13,6 +16,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -95,4 +100,29 @@ public interface InspectionApiEndpoint {
   @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
   @DeleteMapping("/{inspectionId}")
   ResponseEntity<Void> deleteInspection(@PathVariable("inspectionId") Long inspectionId);
+
+  /**
+   * The questions an inspection of the structure asks — Add Inspection's Condition tab — and the
+   * spans and piers to answer them for.
+   *
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — whoever may add an inspection.
+   * <b>404</b> when there is no such structure.
+   *
+   * @param structureId the {@code CROSSING_STRUCTURE_ID}
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @GetMapping("/form")
+  InspectionFormResponse inspectionForm(@RequestParam(name = "structureId") long structureId);
+
+  /**
+   * Adds an inspection, In Progress — Add Inspection.
+   *
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
+   * {@code /saveInspection}; a Routine inspection needs Level 1, checked by the service. <b>201</b>
+   * with the new inspection's id; <b>404</b> when there is no such structure; <b>400</b> with
+   * {@code fieldErrors} keyed by field ({@code inspectionDate}, {@code items.DECK.Q1.span-12}, …).
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PostMapping
+  ResponseEntity<CreatedResponse> createInspection(@RequestBody InspectionCreateRequest request);
 }

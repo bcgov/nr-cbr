@@ -19,7 +19,7 @@ import {
   Tabs,
   Tag,
 } from '@carbon/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 
 import PageTitle from '@/components/core/PageTitle';
@@ -112,6 +112,9 @@ const StructureDetailPage: FC = () => {
    * By name, not by place: where a tab sits depends on whether the structure is a bridge.
    */
   const [openedTabs, setOpenedTabs] = useState<ReadonlySet<TabKey>>(new Set(['information']));
+  /** Add Inspection was pressed on the incomplete structure: what is outstanding turns red. */
+  const [addRefused, setAddRefused] = useState(false);
+  const summaryRef = useRef<HTMLDivElement>(null);
 
   const structure = loaded.data;
   const name = structure?.structureName || linkState?.structureName || structureId || '';
@@ -133,6 +136,11 @@ const StructureDetailPage: FC = () => {
     'repairs',
     'monitoring',
   ];
+  const tabsWithOutstanding = (['SITE', 'DETAILS', 'INSPECTIONS'] as const).filter(
+    (section) => countIn(section) > 0,
+  ).length;
+  const refused = addRefused && outstandingTotal > 0;
+  const tone = refused ? 'error' : 'neutral';
   const notFound = (loaded.error as { status?: number } | null)?.status === 404;
 
   return (
@@ -196,7 +204,13 @@ const StructureDetailPage: FC = () => {
         <>
           {outstandingTotal > 0 && (
             <Column sm={4} md={8} lg={16}>
-              <OutstandingSummary total={outstandingTotal} />
+              <div ref={summaryRef}>
+                <OutstandingSummary
+                  total={outstandingTotal}
+                  tabs={tabsWithOutstanding}
+                  refused={refused}
+                />
+              </div>
             </Column>
           )}
 
@@ -219,7 +233,12 @@ const StructureDetailPage: FC = () => {
                         {TAB_SECTIONS[key] ? (
                           <span className="structure-detail__tab-label">
                             {label}
-                            <TabCount count={countIn(TAB_SECTIONS[key])} section={label} />
+                            <TabCount
+                              count={countIn(TAB_SECTIONS[key])}
+                              section={label}
+                              tone={tone}
+                              blocking="adding an inspection"
+                            />
                           </span>
                         ) : (
                           label
@@ -232,10 +251,18 @@ const StructureDetailPage: FC = () => {
                   {tabs.map((key) => (
                     <TabPanel key={key}>
                       {key === 'information' && (
-                        <InformationTab structure={structure} outstanding={outstandingIn('SITE')} />
+                        <InformationTab
+                          structure={structure}
+                          outstanding={outstandingIn('SITE')}
+                          outstandingTone={tone}
+                        />
                       )}
                       {key === 'details' && (
-                        <DetailsTab structure={structure} outstanding={outstandingIn('DETAILS')} />
+                        <DetailsTab
+                          structure={structure}
+                          outstanding={outstandingIn('DETAILS')}
+                          outstandingTone={tone}
+                        />
                       )}
                       {key === 'spans-and-piers' && (
                         <SpansAndPiersTab
@@ -250,6 +277,15 @@ const StructureDetailPage: FC = () => {
                           opened={openedTabs.has('inspections')}
                           complete={outstandingTotal === 0}
                           outstanding={outstandingIn('INSPECTIONS')}
+                          outstandingTone={tone}
+                          onAddRefused={() => {
+                            setAddRefused(true);
+                            // The banner is above the tabs, likely scrolled past by now.
+                            summaryRef.current?.scrollIntoView?.({
+                              behavior: 'smooth',
+                              block: 'center',
+                            });
+                          }}
                         />
                       )}
                       {key === 'repairs' && (

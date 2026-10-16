@@ -80,7 +80,9 @@ public interface StructureInspectionRepository
    * {@code FIND_INSPECTIONS_BY_STRUCTURE}.
    *
    * <p>Without {@code includeAll}, only inspections dated after {@code after} — 1 January of the
-   * year the superstructure was installed. Joined inner to the current status, as legacy is, so an
+   * year the superstructure was installed — and those not dated yet: an In Progress inspection may
+   * wait for its date, and is the newest work on the structure, so it is listed first. Legacy hid
+   * them with the early ones. Joined inner to the current status, as legacy is, so an
    * inspection with no status history is not listed; the status and its code are fetched with the
    * page rather than one row at a time.
    */
@@ -90,15 +92,18 @@ public interface StructureInspectionRepository
         JOIN FETCH inspection.currentStatus status
         LEFT JOIN FETCH status.statusCode
        WHERE inspection.crossingStructureId = :structureId
-         AND (:includeAll = TRUE OR inspection.inspectionDate > :after)
-       ORDER BY inspection.inspectionDate DESC, inspection.inspectionId DESC
+         AND (:includeAll = TRUE OR inspection.inspectionDate IS NULL
+              OR inspection.inspectionDate > :after)
+       ORDER BY CASE WHEN inspection.inspectionDate IS NULL THEN 0 ELSE 1 END,
+                inspection.inspectionDate DESC, inspection.inspectionId DESC
       """,
       countQuery = """
       SELECT COUNT(inspection)
         FROM StructureInspectionEntity inspection
         JOIN inspection.currentStatus status
        WHERE inspection.crossingStructureId = :structureId
-         AND (:includeAll = TRUE OR inspection.inspectionDate > :after)
+         AND (:includeAll = TRUE OR inspection.inspectionDate IS NULL
+              OR inspection.inspectionDate > :after)
       """)
   Page<StructureInspectionEntity> findPageByStructure(
       @Param("structureId") Long structureId,
@@ -108,15 +113,30 @@ public interface StructureInspectionRepository
 
   /**
    * How many of a structure's inspections {@link #findPageByStructure} leaves out without
-   * {@code includeAll}: those dated on or before {@code after}, or not dated at all.
+   * {@code includeAll}: those dated on or before {@code after}. One not dated yet is listed.
    */
   @Query("""
       SELECT COUNT(inspection)
         FROM StructureInspectionEntity inspection
         JOIN inspection.currentStatus status
        WHERE inspection.crossingStructureId = :structureId
-         AND (inspection.inspectionDate IS NULL OR inspection.inspectionDate <= :after)
+         AND inspection.inspectionDate <= :after
       """)
   long countBeforeInstall(
       @Param("structureId") Long structureId, @Param("after") LocalDate after);
+
+  /**
+   * Whether the structure already has an inspection on this date — legacy's same-date rule
+   * (InspectionForm.java:276-299), offline ({@code OFL}) inspections aside. An inspection with no
+   * status history counts.
+   */
+  @Query("""
+      SELECT COUNT(inspection) > 0
+        FROM StructureInspectionEntity inspection
+        LEFT JOIN inspection.currentStatus status
+       WHERE inspection.crossingStructureId = :structureId
+         AND inspection.inspectionDate = :date
+         AND (status IS NULL OR status.inspectionReportStatusCode <> 'OFL')
+      """)
+  boolean existsOnDate(@Param("structureId") Long structureId, @Param("date") LocalDate date);
 }

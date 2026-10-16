@@ -195,6 +195,8 @@ describe('InspectionSearchResults', () => {
     expect(screen.getByText('S-00123')).toBeInTheDocument();
     // The pill falls back to the raw code when the description is missing.
     expect(screen.getByText('SUB')).toBeInTheDocument();
+    // An In Progress inspection may wait for its date, and says so.
+    expect(screen.getByText('No date yet')).toBeInTheDocument();
   });
 
   it('shows the surviving half of the project file rather than a stranded hyphen', () => {

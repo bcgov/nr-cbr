@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.model.v1;
 
+import ca.bc.gov.nrs.cbr.model.id.AssignableSequence;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -7,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -21,10 +23,9 @@ import org.hibernate.annotations.JoinFormula;
 /**
  * {@code THE.STRUCTURE_INSPECTION} — one inspection of one structure.
  *
- * <p><b>Only the columns Inspection Search reads.</b> The real table is wide — channel measurements,
- * five hazard indicators, costs, comments — and the inspection form engine hangs off it through
- * {@code INSPECTION_ITEM}. None of that is mapped, because the only thing reading this today is the
- * search. The rest arrives with the inspection screens.
+ * <p>Inspection Search reads a few columns; Add Inspection writes the rest — the inspector, cost,
+ * comments, channel measurements and five hazard indicators. The answered questions hang off it in
+ * {@code STRUCTURE_INSPECTION_ITEM}.
  *
  * <p>Not {@code @Immutable}: CBR owns the table and will write to it. The constraint that searching
  * never writes is stated on
@@ -43,6 +44,7 @@ import org.hibernate.annotations.JoinFormula;
 public class StructureInspectionEntity {
 
   @Id
+  @AssignableSequence
   @Column(name = "INSPECTION_ID")
   private Long inspectionId;
 
@@ -82,6 +84,67 @@ public class StructureInspectionEntity {
 
   @Column(name = "CROSSING_STRUCTURE_ID")
   private Long crossingStructureId;
+
+  // The inspection form's own fields — Add Inspection writes them.
+
+  @Column(name = "INSPECTOR_COMPANY_NAME", length = 255)
+  private String inspectorCompanyName;
+
+  /** Whole dollars, {@code NUMBER(6)}. */
+  @Column(name = "INSPECTION_COST")
+  private Long inspectionCost;
+
+  /** Professional Inspection Required? — Y/N, a Level 2 user's to set. */
+  @Column(name = "PENG_INSPECTION_REQ_IND", length = 1)
+  private String pengInspectionReqInd;
+
+  @Column(name = "INSPECTION_COMMENT", length = 4000)
+  private String inspectionComment;
+
+  @Column(name = "PENG_COMMENT", length = 4000)
+  private String pengComment;
+
+  /** Estimated Present Water Level Depth (m). */
+  @Column(name = "CHANNEL_PWL_DEPTH")
+  private BigDecimal channelPwlDepth;
+
+  /** Estimated Present Water Level Width (m). */
+  @Column(name = "CHANNEL_PWL_WIDTH")
+  private BigDecimal channelPwlWidth;
+
+  /** Estimated High Water Level Clearance (m). */
+  @Column(name = "CHANNEL_HWL_CLEARANCE")
+  private BigDecimal channelHwlClearance;
+
+  @Column(name = "HIGH_WATER_HAZARD_IND", length = 1)
+  private String highWaterHazardInd;
+
+  @Column(name = "DEBRIS_HAZARD_IND", length = 1)
+  private String debrisHazardInd;
+
+  @Column(name = "SCOUR_HAZARD_IND", length = 1)
+  private String scourHazardInd;
+
+  @Column(name = "ICE_HAZARD_IND", length = 1)
+  private String iceHazardInd;
+
+  @Column(name = "AGGRADATION_HAZARD_IND", length = 1)
+  private String aggradationHazardInd;
+
+  @Column(name = "HAZARD_COMMENT", length = 2000)
+  private String hazardComment;
+
+  @Column(name = "ENTRY_USERID", length = 30, updatable = false)
+  private String entryUserid;
+
+  @Column(name = "ENTRY_TIMESTAMP", updatable = false)
+  private LocalDateTime entryTimestamp;
+
+  @Column(name = "UPDATE_USERID", length = 30)
+  private String updateUserid;
+
+  @Column(name = "UPDATE_TIMESTAMP")
+  private LocalDateTime updateTimestamp;
 
   /** The structure inspected, and through it the site — both needed by every results row. */
   @ManyToOne(fetch = FetchType.LAZY)

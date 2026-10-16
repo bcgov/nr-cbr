@@ -187,9 +187,9 @@
 // Scoped away from the current link rather than reset afterwards, because
 // `a.cds--side-nav__link--current` is the less specific of the two selectors and would lose.
 .side-nav-drawer {
-  a.#{vars.$bcgov-prefix}--side-nav__link:not(
-      .#{vars.$bcgov-prefix}--side-nav__link--current
-    ):not([aria-current='page']),
+  a.#{vars.$bcgov-prefix}--side-nav__link:not(.#{vars.$bcgov-prefix}--side-nav__link--current):not(
+      [aria-current='page']
+    ),
   .#{vars.$bcgov-prefix}--side-nav__submenu {
     font-weight: 400;
   }

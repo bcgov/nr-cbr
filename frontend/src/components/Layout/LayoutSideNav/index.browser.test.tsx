@@ -45,7 +45,12 @@ vi.mock('@/routes/routePaths', () => ({
           id: 'Profile',
           path: 'profile',
           isMenuItem: true,
-          activeFor: ['user/:userId'],
+          activeFor: ['user/:userId', ':anything'],
+        },
+        {
+          id: 'Password',
+          path: 'password',
+          isMenuItem: true,
         },
       ],
     },
@@ -140,8 +145,18 @@ describe('LayoutSideNav', () => {
     expect(screen.getByText('Profile').closest('a')).toHaveClass('cds--side-nav__link--current');
   });
 
+  it("lights only the entry whose own page it is, though another's pattern matches it", async () => {
+    // As /inspection/new: Inspection Search's `:inspectionId` matches it, Add Inspection owns it.
+    await renderWithProviders('/settings/password');
+
+    expect(screen.getByText('Password').closest('a')).toHaveClass('cds--side-nav__link--current');
+    expect(screen.getByText('Profile').closest('a')).not.toHaveClass(
+      'cds--side-nav__link--current',
+    );
+  });
+
   it('marks nothing on a page no entry claims', async () => {
-    await renderWithProviders('/settings/elsewhere');
+    await renderWithProviders('/settings/somewhere/else');
 
     expect(screen.getByText('Profile').closest('a')).not.toHaveClass(
       'cds--side-nav__link--current',

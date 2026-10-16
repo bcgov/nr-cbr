@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -103,4 +104,18 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
       @Param("outstandingOnly") boolean outstandingOnly,
       @Param("outstandingStatuses") Collection<String> outstandingStatuses,
       @Param("installed") LocalDate installed);
+
+  /**
+   * The structure's repairs a new inspection carries forward — legacy's Inspection.save
+   * (Inspection.java:281-330): not Completed or Not Required, and not already carried forward.
+   */
+  @Query("""
+      SELECT repair
+        FROM StructureRepairEntity repair
+       WHERE repair.crossingStructureId = :structureId
+         AND (repair.repairStatusCode IS NULL OR repair.repairStatusCode NOT IN ('COM', 'NRQ'))
+         AND repair.carriedForwardInd = 'N'
+       ORDER BY repair.repairNumber
+      """)
+  List<StructureRepairEntity> findToCarryForward(@Param("structureId") Long structureId);
 }

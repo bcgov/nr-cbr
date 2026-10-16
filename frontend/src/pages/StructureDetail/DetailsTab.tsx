@@ -22,6 +22,8 @@ import { useAuthorization } from '@/hooks/useAuthorization';
 type Props = {
   structure: StructureDetailResponse;
   outstanding: OutstandingGroup[];
+  /** `error` once adding an inspection has been refused for what is outstanding. */
+  outstandingTone?: 'neutral' | 'error';
 };
 
 /** Legacy's culvert type for a wood log culvert, which hides Culvert Type and Open Bottom. */
@@ -35,7 +37,7 @@ const WOOD_LOG_CULVERT = 'WLC';
  * bridge or culvert row. A field with nothing stored shows an em dash; legacy's invented values —
  * a next inspection a year out, "UNK" signs, a culvert frequency of 3 — are not reproduced.
  */
-const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
+const DetailsTab: FC<Props> = ({ structure, outstanding, outstandingTone }) => {
   const { details, bridge, culvert, loadRating, replacement } = structure;
 
   /** The card being edited, if any — one at a time, as nr-fspts' sections. */
@@ -58,7 +60,11 @@ const DetailsTab: FC<Props> = ({ structure, outstanding }) => {
 
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-details-tab">
-      <OutstandingPanel groups={outstanding} />
+      <OutstandingPanel
+        groups={outstanding}
+        tone={outstandingTone}
+        blocking="adding an inspection"
+      />
 
       <StructureCard
         structureId={structure.id}

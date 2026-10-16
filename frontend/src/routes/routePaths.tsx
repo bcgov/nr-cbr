@@ -273,8 +273,8 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
       {
         path: 'inspection-search',
         id: 'Inspection Search',
-        // An inspection's page, and a new inspection.
-        activeFor: ['new', ':inspectionId'],
+        // An inspection's page. A new one is Add Inspection's, below.
+        activeFor: [':inspectionId'],
         element: (
           <ProtectedRoute>
             <Layout>
@@ -288,11 +288,12 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         roles: [...ROLE_CAPABILITIES.read],
       },
       {
-        // Reached from a structure's Inspections tab — Add Routine / Add Unplanned Inspection —
-        // with `?structureId=&type=ROUT|UNP`. A placeholder for now — see the page. Ranked above
-        // `:inspectionId` by react-router, a static segment winning over a parameter.
+        // Second in the legacy Inspection menu, after Inspection Search (cbr-navigation.local.md
+        // §1). Also reached from a structure's Inspections tab — Add Routine / Add Unplanned
+        // Inspection — with `?structureId=&type=ROUT|UNP`, which fix the structure and type.
+        // Ranked above `:inspectionId` by react-router, a static segment winning over a parameter.
         path: 'new',
-        id: 'New Inspection',
+        id: 'Add Inspection',
         element: (
           <ProtectedRoute>
             <Layout>
@@ -300,9 +301,10 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
             </Layout>
           </ProtectedRoute>
         ),
-        isSideMenu: false,
-        // Legacy gate: /level0Access for Unplanned, /level1Access for Routine — the floor here is
-        // Level 0; the tab offers Routine from Level 1 only.
+        isSideMenu: true,
+        // Legacy gate: the menu entry is /showInspection + /saveInspection — both, so the blank form
+        // is not offered to someone who cannot save it — which is Level 0 and up; not CBR_ADMIN.
+        // From the tab: /level0Access for Unplanned, /level1Access for Routine.
         roles: [...ROLE_CAPABILITIES.inspectionWrite],
       },
       {
