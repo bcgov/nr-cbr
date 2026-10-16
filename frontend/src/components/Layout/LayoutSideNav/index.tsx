@@ -49,14 +49,17 @@ export const LayoutSideNav: FC = () => {
 
   /**
    * Whether the user is on this child's page, or on a page that belongs to it — a structure's page
-   * under Structure Search. Its own page wins: `/inspection/inspection-search` would otherwise also
-   * match Inspection Search's `:inspectionId`, which is harmless, as it is the same entry.
+   * under Structure Search. A child's own page wins: on `/inspection/new` (Add Inspection's) the
+   * pattern Inspection Search claims, `:inspectionId`, also matches, and must not light it too.
    */
-  const isOnChild = (route: MenuItem, child: MenuItem) =>
-    childPath(route.path, child) === location.pathname ||
-    (child.activeFor ?? []).some((pattern) =>
+  const isOnChild = (route: MenuItem, child: MenuItem) => {
+    const ownPage = (each: MenuItem) => childPath(route.path, each) === location.pathname;
+    if (ownPage(child)) return true;
+    if (route.children?.some(ownPage)) return false;
+    return (child.activeFor ?? []).some((pattern) =>
       Boolean(matchPath({ path: `${route.path}/${pattern}`, end: true }, location.pathname)),
     );
+  };
 
   /** The child of this section the user is on, if they are on one. */
   const activeChild = (route: MenuItem) => route.children?.find((child) => isOnChild(route, child));

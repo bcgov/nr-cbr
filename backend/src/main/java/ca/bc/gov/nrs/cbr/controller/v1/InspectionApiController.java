@@ -1,13 +1,19 @@
 package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.InspectionApiEndpoint;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
+import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,11 +31,16 @@ public class InspectionApiController implements InspectionApiEndpoint {
 
   private final InspectionSearchService inspectionSearchService;
   private final InspectionService inspectionService;
+  private final InspectionFormService formService;
+  private final InspectionCreateService createService;
 
   public InspectionApiController(
-      InspectionSearchService inspectionSearchService, InspectionService inspectionService) {
+      InspectionSearchService inspectionSearchService, InspectionService inspectionService,
+      InspectionFormService formService, InspectionCreateService createService) {
     this.inspectionSearchService = inspectionSearchService;
     this.inspectionService = inspectionService;
+    this.formService = formService;
+    this.createService = createService;
   }
 
   @Override
@@ -44,5 +55,15 @@ public class InspectionApiController implements InspectionApiEndpoint {
   public ResponseEntity<Void> deleteInspection(Long inspectionId) {
     inspectionService.delete(inspectionId);
     return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public InspectionFormResponse inspectionForm(long structureId) {
+    return formService.form(structureId);
+  }
+
+  @Override
+  public ResponseEntity<CreatedResponse> createInspection(InspectionCreateRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED).body(createService.create(request));
   }
 }

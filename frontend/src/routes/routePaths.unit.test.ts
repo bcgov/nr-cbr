@@ -89,13 +89,22 @@ describe('getMenuEntries', () => {
     expect(inspection?.children?.[0].path).toBe('inspection-search');
   });
 
-  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
-    'shows Inspection Search to %s — every role that can read',
+  it.each(['CBR_GENERAL', 'CBR_ADMIN'])('shows Inspection Search alone to %s', (role) => {
+    // /showInspectionSearch sits at the GENERAL floor alongside /showSiteSearch; neither role can
+    // save an inspection, so Add Inspection is not offered.
+    expect(entry([role], 'Inspection')?.children?.map((c) => c.id)).toEqual(['Inspection Search']);
+  });
+
+  it.each(['CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'])(
+    'adds Add Inspection after Inspection Search for %s, as the legacy menu',
     (role) => {
-      // /showInspectionSearch sits at the GENERAL floor alongside /showSiteSearch.
-      expect(entry([role], 'Inspection')?.children?.map((c) => c.id)).toEqual([
+      // Legacy's entry needs /showInspection and /saveInspection — Level 0 and up.
+      const inspection = entry([role], 'Inspection');
+      expect(inspection?.children?.map((c) => c.id)).toEqual([
         'Inspection Search',
+        'Add Inspection',
       ]);
+      expect(inspection?.children?.[1].path).toBe('new');
     },
   );
 

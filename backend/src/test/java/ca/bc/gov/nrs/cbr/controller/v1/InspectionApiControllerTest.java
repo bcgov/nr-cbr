@@ -5,6 +5,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
@@ -25,8 +27,10 @@ class InspectionApiControllerTest {
 
   private final InspectionSearchService searchService = mock(InspectionSearchService.class);
   private final InspectionService inspectionService = mock(InspectionService.class);
+  private final InspectionFormService formService = mock(InspectionFormService.class);
+  private final InspectionCreateService createService = mock(InspectionCreateService.class);
   private final InspectionApiController controller =
-      new InspectionApiController(searchService, inspectionService);
+      new InspectionApiController(searchService, inspectionService, formService, createService);
 
   @Test
   @DisplayName("deleting answers 204 with no body, because nothing is left to return")

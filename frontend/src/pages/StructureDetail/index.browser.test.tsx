@@ -1374,7 +1374,7 @@ describe('StructureDetailPage — incomplete data', () => {
     await showing(incomplete());
 
     expect(screen.getByTestId('structure-outstanding-summary')).toMatchTextContent(
-      'Structure data is incomplete: 3 required items outstanding',
+      '3 required items outstanding across 2 tabs',
     );
   });
 
@@ -2562,19 +2562,32 @@ describe('StructureDetailPage — Inspections', () => {
       );
     });
 
-    it('waits until the structure is complete, as legacy, and says why', async () => {
+    it('waits until the structure is complete, as legacy: pressed early, the outstanding turns red', async () => {
       authorization.canWriteInspection = true;
       authorization.canEdit = true;
       await showing(
         bridge({ outstanding: [{ section: 'DETAILS', card: 'Bridge', label: 'Deck Width' }] }),
       );
       await openInspections();
-
-      expect(await screen.findByTestId('inspection-add-routine')).toBeDisabled();
-      expect(screen.getByTestId('inspection-add-unplanned')).toBeDisabled();
       expect(screen.getByTestId('inspection-add-note')).toMatchTextContent(
         'once the structure has nothing outstanding',
       );
+      expect(screen.getByTestId('structure-outstanding-summary')).toMatchTextContent(
+        '1 required item outstanding across 1 tab',
+      );
+
+      await userEvent.click(await screen.findByTestId('inspection-add-routine'));
+
+      // Not opened: the banner, the tab counts and the lists say why, in red.
+      expect(screen.queryByTestId('landed')).not.toBeInTheDocument();
+      expect(screen.getByTestId('structure-outstanding-summary')).toMatchTextContent(
+        /Inspection cannot be added.*All outstanding items must be complete first\./,
+      );
+      expect(
+        screen.getByRole('img', {
+          name: 'Details: 1 item outstanding, blocking adding an inspection',
+        }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -3026,6 +3039,25 @@ describe('StructureDetailPage — Inspections', () => {
     const link = within(row).getByRole('link', { name: 'Jun 1, 2023 (opens in a new tab)' });
     expect(link).toHaveAttribute('href', '/inspection/41');
     expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('links an inspection not dated yet as "No date yet"', async () => {
+    api.getStructureInspections.mockResolvedValue(
+      inspectionsPage([
+        inspection('42', {
+          inspectionDate: null,
+          status: { code: 'PRO', description: 'In Progress' },
+        }),
+      ]),
+    );
+    await showing(bridge());
+
+    await openInspections();
+    const row = await screen.findByTestId('structure-inspection-42');
+
+    expect(
+      within(row).getByRole('link', { name: 'No date yet (opens in a new tab)' }),
+    ).toHaveAttribute('href', '/inspection/42');
   });
 
   it('offers no link to an inspection still out on the offline client', async () => {

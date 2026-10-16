@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
@@ -72,6 +73,20 @@ class InspectionApiEndpointTest {
     assertThat(method.getParameters()[0].getAnnotation(Valid.class))
         .as("criteria are bound without @Valid")
         .isNotNull();
+  }
+
+  @Test
+  @DisplayName("Add Inspection's questions are GET /form and its save POST, both Level 0 and up")
+  void addInspectionIsMappedAndGated() {
+    Method form = method("inspectionForm");
+    Method create = method("createInspection");
+
+    assertThat(form.getAnnotation(GetMapping.class).value()).containsExactly("/form");
+    assertThat(create.getAnnotation(PostMapping.class).value()).isEmpty();
+    assertThat(form.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+    assertThat(create.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
   }
 
   @Test

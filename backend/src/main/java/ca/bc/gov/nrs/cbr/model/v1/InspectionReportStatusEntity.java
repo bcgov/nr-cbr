@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.model.v1;
 
+import ca.bc.gov.nrs.cbr.model.id.AssignableSequence;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -52,6 +53,7 @@ public class InspectionReportStatusEntity {
    * ordered correctly; two rows inserted out of sequence would not be, but nothing inserts them.
    */
   @Id
+  @AssignableSequence
   @Column(name = "INSPECTION_REPORT_STATUS_ID")
   private Long inspectionReportStatusId;
 

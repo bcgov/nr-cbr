@@ -204,6 +204,14 @@ $page-bottom: 2rem;
   }
 }
 
+.structure-detail__outstanding-toggle--error {
+  color: var(--cds-text-error);
+
+  &:hover {
+    color: var(--cds-text-error);
+  }
+}
+
 .structure-detail__outstanding-body {
   margin-block-start: $spacing-03;
 }

@@ -6,6 +6,11 @@ import type {
   PagedResponse,
 } from '@/pages/InspectionSearch/types';
 
+import type {
+  InspectionCreateRequest,
+  InspectionFormResponse,
+} from '@/pages/NewInspection/inspectionForm';
+
 import { HttpClient, type APIConfig } from '@/config/api/types';
 import { sortParams } from '@/utils/headerSort';
 
@@ -48,6 +53,24 @@ export class InspectionSearchService extends HttpClient {
       query: { ...populated(criteria), pageNumber, pageSize, ...sortParams(sort) },
     });
   }
+  /** The questions an inspection of the structure asks, and its spans and piers. */
+  getInspectionForm(structureId: string): CancelablePromise<InspectionFormResponse> {
+    return this.doRequest<InspectionFormResponse>(this.config, {
+      method: 'GET',
+      url: '/v1/inspections/form',
+      query: { structureId },
+    });
+  }
+
+  /** Adds an inspection, In Progress. 400 with `fieldErrors` keyed by field. */
+  createInspection(request: InspectionCreateRequest): CancelablePromise<{ id: string }> {
+    return this.doRequest<{ id: string }>(this.config, {
+      method: 'POST',
+      url: '/v1/inspections',
+      body: request,
+    });
+  }
+
   /**
    * Deletes an offline inspection.
    *
