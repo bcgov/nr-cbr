@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
@@ -31,8 +32,28 @@ class InspectionApiControllerTest {
   private final InspectionFormService formService = mock(InspectionFormService.class);
   private final InspectionCreateService createService = mock(InspectionCreateService.class);
   private final InspectionDetailService detailService = mock(InspectionDetailService.class);
+  private final InspectionFollowUpService followUpService = mock(InspectionFollowUpService.class);
   private final InspectionApiController controller = new InspectionApiController(
-      searchService, inspectionService, formService, createService, detailService);
+      searchService, inspectionService, formService, createService, detailService,
+      followUpService);
+
+  @Test
+  @DisplayName("the inspection's repairs and monitors reach the follow-up service")
+  void followUpDelegates() {
+    assertThat(controller.addRepair(42L, null).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(controller.updateRepair(42L, 5L, null).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(controller.deleteRepair(42L, 5L).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(controller.addMonitor(42L, null).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(controller.updateMonitor(42L, 6L, null).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(controller.deleteMonitor(42L, 6L).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+
+    verify(followUpService).addRepair(42L, null);
+    verify(followUpService).deleteRepair(42L, 5L);
+    verify(followUpService).deleteMonitor(42L, 6L);
+  }
 
   @Test
   @DisplayName("reading an inspection reaches the detail service")

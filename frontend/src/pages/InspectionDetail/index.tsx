@@ -64,6 +64,9 @@ const TABS: { key: TabKey; label: string; icon: CarbonIconType }[] = [
   { key: 'review', label: 'Review', icon: UserCertification },
 ];
 
+/** The statuses after which an inspection is no longer changed from its page — the server's too. */
+const LOCKING_STATUSES = new Set(['RVD', 'ACC', 'REJ']);
+
 const isOutstandingTab = (key: TabKey): key is OutstandingTab =>
   key === 'inspection' || key === 'condition' || key === 'hazards';
 
@@ -98,6 +101,8 @@ const InspectionDetailPage: FC = () => {
     ? `Inspection ${date} — ${inspection.structureName ?? ''}`.replace(/ — $/, '')
     : `Inspection ${inspectionId}`;
   const notFound = (loaded.error as { status?: number } | null)?.status === 404;
+  /** Reviewed, Accepted or Rejected: its repairs and monitoring items are no longer changed here. */
+  const locked = LOCKING_STATUSES.has(inspection?.status.code ?? '');
   /** What it still lacks, by tab — legacy's submit rules and every unanswered question. */
   const outstanding = inspection ? outstandingOf(inspection, form.data) : null;
   const counts = {
@@ -232,7 +237,7 @@ const InspectionDetailPage: FC = () => {
                       structureId={structureId}
                       opened={openedTabs.has('repairs')}
                       inspectionId={inspection.id}
-                      readOnly
+                      locked={locked}
                     />
                   )}
                 </TabPanel>
@@ -242,7 +247,7 @@ const InspectionDetailPage: FC = () => {
                       structureId={structureId}
                       opened={openedTabs.has('monitoring')}
                       inspectionId={inspection.id}
-                      readOnly
+                      locked={locked}
                     />
                   )}
                 </TabPanel>

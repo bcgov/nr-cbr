@@ -387,7 +387,7 @@ public class StructureApiController implements StructureApiEndpoint {
   public ResponseEntity<RepairCreatedResponse> createRepair(
       long structureId, RepairCreateRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(repairsService.create(structureId, request));
+        .body(repairsService.create(structureId, null, request));
   }
 
   @Override
@@ -415,7 +415,7 @@ public class StructureApiController implements StructureApiEndpoint {
   public ResponseEntity<MonitorCreatedResponse> createMonitor(
       long structureId, MonitorCreateRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(monitorsService.create(structureId, request));
+        .body(monitorsService.create(structureId, null, request));
   }
 
   @Override

@@ -354,7 +354,7 @@ class StructureMonitorsServiceTest {
     entityManager.clear();
 
     MonitorCreatedResponse created =
-        service.create(7L, new MonitorCreateRequest("OTH", "After freshet.", " Scour. "));
+        service.create(7L, null, new MonitorCreateRequest("OTH", "After freshet.", " Scour. "));
 
     assertThat(created.number()).isEqualTo(6L);
     StructureMonitorItemEntity monitor = stored(Long.parseLong(created.id()));
@@ -377,8 +377,8 @@ class StructureMonitorsServiceTest {
     givenCodes();
     entityManager.flush();
 
-    MonitorCreatedResponse first = service.create(7L, new MonitorCreateRequest(null, null, "A."));
-    MonitorCreatedResponse second = service.create(7L, new MonitorCreateRequest(null, null, "B."));
+    MonitorCreatedResponse first = service.create(7L, null, new MonitorCreateRequest(null, null, "A."));
+    MonitorCreatedResponse second = service.create(7L, null, new MonitorCreateRequest(null, null, "B."));
 
     assertThat(first.number()).isEqualTo(1L);
     assertThat(second.number()).isEqualTo(2L);
@@ -392,7 +392,7 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
 
     MonitorCreateRequest request = new MonitorCreateRequest("OTH", null, " ");
-    assertThatThrownBy(() -> service.create(7L, request))
+    assertThatThrownBy(() -> service.create(7L, null, request))
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors())
                 .containsOnlyKeys("frequencyComment", "description"));
@@ -403,7 +403,7 @@ class StructureMonitorsServiceTest {
   @DisplayName("refuses to add an item to a structure that does not exist")
   void createOnMissingStructure() {
     MonitorCreateRequest request = new MonitorCreateRequest(null, null, "A.");
-    assertThatThrownBy(() -> service.create(404L, request))
+    assertThatThrownBy(() -> service.create(404L, null, request))
         .isInstanceOf(StructureNotFoundException.class);
   }
 

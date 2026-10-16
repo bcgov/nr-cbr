@@ -208,15 +208,18 @@ public class StructureRepairsService {
    * {@code CBR.INSERT_REPAIR}).
    *
    * <p>As legacy: the repair is Suggested, stamped Suggested by the user, not carried forward, and
-   * belongs to no inspection; it takes the structure's next number (over every repair, those an
+   * belongs to the inspection it was added from — legacy's Repairs & Monitoring tab — or, from the
+   * structure page, to none; it takes the structure's next number (over every repair, those an
    * inspection raised included) and its id from {@code STRUCTURE_REPAIR_SEQ} through the entity's
    * generator. The priority, type, amounts and description are checked as an edit checks them.
    *
+   * @param inspectionId the inspection it was added from, or null from the structure page
    * @throws StructureNotFoundException if there is no such structure
    * @throws FieldValidationException   with a message for each field at fault
    */
   @Transactional
-  public RepairCreatedResponse create(long structureId, RepairCreateRequest request) {
+  public RepairCreatedResponse create(long structureId, Long inspectionId,
+      RepairCreateRequest request) {
     if (!structures.existsById(structureId)) {
       throw new StructureNotFoundException(structureId);
     }
@@ -231,6 +234,7 @@ public class StructureRepairsService {
     long number = repairs.findHighestNumber(structureId) + 1;
     StructureRepairEntity saved = repairs.save(StructureRepairEntity.builder()
         .crossingStructureId(structureId)
+        .inspectionId(inspectionId)
         .repairNumber(number)
         .repairStatusCode(SUGGESTED)
         .repairPriorityCode(priority)

@@ -19,6 +19,8 @@ import { byteLength, overLimitError } from '@/utils/textLimits';
 
 type Props = {
   structureId: string;
+  /** From an inspection's page: saved through it, and an added one raised by it. */
+  inspectionId?: string;
   /**
    * The item being edited, or null to add one. The dialog is mounted only while it is open, so it
    * opens fresh each time.
@@ -65,12 +67,12 @@ const validate = (values: MonitorUpdateRequest): Errors => {
  * <p>Errors sit beside their fields — the form's own rules on Save, then whatever the server refused.
  * A save that fails for no field's sake is a toast, as the app's other actions report one.
  */
-const MonitorDialog: FC<Props> = ({ structureId, monitor, onClose }) => {
+const MonitorDialog: FC<Props> = ({ structureId, inspectionId, monitor, onClose }) => {
   const adding = monitor === null;
   const statuses = useMonitoringStatusCodes();
   const frequencies = useMonitorFrequencyCodes();
-  const create = useCreateStructureMonitor(structureId);
-  const update = useUpdateStructureMonitor(structureId);
+  const create = useCreateStructureMonitor(structureId, inspectionId);
+  const update = useUpdateStructureMonitor(structureId, inspectionId);
   const saving = create.isPending || update.isPending;
   const { display } = useNotification();
 

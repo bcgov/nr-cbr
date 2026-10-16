@@ -532,7 +532,7 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    RepairCreatedResponse created = service.create(7L,
+    RepairCreatedResponse created = service.create(7L, null,
         new RepairCreateRequest(" H ", 4000L, "DECK", 12L, "  Replace planks.  "));
 
     assertThat(created.number()).isEqualTo(5L);
@@ -561,7 +561,7 @@ class StructureRepairsServiceTest {
   void firstNumber() {
     givenCodes();
 
-    assertThat(service.create(7L, new RepairCreateRequest("H", null, "DECK", null, null))
+    assertThat(service.create(7L, null, new RepairCreateRequest("H", null, "DECK", null, null))
         .number()).isEqualTo(1L);
   }
 
@@ -571,7 +571,7 @@ class StructureRepairsServiceTest {
     givenCodes();
 
     RepairCreateRequest request = new RepairCreateRequest(null, -5L, "800A", null, null);
-    assertThatThrownBy(() -> service.create(7L, request))
+    assertThatThrownBy(() -> service.create(7L, null, request))
         .isInstanceOfSatisfying(FieldValidationException.class, refused ->
             assertThat(refused.getFieldErrors())
                 .containsOnlyKeys("priorityCode", "estimate", "description"));
@@ -582,7 +582,7 @@ class StructureRepairsServiceTest {
   @DisplayName("adds nothing to a structure that does not exist")
   void createMissingStructure() {
     RepairCreateRequest request = new RepairCreateRequest("H", null, "DECK", null, null);
-    assertThatThrownBy(() -> service.create(404L, request))
+    assertThatThrownBy(() -> service.create(404L, null, request))
         .isInstanceOf(StructureNotFoundException.class);
   }
 

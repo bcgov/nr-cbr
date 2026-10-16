@@ -42,8 +42,11 @@ type Props = {
    * Inspection Items.
    */
   inspectionId?: string;
-  /** Shown, not changed: no Add, Edit or Delete — the inspection page, until it is editable. */
-  readOnly?: boolean;
+  /**
+   * On an inspection's page: the inspection has been Reviewed or Rejected, so nothing here changes
+   * any more — no Add, Edit or Delete.
+   */
+  locked?: boolean;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -167,17 +170,21 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit,
  * <p>Legacy's one viewing option drove both this tab and Repairs; each tab has its own here, so
  * choosing All on one does not change what the other lists.
  */
-const MonitoringTab: FC<Props> = ({ structureId, opened, inspectionId, readOnly = false }) => {
+const MonitoringTab: FC<Props> = ({ structureId, opened, inspectionId, locked = false }) => {
   const authorization = useAuthorization();
-  const canEdit = authorization.canEdit && !readOnly;
-  const canDelete = authorization.canDelete && !readOnly;
+  // On an inspection's page, legacy's: Level 0 adds and edits, as an inspector records them while
+  // inspecting; on the structure page, Level 1. Delete is Level 2's on either.
+  const canEdit =
+    !locked &&
+    (inspectionId === undefined ? authorization.canEdit : authorization.canWriteInspection);
+  const canDelete = !locked && authorization.canDelete;
   /**
    * The open dialog, if any: an item to edit, or `'new'` to add one. The dialog is mounted only
    * while it is open.
    */
   const [editing, setEditing] = useState<StructureMonitor | 'new' | null>(null);
   const { display } = useNotification();
-  const deleteMonitor = useDeleteStructureMonitor(structureId);
+  const deleteMonitor = useDeleteStructureMonitor(structureId, inspectionId);
   /** The item whose delete is being confirmed, if any. */
   const [pendingDelete, setPendingDelete] = useState<StructureMonitor | null>(null);
   const [view, setView] = useState<MonitorView>('OUTSTANDING');
@@ -199,6 +206,13 @@ const MonitoringTab: FC<Props> = ({ structureId, opened, inspectionId, readOnly 
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-monitoring-tab">
       <Card title="Monitoring" icon={View} testId="structure-section-monitoring">
+        {/* Why there is no Add, Edit or Delete, where their absence alone would not say. */}
+        {locked && (
+          <p className="structure-detail__card-note" data-testid="structure-monitors-locked">
+            This inspection has been reviewed: its monitoring items can no longer be changed from
+            it.
+          </p>
+        )}
         <div className="structure-detail__history-toggle">
           <RadioButtonGroup
             legendText="Choose Viewing Option"
@@ -303,6 +317,7 @@ const MonitoringTab: FC<Props> = ({ structureId, opened, inspectionId, readOnly 
         <MonitorDialog
           key={editing === 'new' ? 'new' : editing.id}
           structureId={structureId}
+          inspectionId={inspectionId}
           monitor={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
         />

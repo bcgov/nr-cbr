@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 import ca.bc.gov.nrs.cbr.endpoint.v1.InspectionApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
@@ -10,6 +11,12 @@ import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
@@ -36,16 +43,18 @@ public class InspectionApiController implements InspectionApiEndpoint {
   private final InspectionFormService formService;
   private final InspectionCreateService createService;
   private final InspectionDetailService detailService;
+  private final InspectionFollowUpService followUpService;
 
   public InspectionApiController(
       InspectionSearchService inspectionSearchService, InspectionService inspectionService,
       InspectionFormService formService, InspectionCreateService createService,
-      InspectionDetailService detailService) {
+      InspectionDetailService detailService, InspectionFollowUpService followUpService) {
     this.inspectionSearchService = inspectionSearchService;
     this.inspectionService = inspectionService;
     this.formService = formService;
     this.createService = createService;
     this.detailService = detailService;
+    this.followUpService = followUpService;
   }
 
   @Override
@@ -75,5 +84,45 @@ public class InspectionApiController implements InspectionApiEndpoint {
   @Override
   public InspectionDetailResponse getInspection(long inspectionId) {
     return detailService.findById(inspectionId);
+  }
+
+  @Override
+  public ResponseEntity<RepairCreatedResponse> addRepair(long inspectionId,
+      RepairCreateRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(followUpService.addRepair(inspectionId, request));
+  }
+
+  @Override
+  public ResponseEntity<Void> updateRepair(long inspectionId, long repairId,
+      RepairUpdateRequest request) {
+    followUpService.updateRepair(inspectionId, repairId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteRepair(long inspectionId, long repairId) {
+    followUpService.deleteRepair(inspectionId, repairId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<MonitorCreatedResponse> addMonitor(long inspectionId,
+      MonitorCreateRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(followUpService.addMonitor(inspectionId, request));
+  }
+
+  @Override
+  public ResponseEntity<Void> updateMonitor(long inspectionId, long monitorId,
+      MonitorUpdateRequest request) {
+    followUpService.updateMonitor(inspectionId, monitorId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> deleteMonitor(long inspectionId, long monitorId) {
+    followUpService.deleteMonitor(inspectionId, monitorId);
+    return ResponseEntity.noContent().build();
   }
 }

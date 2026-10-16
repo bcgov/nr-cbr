@@ -42,8 +42,11 @@ type Props = {
    * Inspection Items.
    */
   inspectionId?: string;
-  /** Shown, not changed: no Add, Edit or Delete — the inspection page, until it is editable. */
-  readOnly?: boolean;
+  /**
+   * On an inspection's page: the inspection has been Reviewed or Rejected, so nothing here changes
+   * any more — no Add, Edit or Delete.
+   */
+  locked?: boolean;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -176,12 +179,16 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, 
  * all of them, a page at a time from the server. Edit (Level 1 and up) and Delete (Level 2 and
  * up) from each row's Actions; Add (Level 1 and up) over the table.
  */
-const RepairsTab: FC<Props> = ({ structureId, opened, inspectionId, readOnly = false }) => {
+const RepairsTab: FC<Props> = ({ structureId, opened, inspectionId, locked = false }) => {
   const authorization = useAuthorization();
-  const canEdit = authorization.canEdit && !readOnly;
-  const canDelete = authorization.canDelete && !readOnly;
+  // On an inspection's page, legacy's: Level 0 adds and edits, as an inspector records them while
+  // inspecting; on the structure page, Level 1. Delete is Level 2's on either.
+  const canEdit =
+    !locked &&
+    (inspectionId === undefined ? authorization.canEdit : authorization.canWriteInspection);
+  const canDelete = !locked && authorization.canDelete;
   const { display } = useNotification();
-  const deleteRepair = useDeleteStructureRepair(structureId);
+  const deleteRepair = useDeleteStructureRepair(structureId, inspectionId);
   /** The repair whose delete is being confirmed, if any. */
   const [pendingDelete, setPendingDelete] = useState<StructureRepair | null>(null);
   /** The repair being edited, `'new'` while one is being added, or null. */
@@ -205,6 +212,12 @@ const RepairsTab: FC<Props> = ({ structureId, opened, inspectionId, readOnly = f
   return (
     <div className="structure-detail__tab-panel" data-testid="structure-repairs-tab">
       <Card title="Repairs" icon={Tools} testId="structure-section-repairs">
+        {/* Why there is no Add, Edit or Delete, where their absence alone would not say. */}
+        {locked && (
+          <p className="structure-detail__card-note" data-testid="structure-repairs-locked">
+            This inspection has been reviewed: its repairs can no longer be changed from it.
+          </p>
+        )}
         <div className="structure-detail__history-toggle">
           <RadioButtonGroup
             legendText="Choose Viewing Option"
@@ -308,6 +321,7 @@ const RepairsTab: FC<Props> = ({ structureId, opened, inspectionId, readOnly = f
         <RepairDialog
           key={editing === 'new' ? 'new' : editing.id}
           structureId={structureId}
+          inspectionId={inspectionId}
           repair={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
         />

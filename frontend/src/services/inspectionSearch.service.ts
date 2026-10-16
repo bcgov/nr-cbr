@@ -10,6 +10,14 @@ import type {
   InspectionCreateRequest,
   InspectionFormResponse,
 } from '@/pages/NewInspection/inspectionForm';
+import type {
+  MonitorCreateRequest,
+  MonitorUpdateRequest,
+} from '@/pages/StructureDetail/monitorsResponse';
+import type {
+  RepairCreateRequest,
+  RepairUpdateRequest,
+} from '@/pages/StructureDetail/repairsResponse';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
 import { sortParams } from '@/utils/headerSort';
@@ -102,6 +110,78 @@ export class InspectionSearchService extends HttpClient {
       method: 'DELETE',
       url: '/v1/inspections/{inspectionId}',
       path: { inspectionId },
+    });
+  }
+
+  /** Adds a repair from an inspection's page, raised by it. 409 once it is reviewed. */
+  addInspectionRepair(
+    inspectionId: string,
+    request: RepairCreateRequest,
+  ): CancelablePromise<{ id: string; number: number }> {
+    return this.doRequest<{ id: string; number: number }>(this.config, {
+      method: 'POST',
+      url: '/v1/inspections/{inspectionId}/repairs',
+      path: { inspectionId },
+      body: request,
+    });
+  }
+
+  /** Saves an edit to one of the structure's repairs, from an inspection's page. */
+  updateInspectionRepair(
+    inspectionId: string,
+    repairId: string,
+    request: RepairUpdateRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/inspections/{inspectionId}/repairs/{repairId}',
+      path: { inspectionId, repairId },
+      body: request,
+    });
+  }
+
+  /** Deletes one of the structure's repairs, from an inspection's page. */
+  deleteInspectionRepair(inspectionId: string, repairId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/inspections/{inspectionId}/repairs/{repairId}',
+      path: { inspectionId, repairId },
+    });
+  }
+
+  /** Adds a monitoring item from an inspection's page, raised by it. 409 once it is reviewed. */
+  addInspectionMonitor(
+    inspectionId: string,
+    request: MonitorCreateRequest,
+  ): CancelablePromise<{ id: string; number: number }> {
+    return this.doRequest<{ id: string; number: number }>(this.config, {
+      method: 'POST',
+      url: '/v1/inspections/{inspectionId}/monitors',
+      path: { inspectionId },
+      body: request,
+    });
+  }
+
+  /** Saves an edit to one of the structure's monitoring items, from an inspection's page. */
+  updateInspectionMonitor(
+    inspectionId: string,
+    monitorId: string,
+    request: MonitorUpdateRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/inspections/{inspectionId}/monitors/{monitorId}',
+      path: { inspectionId, monitorId },
+      body: request,
+    });
+  }
+
+  /** Deletes one of the structure's monitoring items, from an inspection's page. */
+  deleteInspectionMonitor(inspectionId: string, monitorId: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'DELETE',
+      url: '/v1/inspections/{inspectionId}/monitors/{monitorId}',
+      path: { inspectionId, monitorId },
     });
   }
 }

@@ -5,6 +5,12 @@ import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
@@ -18,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -138,4 +145,56 @@ public interface InspectionApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{inspectionId}")
   InspectionDetailResponse getInspection(@PathVariable("inspectionId") long inspectionId);
+
+  /**
+   * Adds a repair from the inspection's page — legacy's Add Repair on its Repairs & Monitoring
+   * tab. Suggested, the structure's next number, raised by this inspection.
+   *
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up: an inspector records
+   * repairs while inspecting. <b>201</b>; <b>404</b> when there is no such inspection; <b>409</b>
+   * once it is Reviewed or Rejected; <b>400</b> with {@code fieldErrors} when a field is refused.
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PostMapping("/{inspectionId}/repairs")
+  ResponseEntity<RepairCreatedResponse> addRepair(
+      @PathVariable("inspectionId") long inspectionId, @RequestBody RepairCreateRequest request);
+
+  /**
+   * Saves an edit to one of the structure's repairs, from the inspection's page — any of them, as
+   * legacy. Level 0 and up; <b>204</b>, <b>404</b>, <b>409</b> or <b>400</b> as adding.
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PutMapping("/{inspectionId}/repairs/{repairId}")
+  ResponseEntity<Void> updateRepair(@PathVariable("inspectionId") long inspectionId,
+      @PathVariable("repairId") long repairId, @RequestBody RepairUpdateRequest request);
+
+  /**
+   * Deletes one of the structure's repairs, from the inspection's page. Gated on
+   * {@link CbrAuthorities#DESTRUCTIVE} — Level 2 and up, legacy's regional engineer.
+   */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{inspectionId}/repairs/{repairId}")
+  ResponseEntity<Void> deleteRepair(@PathVariable("inspectionId") long inspectionId,
+      @PathVariable("repairId") long repairId);
+
+  /**
+   * Adds a monitoring item from the inspection's page — legacy's Add Monitor. Suggested, the
+   * structure's next number, raised by this inspection. Level 0 and up; as adding a repair.
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PostMapping("/{inspectionId}/monitors")
+  ResponseEntity<MonitorCreatedResponse> addMonitor(
+      @PathVariable("inspectionId") long inspectionId, @RequestBody MonitorCreateRequest request);
+
+  /** Saves an edit to one of the structure's monitoring items, from the inspection's page. */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PutMapping("/{inspectionId}/monitors/{monitorId}")
+  ResponseEntity<Void> updateMonitor(@PathVariable("inspectionId") long inspectionId,
+      @PathVariable("monitorId") long monitorId, @RequestBody MonitorUpdateRequest request);
+
+  /** Deletes one of the structure's monitoring items, from the inspection's page. Level 2 and up. */
+  @PreAuthorize(CbrAuthorities.DESTRUCTIVE)
+  @DeleteMapping("/{inspectionId}/monitors/{monitorId}")
+  ResponseEntity<Void> deleteMonitor(@PathVariable("inspectionId") long inspectionId,
+      @PathVariable("monitorId") long monitorId);
 }

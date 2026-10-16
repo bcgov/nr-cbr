@@ -568,11 +568,14 @@ export const useDeletePier = (structureId: string): UseMutationResult<void, Erro
  * Adds a monitoring item, then refreshes the structure's monitoring table. The fields the server
  * refused come back as `fieldErrors`, keyed as the request is.
  */
-export const useCreateStructureMonitor = (structureId: string) => {
+export const useCreateStructureMonitor = (structureId: string, inspectionId?: string) => {
   const queryClient = useQueryClient();
   const mutation = useMutation({
+    // From an inspection's page, raised by the inspection — its own endpoint.
     mutationFn: (request: MonitorCreateRequest) =>
-      API.structureSearch.createStructureMonitor(structureId, request),
+      inspectionId === undefined
+        ? API.structureSearch.createStructureMonitor(structureId, request)
+        : API.inspectionSearch.addInspectionMonitor(inspectionId, request),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
   });
@@ -583,11 +586,13 @@ export const useCreateStructureMonitor = (structureId: string) => {
  * Saves an edit to one monitoring item, then refreshes the structure's monitoring table. The
  * fields the server refused come back as `fieldErrors`, keyed as the request is.
  */
-export const useUpdateStructureMonitor = (structureId: string) => {
+export const useUpdateStructureMonitor = (structureId: string, inspectionId?: string) => {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: ({ monitorId, request }: { monitorId: string; request: MonitorUpdateRequest }) =>
-      API.structureSearch.updateStructureMonitor(structureId, monitorId, request),
+      inspectionId === undefined
+        ? API.structureSearch.updateStructureMonitor(structureId, monitorId, request)
+        : API.inspectionSearch.updateInspectionMonitor(inspectionId, monitorId, request),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
   });
@@ -609,11 +614,14 @@ export const useStructureRepairTypes = (structureId: string) =>
  * Adds a repair, then refreshes the structure's repairs table. The fields the server refused come
  * back as `fieldErrors`, keyed as the request is.
  */
-export const useCreateStructureRepair = (structureId: string) => {
+export const useCreateStructureRepair = (structureId: string, inspectionId?: string) => {
   const queryClient = useQueryClient();
   const mutation = useMutation({
+    // From an inspection's page, raised by the inspection — its own endpoint.
     mutationFn: (request: RepairCreateRequest) =>
-      API.structureSearch.createStructureRepair(structureId, request),
+      inspectionId === undefined
+        ? API.structureSearch.createStructureRepair(structureId, request)
+        : API.inspectionSearch.addInspectionRepair(inspectionId, request),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
   });
@@ -624,11 +632,13 @@ export const useCreateStructureRepair = (structureId: string) => {
  * Saves an edit to one repair, then refreshes the structure's repairs table. The fields the server
  * refused come back as `fieldErrors`, keyed as the request is.
  */
-export const useUpdateStructureRepair = (structureId: string) => {
+export const useUpdateStructureRepair = (structureId: string, inspectionId?: string) => {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: ({ repairId, request }: { repairId: string; request: RepairUpdateRequest }) =>
-      API.structureSearch.updateStructureRepair(structureId, repairId, request),
+      inspectionId === undefined
+        ? API.structureSearch.updateStructureRepair(structureId, repairId, request)
+        : API.inspectionSearch.updateInspectionRepair(inspectionId, repairId, request),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
   });
@@ -641,11 +651,14 @@ export const useUpdateStructureRepair = (structureId: string) => {
  */
 export const useDeleteStructureRepair = (
   structureId: string,
+  inspectionId?: string,
 ): UseMutationResult<void, Error, string> => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (repairId: string) =>
-      API.structureSearch.deleteStructureRepair(structureId, repairId),
+      inspectionId === undefined
+        ? API.structureSearch.deleteStructureRepair(structureId, repairId)
+        : API.inspectionSearch.deleteInspectionRepair(inspectionId, repairId),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
   });
@@ -657,11 +670,14 @@ export const useDeleteStructureRepair = (
  */
 export const useDeleteStructureMonitor = (
   structureId: string,
+  inspectionId?: string,
 ): UseMutationResult<void, Error, string> => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (monitorId: string) =>
-      API.structureSearch.deleteStructureMonitor(structureId, monitorId),
+      inspectionId === undefined
+        ? API.structureSearch.deleteStructureMonitor(structureId, monitorId)
+        : API.inspectionSearch.deleteInspectionMonitor(inspectionId, monitorId),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
   });
