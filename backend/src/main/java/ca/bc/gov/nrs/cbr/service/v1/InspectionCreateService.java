@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Nothing of the structure changes: an inspection not yet reviewed has no load rating and sets
  * no next inspection — those come with its review. Legacy also emailed a Submitted inspection's
- * report to TRIM; that waits for the inspection report (TODO in cbr-inspection-add.local.md).
+ * report to TRIM; that waits for the inspection report (cbr-inspection-add.local.md §10).
  */
 @Service
 public class InspectionCreateService {

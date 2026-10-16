@@ -309,4 +309,134 @@ describe('NewInspectionPage', () => {
     await userEvent.click(screen.getByTestId('inspection-save'));
     expect(inspectionApi.createInspection).not.toHaveBeenCalled();
   });
+
+  it('stacks each pier, and adds stringers to a span one at a time', async () => {
+    inspectionApi.getInspectionForm.mockResolvedValue({
+      ...form,
+      subsections: [
+        {
+          code: 'STR',
+          description: 'Stringers',
+          scope: 'SPAN',
+          questions: [
+            {
+              code: 'SQ',
+              description: 'Stringer condition',
+              perStringer: false,
+              answers: [{ code: 'G', description: 'Good' }],
+            },
+            { code: 'PEEL', description: 'Peeled', perStringer: true, answers: [] },
+          ],
+        },
+        {
+          code: 'PIER',
+          description: 'Piers',
+          scope: 'PIER',
+          questions: [
+            { code: 'PQ', description: 'Pier condition', perStringer: false, answers: [] },
+          ],
+        },
+      ],
+      spans: [{ id: '701', number: 1 }],
+      piers: [
+        { id: '801', number: 1 },
+        { id: '802', number: 2 },
+      ],
+    });
+    renderPage('?structureId=7&type=UNP');
+    await openTab('condition');
+
+    const piers = await screen.findByTestId('condition-PIER');
+    expect(within(piers).getByRole('heading', { name: 'Pier 2' })).toBeInTheDocument();
+
+    const span = screen.getByTestId('condition-STR-span-701');
+    expect(span).toMatchTextContent(/No stringers yet\./);
+    await userEvent.click(within(span).getByTestId('condition-STR-span-701-stringer-add'));
+    await userEvent.click(within(span).getByTestId('condition-STR-span-701-stringer-add'));
+    expect(within(span).getByRole('heading', { name: 'Stringer 2' })).toBeInTheDocument();
+
+    // A typed answer, for a question that lists none.
+    await userEvent.type(screen.getByTestId('items-STR-PEEL-span-701-stringer-2-answer'), 'Yes');
+    expect(screen.getByTestId('items-STR-PEEL-span-701-stringer-2-answer')).toHaveValue('Yes');
+  });
+
+  it('says when the bridge has no spans or piers recorded', async () => {
+    inspectionApi.getInspectionForm.mockResolvedValue({
+      ...form,
+      subsections: [
+        ...form.subsections,
+        {
+          code: 'PIER',
+          description: 'Piers',
+          scope: 'PIER',
+          questions: [
+            { code: 'PQ', description: 'Pier condition', perStringer: false, answers: [] },
+          ],
+        },
+      ],
+      spans: [],
+      piers: [],
+    });
+    renderPage('?structureId=7&type=UNP');
+    await openTab('condition');
+
+    expect(await screen.findByTestId('condition-DECK')).toMatchTextContent(
+      /This bridge has no spans recorded\./,
+    );
+    expect(screen.getByTestId('condition-PIER')).toMatchTextContent(
+      /This bridge has no piers recorded\./,
+    );
+  });
+
+  it('says when the structure is asked no questions, and before one is chosen', async () => {
+    inspectionApi.getInspectionForm.mockResolvedValue({ ...form, subsections: [] });
+    renderPage();
+    await openTab('condition');
+    expect(screen.getByTestId('condition-no-structure')).toBeInTheDocument();
+  });
+
+  it('warns past the hazard ranges and refuses a measurement that is not metres', async () => {
+    renderPage('?structureId=7&type=UNP');
+    await openTab('hazards');
+
+    await userEvent.type(screen.getByTestId('hazard-presentWaterDepth'), '25');
+    expect(screen.getByTestId('inspection-hazards')).toMatchTextContent(
+      /Estimated Present Water Level Depth is not in the range 0 through 20\./,
+    );
+    await userEvent.type(screen.getByTestId('hazard-presentWaterWidth'), 'wide');
+    await userEvent.tab();
+    expect(screen.getByTestId('inspection-hazards')).toMatchTextContent(
+      /Estimated Present Water Level Width must be metres/,
+    );
+    await userEvent.type(screen.getByTestId('hazard-comment'), 'Some debris');
+    expect(screen.getByTestId('hazard-comment')).toHaveValue('Some debris');
+  });
+
+  it('lets Level 2 set Professional Inspection Required', async () => {
+    authorization.canDelete = true;
+    renderPage('?structureId=7&type=UNP');
+
+    await userEvent.click(screen.getByText('Yes'));
+    await userEvent.type(screen.getByTestId('inspection-cost'), '1200');
+    await userEvent.type(screen.getByTestId('inspection-comment'), 'Looks fine');
+    expect(screen.getByRole('radio', { name: 'Yes' })).toBeChecked();
+    authorization.canDelete = false;
+  });
+
+  it("shows the server's refusal beside its field and in the tab's list", async () => {
+    inspectionApi.createInspection.mockRejectedValue({
+      status: 400,
+      body: { fieldErrors: { inspectionDate: 'Inspection with this date already exists.' } },
+    });
+    renderPage('?structureId=7&type=UNP');
+    await screen.findByText('B100');
+
+    await userEvent.click(screen.getByTestId('inspection-save'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('inspection-inspection-errors')).toMatchTextContent(
+        /Inspection with this date already exists\./,
+      ),
+    );
+  });
 });

@@ -34,6 +34,9 @@ import org.springframework.stereotype.Component;
 public class InspectionCreateValidator {
 
   static final String ROUTINE = "ROUT";
+  /** The fields more than one rule reports on. */
+  private static final String TYPE_CODE = "typeCode";
+  private static final String INSPECTION_DATE = "inspectionDate";
   static final String IN_PROGRESS = "PRO";
   static final String SUBMITTED = "SUB";
   /**
@@ -90,7 +93,7 @@ public class InspectionCreateValidator {
     checkStatus(errors, status);
     // Legacy's FRM.validate: past In Progress, the date, inspector and company are required.
     if (status != null && !IN_PROGRESS.equals(status)) {
-      required(errors, "inspectionDate", "Date of Inspection", request.inspectionDate());
+      required(errors, INSPECTION_DATE, "Date of Inspection", request.inspectionDate());
       required(errors, "inspectorName", "Inspector Name", trimmed(request.inspectorName()));
       required(errors, "inspectorCompanyName", "Inspection Company Name",
           trimmed(request.inspectorCompanyName()));
@@ -123,11 +126,11 @@ public class InspectionCreateValidator {
   /** Required and listed; Routine is Level 1's — Unplanned Level 0's, as the structure's buttons. */
   private void checkType(Map<String, String> errors, String type) {
     if (type == null) {
-      errors.put("typeCode", "Inspection Type is required.");
+      errors.put(TYPE_CODE, "Inspection Type is required.");
     } else if (!types.existsById(type)) {
-      errors.put("typeCode", "Inspection Type is not one of the listed types.");
+      errors.put(TYPE_CODE, "Inspection Type is not one of the listed types.");
     } else if (ROUTINE.equals(type) && !loggedUser.canEdit()) {
-      errors.put("typeCode", "Only Level 1 and up can add a Routine inspection.");
+      errors.put(TYPE_CODE, "Only Level 1 and up can add a Routine inspection.");
     }
   }
 
@@ -160,9 +163,9 @@ public class InspectionCreateValidator {
       return;
     }
     if (date.isAfter(LocalDate.now(ZoneId.systemDefault()))) {
-      errors.put("inspectionDate", "Date of Inspection must not be after today.");
+      errors.put(INSPECTION_DATE, "Date of Inspection must not be after today.");
     } else if (inspections.existsOnDate(request.structureId(), date)) {
-      errors.put("inspectionDate",
+      errors.put(INSPECTION_DATE,
           "Inspection with this date already exists. Please choose another Inspection date.");
     }
   }
@@ -205,13 +208,13 @@ public class InspectionCreateValidator {
       return label + " is not one of the listed answers.";
     }
     if (choices.isEmpty() && bytes(answer) > NAME_MAX) {
-      return label + " can be at most " + NAME_MAX + " characters.";
+      return atMost(label, NAME_MAX);
     }
     if (NEEDS_COMMENT.contains(answer) && comment == null) {
       return label + " requires a comment.";
     }
     return comment != null && bytes(comment) > TEXT_MAX
-        ? "The comment can be at most " + TEXT_MAX + " characters."
+        ? atMost("The comment", TEXT_MAX)
         : null;
   }
 
@@ -254,8 +257,13 @@ public class InspectionCreateValidator {
       String value, int max) {
     String text = trimmed(value);
     if (text != null && bytes(text) > max) {
-      errors.put(field, label + " can be at most " + max + " characters.");
+      errors.put(field, atMost(label, max));
     }
+  }
+
+  /** "Inspector Name can be at most 255 characters." */
+  private static String atMost(String subject, int max) {
+    return subject + " can be at most " + max + " characters.";
   }
 
   private static int bytes(String text) {

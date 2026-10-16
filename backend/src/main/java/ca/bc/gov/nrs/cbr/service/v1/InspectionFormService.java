@@ -67,7 +67,7 @@ public class InspectionFormService {
   static final String STRINGERS = "STR";
   static final String WOOD_BOX_CULVERT = "WDC";
   private static final String SUPERSTRUCTURE = "SS";
-  private static final String PIERS = "PIER";
+  private static final String PIER_GROUP = "PIER";
   private static final Set<String> PER_SPAN = Set.of("DECK", SUPERSTRUCTURE, STRINGERS);
   /** Superstructures inspected under Stringers rather than Superstructure. */
   private static final Set<String> STRINGER_SUPERSTRUCTURES = Set.of("LGST", "TT", "TU");
@@ -187,7 +187,7 @@ public class InspectionFormService {
     if (PER_SPAN.contains(subsectionCode)) {
       return Scope.SPAN;
     }
-    return PIERS.equals(subsectionCode) ? Scope.PIER : Scope.STRUCTURE;
+    return PIER_GROUP.equals(subsectionCode) ? Scope.PIER : Scope.STRUCTURE;
   }
 
   /** Legacy's tab rules: Piers with piers; Stringers or Superstructure by the superstructure. */
@@ -195,7 +195,7 @@ public class InspectionFormService {
     boolean stringerBridge = fit.superstructure() != null
         && STRINGER_SUPERSTRUCTURES.contains(fit.superstructure());
     return switch (subsectionCode) {
-      case PIERS -> hasPiers;
+      case PIER_GROUP -> hasPiers;
       case STRINGERS -> stringerBridge;
       case SUPERSTRUCTURE -> !stringerBridge;
       default -> true;

@@ -5,7 +5,6 @@ import type {
   InspectionSort,
   PagedResponse,
 } from '@/pages/InspectionSearch/types';
-
 import type {
   InspectionCreateRequest,
   InspectionFormResponse,
@@ -62,7 +61,7 @@ export class InspectionSearchService extends HttpClient {
     });
   }
 
-  /** Adds an inspection, In Progress. 400 with `fieldErrors` keyed by field. */
+  /** Adds an inspection, In Progress or Submitted. 400 with `fieldErrors` keyed by field. */
   createInspection(request: InspectionCreateRequest): CancelablePromise<{ id: string }> {
     return this.doRequest<{ id: string }>(this.config, {
       method: 'POST',
