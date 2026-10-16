@@ -8,8 +8,10 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionUpdateRequest;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -24,8 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The Inspection tab of an inspection's page, edited — legacy's Inspection tab on its update
- * ({@code cbr-inspection-page.local.md} §2, §8), a card at a time.
+ * The inspection's own record, edited from its page — legacy's Inspection and Hydraulic Hazards
+ * tabs on its update ({@code cbr-inspection-page.local.md} §2, §8), a card at a time. See
+ * {@link #updateHazards} for the hazards; the Inspection tab's rules:
  *
  * <ul>
  *   <li>Date of Inspection, Inspector Name and Inspection Company Name are required past In
@@ -51,11 +54,14 @@ public class InspectionEditService {
   private static final String SUBMITTED = "SUB";
   private static final String REJECTED = "REJ";
   private static final String STATUS_FIELD = "statusCode";
+  private static final String DATE_FIELD = "inspectionDate";
+  private static final String LOCKED = "it can no longer be changed from its page";
   private static final Set<String> EDITABLE_STATUSES = Set.of(IN_PROGRESS, SUBMITTED);
   private static final Map<String, String> LOCKING_STATUSES =
       Map.of("RVD", "Reviewed", "ACC", "Accepted");
   private static final int NAME_MAX = 255;
   private static final int COMMENT_MAX = 4000;
+  private static final int HAZARD_COMMENT_MAX = 2000;
   private static final long COST_MAX = 999_999L;
   private static final String YES = "Y";
 
@@ -97,7 +103,7 @@ public class InspectionEditService {
         .inspectorName(name)
         .inspectorCompanyName(company)
         .inspectionCost(request.cost())
-        .pengInspectionReqInd(professional ? YES : "N")
+        .pengInspectionReqInd(yesNo(professional))
         .updateUserid(user)
         .updateTimestamp(now)
         .build());
@@ -119,7 +125,7 @@ public class InspectionEditService {
     String status = request.statusCode();
     checkStatus(errors, current, status);
     boolean pastInProgress = status != null && !IN_PROGRESS.equals(status);
-    required(errors, "inspectionDate", "Date of Inspection", request.inspectionDate(),
+    required(errors, DATE_FIELD, "Date of Inspection", request.inspectionDate(),
         pastInProgress || inspection.getInspectionDate() != null);
     required(errors, "inspectorName", "Inspector Name", request.inspectorName(),
         pastInProgress || inspection.getInspectorName() != null);
@@ -135,9 +141,9 @@ public class InspectionEditService {
     if (cost != null && (cost < 0 || cost > COST_MAX)) {
       errors.put("cost", "Cost of Inspection must be whole dollars from $0 to $999,999.");
     }
+    boolean professional = Boolean.TRUE.equals(request.professionalInspectionRequired());
     boolean storedProfessional = YES.equals(inspection.getPengInspectionReqInd());
-    if (request.professionalInspectionRequired() != storedProfessional
-        && !loggedUser.canDestroy()) {
+    if (professional != storedProfessional && !loggedUser.canDestroy()) {
       errors.put("professionalInspectionRequired",
           "Only Level 2 and up can change Professional Inspection Required.");
     }
@@ -171,14 +177,75 @@ public class InspectionEditService {
     log.info("Updated the comments of inspection {}", inspectionId);
   }
 
+  /**
+   * Saves the Hydraulic Hazards tab: the three water measurements — metres, to one decimal place,
+   * from 0 to 99999.9, and required past In Progress or once given (legacy's "Required field.",
+   * which its save ignored) — the five hazards, and their comments, at most 2000. Legacy's range
+   * warnings stay warnings, on the page.
+   *
+   * @throws InspectionNotFoundException if there is no such inspection
+   * @throws InspectionLockedException   once it is Reviewed or Accepted
+   * @throws FieldValidationException    with a message for each field at fault
+   */
+  @Transactional
+  public void updateHazards(long inspectionId, HazardsUpdateRequest request) {
+    StructureInspectionEntity inspection = open(inspectionId);
+    validateHazards(request, statusOf(inspection), inspection);
+    inspections.save(inspection.toBuilder()
+        .channelPwlDepth(request.presentWaterDepth())
+        .channelPwlWidth(request.presentWaterWidth())
+        .channelHwlClearance(request.highWaterClearance())
+        .highWaterHazardInd(yesNo(request.highWater()))
+        .debrisHazardInd(yesNo(request.debris()))
+        .scourHazardInd(yesNo(request.scour()))
+        .iceHazardInd(yesNo(request.ice()))
+        .aggradationHazardInd(yesNo(request.aggradation()))
+        .hazardComment(InspectionCreateValidator.trimmed(request.comment()))
+        .updateUserid(loggedUser.getLoggedUserId())
+        .updateTimestamp(LocalDateTime.now(ZoneId.systemDefault()))
+        .build());
+    log.info("Updated the hydraulic hazards of inspection {}", inspectionId);
+  }
+
+  private static void validateHazards(HazardsUpdateRequest request, String status,
+      StructureInspectionEntity stored) {
+    Map<String, String> errors = new LinkedHashMap<>();
+    boolean pastInProgress = status != null && !IN_PROGRESS.equals(status);
+    measurement(errors, "presentWaterDepth", "Estimated Present Water Level Depth",
+        request.presentWaterDepth(), pastInProgress || stored.getChannelPwlDepth() != null);
+    measurement(errors, "presentWaterWidth", "Estimated Present Water Level Width",
+        request.presentWaterWidth(), pastInProgress || stored.getChannelPwlWidth() != null);
+    measurement(errors, "highWaterClearance", "Estimated High Water Level Clearance",
+        request.highWaterClearance(),
+        pastInProgress || stored.getChannelHwlClearance() != null);
+    InspectionCreateValidator.tooLong(errors, "hazardComment", "Comments", request.comment(),
+        HAZARD_COMMENT_MAX);
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Hydraulic hazards cannot be saved", errors);
+    }
+  }
+
+  /** Required when legacy marks it so; otherwise metres, when given. */
+  private static void measurement(Map<String, String> errors, String field, String label,
+      BigDecimal value, boolean required) {
+    if (value == null && required) {
+      errors.put(field, label + " is required.");
+    } else {
+      InspectionCreateValidator.metres(errors, field, label, value);
+    }
+  }
+
+  private static String yesNo(Boolean value) {
+    return Boolean.TRUE.equals(value) ? YES : "N";
+  }
+
   /** The inspection, once it is known to exist and not yet Reviewed or Accepted. */
   private StructureInspectionEntity open(long inspectionId) {
     StructureInspectionEntity inspection = inspections.findById(inspectionId)
         .orElseThrow(() -> new InspectionNotFoundException(inspectionId));
     String status = statusOf(inspection);
     if (status != null && LOCKING_STATUSES.containsKey(status)) {
-      throw new InspectionLockedException(inspectionId, LOCKING_STATUSES.get(status),
-          "it can no longer be changed from its page");
+      throw new InspectionLockedException(inspectionId, LOCKING_STATUSES.get(status), LOCKED);
     }
     return inspection;
   }
@@ -190,13 +257,12 @@ public class InspectionEditService {
   private void checkStatus(Map<String, String> errors, String current, String status) {
     if (status == null) {
       errors.put(STATUS_FIELD, "Inspection Report Status is required.");
-    } else if (status.equals(current)) {
-      return;
-    } else if (!EDITABLE_STATUSES.contains(status)) {
-      errors.put(STATUS_FIELD,
-          "Reviewed and Rejected are set by a P.Eng on the Review tab.");
-    } else if (REJECTED.equals(current) && !loggedUser.isPeng()) {
-      errors.put(STATUS_FIELD, "You do not have permission to change this status.");
+    } else if (!status.equals(current)) {
+      if (!EDITABLE_STATUSES.contains(status)) {
+        errors.put(STATUS_FIELD, "Reviewed and Rejected are set by a P.Eng on the Review tab.");
+      } else if (REJECTED.equals(current) && !loggedUser.isPeng()) {
+        errors.put(STATUS_FIELD, "You do not have permission to change this status.");
+      }
     }
   }
 
@@ -207,10 +273,10 @@ public class InspectionEditService {
       return;
     }
     if (date.isAfter(LocalDate.now(ZoneId.systemDefault()))) {
-      errors.put("inspectionDate", "Date of Inspection must not be after today.");
+      errors.put(DATE_FIELD, "Date of Inspection must not be after today.");
     } else if (inspections.existsOnDateExcept(inspection.getCrossingStructureId(), date,
         inspection.getInspectionId())) {
-      errors.put("inspectionDate",
+      errors.put(DATE_FIELD,
           "Inspection with this date already exists. Please choose another Inspection date.");
     }
   }

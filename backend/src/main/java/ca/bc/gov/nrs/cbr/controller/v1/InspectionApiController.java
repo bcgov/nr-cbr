@@ -6,7 +6,6 @@ import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionEditService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
-import ca.bc.gov.nrs.cbr.service.v1.InspectionHazardsService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
@@ -51,21 +50,19 @@ public class InspectionApiController implements InspectionApiEndpoint {
   private final InspectionCreateService createService;
   private final InspectionDetailService detailService;
   private final InspectionFollowUpService followUpService;
-  private final InspectionHazardsService hazardsService;
   private final InspectionEditService editService;
 
   public InspectionApiController(
       InspectionSearchService inspectionSearchService, InspectionService inspectionService,
       InspectionFormService formService, InspectionCreateService createService,
       InspectionDetailService detailService, InspectionFollowUpService followUpService,
-      InspectionHazardsService hazardsService, InspectionEditService editService) {
+      InspectionEditService editService) {
     this.inspectionSearchService = inspectionSearchService;
     this.inspectionService = inspectionService;
     this.formService = formService;
     this.createService = createService;
     this.detailService = detailService;
     this.followUpService = followUpService;
-    this.hazardsService = hazardsService;
     this.editService = editService;
   }
 
@@ -153,7 +150,7 @@ public class InspectionApiController implements InspectionApiEndpoint {
 
   @Override
   public ResponseEntity<Void> updateHazards(long inspectionId, HazardsUpdateRequest request) {
-    hazardsService.update(inspectionId, request);
+    editService.updateHazards(inspectionId, request);
     return ResponseEntity.noContent().build();
   }
 
