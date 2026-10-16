@@ -34,6 +34,11 @@ export type InspectionHazards = {
   comment: string | null;
 };
 
+/** An inspection's Hydraulic Hazards as saved — the backend's `HazardsUpdateRequest`. */
+export type InspectionHazardsRequest = Omit<InspectionHazards, 'comment'> & {
+  comment: string | null;
+};
+
 /** One answered question, where it was asked: a span, a pier, a stringer. */
 export type InspectionItem = {
   subsectionCode: string;

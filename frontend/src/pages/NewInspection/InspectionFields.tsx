@@ -179,25 +179,28 @@ export const InspectionFields: FC<
   );
 };
 
+type Measurement = 'presentWaterDepth' | 'presentWaterWidth' | 'highWaterClearance';
+
 /**
  * The Hydraulic Hazards tab: the channel's three measurements, legacy's five hazards and their
  * comments. Legacy's range warnings show as typed and never stop the save.
+ *
+ * <p>Add Inspection's, and the inspection page's once Edit is pressed — which marks the
+ * measurements it requires and puts its Cancel and Save under the fields.
  */
-export const HazardFields: FC<FieldProps<HazardValues>> = ({
-  values,
-  shown,
-  warnings = {},
-  change,
-  leave,
-}) => {
-  const metres = (
-    field: 'presentWaterDepth' | 'presentWaterWidth' | 'highWaterClearance',
-    label: string,
-  ) => (
+export const HazardFields: FC<
+  FieldProps<HazardValues> & {
+    /** The measurements required now: a red asterisk on each. */
+    required?: Partial<Record<Measurement, boolean>>;
+    /** The form's own actions, under the fields — the inspection page's Cancel and Save. */
+    actions?: ReactNode;
+  }
+> = ({ values, shown, warnings = {}, change, leave, required = {}, actions }) => {
+  const metres = (field: Measurement, label: string) => (
     <TextInput
       id={`hazard-${field}`}
       data-testid={`hazard-${field}`}
-      labelText={label}
+      labelText={requiredLabel(label, Boolean(required[field]))}
       inputMode="decimal"
       maxLength={7}
       value={values[field]}
@@ -252,6 +255,7 @@ export const HazardFields: FC<FieldProps<HazardValues>> = ({
             onBlur={() => leave('hazardComment')}
           />
         </FieldWithCounter>
+        {actions}
       </div>
     </Card>
   );

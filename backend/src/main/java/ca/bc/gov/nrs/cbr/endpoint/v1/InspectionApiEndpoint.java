@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
@@ -227,4 +228,19 @@ public interface InspectionApiEndpoint {
   @DeleteMapping("/{inspectionId}/documents/{fileId}")
   ResponseEntity<Void> deleteDocument(@PathVariable("inspectionId") long inspectionId,
       @PathVariable("fileId") long fileId);
+
+  /**
+   * Saves the inspection's Hydraulic Hazards — legacy's tab: the three water measurements, the five
+   * hazards and their comments.
+   *
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
+   * {@code /level0Access} on the tab. <b>204</b>; <b>404</b> when there is no such inspection;
+   * <b>409</b> once it is Reviewed or Accepted; <b>400</b> with {@code fieldErrors} keyed
+   * {@code presentWaterDepth}, {@code presentWaterWidth}, {@code highWaterClearance} or
+   * {@code hazardComment}.
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PutMapping("/{inspectionId}/hazards")
+  ResponseEntity<Void> updateHazards(@PathVariable("inspectionId") long inspectionId,
+      @RequestBody HazardsUpdateRequest request);
 }

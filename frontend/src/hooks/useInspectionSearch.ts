@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { InspectionHazardsRequest } from '@/pages/InspectionDetail/inspectionDetail';
 import type {
   InspectionSearchCriteria,
   InspectionSearchResult,
@@ -81,6 +82,17 @@ export const useInspection = (inspectionId: string | undefined) =>
     queryFn: () => API.inspectionSearch.getInspection(inspectionId as string),
     enabled: Boolean(inspectionId),
   });
+
+/** Saves an inspection's Hydraulic Hazards, then reads the inspection again. */
+export const useUpdateInspectionHazards = (inspectionId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: InspectionHazardsRequest) =>
+      API.inspectionSearch.updateInspectionHazards(inspectionId, request),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
 
 export const useInspectionForm = (structureId: string | null) =>
   useQuery({

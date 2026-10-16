@@ -1,5 +1,8 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
-import type { InspectionDetailResponse } from '@/pages/InspectionDetail/inspectionDetail';
+import type {
+  InspectionDetailResponse,
+  InspectionHazardsRequest,
+} from '@/pages/InspectionDetail/inspectionDetail';
 import type {
   InspectionSearchCriteria,
   InspectionSearchResult,
@@ -213,6 +216,19 @@ export class InspectionSearchService extends HttpClient {
       method: 'DELETE',
       url: '/v1/inspections/{inspectionId}/documents/{fileId}',
       path: { inspectionId, fileId },
+    });
+  }
+
+  /** Saves an inspection's Hydraulic Hazards. 400 with `fieldErrors`; 409 once it is reviewed. */
+  updateInspectionHazards(
+    inspectionId: string,
+    request: InspectionHazardsRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/inspections/{inspectionId}/hazards',
+      path: { inspectionId },
+      body: request,
     });
   }
 }

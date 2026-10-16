@@ -29,6 +29,7 @@ const inspectionApi = vi.hoisted(() => ({
   deleteInspectionRepair: vi.fn(),
   deleteInspectionMonitor: vi.fn(),
   deleteInspectionDocument: vi.fn(),
+  updateInspectionHazards: vi.fn(),
 }));
 const structureApi = vi.hoisted(() => ({
   getStructure: vi.fn(),
@@ -489,6 +490,73 @@ describe('InspectionDetailPage', () => {
       );
       expect(screen.queryByTestId('structure-documents-add')).not.toBeInTheDocument();
       expect(screen.getByTestId('structure-document-delete-1')).toBeInTheDocument();
+    });
+  });
+
+  describe('editing the hydraulic hazards, as legacy', () => {
+    const openHazards = async () => {
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('hazards');
+    };
+
+    it('saves the measurements, hazards and comment, and shows them again', async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'PRO', description: 'In Progress' } }),
+      );
+      inspectionApi.updateInspectionHazards.mockResolvedValue(undefined);
+      await openHazards();
+
+      await userEvent.click(screen.getByTestId('hazards-edit'));
+      const width = screen.getByTestId('hazard-presentWaterWidth');
+      await userEvent.type(width, '400');
+      // Legacy's range warning: shown, never stopping the save.
+      expect(screen.getByTestId('inspection-section-hazards')).toMatchTextContent(
+        /not in the range 0 through 350/,
+      );
+      await userEvent.click(screen.getByText('Ice?'));
+      await userEvent.click(screen.getByTestId('hazards-save'));
+
+      await waitFor(() =>
+        expect(inspectionApi.updateInspectionHazards).toHaveBeenCalledWith(
+          '41',
+          expect.objectContaining({
+            presentWaterDepth: 1.5,
+            presentWaterWidth: 400,
+            highWaterClearance: 3,
+            debris: true,
+            ice: true,
+            comment: 'Some debris at the pier.',
+          }),
+        ),
+      );
+      await waitFor(() => expect(screen.getByTestId('hazards-edit')).toBeInTheDocument());
+    });
+
+    it('will not blank a saved measurement, and needs all three past In Progress', async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'SUB', description: 'Submitted' } }),
+      );
+      await openHazards();
+
+      await userEvent.click(screen.getByTestId('hazards-edit'));
+      await userEvent.clear(screen.getByTestId('hazard-presentWaterDepth'));
+      await userEvent.click(screen.getByTestId('hazards-save'));
+
+      const card = screen.getByTestId('inspection-section-hazards');
+      expect(card).toMatchTextContent(/Estimated Present Water Level Depth is required\./);
+      expect(card).toMatchTextContent(/Estimated Present Water Level Width is required\./);
+      expect(inspectionApi.updateInspectionHazards).not.toHaveBeenCalled();
+
+      await userEvent.click(screen.getByTestId('hazards-cancel'));
+      expect(screen.getByTestId('hazards-edit')).toBeInTheDocument();
+    });
+
+    it('offers no Edit once Reviewed, as legacy disables its page', async () => {
+      await openHazards();
+
+      expect(screen.getByTestId('inspection-section-hazards')).toBeInTheDocument();
+      expect(screen.queryByTestId('hazards-edit')).not.toBeInTheDocument();
     });
   });
 
