@@ -165,6 +165,12 @@ describe('InspectionSearchService', () => {
     ['updateInspectionHazards', ['41', {}], 'PUT', '/api/v1/inspections/41/hazards'],
     ['updateInspection', ['41', {}], 'PUT', '/api/v1/inspections/41'],
     ['updateInspectionComment', ['41', 'x'], 'PUT', '/api/v1/inspections/41/comment'],
+    [
+      'updateInspectionCondition',
+      ['41', 'DECK', []],
+      'PUT',
+      '/api/v1/inspections/41/condition/DECK',
+    ],
   ] as const)('%s calls %s %s', async (name, args, method, url) => {
     const { service, request } = withMockedRequest();
 

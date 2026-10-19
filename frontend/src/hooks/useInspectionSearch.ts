@@ -10,7 +10,10 @@ import type {
   InspectionSort,
   PagedResponse,
 } from '@/pages/InspectionSearch/types';
-import type { InspectionCreateRequest } from '@/pages/NewInspection/inspectionForm';
+import type {
+  InspectionCreateRequest,
+  InspectionItemRequest,
+} from '@/pages/NewInspection/inspectionForm';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
@@ -114,6 +117,17 @@ export const useUpdateInspectionComment = (inspectionId: string) => {
   const mutation = useMutation({
     mutationFn: (comment: string) =>
       API.inspectionSearch.updateInspectionComment(inspectionId, comment),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Saves one Condition card's answers, then reads the inspection again. */
+export const useUpdateInspectionCondition = (inspectionId: string, subsectionCode: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (items: InspectionItemRequest[]) =>
+      API.inspectionSearch.updateInspectionCondition(inspectionId, subsectionCode, items),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };

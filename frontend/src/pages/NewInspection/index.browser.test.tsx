@@ -310,7 +310,7 @@ describe('NewInspectionPage', () => {
     expect(inspectionApi.createInspection).not.toHaveBeenCalled();
   });
 
-  it('stacks each pier, and adds stringers to a span one at a time', async () => {
+  it("stacks each pier, and keeps a span's stringers in a table, one form at a time", async () => {
     inspectionApi.getInspectionForm.mockResolvedValue({
       ...form,
       subsections: [
@@ -351,13 +351,33 @@ describe('NewInspectionPage', () => {
 
     const span = screen.getByTestId('condition-STR-span-701');
     expect(span).toMatchTextContent(/No stringers yet\./);
-    await userEvent.click(within(span).getByTestId('condition-STR-span-701-stringer-add'));
-    await userEvent.click(within(span).getByTestId('condition-STR-span-701-stringer-add'));
-    expect(within(span).getByRole('heading', { name: 'Stringer 2' })).toBeInTheDocument();
+    const add = within(span).getByTestId('condition-STR-span-701-stringer-add');
 
-    // A typed answer, for a question that lists none.
-    await userEvent.type(screen.getByTestId('items-STR-PEEL-span-701-stringer-2-answer'), 'Yes');
-    expect(screen.getByTestId('items-STR-PEEL-span-701-stringer-2-answer')).toHaveValue('Yes');
+    // One stringer's form at a time, under the table; legacy's rule: Peeled is required, marked.
+    await userEvent.click(add);
+    expect(add).toBeDisabled();
+    const stringerForm = within(span).getByTestId('condition-STR-span-701-stringer-form');
+    const peeled = screen.getByTestId('items-STR-PEEL-span-701-stringer-1');
+    expect(peeled.querySelector('.required-asterisk')).not.toBeNull();
+    // Its error shows once the question is left, then follows the answer live.
+    expect(stringerForm).not.toMatchTextContent(/Peeled is required\./);
+    await userEvent.click(screen.getByTestId('items-STR-PEEL-span-701-stringer-1-answer'));
+    await userEvent.tab();
+    expect(stringerForm).toMatchTextContent(/Peeled is required\./);
+    await userEvent.type(screen.getByTestId('items-STR-PEEL-span-701-stringer-1-answer'), 'Yes');
+    expect(stringerForm).not.toMatchTextContent(/Peeled is required\./);
+    await userEvent.click(within(span).getByTestId('condition-STR-span-701-stringer-save'));
+
+    const row = within(span).getByTestId('condition-STR-span-701-stringer-1');
+    expect(row).toMatchTextContent(/1\s*Yes/);
+    expect(screen.queryByTestId('condition-STR-span-701-stringer-form')).not.toBeInTheDocument();
+
+    // Edit opens it again, with its answers; Delete takes it out.
+    await userEvent.click(within(span).getByTestId('condition-STR-span-701-stringer-edit-1'));
+    expect(screen.getByTestId('items-STR-PEEL-span-701-stringer-1-answer')).toHaveValue('Yes');
+    await userEvent.click(within(span).getByTestId('condition-STR-span-701-stringer-cancel'));
+    await userEvent.click(within(span).getByTestId('condition-STR-span-701-stringer-delete-1'));
+    expect(span).toMatchTextContent(/No stringers yet\./);
   });
 
   it('says when the bridge has no spans or piers recorded', async () => {

@@ -155,6 +155,7 @@ class InspectionApiEndpointTest {
   void editIsMappedAndGated() {
     Method update = method("updateInspection");
     Method comment = method("updateInspectionComment");
+    Method condition = method("updateCondition");
 
     assertThat(update.getAnnotation(PutMapping.class).value()).containsExactly("/{inspectionId}");
     assertThat(comment.getAnnotation(PutMapping.class).value())
@@ -162,6 +163,10 @@ class InspectionApiEndpointTest {
     assertThat(update.getAnnotation(PreAuthorize.class).value())
         .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
     assertThat(comment.getAnnotation(PreAuthorize.class).value())
+        .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
+    assertThat(condition.getAnnotation(PutMapping.class).value())
+        .containsExactly("/{inspectionId}/condition/{subsectionCode}");
+    assertThat(condition.getAnnotation(PreAuthorize.class).value())
         .isEqualTo(CbrAuthorities.INSPECTION_WRITE);
   }
 

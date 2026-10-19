@@ -32,6 +32,7 @@ const inspectionApi = vi.hoisted(() => ({
   updateInspectionHazards: vi.fn(),
   updateInspection: vi.fn(),
   updateInspectionComment: vi.fn(),
+  updateInspectionCondition: vi.fn(),
 }));
 const structureApi = vi.hoisted(() => ({
   getStructure: vi.fn(),
@@ -303,8 +304,18 @@ describe('InspectionDetailPage', () => {
       /No stringers recorded\./,
     );
     const span2 = screen.getByTestId('condition-STR-span-702');
-    expect(within(span2).getByRole('heading', { name: 'Stringer 3' })).toBeInTheDocument();
-    expect(span2).toMatchTextContent(/Peeled\s*Yes/);
+    // A table of the span's stringers; View opens one's answers and comments.
+    expect(within(span2).getByTestId('condition-STR-span-702-stringer-3')).toMatchTextContent(
+      /3\s*Yes/,
+    );
+    await userEvent.click(within(span2).getByTestId('condition-STR-span-702-stringer-view-3'));
+    const details = within(span2).getByTestId('condition-STR-span-702-stringer-details');
+    expect(within(details).getByRole('heading', { name: 'Stringer 3' })).toBeInTheDocument();
+    expect(details).toMatchTextContent(/Peeled\s*Yes/);
+    await userEvent.click(within(span2).getByTestId('condition-STR-span-702-stringer-view-3'));
+    expect(
+      within(span2).queryByTestId('condition-STR-span-702-stringer-details'),
+    ).not.toBeInTheDocument();
 
     expect(screen.getByTestId('condition-other')).toMatchTextContent(/OLD · GONE/);
   });
@@ -677,6 +688,68 @@ describe('InspectionDetailPage', () => {
 
       expect(screen.queryByTestId('inspection-edit')).not.toBeInTheDocument();
       expect(screen.queryByTestId('comments-edit')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('editing a Condition card, as legacy', () => {
+    it("saves its group's answers, keeping Add Inspection's rules", async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'SUB', description: 'Submitted' } }),
+      );
+      inspectionApi.updateInspectionCondition.mockResolvedValue(undefined);
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('condition');
+
+      await userEvent.click(await screen.findByTestId('condition-APP-edit'));
+      // One card at a time.
+      expect(screen.queryByTestId('condition-STR-edit')).not.toBeInTheDocument();
+      const comment = screen.getByTestId('items-APP-APPQ-comment');
+      expect(comment).toHaveValue('Potholes');
+      await userEvent.clear(comment);
+      await userEvent.click(screen.getByTestId('condition-APP-save'));
+      expect(screen.getByTestId('condition-APP')).toMatchTextContent(
+        /\(Approaches\) Approach condition requires a comment\./,
+      );
+      expect(inspectionApi.updateInspectionCondition).not.toHaveBeenCalled();
+
+      await userEvent.type(comment, 'Ruts');
+      fireEvent.change(screen.getByTestId('items-APP-GR-answer'), { target: { value: 'Bent' } });
+      await userEvent.click(screen.getByTestId('condition-APP-save'));
+      await waitFor(() =>
+        expect(inspectionApi.updateInspectionCondition).toHaveBeenCalledWith('41', 'APP', [
+          expect.objectContaining({ questionCode: 'APPQ', answer: 'P', comment: 'Ruts' }),
+          expect.objectContaining({ questionCode: 'GR', answer: 'Bent' }),
+        ]),
+      );
+    });
+
+    it("edits a span's stringers in its table, one form at a time", async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'PRO', description: 'In Progress' } }),
+      );
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('condition');
+
+      await userEvent.click(await screen.findByTestId('condition-STR-edit'));
+      const span = screen.getByTestId('condition-STR-span-702');
+      expect(within(span).getByTestId('condition-STR-span-702-stringer-3')).toMatchTextContent(
+        /3\s*Yes/,
+      );
+      await userEvent.click(within(span).getByTestId('condition-STR-span-702-stringer-edit-3'));
+      expect(screen.getByTestId('items-STR-PEEL-span-702-stringer-3-answer')).toHaveValue('Yes');
+      await userEvent.click(screen.getByTestId('condition-STR-cancel'));
+      expect(screen.getByTestId('condition-STR-edit')).toBeInTheDocument();
+    });
+
+    it('offers no Edit once Reviewed, as legacy disables its page', async () => {
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('condition');
+
+      await screen.findByTestId('condition-APP');
+      expect(screen.queryByTestId('condition-APP-edit')).not.toBeInTheDocument();
     });
   });
 

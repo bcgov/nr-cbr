@@ -49,6 +49,9 @@ class InspectionApiControllerTest {
         .isEqualTo(HttpStatus.NO_CONTENT);
     verify(editService).update(42L, null);
     verify(editService).updateComment(42L, null);
+    assertThat(controller.updateCondition(42L, "DECK", null).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    verify(editService).updateCondition(42L, "DECK", null);
   }
 
   @Test

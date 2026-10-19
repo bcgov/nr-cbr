@@ -109,3 +109,28 @@
   --cds-field-hover: var(--cds-field-hover-01);
   --cds-border-subtle: var(--cds-border-subtle-01);
 }
+
+// The stringers' heading, and under it their Add, at the start of the row, above their table.
+.new-inspection__stringer-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-04;
+  margin-block-end: $spacing-04;
+}
+
+// One stringer's form, under the table: set apart as its own small panel.
+.new-inspection__stringer-form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-05;
+  margin-block-start: $spacing-05;
+  padding: $spacing-05;
+  border: 1px solid var(--cds-border-subtle-01);
+  border-radius: 0.25rem;
+}
+
+// A card's Cancel and Save under its last question, set apart from it as the structure page's are.
+.new-inspection__card-footer {
+  margin-block-start: $spacing-07;
+}
