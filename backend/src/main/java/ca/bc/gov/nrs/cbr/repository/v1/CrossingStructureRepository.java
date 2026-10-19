@@ -257,6 +257,29 @@ public interface CrossingStructureRepository
       @Param("user") String user);
 
   /**
+   * Writes what a P.Eng's review sets on the structure — legacy's Accept dialog: the routine
+   * frequency, Load Rating Review Required and, for a routine inspection, the next planned routine
+   * inspection (kept as stored when none is given) — with who changed it and when.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.nextPlannedInspectionDate =
+               COALESCE(:nextRoutineDate, structure.nextPlannedInspectionDate),
+             structure.routineInspectionFrequency = :routineFrequency,
+             structure.loadRatingUnknownIndicator = :reviewInd,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updateFromReview(
+      @Param("id") Long id,
+      @Param("nextRoutineDate") LocalDate nextRoutineDate,
+      @Param("routineFrequency") String routineFrequency,
+      @Param("reviewInd") String reviewInd,
+      @Param("user") String user);
+
+  /**
    * Marks structures updated by a repair-responsibility change, as legacy's {@code structure.save}
    * did: stamped with who and when, and {@code ACTIVE_IND = 'Y'} — legacy's save sets every
    * structure it touches active, so an archived structure ticked for this comes back. Kept on

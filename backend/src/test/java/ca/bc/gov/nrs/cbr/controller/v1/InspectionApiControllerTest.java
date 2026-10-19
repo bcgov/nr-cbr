@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionEditService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionReviewService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
@@ -36,9 +37,21 @@ class InspectionApiControllerTest {
   private final InspectionDetailService detailService = mock(InspectionDetailService.class);
   private final InspectionFollowUpService followUpService = mock(InspectionFollowUpService.class);
   private final InspectionEditService editService = mock(InspectionEditService.class);
+  private final InspectionReviewService reviewService = mock(InspectionReviewService.class);
   private final InspectionApiController controller = new InspectionApiController(
       searchService, inspectionService, formService, createService, detailService,
-      followUpService, editService);
+      followUpService, editService, reviewService);
+
+  @Test
+  @DisplayName("the review and the PEng comments reach the review service: 204")
+  void reviewDelegates() {
+    assertThat(controller.reviewInspection(42L, null).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(controller.updatePengComment(42L, null).getStatusCode())
+        .isEqualTo(HttpStatus.NO_CONTENT);
+    verify(reviewService).review(42L, null);
+    verify(reviewService).updatePengComment(42L, null);
+  }
 
   @Test
   @DisplayName("saving the Inspection card and its comments reaches the edit service: 204")

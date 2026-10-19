@@ -43,8 +43,9 @@ import org.springframework.transaction.annotation.Transactional;
  *       Progress, or once given — legacy's {@code FRM.validate}: "X is required.";
  *   <li>the date is not in the future, and no other inspection of the structure is on it (offline
  *       ones aside);
- *   <li>the status moves between In Progress and Submitted here; Reviewed and Rejected are a
- *       P.Eng's, on the Review tab; out of Rejected only a P.Eng moves it, as legacy;
+ *   <li>the status moves between In Progress and Submitted here; Reviewed is a P.Eng's, through
+ *       the review ({@link InspectionReviewService}); out of Rejected only a P.Eng moves it, as
+ *       legacy;
  *   <li>Professional Inspection Required is a Level 2 user's to change;
  *   <li>refused once Reviewed or Accepted, as legacy disables its page then — here on the server
  *       too.
@@ -343,7 +344,7 @@ public class InspectionEditService {
       errors.put(STATUS_FIELD, "Inspection Report Status is required.");
     } else if (!status.equals(current)) {
       if (!EDITABLE_STATUSES.contains(status)) {
-        errors.put(STATUS_FIELD, "Reviewed and Rejected are set by a P.Eng on the Review tab.");
+        errors.put(STATUS_FIELD, "Reviewed is set by a P.Eng through the review, not saved here.");
       } else if (REJECTED.equals(current) && !loggedUser.isPeng()) {
         errors.put(STATUS_FIELD, "You do not have permission to change this status.");
       }

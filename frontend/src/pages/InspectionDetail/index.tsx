@@ -3,7 +3,6 @@ import {
   Inspection as InspectionIcon,
   Report,
   Tools,
-  UserCertification,
   View,
   WaveDirection,
 } from '@carbon/icons-react';
@@ -32,7 +31,7 @@ import TabCount from '@/pages/StructureDetail/TabCount';
 import ConditionView from './ConditionView';
 import HazardsTab from './HazardsTab';
 import InspectionTab from './InspectionTab';
-import { ReviewCards, StatusTag } from './InspectionViews';
+import { StatusTag } from './InspectionViews';
 import { countOf, outstandingOf, type OutstandingTab } from './outstanding';
 
 import type { CarbonIconType } from '@carbon/icons-react';
@@ -48,8 +47,7 @@ import '@/pages/StructureDetail/structureDetail.scss';
 import './inspectionDetail.scss';
 
 /** The page's tabs, in order — legacy's, with Repairs & Monitoring split as the structure page's. */
-type TabKey =
-  'inspection' | 'condition' | 'hazards' | 'documents' | 'repairs' | 'monitoring' | 'review';
+type TabKey = 'inspection' | 'condition' | 'hazards' | 'documents' | 'repairs' | 'monitoring';
 
 const TABS: { key: TabKey; label: string; icon: CarbonIconType }[] = [
   { key: 'inspection', label: 'Inspection', icon: InspectionIcon },
@@ -58,7 +56,6 @@ const TABS: { key: TabKey; label: string; icon: CarbonIconType }[] = [
   { key: 'documents', label: 'Documents & Photos', icon: DocumentAttachment },
   { key: 'repairs', label: 'Repairs', icon: Tools },
   { key: 'monitoring', label: 'Monitoring', icon: View },
-  { key: 'review', label: 'Review', icon: UserCertification },
 ];
 
 /** The statuses after which an inspection is no longer changed from its page — the server's too. */
@@ -77,8 +74,9 @@ const isOutstandingTab = (key: TabKey): key is OutstandingTab =>
  * <p>Inspection (the structure and its site, the inspection, its comments), Condition (every
  * question asked, answered or not), Hydraulic Hazards, then as legacy: Documents & Photos (every
  * document on the structure, by inspection), Repairs and Monitoring (outstanding by default, with
- * Current Inspection Items for this one's), and Review (status and history, load rating, PEng
- * comments).
+ * Current Inspection Items for this one's). As legacy, there is no Review tab: the status history,
+ * the review's load rating and the PEng Comments are on the Inspection tab, and a P.Eng reviews the
+ * inspection by saving it as Reviewed, which opens the Review dialog — legacy's Accept.
  *
  * <p>What it still lacks — legacy's submit rules and every unanswered question — shows as the
  * structure page shows an incomplete structure: a notice above the tabs, a count on each tab, and
@@ -256,11 +254,6 @@ const InspectionDetailPage: FC = () => {
                       locked={locked}
                     />
                   )}
-                </TabPanel>
-                <TabPanel>
-                  <div className="structure-detail__tab-panel" data-testid="inspection-review">
-                    <ReviewCards inspection={inspection} />
-                  </div>
                 </TabPanel>
               </TabPanels>
             </Tabs>

@@ -6,7 +6,18 @@ import {
   UserCertification,
   WaveDirection,
 } from '@carbon/icons-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tag } from '@carbon/react';
+import {
+  Button,
+  Modal,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tag,
+} from '@carbon/react';
+import { useState } from 'react';
 
 import ExternalLink from '@/components/core/ExternalLink';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
@@ -83,7 +94,73 @@ type CardProps = {
   children?: ReactNode;
 };
 
-/** The Inspection card: type, status, date, who inspected and at what cost. */
+/** Every status the inspection has had, newest first — legacy's View History dialog. */
+const StatusHistoryDialog: FC<{ inspection: InspectionDetailResponse; onClose: () => void }> = ({
+  inspection,
+  onClose,
+}) => (
+  <Modal
+    open
+    passiveModal
+    size="sm"
+    modalHeading="Status history"
+    onRequestClose={onClose}
+    data-testid="status-history-dialog"
+  >
+    {inspection.statusHistory.length === 0 ? (
+      <p className="structure-detail__empty">No status has been recorded.</p>
+    ) : (
+      <Table size="md" useZebraStyles aria-label="Status History">
+        <TableHead>
+          <TableRow>
+            <TableHeader>Status</TableHeader>
+            <TableHeader>Changed By</TableHeader>
+            <TableHeader>Date</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {inspection.statusHistory.map((change, index) => (
+            <TableRow
+              // Newest first; a status may recur, so its place keeps the row's key unique.
+              key={`${index}-${change.status.code}`}
+              data-testid={`status-history-${index}`}
+            >
+              <TableCell>
+                <StatusTag status={change.status} />
+              </TableCell>
+              <TableCell>{change.changedBy}</TableCell>
+              <TableCell>{formatDateTime(change.changedAt)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )}
+  </Modal>
+);
+
+/** The status, and legacy's View History beside it. */
+const StatusWithHistory: FC<{ inspection: InspectionDetailResponse }> = ({ inspection }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="inspection-detail__status">
+      <StatusTag status={inspection.status} />
+      <Button
+        kind="ghost"
+        size="sm"
+        data-testid="status-history-open"
+        onClick={() => setOpen(true)}
+      >
+        View history
+      </Button>
+      {open && <StatusHistoryDialog inspection={inspection} onClose={() => setOpen(false)} />}
+    </span>
+  );
+};
+
+/**
+ * The Inspection card: type, status — with who reviewed it and its history — date, who inspected
+ * and at what cost.
+ */
 export const InspectionCard: FC<CardProps> = ({ inspection, action, children }) => (
   <Card
     title="Inspection"
@@ -96,7 +173,12 @@ export const InspectionCard: FC<CardProps> = ({ inspection, action, children }) 
         <ReadOnlyField label="Inspection Type" value={describe(inspection.type)} />
         <ReadOnlyField
           label="Inspection Report Status"
-          value={<StatusTag status={inspection.status} />}
+          value={<StatusWithHistory inspection={inspection} />}
+        />
+        <ReadOnlyField label="Reviewed By" value={inspection.review.reviewedBy} />
+        <ReadOnlyField
+          label="Reviewed Date"
+          value={formatShortDate(inspection.review.reviewedDate)}
         />
         <ReadOnlyField
           label="Date of Inspection"
@@ -166,70 +248,31 @@ export const HazardsCard: FC<{
   );
 };
 
-/**
- * The Review tab — legacy's Accept dialog and status history, read only: the status and who
- * reviewed it, every status it has had, the load rating recorded with the review, and the P.Eng's
- * comments.
- */
-export const ReviewCards: FC<{ inspection: InspectionDetailResponse }> = ({ inspection }) => {
+/** The load rating the P.Eng's review recorded, and its reason. */
+export const LoadRatingCard: FC<{ inspection: InspectionDetailResponse }> = ({ inspection }) => {
   const { review } = inspection;
   return (
-    <>
-      <Card title="Status" icon={UserCertification} testId="inspection-section-status">
-        <div className="structure-detail__fields">
-          <ReadOnlyField
-            label="Inspection Report Status"
-            value={<StatusTag status={inspection.status} />}
-          />
-          <ReadOnlyField label="Reviewed By" value={review.reviewedBy} />
-          <ReadOnlyField label="Reviewed Date" value={formatShortDate(review.reviewedDate)} />
-        </div>
-        <h3 className="inspection-detail__subheading">Status History</h3>
-        {inspection.statusHistory.length === 0 ? (
-          <p className="structure-detail__empty">No status has been recorded.</p>
-        ) : (
-          <Table size="md" useZebraStyles aria-label="Status History">
-            <TableHead>
-              <TableRow>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Changed By</TableHeader>
-                <TableHeader>Date</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {inspection.statusHistory.map((change, index) => (
-                <TableRow
-                  // Newest first; a status may recur, so its place keeps the row's key unique.
-                  key={`${index}-${change.status.code}`}
-                  data-testid={`status-history-${index}`}
-                >
-                  <TableCell>
-                    <StatusTag status={change.status} />
-                  </TableCell>
-                  <TableCell>{change.changedBy}</TableCell>
-                  <TableCell>{formatDateTime(change.changedAt)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
-      <Card title="Load Rating" icon={Report} testId="inspection-section-load-rating">
-        <div className="structure-detail__fields">
-          <ReadOnlyField
-            label="Load Rating of Inspection (GVW tonnes)"
-            value={number(review.loadRating)}
-          />
-          <ReadOnlyField label="Load Rating Reason" value={describe(review.loadRatingReason)} />
-          <ReadOnlyField
-            label="Load Rating Reason Comment"
-            value={review.loadRatingReasonComment}
-          />
-        </div>
-      </Card>
-      <Card title="PEng Comments" icon={Forum} testId="inspection-section-peng-comments">
-        <Text value={review.pengComment} testId="inspection-peng-comment" />
-      </Card>
-    </>
+    <Card title="Load Rating" icon={Report} testId="inspection-section-load-rating">
+      <div className="structure-detail__fields">
+        <ReadOnlyField
+          label="Load Rating of Inspection (GVW tonnes)"
+          value={number(review.loadRating)}
+        />
+        <ReadOnlyField label="Load Rating Reason" value={describe(review.loadRatingReason)} />
+        <ReadOnlyField label="Load Rating Reason Comment" value={review.loadRatingReasonComment} />
+      </div>
+    </Card>
   );
 };
+
+/** The P.Eng's comments. */
+export const PengCommentsCard: FC<CardProps> = ({ inspection, action, children }) => (
+  <Card
+    title="PEng Comments"
+    icon={UserCertification}
+    testId="inspection-section-peng-comments"
+    action={action}
+  >
+    {children ?? <Text value={inspection.review.pengComment} testId="inspection-peng-comment" />}
+  </Card>
+);

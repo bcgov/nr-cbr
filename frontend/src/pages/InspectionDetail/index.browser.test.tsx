@@ -33,15 +33,19 @@ const inspectionApi = vi.hoisted(() => ({
   updateInspection: vi.fn(),
   updateInspectionComment: vi.fn(),
   updateInspectionCondition: vi.fn(),
+  reviewInspection: vi.fn(),
+  updatePengComment: vi.fn(),
 }));
 const structureApi = vi.hoisted(() => ({
   getStructure: vi.fn(),
   getDocuments: vi.fn(),
   getStructureRepairs: vi.fn(),
   getStructureMonitors: vi.fn(),
+  getInspectionSchedule: vi.fn(),
 }));
 const configurationApi = vi.hoisted(() => ({
   getInspectionReportStatusCodes: vi.fn(),
+  getLoadRatingCodes: vi.fn(),
 }));
 vi.mock('@/services/APIs', () => ({
   default: {
@@ -185,9 +189,28 @@ beforeEach(() => {
     id: '7',
     structureName: 'B100',
     typeClass: { code: 'PB', description: 'Durable Bridge' },
-    details: { yearBuilt: 2000 },
+    details: { yearBuilt: 2000, endOfDesignLifeYear: 2020 },
     site: null,
+    loadRating: {
+      currentRating: 50,
+      history: [],
+      reviewRequired: true,
+      designVehicle: { code: 'L75', description: 'L-75' },
+      designLoadRating: 75,
+    },
+    replacement: { estimatedLoadRestrictionYear: null, estimatedReplacementYear: 2090 },
     outstanding: [],
+  });
+  structureApi.getInspectionSchedule.mockResolvedValue({ routineFrequencyYears: 3 });
+  configurationApi.getLoadRatingCodes.mockResolvedValue({
+    loadPostingSigns: [],
+    designVehicles: [],
+    reasons: [
+      { code: 'INSP', description: 'Inspection', deltas: ['INC'] },
+      { code: 'DOWN', description: 'Downrated', deltas: ['DEC'] },
+      { code: 'OTHR', description: 'Other', deltas: ['UNDEF'] },
+      { code: 'HIST', description: 'Historical', deltas: ['UNDEF'] },
+    ],
   });
   structureApi.getDocuments.mockResolvedValue({ documents: [] });
   structureApi.getStructureRepairs.mockReset();
@@ -331,17 +354,26 @@ describe('InspectionDetailPage', () => {
     expect(screen.getByTestId('hazard-comment')).toMatchTextContent('Some debris at the pier.');
   });
 
-  it('shows the review, its status history and load rating, and the PEng comments', async () => {
+  it('shows the review on the Inspection tab, as legacy: no Review tab', async () => {
     renderPage();
     await screen.findByTestId('inspection-inspection');
-    await openTab('review');
 
-    const review = screen.getByTestId('inspection-review');
-    expect(review).toMatchTextContent(/Pat Engineer/);
-    expect(review).toMatchTextContent(/Structural deterioration/);
-    expect(screen.getByTestId('status-history-0')).toMatchTextContent(/Reviewed\s*IDIR\\PAT/);
-    expect(screen.getByTestId('status-history-1')).toMatchTextContent(/Submitted/);
+    expect(screen.queryByTestId('inspection-tab-review')).not.toBeInTheDocument();
+    expect(screen.getByTestId('inspection-section-inspection')).toMatchTextContent(
+      /Reviewed By\s*Pat Engineer/,
+    );
+    expect(screen.getByTestId('inspection-section-load-rating')).toMatchTextContent(
+      /55[\s\S]*Structural deterioration/,
+    );
     expect(screen.getByTestId('inspection-peng-comment')).toMatchTextContent('Agreed.');
+
+    // Its status history, in legacy's View History dialog.
+    await userEvent.click(screen.getByTestId('status-history-open'));
+    const history = screen.getByTestId('status-history-dialog');
+    expect(within(history).getByTestId('status-history-0')).toMatchTextContent(
+      /Reviewed\s*IDIR\\PAT/,
+    );
+    expect(within(history).getByTestId('status-history-1')).toMatchTextContent(/Submitted/);
   });
 
   it("lists the structure's outstanding repairs, read only, and this inspection's on request", async () => {
@@ -606,7 +638,7 @@ describe('InspectionDetailPage', () => {
           within(status)
             .getAllByRole('option')
             .map((option) => option.textContent),
-        ).toEqual(['In Progress', 'Submitted']),
+        ).toEqual(['In Progress', 'Reviewed', 'Submitted']),
       );
       // One card at a time.
       expect(screen.queryByTestId('comments-edit')).not.toBeInTheDocument();
@@ -688,6 +720,107 @@ describe('InspectionDetailPage', () => {
 
       expect(screen.queryByTestId('inspection-edit')).not.toBeInTheDocument();
       expect(screen.queryByTestId('comments-edit')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('peng-comments-edit')).not.toBeInTheDocument();
+    });
+
+    it('offers Reviewed and the PEng Comments to a P.Eng only', async () => {
+      inspectionApi.getInspection.mockResolvedValue(inProgress());
+      authorization.isPeng = false;
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      expect(screen.queryByTestId('peng-comments-edit')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      const status = screen.getByTestId('inspection-edit-statusCode');
+      await waitFor(() =>
+        expect(
+          within(status)
+            .getAllByRole('option')
+            .map((option) => option.textContent),
+        ).toEqual(['In Progress', 'Submitted']),
+      );
+      authorization.isPeng = true;
+    });
+
+    it('saves the PEng Comments', async () => {
+      inspectionApi.getInspection.mockResolvedValue(inProgress());
+      inspectionApi.updatePengComment.mockResolvedValue(undefined);
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      await userEvent.click(screen.getByTestId('peng-comments-edit'));
+      const box = screen.getByTestId('inspection-edit-peng-comment');
+      await userEvent.clear(box);
+      await userEvent.type(box, 'Sound.');
+      await userEvent.click(screen.getByTestId('peng-comment-save'));
+
+      await waitFor(() =>
+        expect(inspectionApi.updatePengComment).toHaveBeenCalledWith('41', 'Sound.'),
+      );
+    });
+
+    it("reviews it in legacy's Accept dialog: the card, then the review", async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'SUB', description: 'Submitted' } }),
+      );
+      inspectionApi.updateInspection.mockResolvedValue(undefined);
+      inspectionApi.reviewInspection.mockResolvedValue(undefined);
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      const status = screen.getByTestId('inspection-edit-statusCode');
+      await waitFor(() => expect(within(status).getAllByRole('option')).toHaveLength(3));
+      fireEvent.change(status, { target: { value: 'RVD' } });
+      await userEvent.click(screen.getByTestId('inspection-save'));
+
+      // Saving as Reviewed opens the dialog instead of saving.
+      const dialog = await screen.findByTestId('review-dialog');
+      expect(inspectionApi.updateInspection).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(within(dialog).getByTestId('review-loadRating')).toHaveValue('55'),
+      );
+      // Legacy's suggestion: the inspection date plus the structure's frequency.
+      expect(within(dialog).getByTestId('review-routineFrequencyYears')).toHaveValue('3');
+      expect(dialog.querySelector('#review-nextRoutineDate')).toHaveValue('2027/05/01');
+      expect(within(dialog).getByTestId('review-end-of-design-life')).toMatchTextContent(
+        /years overdue/,
+      );
+      // 55 over the structure's 50 is an increase: its reasons, and any change's — never HIST.
+      expect(
+        within(within(dialog).getByTestId('review-reasonCode'))
+          .getAllByRole('option')
+          .map((option) => option.getAttribute('value')),
+      ).toEqual(['', 'INSP', 'OTHR']);
+
+      await userEvent.click(within(dialog).getByTestId('review-accept'));
+      expect(dialog).toMatchTextContent(/Choose a reason that fits the change in load rating\./);
+      expect(inspectionApi.reviewInspection).not.toHaveBeenCalled();
+
+      fireEvent.change(within(dialog).getByTestId('review-reasonCode'), {
+        target: { value: 'OTHR' },
+      });
+      await userEvent.click(within(dialog).getByTestId('review-accept'));
+      expect(dialog).toMatchTextContent(/Load Rating Reason Comment is required for Other\./);
+      await userEvent.type(within(dialog).getByTestId('review-reasonComment'), 'Re-rated.');
+      await userEvent.click(within(dialog).getByTestId('review-loadRatingReviewRequired'));
+      await userEvent.click(within(dialog).getByTestId('review-accept'));
+
+      await waitFor(() =>
+        expect(inspectionApi.reviewInspection).toHaveBeenCalledWith('41', {
+          loadRating: 55,
+          reasonCode: 'OTHR',
+          reasonComment: 'Re-rated.',
+          nextRoutineDate: '2027-05-01',
+          routineFrequencyYears: 3,
+          loadRatingReviewRequired: false,
+        }),
+      );
+      // The card first, at the status it has: Reviewed is the review's.
+      expect(inspectionApi.updateInspection).toHaveBeenCalledWith(
+        '41',
+        expect.objectContaining({ statusCode: 'SUB' }),
+      );
     });
   });
 

@@ -139,13 +139,13 @@ class InspectionEditServiceTest {
   }
 
   @Test
-  @DisplayName("leaves Reviewed and Rejected to the Review tab, Rejected to a P.Eng to move")
+  @DisplayName("leaves Reviewed to the review, Rejected to a P.Eng to move")
   void statuses() {
     inspection(41L, "PRO", null, null);
     inspection(42L, "REJ", DAY, "Jo");
 
     assertThat(refused(41L, card("RVD", null, null, null))).containsEntry(
-        "statusCode", "Reviewed and Rejected are set by a P.Eng on the Review tab.");
+        "statusCode", "Reviewed is set by a P.Eng through the review, not saved here.");
     assertThat(refused(42L, card("SUB", DAY, "Jo", "Co"))).containsOnly(
         Map.entry("statusCode", "You do not have permission to change this status."));
     service.update(42L, card("REJ", DAY, "Jo", "Co"));

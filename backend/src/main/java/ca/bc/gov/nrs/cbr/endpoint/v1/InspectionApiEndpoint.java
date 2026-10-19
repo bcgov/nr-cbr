@@ -9,6 +9,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionReviewRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
@@ -284,4 +285,30 @@ public interface InspectionApiEndpoint {
   ResponseEntity<Void> updateCondition(@PathVariable("inspectionId") long inspectionId,
       @PathVariable("subsectionCode") String subsectionCode,
       @RequestBody ConditionUpdateRequest request);
+
+  /**
+   * Reviews the inspection — legacy's Accept dialog: marks it Reviewed, bound to the P.Eng saving
+   * it, records its load rating, and sets the structure's routine frequency, Load Rating Review
+   * Required and, for a routine inspection, the next planned one.
+   *
+   * <p>Gated on {@link CbrAuthorities#APPROVE} — a P.Eng, legacy's {@code /approveInspection}; the
+   * service also needs the caller's active inspection reviewer row. <b>204</b>; <b>404</b> when
+   * there is no such inspection; <b>403</b> when the caller is not an active reviewer; <b>409</b>
+   * once it is Reviewed or Accepted; <b>400</b> with {@code fieldErrors} keyed {@code loadRating},
+   * {@code reasonCode}, {@code reasonComment}, {@code nextRoutineDate},
+   * {@code routineFrequencyYears}, or the Inspection card's required fields.
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @PostMapping("/{inspectionId}/review")
+  ResponseEntity<Void> reviewInspection(@PathVariable("inspectionId") long inspectionId,
+      @RequestBody InspectionReviewRequest request);
+
+  /**
+   * Saves the PEng Comments. A P.Eng's — legacy's {@code /pEngAccess} on the box; <b>204</b>,
+   * <b>404</b>, <b>409</b> or <b>400</b> (keyed {@code pengComment}) as the Inspection card.
+   */
+  @PreAuthorize(CbrAuthorities.APPROVE)
+  @PutMapping("/{inspectionId}/peng-comment")
+  ResponseEntity<Void> updatePengComment(@PathVariable("inspectionId") long inspectionId,
+      @RequestBody InspectionCommentRequest request);
 }

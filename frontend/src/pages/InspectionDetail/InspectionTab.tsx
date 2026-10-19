@@ -27,11 +27,15 @@ import {
 import {
   InspectionCard,
   InspectionCommentsCard,
+  LoadRatingCard,
+  PengCommentsCard,
   StatusTag,
   StructureCard,
 } from './InspectionViews';
+import ReviewDialog from './ReviewDialog';
 
-import type { InspectionDetailResponse } from './inspectionDetail';
+import type { InspectionDetailResponse, InspectionReviewRequest } from './inspectionDetail';
+import type { ReviewField } from './reviewRules';
 import type { StructureDetailResponse } from '@/pages/StructureDetail/structureResponse';
 import type { ChangeEvent, FC, ReactNode } from 'react';
 
@@ -39,8 +43,17 @@ import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
 import { useInspectionReportStatusCodes } from '@/hooks/useConfiguration';
 import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
-import { useUpdateInspection, useUpdateInspectionComment } from '@/hooks/useInspectionSearch';
-import { COMMENT_MAX, type InspectionValues } from '@/pages/NewInspection/inspectionRules';
+import {
+  useReviewInspection,
+  useUpdateInspection,
+  useUpdateInspectionComment,
+  useUpdatePengComment,
+} from '@/hooks/useInspectionSearch';
+import {
+  COMMENT_MAX,
+  IN_PROGRESS,
+  type InspectionValues,
+} from '@/pages/NewInspection/inspectionRules';
 import { describe } from '@/pages/StructureDetail/format';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { byteLength } from '@/utils/textLimits';
@@ -93,15 +106,34 @@ const useSaved = (what: string) => {
   };
 };
 
-/** The Inspection card's form: status, date, inspector, company, cost, professional. */
-const InspectionEditor: FC<{ inspection: InspectionDetailResponse; onDone: () => void }> = ({
-  inspection,
-  onDone,
-}) => {
+/** Reviewed — a P.Eng's, saved through the Review dialog rather than with the card. */
+const REVIEWED = 'RVD';
+/** The Review dialog's own fields; any other refusal is the card's. */
+const REVIEW_FIELDS = new Set<string>([
+  'loadRating',
+  'reasonCode',
+  'reasonComment',
+  'nextRoutineDate',
+  'routineFrequencyYears',
+]);
+
+/**
+ * The Inspection card's form: status, date, inspector, company, cost, professional. A P.Eng may
+ * pick Reviewed: Save then opens the Review dialog — legacy's Accept — which saves the card as it
+ * stands, then the review.
+ */
+const InspectionEditor: FC<{
+  inspection: InspectionDetailResponse;
+  structure: StructureDetailResponse | undefined;
+  onDone: () => void;
+}> = ({ inspection, structure, onDone }) => {
   const { isPeng, canDelete: level2 } = useAuthorization();
   const statuses = useInspectionReportStatusCodes();
   const update = useUpdateInspection(inspection.id);
+  const review = useReviewInspection(inspection.id);
   const report = useSaved('Inspection');
+  const { display } = useNotification();
+  const [reviewing, setReviewing] = useState(false);
   const [values, setValues] = useState<InspectionValues>(() => valuesOf(inspection));
   const form = useFieldErrors<string>(cardErrorsOf(values, inspection), update.fieldErrors);
   const { shown } = form;
@@ -129,6 +161,10 @@ const InspectionEditor: FC<{ inspection: InspectionDetailResponse; onDone: () =>
 
   const save = () => {
     if (!form.submit()) return;
+    if (values.statusCode === REVIEWED) {
+      setReviewing(true);
+      return;
+    }
     update.mutate(toUpdateRequest(values), {
       onSuccess: () => {
         report.saved();
@@ -138,9 +174,45 @@ const InspectionEditor: FC<{ inspection: InspectionDetailResponse; onDone: () =>
     });
   };
 
-  // In Progress and Submitted, and the status it has if neither (Rejected), so it reads right.
+  /** Accept: the card as it stands, at the status it has, then the review. */
+  const accept = async (request: InspectionReviewRequest) => {
+    try {
+      await update.mutateAsync(toUpdateRequest({ ...values, statusCode: current ?? IN_PROGRESS }));
+    } catch (error) {
+      // The card's refusals show beside its fields, under the dialog.
+      setReviewing(false);
+      report.failed(error);
+      return;
+    }
+    review.mutate(request, {
+      onSuccess: () => {
+        display({ kind: 'success', title: 'Inspection reviewed', timeout: 4000 });
+        onDone();
+      },
+      onError: (error) => {
+        const refused = Object.keys(apiFieldErrors(error));
+        // The dialog's own fields show their refusals; anything else is a toast.
+        if (refused.length > 0 && refused.every((field) => REVIEW_FIELDS.has(field))) return;
+        display({
+          kind: 'error',
+          title: 'The inspection was not reviewed',
+          subtitle:
+            refused.length > 0
+              ? Object.values(apiFieldErrors(error)).join(' ')
+              : apiErrorMessage(error, 'Try again, or contact support if this continues.'),
+          timeout: 0,
+        });
+      },
+    });
+  };
+
+  // In Progress and Submitted, and the status it has if neither (Rejected), so it reads right;
+  // Reviewed for a P.Eng, through the Review dialog.
   const offered = (statuses.data ?? []).filter(
-    (status) => CARD_STATUSES.has(status.code) || status.code === current,
+    (status) =>
+      CARD_STATUSES.has(status.code) ||
+      status.code === current ||
+      (isPeng && status.code === REVIEWED),
   );
 
   return (
@@ -200,26 +272,45 @@ const InspectionEditor: FC<{ inspection: InspectionDetailResponse; onDone: () =>
           />
         )}
       </div>
-      <EditActions id="inspection" pending={update.isPending} onCancel={onDone} onSave={save} />
+      <EditActions
+        id="inspection"
+        pending={update.isPending || review.isPending}
+        onCancel={onDone}
+        onSave={save}
+      />
+      {reviewing && (
+        <ReviewDialog
+          inspection={inspection}
+          structure={structure}
+          pending={update.isPending || review.isPending}
+          serverErrors={review.fieldErrors as Partial<Record<ReviewField, string>>}
+          onAccept={(request) => void accept(request)}
+          onCancel={() => setReviewing(false)}
+        />
+      )}
     </div>
   );
 };
 
-/** The Inspection Comments card's form. */
-const CommentsEditor: FC<{ inspection: InspectionDetailResponse; onDone: () => void }> = ({
-  inspection,
-  onDone,
-}) => {
-  const update = useUpdateInspectionComment(inspection.id);
-  const report = useSaved('Inspection comments');
-  const [comment, setComment] = useState(inspection.inspectionComment ?? '');
+/** A comments card's form: the inspector's comments, or the P.Eng's. */
+const CommentsEditor: FC<{
+  /** The field the server refuses it under: `inspectionComment`, `pengComment`. */
+  field: string;
+  /** The id its box and buttons are named from: `inspection-edit-{id}`, `{actions}-save`. */
+  id: string;
+  actions: string;
+  label: string;
+  /** What the toast calls it: "Inspection comments". */
+  what: string;
+  initial: string | null;
+  update: ReturnType<typeof useUpdateInspectionComment>;
+  onDone: () => void;
+}> = ({ field, id, actions, label, what, initial, update, onDone }) => {
+  const report = useSaved(what);
+  const [comment, setComment] = useState(initial ?? '');
   const tooLong = byteLength(comment.trim()) > COMMENT_MAX;
   const form = useFieldErrors<string>(
-    {
-      inspectionComment: tooLong
-        ? `Inspection Comments can be at most ${COMMENT_MAX} characters.`
-        : undefined,
-    },
+    { [field]: tooLong ? `${label} can be at most ${COMMENT_MAX} characters.` : undefined },
     update.fieldErrors,
   );
 
@@ -238,45 +329,76 @@ const CommentsEditor: FC<{ inspection: InspectionDetailResponse; onDone: () => v
     <div className="structure-detail__edit">
       <FieldWithCounter used={byteLength(comment)} limit={COMMENT_MAX}>
         <TextArea
-          id="inspection-edit-comment"
-          data-testid="inspection-edit-comment"
+          id={`inspection-edit-${id}`}
+          data-testid={`inspection-edit-${id}`}
           labelText="Comments"
           rows={6}
           value={comment}
-          invalid={Boolean(form.shown.inspectionComment)}
-          invalidText={form.shown.inspectionComment}
+          invalid={Boolean(form.shown[field])}
+          invalidText={form.shown[field]}
           onChange={(event) => {
             setComment(event.target.value);
-            form.change('inspectionComment');
+            form.change(field);
           }}
-          onBlur={() => form.leave('inspectionComment')}
+          onBlur={() => form.leave(field)}
         />
       </FieldWithCounter>
-      <EditActions
-        id="inspection-comment"
-        pending={update.isPending}
-        onCancel={onDone}
-        onSave={save}
-      />
+      <EditActions id={actions} pending={update.isPending} onCancel={onDone} onSave={save} />
     </div>
   );
 };
 
+/** The Inspection Comments card's form. */
+const InspectionCommentsEditor: FC<{
+  inspection: InspectionDetailResponse;
+  onDone: () => void;
+}> = ({ inspection, onDone }) => (
+  <CommentsEditor
+    field="inspectionComment"
+    id="comment"
+    actions="inspection-comment"
+    label="Inspection Comments"
+    what="Inspection comments"
+    initial={inspection.inspectionComment}
+    update={useUpdateInspectionComment(inspection.id)}
+    onDone={onDone}
+  />
+);
+
+/** The PEng Comments card's form — a P.Eng's. */
+const PengCommentsEditor: FC<{ inspection: InspectionDetailResponse; onDone: () => void }> = ({
+  inspection,
+  onDone,
+}) => (
+  <CommentsEditor
+    field="pengComment"
+    id="peng-comment"
+    actions="peng-comment"
+    label="PEng Comments"
+    what="PEng comments"
+    initial={inspection.review.pengComment}
+    update={useUpdatePengComment(inspection.id)}
+    onDone={onDone}
+  />
+);
+
 /**
- * The Inspection tab: the structure and its site, then the inspection and its comments — each
- * card with its own Edit, one at a time, the structure page's pattern. Level 0 and up edit
- * (legacy's `/level0Access`); Professional Inspection Required is Level 2's. No Edit once the
- * inspection is Reviewed or Accepted, as legacy disables its page then.
+ * The Inspection tab: the structure and its site, the inspection and its comments, then the P.Eng's
+ * part — the load rating the review recorded and the PEng Comments — each card with its own Edit,
+ * one at a time, the structure page's pattern. Level 0 and up edit (legacy's `/level0Access`);
+ * Professional Inspection Required is Level 2's; the PEng Comments and Reviewed a P.Eng's. No Edit
+ * once the inspection is Reviewed or Accepted, as legacy disables its page then.
  */
 const InspectionTab: FC<{
   inspection: InspectionDetailResponse;
   structure: StructureDetailResponse | undefined;
 }> = ({ inspection, structure }) => {
-  const { canWriteInspection } = useAuthorization();
-  const [editing, setEditing] = useState<'inspection' | 'comments' | null>(null);
-  const canEdit = canWriteInspection && !LOCKING_STATUSES.has(inspection.status.code ?? '');
-  const edit = (card: 'inspection' | 'comments', label: string) =>
-    canEdit &&
+  const { canWriteInspection, isPeng } = useAuthorization();
+  const [editing, setEditing] = useState<Card | null>(null);
+  const open = !LOCKING_STATUSES.has(inspection.status.code ?? '');
+  const edit = (card: Card, label: string, allowed = canWriteInspection) =>
+    allowed &&
+    open &&
     editing === null && (
       <Button
         kind="tertiary"
@@ -288,6 +410,7 @@ const InspectionTab: FC<{
         {label}
       </Button>
     );
+  const done = () => setEditing(null);
 
   return (
     <>
@@ -295,16 +418,28 @@ const InspectionTab: FC<{
       {/* The editor in place of the card's values while it is edited; the values otherwise. */}
       <InspectionCard inspection={inspection} action={edit('inspection', 'Edit inspection')}>
         {editing === 'inspection' ? (
-          <InspectionEditor inspection={inspection} onDone={() => setEditing(null)} />
+          <InspectionEditor inspection={inspection} structure={structure} onDone={done} />
         ) : undefined}
       </InspectionCard>
       <InspectionCommentsCard inspection={inspection} action={edit('comments', 'Edit comments')}>
         {editing === 'comments' ? (
-          <CommentsEditor inspection={inspection} onDone={() => setEditing(null)} />
+          <InspectionCommentsEditor inspection={inspection} onDone={done} />
         ) : undefined}
       </InspectionCommentsCard>
+      <LoadRatingCard inspection={inspection} />
+      <PengCommentsCard
+        inspection={inspection}
+        action={edit('peng-comments', 'Edit PEng comments', isPeng)}
+      >
+        {editing === 'peng-comments' ? (
+          <PengCommentsEditor inspection={inspection} onDone={done} />
+        ) : undefined}
+      </PengCommentsCard>
     </>
   );
 };
+
+/** The tab's cards that edit. */
+type Card = 'inspection' | 'comments' | 'peng-comments';
 
 export default InspectionTab;

@@ -15,8 +15,9 @@ import org.hibernate.annotations.Immutable;
 /**
  * {@code THE.STRUCTURE_INSPECTION_REVIEWER} — a P.Eng who may mark an inspection reviewed.
  *
- * <p>Read only for the IDIR ID a reviewed inspection's load rating is shown under, as legacy's
- * {@code FIND_LOAD_RATINGS_BY_STRC_ID} shows it. Who may review is covered in
+ * <p>Read only: for the IDIR ID a reviewed inspection's load rating is shown under, as legacy's
+ * {@code FIND_LOAD_RATINGS_BY_STRC_ID} shows it, and for the reviewer an inspection is bound to when
+ * a P.Eng reviews it. Who may review is covered in
  * {@code cbr-inspection-reviewer.local.md}.
  */
 @Entity
@@ -43,4 +44,8 @@ public class StructureInspectionReviewerEntity {
 
   @Column(name = "LAST_NAME", length = 50)
   private String lastName;
+
+  /** {@code 'Y'} while the reviewer may still review inspections. */
+  @Column(name = "ACTIVE_IND", length = 1)
+  private String activeInd;
 }

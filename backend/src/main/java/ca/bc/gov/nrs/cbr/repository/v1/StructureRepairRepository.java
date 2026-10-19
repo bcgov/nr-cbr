@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -121,4 +122,21 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
        ORDER BY repair.repairNumber
       """)
   List<StructureRepairEntity> findToCarryForward(@Param("structureId") Long structureId);
+
+  /**
+   * Makes every suggested repairs of the structure required — what legacy's {@code UPDATE_INSPECTION}
+   * does when an inspection is reviewed — stamped with who and when.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE StructureRepairEntity repair
+         SET repair.repairStatusCode = 'REQ',
+             repair.requiredByUserid = :user,
+             repair.requiredByTimestamp = LOCAL DATETIME,
+             repair.updateUserid = :user,
+             repair.updateTimestamp = LOCAL DATETIME
+       WHERE repair.crossingStructureId = :structureId
+         AND repair.repairStatusCode = 'SUG'
+      """)
+  int requireSuggested(@Param("structureId") Long structureId, @Param("user") String user);
 }

@@ -50,6 +50,18 @@ export type InspectionUpdateRequest = {
   professionalInspectionRequired: boolean;
 };
 
+/** A P.Eng's review — legacy's Accept dialog — as sent: the backend's `InspectionReviewRequest`. */
+export type InspectionReviewRequest = {
+  /** GVW tonnes, a whole number. */
+  loadRating: number;
+  reasonCode: string;
+  reasonComment: string;
+  /** `yyyy-MM-dd`; a routine inspection's only. */
+  nextRoutineDate: string | null;
+  routineFrequencyYears: number;
+  loadRatingReviewRequired: boolean;
+};
+
 /** One answered question, where it was asked: a span, a pier, a stringer. */
 export type InspectionItem = {
   subsectionCode: string;

@@ -6,6 +6,7 @@ import java.util.Collection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -94,4 +95,21 @@ public interface StructureMonitorItemRepository
       @Param("outstandingOnly") boolean outstandingOnly,
       @Param("outstandingStatuses") Collection<String> outstandingStatuses,
       @Param("installed") LocalDate installed);
+
+  /**
+   * Makes every suggested monitoring items of the structure required — what legacy's {@code UPDATE_INSPECTION}
+   * does when an inspection is reviewed — stamped with who and when.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE StructureMonitorItemEntity monitor
+         SET monitor.monitoringStatusCode = 'REQ',
+             monitor.requiredByUserid = :user,
+             monitor.requiredByTimestamp = LOCAL DATETIME,
+             monitor.updateUserid = :user,
+             monitor.updateTimestamp = LOCAL DATETIME
+       WHERE monitor.crossingStructureId = :structureId
+         AND monitor.monitoringStatusCode = 'SUG'
+      """)
+  int requireSuggested(@Param("structureId") Long structureId, @Param("user") String user);
 }
