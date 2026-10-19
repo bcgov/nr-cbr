@@ -202,13 +202,14 @@ class InspectionReviewServiceTest {
   void refusals() {
     inspection(41L, "SUB", "ROUT");
     inspection(42L, "RVD", "ROUT");
+    InspectionReviewRequest request = review(40L, "INSP", null);
 
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\SOMEONE");
-    assertThatThrownBy(() -> service.review(41L, review(40L, "INSP", null)))
+    assertThatThrownBy(() -> service.review(41L, request))
         .isInstanceOfSatisfying(ResponseStatusException.class,
             refusal -> assertThat(refusal.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
     when(loggedUser.getLoggedUserId()).thenReturn(PENG);
-    assertThatThrownBy(() -> service.review(42L, review(40L, "INSP", null)))
+    assertThatThrownBy(() -> service.review(42L, request))
         .isInstanceOf(InspectionLockedException.class);
   }
 
@@ -219,8 +220,8 @@ class InspectionReviewServiceTest {
 
     service.updatePengComment(41L, new InspectionCommentRequest(" Sound. "));
     assertThat(found(StructureInspectionEntity.class, 41L).getPengComment()).isEqualTo("Sound.");
-    assertThatThrownBy(() ->
-        service.updatePengComment(41L, new InspectionCommentRequest("x".repeat(4001))))
+    InspectionCommentRequest tooLong = new InspectionCommentRequest("x".repeat(4001));
+    assertThatThrownBy(() -> service.updatePengComment(41L, tooLong))
         .isInstanceOf(FieldValidationException.class);
   }
 }
