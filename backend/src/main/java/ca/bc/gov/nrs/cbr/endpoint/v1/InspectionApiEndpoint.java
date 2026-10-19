@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.ConditionUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
@@ -268,4 +269,19 @@ public interface InspectionApiEndpoint {
   @PutMapping("/{inspectionId}/comment")
   ResponseEntity<Void> updateInspectionComment(@PathVariable("inspectionId") long inspectionId,
       @RequestBody InspectionCommentRequest request);
+
+  /**
+   * Saves one Condition card — a question group's answers, at each span, pier and stringer.
+   * Answers the request leaves out are no longer answered.
+   *
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
+   * {@code /level0Access}. <b>204</b>; <b>404</b> when there is no such inspection, or the
+   * structure is not asked the group; <b>409</b> once it is Reviewed or Accepted; <b>400</b> with
+   * {@code fieldErrors} keyed {@code items.DECK.Q1.span-12}, ….
+   */
+  @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
+  @PutMapping("/{inspectionId}/condition/{subsectionCode}")
+  ResponseEntity<Void> updateCondition(@PathVariable("inspectionId") long inspectionId,
+      @PathVariable("subsectionCode") String subsectionCode,
+      @RequestBody ConditionUpdateRequest request);
 }

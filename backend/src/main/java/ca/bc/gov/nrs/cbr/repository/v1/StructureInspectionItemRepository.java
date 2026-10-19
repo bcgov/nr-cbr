@@ -15,6 +15,10 @@ public interface StructureInspectionItemRepository
   /** An inspection's answers. */
   List<StructureInspectionItemEntity> findByInspectionId(Long inspectionId);
 
+  /** An inspection's answers to one question group — a Condition card. */
+  List<StructureInspectionItemEntity> findByInspectionIdAndSubsectionCode(Long inspectionId,
+      String subsectionCode);
+
   /**
    * Whether any inspection answered a question about this span — legacy's
    * {@code FIND_INSPCTN_ITEMS_BY_SPAN_ID}, which blocks its delete.

@@ -1,7 +1,20 @@
-import { Report } from '@carbon/icons-react';
-import { SkeletonText } from '@carbon/react';
+import { Edit, Report } from '@carbon/icons-react';
+import {
+  Button,
+  SkeletonText,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@carbon/react';
+import { useState } from 'react';
 
 import Card from '@/pages/StructureDetail/Card';
+
+import ConditionEditor from './ConditionEditor';
+import StringerViewTable from './StringerViewTable';
 
 import type { InspectionItem } from './inspectionDetail';
 import type {
@@ -18,6 +31,9 @@ type Props = {
   form: InspectionFormResponse | undefined;
   loading: boolean;
   items: InspectionItem[];
+  inspectionId: string;
+  /** Whether the user may edit the cards — Level 0 and up, until Reviewed or Accepted. */
+  editable: boolean;
 };
 
 /** Where in the structure an answer was given. */
@@ -35,23 +51,37 @@ const answerText = (question: InspectionQuestion, item: InspectionItem | undefin
   return question.answers.find((option) => option.code === item.answer)?.description ?? item.answer;
 };
 
+/** A table of questions, answers and comments, a row each. */
+const AnswerTable: FC<{ label: string; children: ReactNode }> = ({ label, children }) => (
+  <div className="structure-detail__table-scroll">
+    <Table size="sm" useZebraStyles aria-label={label}>
+      <TableHead>
+        <TableRow>
+          <TableHeader>Question</TableHeader>
+          <TableHeader>Answer</TableHeader>
+          <TableHeader>Comments</TableHeader>
+        </TableRow>
+      </TableHead>
+      <TableBody>{children}</TableBody>
+    </Table>
+  </div>
+);
+
 /** One question: its wording, its answer and its comment — "—" where none was given. */
 const QuestionRow: FC<{ question: InspectionQuestion; item: InspectionItem | undefined }> = ({
   question,
   item,
 }) => (
-  <div className="new-inspection__question" data-testid={`answer-${question.code}`}>
-    <span className="new-inspection__question-label">{question.description}</span>
-    <span className="new-inspection__question-label">{answerText(question, item) ?? '—'}</span>
-    <span className="new-inspection__question-label inspection-detail__comment">
-      {item?.comment || ''}
-    </span>
-  </div>
+  <TableRow data-testid={`answer-${question.code}`}>
+    <TableCell>{question.description}</TableCell>
+    <TableCell>{answerText(question, item) ?? '—'}</TableCell>
+    <TableCell className="inspection-detail__comment">{item?.comment || ''}</TableCell>
+  </TableRow>
 );
 
 /**
  * One question group as a card, read only — as Add Inspection lays it out: a block per span or
- * pier under its heading, and a span's stringers under theirs.
+ * pier under its heading, and a span's stringers as a table, each row's View opening its answers.
  */
 const SubsectionCard: FC<{
   subsection: InspectionSubsection;
@@ -59,7 +89,9 @@ const SubsectionCard: FC<{
   piers: BridgePart[];
   answers: Map<string, InspectionItem>;
   stringersOf: (spanId: string | null) => number[];
-}> = ({ subsection, spans, piers, answers, stringersOf }) => {
+  /** The card's Edit, when the user may edit it. */
+  action?: ReactNode;
+}> = ({ subsection, spans, piers, answers, stringersOf, action }) => {
   const perSpan = subsection.scope === 'SPAN';
   const perPier = subsection.scope === 'PIER';
   const groupQuestions = subsection.questions.filter((question) => !question.perStringer);
@@ -67,7 +99,7 @@ const SubsectionCard: FC<{
   const testId = `condition-${subsection.code}`;
 
   const rows = (questions: InspectionQuestion[], where: Where) => (
-    <div className="new-inspection__questions">
+    <AnswerTable label={subsection.description}>
       {questions.map((question) => (
         <QuestionRow
           key={question.code}
@@ -75,36 +107,31 @@ const SubsectionCard: FC<{
           item={answers.get(keyOf(subsection.code, question.code, where))}
         />
       ))}
-    </div>
+    </AnswerTable>
   );
 
-  const block = (where: Where) => {
-    const stringers = stringersOf(where.spanId);
-    return (
-      <>
-        {groupQuestions.length > 0 && rows(groupQuestions, where)}
-        {stringerQuestions.length > 0 && (
-          <div className="new-inspection__stringers">
-            {stringers.length === 0 && (
-              <p className="structure-detail__empty">No stringers recorded.</p>
-            )}
-            {stringers.map((number) => (
-              <section key={number} className="new-inspection__stringer">
-                <h4 className="new-inspection__stringer-title">Stringer {number}</h4>
-                {rows(stringerQuestions, { ...where, stringerNumber: number })}
-              </section>
-            ))}
-          </div>
-        )}
-      </>
-    );
-  };
+  const block = (where: Where, idPrefix: string) => (
+    <>
+      {groupQuestions.length > 0 && rows(groupQuestions, where)}
+      {stringerQuestions.length > 0 && (
+        <StringerViewTable
+          questions={stringerQuestions}
+          stringers={stringersOf(where.spanId)}
+          itemOf={(questionCode, stringerNumber) =>
+            answers.get(keyOf(subsection.code, questionCode, { ...where, stringerNumber }))
+          }
+          details={(stringerNumber) => rows(stringerQuestions, { ...where, stringerNumber })}
+          idPrefix={idPrefix}
+        />
+      )}
+    </>
+  );
 
   const parts = perSpan ? spans : piers;
   const kind = perSpan ? 'Span' : 'Pier';
   let body: ReactNode;
   if (!perSpan && !perPier) {
-    body = block({ spanId: null, pierId: null, stringerNumber: null });
+    body = block({ spanId: null, pierId: null, stringerNumber: null }, testId);
   } else if (parts.length === 0) {
     body = (
       <p className="structure-detail__empty">
@@ -119,17 +146,20 @@ const SubsectionCard: FC<{
         data-testid={`${testId}-${kind.toLowerCase()}-${part.id}`}
       >
         <h3 className="new-inspection__part-title">{partLabel(kind, part)}</h3>
-        {block({
-          spanId: perSpan ? part.id : null,
-          pierId: perPier ? part.id : null,
-          stringerNumber: null,
-        })}
+        {block(
+          {
+            spanId: perSpan ? part.id : null,
+            pierId: perPier ? part.id : null,
+            stringerNumber: null,
+          },
+          `${testId}-${kind.toLowerCase()}-${part.id}`,
+        )}
       </section>
     ));
   }
 
   return (
-    <Card title={subsection.description} icon={Report} testId={testId}>
+    <Card title={subsection.description} icon={Report} testId={testId} action={action}>
       {body}
     </Card>
   );
@@ -156,7 +186,9 @@ const isAsked = (item: InspectionItem, form: InspectionFormResponse): boolean =>
  * its answer and comment or "—". An answer to a question no longer asked — retired since, or the
  * structure changed — is listed last, so nothing recorded is hidden.
  */
-const ConditionView: FC<Props> = ({ form, loading, items }) => {
+const ConditionView: FC<Props> = ({ form, loading, items, inspectionId, editable }) => {
+  /** The card being edited — one at a time — or none. */
+  const [editing, setEditing] = useState<string | null>(null);
   const empty = (content: ReactNode) => (
     <Card title="Condition" icon={Report} testId="condition-empty">
       {content}
@@ -200,28 +232,50 @@ const ConditionView: FC<Props> = ({ form, loading, items }) => {
 
   return (
     <>
-      {form.subsections.map((subsection) => (
-        <SubsectionCard
-          key={subsection.code}
-          subsection={subsection}
-          spans={form.spans}
-          piers={form.piers}
-          answers={answers}
-          stringersOf={stringersBy(subsection.code)}
-        />
-      ))}
+      {form.subsections.map((subsection) =>
+        editing === subsection.code ? (
+          <ConditionEditor
+            key={subsection.code}
+            inspectionId={inspectionId}
+            subsection={subsection}
+            form={form}
+            items={items}
+            onDone={() => setEditing(null)}
+          />
+        ) : (
+          <SubsectionCard
+            key={subsection.code}
+            subsection={subsection}
+            spans={form.spans}
+            piers={form.piers}
+            answers={answers}
+            stringersOf={stringersBy(subsection.code)}
+            action={
+              editable &&
+              editing === null && (
+                <Button
+                  kind="tertiary"
+                  size="sm"
+                  renderIcon={Edit}
+                  data-testid={`condition-${subsection.code}-edit`}
+                  onClick={() => setEditing(subsection.code)}
+                >
+                  {`Edit ${subsection.description.toLowerCase()}`}
+                </Button>
+              )
+            }
+          />
+        ),
+      )}
       {others.length > 0 && (
         <Card title="Other recorded answers" icon={Report} testId="condition-other">
           <p className="structure-detail__note structure-detail__note--first">
             Answers to questions this structure is no longer asked, by their codes.
           </p>
-          <div className="new-inspection__questions">
+          <AnswerTable label="Other recorded answers">
             {others.map((item) => (
-              <div
-                key={keyOf(item.subsectionCode, item.questionCode, item)}
-                className="new-inspection__question"
-              >
-                <span className="new-inspection__question-label">
+              <TableRow key={keyOf(item.subsectionCode, item.questionCode, item)}>
+                <TableCell>
                   {[
                     item.subsectionCode,
                     item.questionCode,
@@ -229,14 +283,12 @@ const ConditionView: FC<Props> = ({ form, loading, items }) => {
                   ]
                     .filter(Boolean)
                     .join(' · ')}
-                </span>
-                <span className="new-inspection__question-label">{item.answer ?? '—'}</span>
-                <span className="new-inspection__question-label inspection-detail__comment">
-                  {item.comment ?? ''}
-                </span>
-              </div>
+                </TableCell>
+                <TableCell>{item.answer ?? '—'}</TableCell>
+                <TableCell className="inspection-detail__comment">{item.comment ?? ''}</TableCell>
+              </TableRow>
             ))}
-          </div>
+          </AnswerTable>
         </Card>
       )}
     </>

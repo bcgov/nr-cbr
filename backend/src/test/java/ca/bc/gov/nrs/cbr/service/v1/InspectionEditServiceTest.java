@@ -29,7 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** The Inspection tab of an inspection's page, edited with legacy's rules. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import(InspectionEditService.class)
+@Import({InspectionEditService.class, InspectionFormService.class})
 class InspectionEditServiceTest {
 
   private static final LocalDateTime PAST = LocalDateTime.of(2000, 1, 1, 0, 0);

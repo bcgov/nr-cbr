@@ -26,7 +26,7 @@ import lombok.ToString;
 @EqualsAndHashCode(of = "structureInspectionItemId")
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class StructureInspectionItemEntity {
 
   @Id

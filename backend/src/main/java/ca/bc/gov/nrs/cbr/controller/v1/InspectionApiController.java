@@ -11,6 +11,7 @@ import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.ConditionUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
@@ -165,6 +166,13 @@ public class InspectionApiController implements InspectionApiEndpoint {
   public ResponseEntity<Void> updateInspectionComment(long inspectionId,
       InspectionCommentRequest request) {
     editService.updateComment(inspectionId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> updateCondition(long inspectionId, String subsectionCode,
+      ConditionUpdateRequest request) {
+    editService.updateCondition(inspectionId, subsectionCode, request);
     return ResponseEntity.noContent().build();
   }
 }

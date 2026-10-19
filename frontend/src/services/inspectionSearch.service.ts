@@ -13,6 +13,7 @@ import type {
 import type {
   InspectionCreateRequest,
   InspectionFormResponse,
+  InspectionItemRequest,
 } from '@/pages/NewInspection/inspectionForm';
 import type { DocumentDetailsRequest } from '@/pages/StructureDetail/documentsResponse';
 import type {
@@ -253,6 +254,23 @@ export class InspectionSearchService extends HttpClient {
       url: '/v1/inspections/{inspectionId}/comment',
       path: { inspectionId },
       body: { comment },
+    });
+  }
+
+  /**
+   * Saves one Condition card: its question group's answers. Answers it leaves out are no longer
+   * answered. 400 with `fieldErrors`; 409 once the inspection is reviewed.
+   */
+  updateInspectionCondition(
+    inspectionId: string,
+    subsectionCode: string,
+    items: InspectionItemRequest[],
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/inspections/{inspectionId}/condition/{subsectionCode}',
+      path: { inspectionId, subsectionCode },
+      body: { items },
     });
   }
 }

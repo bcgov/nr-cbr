@@ -38,6 +38,7 @@ import { countOf, outstandingOf, type OutstandingTab } from './outstanding';
 import type { CarbonIconType } from '@carbon/icons-react';
 import type { FC } from 'react';
 
+import { useAuthorization } from '@/hooks/useAuthorization';
 import { useInspection, useInspectionForm } from '@/hooks/useInspectionSearch';
 import { useStructure } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
@@ -84,6 +85,7 @@ const isOutstandingTab = (key: TabKey): key is OutstandingTab =>
  * a list at the top of it.
  */
 const InspectionDetailPage: FC = () => {
+  const { canWriteInspection } = useAuthorization();
   const { inspectionId = '' } = useParams<{ inspectionId: string }>();
   const loaded = useInspection(inspectionId);
   const inspection = loaded.data;
@@ -103,6 +105,8 @@ const InspectionDetailPage: FC = () => {
   const locked = LOCKING_STATUSES.has(inspection?.status.code ?? '');
   /** Reviewed or Accepted: no document added any more — legacy disables its Add then, not on Rejected. */
   const documentsLocked = DOCUMENT_LOCKING_STATUSES.has(inspection?.status.code ?? '');
+  /** Legacy's page: Level 0 and up edit it, until it is Reviewed or Accepted. */
+  const canEditInspection = canWriteInspection && !documentsLocked;
   /** What it still lacks, by tab — legacy's submit rules and every unanswered question. */
   const outstanding = inspection ? outstandingOf(inspection, form.data) : null;
   const counts = {
@@ -208,6 +212,8 @@ const InspectionDetailPage: FC = () => {
                       form={form.data}
                       loading={form.isLoading}
                       items={inspection.items}
+                      inspectionId={inspection.id}
+                      editable={canEditInspection}
                     />
                   </div>
                 </TabPanel>

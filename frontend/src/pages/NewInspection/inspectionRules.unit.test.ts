@@ -164,12 +164,19 @@ describe('answerErrorsOf', () => {
   });
 
   it('holds a typed answer to 255 and a comment to 2000', () => {
-    expect(errorOf(answer({ questionCode: 'PLR', answer: 'x'.repeat(256) }))).toBe(
+    expect(errorOf(answer({ questionCode: 'PLR', answer: '1'.repeat(256) }))).toBe(
       '(Approaches) Posted Load Rating can be at most 255 characters.',
     );
     expect(errorOf(answer({ answer: 'G', comment: 'x'.repeat(2001) }))).toBe(
       'The comment can be at most 2000 characters.',
     );
+  });
+
+  it('refuses a non-number where a number is asked', () => {
+    expect(errorOf(answer({ questionCode: 'PLR', answer: 'forty' }), [])).toBe(
+      '(APP) PLR must be a number.',
+    );
+    expect(errorOf(answer({ questionCode: 'PLR', answer: ' 40.5 ' }), [])).toBeUndefined();
   });
 
   it('names a question by its codes when the form does not know it', () => {

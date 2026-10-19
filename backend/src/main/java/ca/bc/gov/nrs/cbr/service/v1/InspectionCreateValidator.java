@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
@@ -46,6 +47,13 @@ public class InspectionCreateValidator {
   static final Set<String> ADDABLE_STATUSES = Set.of(IN_PROGRESS, SUBMITTED);
   /** Legacy's answers that need a comment: Poor and Unrated (InspectionItem.java:32-33). */
   private static final Set<String> NEEDS_COMMENT = Set.of("P", "UNR");
+  /**
+   * The questions answered with a number — those legacy range-checks (InspectionAction.java:310-435).
+   * Legacy only warned when one was not a number, and saved it; here it is refused.
+   */
+  private static final Set<String> NUMERIC_QUESTIONS =
+      Set.of("PLR", "GDD", "DMT", "RDB", "RDS", "RDT", "ASR");
+  private static final Pattern NUMBER = Pattern.compile("-?\\d+(\\.\\d+)?");
   private static final int NAME_MAX = 255;
   private static final int COMMENT_MAX = 4000;
   private static final int TEXT_MAX = 2000;
@@ -119,7 +127,7 @@ public class InspectionCreateValidator {
     metres(errors, "highWaterClearance", "Estimated High Water Level Clearance",
         request.highWaterClearance());
     tooLong(errors, "hazardComment", "Hazard Comments", request.hazardComment(), TEXT_MAX);
-    checkItems(errors, request.items() == null ? List.of() : request.items(), form);
+    errors.putAll(itemErrors(request.items() == null ? List.of() : request.items(), form));
     return errors;
   }
 
@@ -170,7 +178,20 @@ public class InspectionCreateValidator {
     }
   }
 
-  private void checkItems(Map<String, String> errors, List<Item> items,
+  /**
+   * Every reason the answers cannot be saved, keyed as {@link #itemKey} — each answer's rules, then
+   * legacy's stringer rules. Add Inspection's, and a Condition card's on the inspection's page.
+   *
+   * @param form the questions the structure is asked — {@link InspectionFormService#form}
+   */
+  static Map<String, String> itemErrors(List<Item> items, InspectionFormResponse form) {
+    Map<String, String> errors = new LinkedHashMap<>();
+    checkItems(errors, items, form);
+    StringerRules.check(errors, items, form);
+    return errors;
+  }
+
+  private static void checkItems(Map<String, String> errors, List<Item> items,
       InspectionFormResponse form) {
     Set<String> seen = new HashSet<>();
     for (Item item : items) {
@@ -212,6 +233,9 @@ public class InspectionCreateValidator {
     }
     if (NEEDS_COMMENT.contains(answer) && comment == null) {
       return label + " requires a comment.";
+    }
+    if (NUMERIC_QUESTIONS.contains(question.code()) && !NUMBER.matcher(answer).matches()) {
+      return label + " must be a number.";
     }
     return comment != null && bytes(comment) > TEXT_MAX
         ? atMost("The comment", TEXT_MAX)

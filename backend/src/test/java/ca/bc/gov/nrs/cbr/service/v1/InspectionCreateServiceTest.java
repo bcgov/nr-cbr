@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -30,6 +31,7 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionItemEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.ConditionUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest.Item;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
@@ -51,11 +53,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Add Inspection — its questions and its save — against the database. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
 @Import({InspectionCreateService.class, InspectionCreateValidator.class,
-    InspectionFormService.class})
+    InspectionFormService.class, InspectionEditService.class})
 class InspectionCreateServiceTest {
 
   private static final LocalDateTime PAST = LocalDateTime.now().minusYears(5);
@@ -67,6 +70,10 @@ class InspectionCreateServiceTest {
 
   @Autowired
   private InspectionFormService forms;
+
+  /** A Condition card's save, on the inspection's page — the same questions and rules. */
+  @Autowired
+  private InspectionEditService edits;
 
   @Autowired
   private EntityManager entityManager;
@@ -376,5 +383,57 @@ class InspectionCreateServiceTest {
     complete(false);
     assertThat(refused(request("UNP", TODAY, List.of()))).containsOnly(Map.entry("structureId",
         "Structure B7 is incomplete. Complete it on its structure page before it can be inspected."));
+  }
+
+  @Test
+  @DisplayName("a Condition card's save keeps, adds and takes out its group's answers only")
+  void conditionCard() {
+    InspectionFormResponse form = form();
+    long span1 = Long.parseLong(form.spans().get(0).id());
+    long span2 = Long.parseLong(form.spans().get(1).id());
+    long id = Long.parseLong(service.create(request("UNP", TODAY, List.of(
+        new Item("APP", "APPQ", null, null, null, "G", null),
+        new Item("DECK", "DECKQ", span1, null, null, "P", "Rotten plank")))).id());
+    entityManager.flush();
+    entityManager.clear();
+
+    edits.updateCondition(id, "DECK", new ConditionUpdateRequest(List.of(
+        new Item("DECK", "DECKQ", span1, null, null, "G", null),
+        new Item("DECK", "DECKQ", span2, null, null, "E", "Like new"))));
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(all(StructureInspectionItemEntity.class))
+        .extracting(StructureInspectionItemEntity::getQuestionCode,
+            StructureInspectionItemEntity::getForestServiceBridgeSpanId,
+            StructureInspectionItemEntity::getAnswerValue)
+        .containsExactlyInAnyOrder(tuple("APPQ", null, "G"), tuple("DECKQ", span1, "G"),
+            tuple("DECKQ", span2, "E"));
+
+    // Sent blank, or not sent: no longer answered.
+    edits.updateCondition(id, "DECK", new ConditionUpdateRequest(List.of(
+        new Item("DECK", "DECKQ", span1, null, null, " ", " "))));
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(all(StructureInspectionItemEntity.class))
+        .extracting(StructureInspectionItemEntity::getQuestionCode).containsExactly("APPQ");
+  }
+
+  @Test
+  @DisplayName("a Condition card keeps Add Inspection's rules, and its own group")
+  void conditionCardRules() {
+    long id = Long.parseLong(service.create(request("UNP", TODAY, List.of())).id());
+    entityManager.flush();
+
+    ConditionUpdateRequest poor = new ConditionUpdateRequest(List.of(
+        new Item("APP", "APPQ", null, null, null, "P", null),
+        new Item("DECK", "DECKQ", 1L, null, null, "G", null)));
+    assertThatThrownBy(() -> edits.updateCondition(id, "APP", poor))
+        .isInstanceOfSatisfying(FieldValidationException.class, refusal ->
+            assertThat(refusal.getFieldErrors())
+                .containsEntry("items.APP.APPQ", "(APP group) APPQ question requires a comment.")
+                .containsKey("items.DECK.DECKQ.span-1"));
+    ConditionUpdateRequest none = new ConditionUpdateRequest(List.of());
+    assertThatThrownBy(() -> edits.updateCondition(id, "NOPE", none))
+        .isInstanceOf(ResponseStatusException.class);
   }
 }

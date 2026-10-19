@@ -15,11 +15,19 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionItemEntity;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionItemRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.ConditionUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest.Item;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -67,12 +75,17 @@ public class InspectionEditService {
 
   private final StructureInspectionRepository inspections;
   private final InspectionReportStatusRepository statuses;
+  private final StructureInspectionItemRepository items;
+  private final InspectionFormService forms;
   private final LoggedUserHelper loggedUser;
 
   public InspectionEditService(StructureInspectionRepository inspections,
-      InspectionReportStatusRepository statuses, LoggedUserHelper loggedUser) {
+      InspectionReportStatusRepository statuses, StructureInspectionItemRepository items,
+      InspectionFormService forms, LoggedUserHelper loggedUser) {
     this.inspections = inspections;
     this.statuses = statuses;
+    this.items = items;
+    this.forms = forms;
     this.loggedUser = loggedUser;
   }
 
@@ -175,6 +188,77 @@ public class InspectionEditService {
         .updateTimestamp(LocalDateTime.now(ZoneId.systemDefault()))
         .build());
     log.info("Updated the comments of inspection {}", inspectionId);
+  }
+
+  /**
+   * Saves one Condition card — a question group's answers, at each span, pier and stringer — as
+   * legacy's update does: an answer kept is updated, a new one added, one no longer sent (or sent
+   * blank) taken out. The rules are Add Inspection's: each answer's, and legacy's stringer rules.
+   *
+   * @throws InspectionNotFoundException if there is no such inspection
+   * @throws InspectionLockedException   once it is Reviewed or Accepted
+   * @throws FieldValidationException    with a message for each answer at fault, keyed
+   *     {@code items.DECK.Q1.span-12}, …
+   */
+  @Transactional
+  public void updateCondition(long inspectionId, String subsectionCode,
+      ConditionUpdateRequest request) {
+    StructureInspectionEntity inspection = open(inspectionId);
+    InspectionFormResponse form = forms.form(inspection.getCrossingStructureId());
+    if (form.subsections().stream().noneMatch(group -> group.code().equals(subsectionCode))) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+          "This structure is not asked the question group " + subsectionCode + ".");
+    }
+    List<Item> sent = (request.items() == null ? List.<Item>of() : request.items()).stream()
+        .filter(item -> InspectionCreateValidator.trimmed(item.answer()) != null
+            || InspectionCreateValidator.trimmed(item.comment()) != null)
+        .toList();
+    Map<String, String> errors = new LinkedHashMap<>();
+    sent.stream()
+        .filter(item -> !subsectionCode.equals(item.subsectionCode()))
+        .forEach(item -> errors.put(InspectionCreateValidator.itemKey(item),
+            "This answer is not of this question group."));
+    errors.putAll(InspectionCreateValidator.itemErrors(sent, form));
+    if (!errors.isEmpty()) {
+      throw new FieldValidationException("Condition cannot be saved", errors);
+    }
+
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    Map<String, StructureInspectionItemEntity> stored = new LinkedHashMap<>();
+    for (StructureInspectionItemEntity item :
+        items.findByInspectionIdAndSubsectionCode(inspectionId, subsectionCode)) {
+      stored.put(InspectionCreateValidator.itemKey(itemOf(item)), item);
+    }
+    for (Item item : sent) {
+      StructureInspectionItemEntity kept = stored.remove(InspectionCreateValidator.itemKey(item));
+      StructureInspectionItemEntity.StructureInspectionItemEntityBuilder row = kept == null
+          ? StructureInspectionItemEntity.builder()
+              .inspectionId(inspectionId)
+              .subsectionCode(subsectionCode)
+              .questionCode(item.questionCode())
+              .forestServiceBridgeSpanId(item.spanId())
+              .forestServiceBridgePierId(item.pierId())
+              .stringerNumber(item.stringerNumber())
+              .entryUserid(user)
+              .entryTimestamp(now)
+          : kept.toBuilder();
+      items.save(row
+          .answerValue(InspectionCreateValidator.trimmed(item.answer()))
+          .itemComment(InspectionCreateValidator.trimmed(item.comment()))
+          .updateUserid(user)
+          .updateTimestamp(now)
+          .build());
+    }
+    items.deleteAll(stored.values());
+    log.info("Updated the {} answers of inspection {}", subsectionCode, inspectionId);
+  }
+
+  /** A stored answer as the request names one, for its key. */
+  private static Item itemOf(StructureInspectionItemEntity item) {
+    return new Item(item.getSubsectionCode(), item.getQuestionCode(),
+        item.getForestServiceBridgeSpanId(), item.getForestServiceBridgePierId(),
+        item.getStringerNumber(), item.getAnswerValue(), item.getItemComment());
   }
 
   /**

@@ -18,6 +18,16 @@ const METRES_MAX = 99_999.9;
 /** Legacy's answers that need a comment: Poor and Unrated. */
 export const NEEDS_COMMENT = new Set(['P', 'UNR']);
 
+/**
+ * The questions answered with a number: Posted Load Rating, Gravel Deck Depth, Diameter, the rot
+ * depths and Average Rot Depth — those legacy range-checks. Legacy only warned when one was not a
+ * number, and saved it; here it is refused.
+ */
+export const NUMERIC_QUESTIONS = new Set(['PLR', 'GDD', 'DMT', 'RDB', 'RDS', 'RDT', 'ASR']);
+
+/** Whether a typed answer reads as a number — `12`, `0.5`, `-3`. */
+export const isNumber = (typed: string): boolean => /^-?\d+(\.\d+)?$/.test(typed.trim());
+
 /** Whether an answer's message is about its comment — shown under the comment box, not the answer. */
 export const isCommentMessage = (message: string): boolean =>
   message.endsWith(' requires a comment.') || message.startsWith('The comment ');
@@ -214,17 +224,25 @@ export const answerErrorsOf = (answers: Answers, subsections: InspectionSubsecti
     const label = `(${group?.description ?? entry.subsectionCode}) ${
       question?.description ?? entry.questionCode
     }`;
-    const answer = entry.answer.trim();
-    const comment = entry.comment.trim();
-    if (!answer && comment) errors[key] = `${label} requires an answer.`;
-    else if (NEEDS_COMMENT.has(answer) && !comment) errors[key] = `${label} requires a comment.`;
-    else if (byteLength(answer) > NAME_MAX && question?.answers.length === 0) {
-      errors[key] = `${label} can be at most ${NAME_MAX} characters.`;
-    } else if (byteLength(comment) > TEXT_MAX) {
-      errors[key] = `The comment can be at most ${TEXT_MAX} characters.`;
-    }
+    errors[key] = answerProblemOf(entry, label, question?.answers.length === 0);
   }
   return errors;
+};
+
+/** What is wrong with one answer, if anything — legacy's rules, and a number where one is asked. */
+const answerProblemOf = (entry: Answer, label: string, typed: boolean): string | undefined => {
+  const answer = entry.answer.trim();
+  const comment = entry.comment.trim();
+  if (!answer && comment) return `${label} requires an answer.`;
+  if (NEEDS_COMMENT.has(answer) && !comment) return `${label} requires a comment.`;
+  if (answer && NUMERIC_QUESTIONS.has(entry.questionCode) && !isNumber(answer)) {
+    return `${label} must be a number.`;
+  }
+  if (byteLength(answer) > NAME_MAX && typed)
+    return `${label} can be at most ${NAME_MAX} characters.`;
+  return byteLength(comment) > TEXT_MAX
+    ? `The comment can be at most ${TEXT_MAX} characters.`
+    : undefined;
 };
 
 /** The page's values as the server takes them. */
