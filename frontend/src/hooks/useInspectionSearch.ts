@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import type {
   InspectionHazardsRequest,
+  InspectionReviewRequest,
   InspectionUpdateRequest,
 } from '@/pages/InspectionDetail/inspectionDetail';
 import type {
@@ -128,6 +129,30 @@ export const useUpdateInspectionCondition = (inspectionId: string, subsectionCod
   const mutation = useMutation({
     mutationFn: (items: InspectionItemRequest[]) =>
       API.inspectionSearch.updateInspectionCondition(inspectionId, subsectionCode, items),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/**
+ * Reviews an inspection — legacy's Accept. It changes the structure too (its load rating and
+ * schedule, its repairs and monitoring items), so everything is read again.
+ */
+export const useReviewInspection = (inspectionId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (request: InspectionReviewRequest) =>
+      API.inspectionSearch.reviewInspection(inspectionId, request),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+  return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
+};
+
+/** Saves an inspection's PEng Comments, then reads the inspection again. */
+export const useUpdatePengComment = (inspectionId: string) => {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (comment: string) => API.inspectionSearch.updatePengComment(inspectionId, comment),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };

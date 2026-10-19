@@ -19,3 +19,38 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+// The status pill, and View history beside it.
+.inspection-detail__status {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-03;
+}
+
+// The Review dialog: its groups, and the question over its buttons.
+.inspection-detail__dialog-section .inspection-detail__subheading {
+  margin-block-start: 0;
+}
+
+.inspection-detail__dialog-question {
+  margin-block-start: $spacing-07;
+
+  // Carbon's modal sets its paragraphs' weight, so the bold is the element's own.
+  strong {
+    font-weight: 600;
+  }
+}
+
+// A planned year, and how it stands beside it.
+.inspection-detail__year {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-03;
+}
+
+// Legacy's yellow: due within five years.
+.inspection-detail__due-soon.cds--tag {
+  background-color: var(--cds-support-warning);
+  // Dark text on yellow, in either theme.
+  color: #161616;
+}

@@ -2,6 +2,7 @@ import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type {
   InspectionDetailResponse,
   InspectionHazardsRequest,
+  InspectionReviewRequest,
   InspectionUpdateRequest,
 } from '@/pages/InspectionDetail/inspectionDetail';
 import type {
@@ -271,6 +272,32 @@ export class InspectionSearchService extends HttpClient {
       url: '/v1/inspections/{inspectionId}/condition/{subsectionCode}',
       path: { inspectionId, subsectionCode },
       body: { items },
+    });
+  }
+
+  /**
+   * Reviews an inspection — legacy's Accept: Reviewed, its load rating, the structure's schedule.
+   * A P.Eng's; 400 with `fieldErrors`; 403 when not an active reviewer; 409 once reviewed.
+   */
+  reviewInspection(
+    inspectionId: string,
+    request: InspectionReviewRequest,
+  ): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'POST',
+      url: '/v1/inspections/{inspectionId}/review',
+      path: { inspectionId },
+      body: request,
+    });
+  }
+
+  /** Saves an inspection's PEng Comments. A P.Eng's; 400 with `fieldErrors`; 409 once reviewed. */
+  updatePengComment(inspectionId: string, comment: string): CancelablePromise<void> {
+    return this.doRequest<void>(this.config, {
+      method: 'PUT',
+      url: '/v1/inspections/{inspectionId}/peng-comment',
+      path: { inspectionId },
+      body: { comment },
     });
   }
 }

@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.endpoint.v1.InspectionApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionCreateService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionDetailService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionEditService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionReviewService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
@@ -16,6 +17,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionDetailResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionReviewRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
@@ -52,12 +54,14 @@ public class InspectionApiController implements InspectionApiEndpoint {
   private final InspectionDetailService detailService;
   private final InspectionFollowUpService followUpService;
   private final InspectionEditService editService;
+  private final InspectionReviewService reviewService;
 
+  @SuppressWarnings("java:S107") // One service per concern of the inspection page.
   public InspectionApiController(
       InspectionSearchService inspectionSearchService, InspectionService inspectionService,
       InspectionFormService formService, InspectionCreateService createService,
       InspectionDetailService detailService, InspectionFollowUpService followUpService,
-      InspectionEditService editService) {
+      InspectionEditService editService, InspectionReviewService reviewService) {
     this.inspectionSearchService = inspectionSearchService;
     this.inspectionService = inspectionService;
     this.formService = formService;
@@ -65,6 +69,7 @@ public class InspectionApiController implements InspectionApiEndpoint {
     this.detailService = detailService;
     this.followUpService = followUpService;
     this.editService = editService;
+    this.reviewService = reviewService;
   }
 
   @Override
@@ -173,6 +178,20 @@ public class InspectionApiController implements InspectionApiEndpoint {
   public ResponseEntity<Void> updateCondition(long inspectionId, String subsectionCode,
       ConditionUpdateRequest request) {
     editService.updateCondition(inspectionId, subsectionCode, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> reviewInspection(long inspectionId,
+      InspectionReviewRequest request) {
+    reviewService.review(inspectionId, request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  public ResponseEntity<Void> updatePengComment(long inspectionId,
+      InspectionCommentRequest request) {
+    reviewService.updatePengComment(inspectionId, request);
     return ResponseEntity.noContent().build();
   }
 }
