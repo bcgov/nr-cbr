@@ -1,7 +1,7 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.blankIfNull;
-import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.date;
+import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.formatDate;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.filename;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.firstOf;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.millisSince;
@@ -15,12 +15,8 @@ import ca.bc.gov.nrs.cbr.specification.v1.StructureInventoryReportSpecifications
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
 import jakarta.persistence.EntityManager;
-import java.io.IOException;
-import java.io.StringWriter;
-import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
@@ -30,8 +26,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -155,7 +149,7 @@ public class StructureInventorySummaryService {
           line.currentLoadRating() == null ? ""
               : line.currentLoadRating().setScale(0, RoundingMode.HALF_EVEN).toPlainString(),
           // Present but empty when every routine inspection is undated — MAX of nothing.
-          date(lastInspected.get(id)),
+          formatDate(lastInspected.get(id)),
           number(line.yearBuilt()),
           blankIfNull(statuses.get(id)),
           number(line.fullLogHaulReplacementYear()),

@@ -1,7 +1,7 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.blankIfNull;
-import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.date;
+import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.formatDate;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.filename;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.firstOf;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.millisSince;
@@ -68,6 +68,9 @@ public class StructureInventoryDetailedService {
   static final String FILENAME = "StructureInventoryDetailReport";
 
   private static final String YES = "Y";
+
+  /** Legacy's template pattern for a whole number: {@code #,##0}. */
+  private static final String WHOLE = "#,##0";
 
   /** The CSV's columns: legacy's {@code CBRCSVUtils} headings, in its order, less Structure ID. */
   static final List<String> CSV_COLUMNS = List.of(
@@ -166,7 +169,7 @@ public class StructureInventoryDetailedService {
           blankIfNull(line.crossingStructureName()),
           blankIfNull(line.crossingSiteId()),
           blankIfNull(line.siteStatusDescription()),
-          date(fact.lastInspected()),
+          formatDate(fact.lastInspected()),
           format(line.pointOfCommencementDistance(), "###0.00"),
           format(line.userKm(), "#,##0.00"),
           blankIfNull(line.typeClassDescription()),
@@ -176,19 +179,18 @@ public class StructureInventoryDetailedService {
           blankIfNull(line.districtName()),
           blankIfNull(line.roadSectName()),
           blankIfNull(line.crossingName()),
-          bridge == null ? "" : blankIfNull(bridge.superstructureType()),
-          bridge == null ? "" : blankIfNull(bridge.deckType()),
-          bridge == null ? "" : blankIfNull(bridge.leftAbutment()),
-          bridge == null ? "" : blankIfNull(bridge.rightAbutment()),
-          format(line.designLoadRating(), "#,##0"),
-          format(line.currentLoadRating(), "#,##0"),
-          // Legacy counts the spans of no bridge as 0, so a culvert shows "0".
-          bridge == null ? "0" : format(BigDecimal.valueOf(bridge.spanCount()), "#,##0"),
+          of(bridge, StructureBridgeDetail::superstructureType),
+          of(bridge, StructureBridgeDetail::deckType),
+          of(bridge, StructureBridgeDetail::leftAbutment),
+          of(bridge, StructureBridgeDetail::rightAbutment),
+          format(line.designLoadRating(), WHOLE),
+          format(line.currentLoadRating(), WHOLE),
+          format(BigDecimal.valueOf(fact.spanCount()), WHOLE),
           format(fact.totalLength(), "###0.0"),
           number(line.yearBuilt()),
-          bridge == null ? "" : blankIfNull(bridge.portableLocationDetail()),
+          of(bridge, StructureBridgeDetail::portableLocationDetail),
           blankIfNull(line.capitalRoadInd()),
-          bridge == null ? "" : blankIfNull(bridge.curbType()),
+          of(bridge, StructureBridgeDetail::curbType),
           blankIfNull(line.loadRatingUnknownIndicator()));
     }).toList();
   }
@@ -217,7 +219,7 @@ public class StructureInventoryDetailedService {
           blankIfNull(line.crossingStructureName()),
           blankIfNull(line.crossingSiteId()),
           blankIfNull(line.siteStatusDescription()),
-          date(fact.lastInspected()),
+          formatDate(fact.lastInspected()),
           plain(line.pointOfCommencementDistance()),
           plain(line.userKm()),
           blankIfNull(line.typeClassDescription()),
@@ -227,20 +229,20 @@ public class StructureInventoryDetailedService {
           orgUnit(orgUnitNames, line.businessAreaOrgUnitNo()),
           blankIfNull(line.roadSectName()),
           blankIfNull(line.crossingName()),
-          bridge == null ? "" : blankIfNull(bridge.superstructureType()),
-          bridge == null ? "" : blankIfNull(bridge.deckType()),
-          bridge == null ? "" : blankIfNull(bridge.leftAbutment()),
-          bridge == null ? "" : blankIfNull(bridge.rightAbutment()),
+          of(bridge, StructureBridgeDetail::superstructureType),
+          of(bridge, StructureBridgeDetail::deckType),
+          of(bridge, StructureBridgeDetail::leftAbutment),
+          of(bridge, StructureBridgeDetail::rightAbutment),
           plain(line.designLoadRating()),
-          bridge == null ? "0" : plain(bridge.spanCount()),
+          plain(fact.spanCount()),
           plain(fact.totalLength()),
           number(line.yearBuilt()),
-          bridge == null ? "" : blankIfNull(bridge.portableLocationDetail()),
+          of(bridge, StructureBridgeDetail::portableLocationDetail),
           describe(codes.designVehicles(), line.designVehicleLoadCode()),
-          bridge == null ? "" : plain(bridge.deckWidth()),
+          of(bridge, b -> plain(b.deckWidth())),
           describe(codes.builtBy(), line.builtByCode()),
-          date(line.nextPlannedInspectionDate()),
-          line.clientNumber() == null ? "" : blankIfNull(clientNames.get(line.clientNumber())),
+          formatDate(line.nextPlannedInspectionDate()),
+          of(line.clientNumber(), clientNames::get),
           describe(codes.siteTypes(), line.crossingSiteTypeCode()),
           number(line.lightVehicleReplacementYear()),
           plain(line.estimatedReplacementCost()),
@@ -249,14 +251,14 @@ public class StructureInventoryDetailedService {
           plain(line.longitude()),
           plain(line.latitude()),
           describe(codes.sources(), line.structureSourceCode()),
-          culvert == null ? "" : blankIfNull(culvert.culvertType()),
-          culvert == null ? "" : blankIfNull(culvert.culvertMaterial()),
-          culvert == null ? "" : plain(culvert.openingHeight()),
-          culvert == null ? "" : plain(culvert.openingWidth()),
-          culvert == null ? "" : plain(culvert.culvertLength()),
-          culvert == null ? "" : plain(culvert.slope()),
-          culvert == null ? "" : plain(culvert.inletCoverDepth()),
-          culvert == null ? "" : plain(culvert.outletCoverDepth()),
+          of(culvert, StructureCulvertDetail::culvertType),
+          of(culvert, StructureCulvertDetail::culvertMaterial),
+          of(culvert, c -> plain(c.openingHeight())),
+          of(culvert, c -> plain(c.openingWidth())),
+          of(culvert, c -> plain(c.culvertLength())),
+          of(culvert, c -> plain(c.slope())),
+          of(culvert, c -> plain(c.inletCoverDepth())),
+          of(culvert, c -> plain(c.outletCoverDepth())),
           orgUnit(orgUnitNames, line.managementOrgUnitNo()),
           blankIfNull(line.districtName()),
           orgUnit(orgUnitNames, line.regionOrgUnitNo()),
@@ -264,9 +266,14 @@ public class StructureInventoryDetailedService {
           blankIfNull(statuses.get(line.crossingStructureId())),
           plain(line.currentLoadRating()),
           yesNo(line.capitalRoadInd()),
-          bridge == null ? "" : blankIfNull(bridge.curbType()),
+          of(bridge, StructureBridgeDetail::curbType),
           yesNo(line.loadRatingUnknownIndicator()));
     }).toList();
+  }
+
+  /** A value of the bridge or culvert row — or the maintainer — or blank when there is none. */
+  private static <T> String of(T row, Function<T, String> value) {
+    return row == null ? "" : blankIfNull(value.apply(row));
   }
 
   private static String orgUnit(Map<Long, String> names, Long orgUnitNo) {
@@ -279,6 +286,11 @@ public class StructureInventoryDetailedService {
       StructureBridgeDetail bridge,
       StructureCulvertDetail culvert,
       LocalDate lastInspected) {
+
+    /** Legacy counts the spans of no bridge as 0, so a culvert shows 0. */
+    long spanCount() {
+      return bridge == null || bridge.spanCount() == null ? 0 : bridge.spanCount();
+    }
 
     /**
      * Legacy's CASE: a structure with a bridge row shows the bridge's length, even when the bridge

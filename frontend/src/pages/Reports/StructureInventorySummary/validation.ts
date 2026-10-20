@@ -1,4 +1,4 @@
-import { checkFields, isKilometre, isYear, KILOMETRES_MESSAGE, YEAR_MESSAGE } from '../validation';
+import { checkFields, commonCriteriaErrors } from '../validation';
 
 import type { StructureInventorySummaryCriteria } from './types';
 
@@ -9,26 +9,11 @@ export type CriteriaErrors = Partial<Record<keyof StructureInventorySummaryCrite
 
 /**
  * Field-level messages for whatever is wrong — one per offending box, each judged on its own.
- * Legacy's rules: kilometres are a number, years are four digits, an opening width is whole
- * millimetres. The wording matches Structure Search's for the boxes the two share.
+ * The shared rules, then the Summary's own: an opening width is whole millimetres. The wording
+ * matches Structure Search's for the boxes the two share.
  */
 export const criteriaErrors = (criteria: StructureInventorySummaryCriteria): CriteriaErrors => {
-  const errors: CriteriaErrors = {};
-  checkFields(criteria, ['kiloStart', 'kiloEnd'], isKilometre, KILOMETRES_MESSAGE, errors);
-  checkFields(
-    criteria,
-    [
-      'yearBuiltStart',
-      'yearBuiltEnd',
-      'loadRestrictionYearStart',
-      'loadRestrictionYearEnd',
-      'replacementYearStart',
-      'replacementYearEnd',
-    ],
-    isYear,
-    YEAR_MESSAGE,
-    errors,
-  );
+  const errors = commonCriteriaErrors(criteria);
   checkFields(
     criteria,
     ['openingWidthMin', 'openingWidthMax'],

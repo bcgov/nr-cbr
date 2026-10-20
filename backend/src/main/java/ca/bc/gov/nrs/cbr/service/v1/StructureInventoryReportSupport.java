@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.springframework.beans.factory.annotation.Value;
@@ -184,12 +185,12 @@ public class StructureInventoryReportSupport {
   static <R, T> Map<Long, T> firstOf(
       List<Long> ids,
       Function<Collection<Long>, List<R>> lookup,
-      Function<R, Long> structureId,
+      ToLongFunction<R> structureId,
       Function<R, T> value) {
     Map<Long, T> values = new HashMap<>();
     for (int from = 0; from < ids.size(); from += BATCH) {
       for (R found : lookup.apply(ids.subList(from, Math.min(ids.size(), from + BATCH)))) {
-        values.putIfAbsent(structureId.apply(found), value.apply(found));
+        values.putIfAbsent(structureId.applyAsLong(found), value.apply(found));
       }
     }
     return values;
@@ -262,7 +263,7 @@ public class StructureInventoryReportSupport {
   }
 
   /** A date as the reports print it, or blank. */
-  static String date(LocalDate value) {
+  static String formatDate(LocalDate value) {
     return value == null ? "" : value.format(DATE);
   }
 

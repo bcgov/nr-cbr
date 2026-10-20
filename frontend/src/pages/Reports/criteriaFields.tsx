@@ -11,7 +11,7 @@ type Context<C extends object> = {
   id: string;
   criteria: C;
   /** The errors to show now — `useFieldErrors().shown`. */
-  shown: Partial<Record<keyof C, string | undefined>>;
+  shown: Partial<Record<keyof C & string, string | undefined>>;
   /** A box was left — `useFieldErrors().leave`. */
   leave: (field: keyof C & string) => void;
   onChange: <K extends keyof C>(field: K, value: C[K]) => void;
