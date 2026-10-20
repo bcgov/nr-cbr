@@ -221,8 +221,8 @@ public class StructureInventorySummaryService {
     /** Plain numbers, the type/class's description, and Yes or No. */
     static Style data(Map<String, String> typeClasses) {
       return new Style(
-          StructureInventorySummaryService::plain,
-          StructureInventorySummaryService::plain,
+          Style::plain,
+          Style::plain,
           code -> code == null ? "" : typeClasses.getOrDefault(code, code),
           indicator -> {
             if (indicator == null) {
@@ -230,6 +230,11 @@ public class StructureInventorySummaryService {
             }
             return YES.equalsIgnoreCase(indicator) ? "Yes" : "No";
           });
+    }
+
+    /** "1234.6", "12.5": no grouping, no trailing zeros — what a spreadsheet reads as a number. */
+    private static String plain(BigDecimal value) {
+      return value.stripTrailingZeros().toPlainString();
     }
   }
 
@@ -346,9 +351,9 @@ public class StructureInventorySummaryService {
         codesById.put(row.getInspectionReportStatusId(), row.getInspectionReportStatusCode());
       }
     }
-    Map<Long, String> codes = new HashMap<>();
-    newest.forEach((structureId, statusId) -> codes.put(structureId, codesById.get(statusId)));
-    return codes;
+    Map<Long, String> latest = new HashMap<>();
+    newest.forEach((structureId, statusId) -> latest.put(structureId, codesById.get(statusId)));
+    return latest;
   }
 
   private static long millisSince(long nanos) {
@@ -380,11 +385,6 @@ public class StructureInventorySummaryService {
     DecimalFormat format = new DecimalFormat("#,##0.0", DecimalFormatSymbols.getInstance(Locale.CANADA));
     format.setRoundingMode(RoundingMode.HALF_EVEN);
     return format;
-  }
-
-  /** "1234.6", "12.5": no grouping, no trailing zeros — what a spreadsheet reads as a number. */
-  private static String plain(BigDecimal value) {
-    return value.stripTrailingZeros().toPlainString();
   }
 
   private static String number(Integer value) {
