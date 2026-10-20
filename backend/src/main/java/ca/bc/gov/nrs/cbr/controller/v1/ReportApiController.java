@@ -2,8 +2,10 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.ReportApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.ReportFile;
+import ca.bc.gov.nrs.cbr.service.v1.StructureInventoryDetailedService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventorySummaryService;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.ContentDisposition;
@@ -16,15 +18,25 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReportApiController implements ReportApiEndpoint {
 
   private final StructureInventorySummaryService structureInventorySummary;
+  private final StructureInventoryDetailedService structureInventoryDetailed;
 
-  public ReportApiController(StructureInventorySummaryService structureInventorySummary) {
+  public ReportApiController(
+      StructureInventorySummaryService structureInventorySummary,
+      StructureInventoryDetailedService structureInventoryDetailed) {
     this.structureInventorySummary = structureInventorySummary;
+    this.structureInventoryDetailed = structureInventoryDetailed;
   }
 
   @Override
   public ResponseEntity<byte[]> structureInventorySummary(
       StructureInventorySummaryCriteria criteria, ReportFormat format) {
     return download(structureInventorySummary.generate(criteria, format));
+  }
+
+  @Override
+  public ResponseEntity<byte[]> structureInventoryDetailed(
+      StructureInventoryDetailedCriteria criteria, ReportFormat format) {
+    return download(structureInventoryDetailed.generate(criteria, format));
   }
 
   /** Always an attachment: a report is saved, and the page asks for it to be. */

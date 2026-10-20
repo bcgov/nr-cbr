@@ -15,10 +15,15 @@ const api = vi.hoisted(() => ({
   getManagementAreas: vi.fn(),
 }));
 const clientApi = vi.hoisted(() => ({ searchClients: vi.fn(), clientLocations: vi.fn() }));
+const reportApi = vi.hoisted(() => ({ structureInventoryDetailed: vi.fn() }));
 
 vi.mock('@/services/APIs', () => ({
-  default: { configuration: api, client: clientApi },
+  default: { configuration: api, client: clientApi, report: reportApi },
 }));
+
+// The browser's save is asserted on what the page asked to save.
+const saveFile = vi.hoisted(() => vi.fn());
+vi.mock('@/utils/saveFile', () => ({ saveFile }));
 
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
@@ -47,6 +52,9 @@ const run = (format: 'PDF' | 'CSV' | 'KMZ' = 'PDF') => fireEvent.click(byId(`run
 beforeEach(() => {
   sessionStorage.clear();
   display.mockReset();
+  saveFile.mockReset();
+  reportApi.structureInventoryDetailed.mockReset();
+  reportApi.structureInventoryDetailed.mockResolvedValue(new Blob(['%PDF']));
   Object.values(api).forEach((fn) => {
     fn.mockReset();
     fn.mockResolvedValue([]);
@@ -111,7 +119,59 @@ describe('StructureInventoryDetailedPage', () => {
     expect(display).not.toHaveBeenCalled();
   });
 
-  it.each(['PDF', 'CSV', 'KMZ'] as const)(
+  it.each(['PDF', 'CSV'] as const)(
+    "fetches the %s for the criteria and saves it under legacy's name, dated today",
+    async (format) => {
+      renderPage();
+
+      type('kiloStart', '1.5');
+      run(format);
+
+      await waitFor(() => expect(saveFile).toHaveBeenCalled());
+      expect(reportApi.structureInventoryDetailed).toHaveBeenCalledWith(
+        expect.objectContaining({ kiloStart: '1.5' }),
+        format,
+      );
+      expect(saveFile.mock.calls[0][1]).toMatch(
+        new RegExp(
+          `^StructureInventoryDetailReport_\\d{4}-\\d{2}-\\d{2}\\.${format.toLowerCase()}$`,
+        ),
+      );
+    },
+  );
+
+  it('waits while the PDF is produced, and says so', async () => {
+    let finish: (file: Blob) => void = () => {};
+    reportApi.structureInventoryDetailed.mockReturnValue(
+      new Promise<Blob>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderPage();
+
+    run('PDF');
+
+    expect(await screen.findByRole('button', { name: 'Producing PDF…' })).toBeDisabled();
+    expect(byId('run-CSV')).toBeDisabled();
+    finish(new Blob(['%PDF']));
+    expect(await screen.findByRole('button', { name: 'Download PDF' })).toBeEnabled();
+  });
+
+  it('says so when the PDF could not be produced, and saves nothing', async () => {
+    reportApi.structureInventoryDetailed.mockRejectedValue(new Error('down'));
+    renderPage();
+
+    run('PDF');
+
+    await waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: 'The PDF could not be produced' }),
+      ),
+    );
+    expect(saveFile).not.toHaveBeenCalled();
+  });
+
+  it.each(['KMZ'] as const)(
     'says the %s is not available yet when the criteria are valid',
     (format) => {
       renderPage();
@@ -126,6 +186,7 @@ describe('StructureInventoryDetailedPage', () => {
           subtitle: `The criteria are valid. The ${format} is still being built.`,
         }),
       );
+      expect(reportApi.structureInventoryDetailed).not.toHaveBeenCalled();
     },
   );
 
@@ -170,6 +231,6 @@ describe('StructureInventoryDetailedPage', () => {
       await screen.findByTestId('structure-inventory-detailed-codes-error'),
     ).toBeInTheDocument();
     run();
-    expect(display).toHaveBeenCalled();
+    await waitFor(() => expect(reportApi.structureInventoryDetailed).toHaveBeenCalled());
   });
 });

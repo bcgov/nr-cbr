@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import PageTitle from '@/components/core/PageTitle';
 
+import { reportFilename } from '../reportFilename';
+
 import StructureInventoryDetailedCriteriaForm, {
   type CodeTables,
 } from './StructureInventoryDetailedCriteria';
@@ -27,6 +29,9 @@ import {
   useSpecialAccessCodes,
   useStructureInventoryDetailedReferenceDataState,
 } from '@/hooks/useConfiguration';
+import { useStructureInventoryDetailedReport } from '@/hooks/useReports';
+import { apiErrorMessage } from '@/utils/apiError';
+import { saveFile } from '@/utils/saveFile';
 import { readSessionState, writeSessionState } from '@/utils/sessionState';
 
 /** Where the page keeps its criteria for the tab. */
@@ -42,7 +47,9 @@ export const STRUCTURE_INVENTORY_DETAILED_STATE_KEY = 'cbr.report.structureInven
  *
  * <p>The criteria are kept for the browser tab, as on the Summary; Clear forgets them.
  *
- * <p>The Download buttons check the criteria and stop there: the report itself is not built yet.
+ * <p>Download PDF and Download CSV check the criteria, then fetch the report from the server and
+ * save it: the PDF in legacy's layout, the CSV as legacy's fuller export. Download KMZ checks the
+ * criteria and stops there: it is still to come.
  */
 const StructureInventoryDetailedPage: FC = () => {
   const [criteria, setCriteria] = useState<StructureInventoryDetailedCriteria>(() => ({
@@ -107,16 +114,42 @@ const StructureInventoryDetailedPage: FC = () => {
     [],
   );
 
+  const report = useStructureInventoryDetailedReport();
+  /** The format being produced, while it is; the buttons wait for it. */
+  const running = report.isPending ? (report.variables?.format ?? null) : null;
+
   const run = useCallback(
     (format: ReportFormat) => {
-      display({
-        kind: 'info',
-        title: 'This report is not available yet',
-        subtitle: `The criteria are valid. The ${format} is still being built.`,
-        timeout: 6000,
-      });
+      // The KMZ is still to come.
+      if (format === 'KMZ') {
+        display({
+          kind: 'info',
+          title: 'This report is not available yet',
+          subtitle: `The criteria are valid. The ${format} is still being built.`,
+          timeout: 6000,
+        });
+        return;
+      }
+      report.mutate(
+        { criteria, format },
+        {
+          onSuccess: (file) =>
+            saveFile(file, reportFilename('StructureInventoryDetailReport', format)),
+          onError: (error) => {
+            display({
+              kind: 'error',
+              title: `The ${format} could not be produced`,
+              subtitle: apiErrorMessage(
+                error,
+                'Try again, or narrow the criteria. Contact support if this continues.',
+              ),
+              timeout: 0,
+            });
+          },
+        },
+      );
     },
-    [display],
+    [report, criteria, display],
   );
 
   const reset = useCallback(() => {
@@ -158,6 +191,7 @@ const StructureInventoryDetailedPage: FC = () => {
           managementAreasLoading={managementAreas.isFetching}
           onChange={updateCriteria}
           onRun={run}
+          running={running}
           onReset={reset}
         />
       </Column>

@@ -1,4 +1,5 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
+import type { StructureInventoryDetailedCriteria } from '@/pages/Reports/StructureInventoryDetailed/types';
 import type {
   ReportFormat,
   StructureInventorySummaryCriteria,
@@ -38,6 +39,22 @@ export class ReportService extends HttpClient {
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
       url: '/v1/reports/structure-inventory-summary',
+      query: { ...populated(criteria), format },
+      responseType: 'blob',
+    });
+  }
+
+  /**
+   * Structure Inventory – Detailed (legacy CBR007): a PDF in legacy's layout — a block of fields
+   * per structure — or a CSV of legacy's fuller export. A GET, the criteria as query parameters.
+   */
+  structureInventoryDetailed(
+    criteria: StructureInventoryDetailedCriteria,
+    format: ReportFormat,
+  ): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/structure-inventory-detailed',
       query: { ...populated(criteria), format },
       responseType: 'blob',
     });

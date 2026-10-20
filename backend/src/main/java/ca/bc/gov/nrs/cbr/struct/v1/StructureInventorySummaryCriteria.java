@@ -71,15 +71,10 @@ public record StructureInventorySummaryCriteria(
     String replacementYearEnd,
     /** Legacy's default when unset: project, branch, user km. */
     StructureInventorySort sortBy
-) {
+) implements StructureInventoryCriteria {
 
   /** An unset value, or whole millimetres — legacy's {@code ######}. */
   public static final String OPENING_WIDTH = "^$|^\\d{1,6}$";
 
   static final String INVALID_OPENING_WIDTH = "Opening width must be whole millimetres, e.g. 1200";
-
-  /** The order asked for, or legacy's default. */
-  public StructureInventorySort sortOrDefault() {
-    return sortBy == null ? StructureInventorySort.PROJECT_BRANCH_USER_KM : sortBy;
-  }
 }

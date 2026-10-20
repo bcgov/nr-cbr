@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import PageTitle from '@/components/core/PageTitle';
 
+import { reportFilename } from '../reportFilename';
+
 import StructureInventorySummaryCriteriaForm, {
   type CodeTables,
 } from './StructureInventorySummaryCriteria';
@@ -32,17 +34,6 @@ import { useStructureInventorySummaryReport } from '@/hooks/useReports';
 import { apiErrorMessage } from '@/utils/apiError';
 import { saveFile } from '@/utils/saveFile';
 import { readSessionState, writeSessionState } from '@/utils/sessionState';
-
-/**
- * "StructureInventorySummaryReport_2026-10-20.pdf" — the name the server gives it: legacy's pattern
- * for its reports' files, dated today.
- */
-const reportFilename = (format: ReportFormat): string => {
-  const today = new Date();
-  const pad = (value: number) => String(value).padStart(2, '0');
-  const date = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-  return `StructureInventorySummaryReport_${date}.${format.toLowerCase()}`;
-};
 
 /** Where the page keeps its criteria for the tab. */
 export const STRUCTURE_INVENTORY_SUMMARY_STATE_KEY = 'cbr.report.structureInventorySummary';
@@ -149,7 +140,8 @@ const StructureInventorySummaryPage: FC = () => {
       report.mutate(
         { criteria, format },
         {
-          onSuccess: (file) => saveFile(file, reportFilename(format)),
+          onSuccess: (file) =>
+            saveFile(file, reportFilename('StructureInventorySummaryReport', format)),
           onError: (error) => {
             display({
               kind: 'error',

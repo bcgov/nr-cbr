@@ -10,6 +10,8 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.longRange;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceCulvertEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySort;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -29,8 +31,9 @@ import java.util.function.BiFunction;
 import org.springframework.util.StringUtils;
 
 /**
- * Which structures the Structure Inventory – Summary report lists, and in what order, as a JPA
- * criteria query selecting only what each line prints ({@link StructureInventoryLine}).
+ * Which structures the Structure Inventory reports list, and in what order, as JPA criteria queries
+ * selecting only what each prints: a Summary line ({@link StructureInventoryLine}) or a Detailed
+ * block ({@link StructureInventoryDetailLine}). The criteria the two share are written once.
  *
  * <p>Replaces the {@code WHERE} clause legacy's {@code StructureInventorySummaryReportForm.createSearch}
  * and {@code OracleReportQueryDAO.generateReportQuery} assemble as a string for
@@ -56,8 +59,24 @@ public final class StructureInventoryReportSpecifications {
   private static final String LOAD_RESTRICTION_YEAR = "fullLogHaulReplacementYear";
   private static final String REPLACEMENT_YEAR = "lightVehicleReplacementYear";
   private static final String PORTABLE_IND = "portableStructureInd";
+  private static final String DESIGN_VEHICLE = "designVehicleLoadCode";
+  private static final String BUILT_BY = "builtByCode";
+  private static final String NEXT_PLANNED_INSPECTION = "nextPlannedInspectionDate";
+  private static final String REPLACEMENT_COST = "estimatedReplacementCost";
+  private static final String CLOSURE_YEAR = "estimatedClosureYear";
+  private static final String STRUCTURE_SOURCE = "structureSourceCode";
+  private static final String LONGITUDE = "longitude";
+  private static final String LATITUDE = "latitude";
+  private static final String STRUCTURE_INSPECTION_STATUS = "structureInspectionStatusCode";
+  private static final String ROLLUP_REGION_NO = "rollupRegionNo";
+
+  private static final String TYPE_CLASS = "typeClass";
+  private static final String DESCRIPTION = "description";
 
   private static final String SITE = "site";
+  private static final String SITE_STATUS_CODE = "status";
+  private static final String ORG_UNIT = "orgUnit";
+  private static final String ORG_UNIT_NAME = "orgUnitName";
   private static final String SITE_ID = "crossingSiteId";
   private static final String ROAD_SECTION = "roadSection";
   private static final String ROAD_SECTION_NAME = "roadSectName";
@@ -106,11 +125,8 @@ public final class StructureInventoryReportSpecifications {
     From<?, ?> site = root.join(SITE, JoinType.LEFT);
     From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
 
-    List<Predicate> predicates = new ArrayList<>();
-    predicates.add(builder.equal(root.get(ACTIVE_IND), YES));
-    structureCriteria(builder, root, site, criteria, predicates);
-    siteCriteria(builder, site, criteria, predicates);
-    bridgeAndCulvertCriteria(builder, query, root, criteria, predicates);
+    List<Predicate> predicates = sharedCriteria(builder, query, root, site, criteria);
+    constructionCriteria(builder, query, root, criteria, predicates);
 
     return query
         .select(builder.construct(StructureInventoryLine.class,
@@ -132,14 +148,90 @@ public final class StructureInventoryReportSpecifications {
         .orderBy(order(criteria.sortOrDefault(), root, site, roadSection, builder));
   }
 
+  /**
+   * The structures the Structure Inventory – Detailed report covers for these criteria, in the
+   * order chosen — one statement, selecting what its PDF block and its CSV row show of the structure
+   * and its site, so the two formats list the same structures. The bridge, the culvert and the
+   * routine inspections are read beside it.
+   *
+   * <p>The type/class is an inner join, as in legacy's {@code STRCTRE_INVNTRY_DTL_RPT}: a
+   * structure with no type/class is left out of this report, though the Summary lists it.
+   */
+  public static CriteriaQuery<StructureInventoryDetailLine> detailed(
+      CriteriaBuilder builder, StructureInventoryDetailedCriteria criteria) {
+    CriteriaQuery<StructureInventoryDetailLine> query =
+        builder.createQuery(StructureInventoryDetailLine.class);
+    Root<CrossingStructureEntity> root = query.from(CrossingStructureEntity.class);
+    From<?, ?> typeClass = root.join(TYPE_CLASS, JoinType.INNER);
+    From<?, ?> site = root.join(SITE, JoinType.LEFT);
+    From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
+    From<?, ?> status = site.join(SITE_STATUS_CODE, JoinType.LEFT);
+    From<?, ?> district = site.join(ORG_UNIT, JoinType.LEFT);
+
+    List<Predicate> predicates = sharedCriteria(builder, query, root, site, criteria);
+
+    return query
+        .select(builder.construct(StructureInventoryDetailLine.class,
+            root.get(STRUCTURE_ID),
+            root.get(STRUCTURE_NAME),
+            typeClass.get(DESCRIPTION),
+            root.get(PORTABLE_IND),
+            root.get(DESIGN_LOAD_RATING),
+            root.get(CURRENT_LOAD_RATING),
+            root.get(YEAR_BUILT),
+            root.get(LOAD_RATING_UNKNOWN),
+            site.get(SITE_ID),
+            status.get(DESCRIPTION),
+            site.get(KILOMETRES),
+            site.get(USER_KM),
+            site.get(FOREST_FILE_ID),
+            site.get(ROAD_SECTION_ID),
+            district.get(ORG_UNIT_NAME),
+            roadSection.get(ROAD_SECTION_NAME),
+            site.get(CROSSING_NAME),
+            site.get(CAPITAL_ROAD),
+            root.get(DESIGN_VEHICLE),
+            root.get(BUILT_BY),
+            root.get(NEXT_PLANNED_INSPECTION),
+            root.get(REPLACEMENT_YEAR),
+            root.get(REPLACEMENT_COST),
+            root.get(CLOSURE_YEAR),
+            root.get(LOAD_RESTRICTION_YEAR),
+            root.get(STRUCTURE_SOURCE),
+            site.get(CLIENT_NUMBER),
+            site.get(SITE_TYPE),
+            site.get(LONGITUDE),
+            site.get(LATITUDE),
+            site.get(MANAGEMENT_ORG_UNIT_NO),
+            site.get(BUSINESS_AREA_ORG_UNIT_NO),
+            district.get(ROLLUP_REGION_NO),
+            site.get(STRUCTURE_INSPECTION_STATUS)))
+        .where(predicates.toArray(new Predicate[0]))
+        .orderBy(order(criteria.sortOrDefault(), root, site, roadSection, builder));
+  }
+
+  /** The criteria every Structure Inventory report has — always {@code ACTIVE_IND = 'Y'}. */
+  private static List<Predicate> sharedCriteria(
+      CriteriaBuilder builder,
+      CriteriaQuery<?> query,
+      Root<CrossingStructureEntity> root,
+      From<?, ?> site,
+      StructureInventoryCriteria criteria) {
+    List<Predicate> predicates = new ArrayList<>();
+    predicates.add(builder.equal(root.get(ACTIVE_IND), YES));
+    structureCriteria(builder, root, site, criteria, predicates);
+    siteCriteria(builder, site, criteria, predicates);
+    bridgeHas(builder, query, root, PORTABLE_STATUS, criteria.portableSuperstructureStatusCode())
+        .ifPresent(predicates::add);
+    return predicates;
+  }
+
   private static void structureCriteria(
       CriteriaBuilder builder,
       Root<CrossingStructureEntity> root,
       From<?, ?> site,
-      StructureInventorySummaryCriteria criteria,
+      StructureInventoryCriteria criteria,
       List<Predicate> predicates) {
-    equalsText(builder, root.get(TYPE_CLASS_CODE), criteria.structureTypeClassCode())
-        .ifPresent(predicates::add);
     integerRange(builder, root.get(YEAR_BUILT),
         criteria.yearBuiltStart(), criteria.yearBuiltEnd()).ifPresent(predicates::add);
     integerRange(builder, root.get(LOAD_RESTRICTION_YEAR),
@@ -155,7 +247,7 @@ public final class StructureInventoryReportSpecifications {
   private static void siteCriteria(
       CriteriaBuilder builder,
       From<?, ?> site,
-      StructureInventorySummaryCriteria criteria,
+      StructureInventoryCriteria criteria,
       List<Predicate> predicates) {
     contains(builder, site.get(FOREST_FILE_ID), criteria.forestFileId()).ifPresent(predicates::add);
     contains(builder, site.get(ROAD_SECTION_ID), criteria.roadSectionId())
@@ -183,18 +275,21 @@ public final class StructureInventoryReportSpecifications {
     }
   }
 
-  /** The criteria that are columns of the bridge row or the culvert row. */
-  private static void bridgeAndCulvertCriteria(
+  /**
+   * The Summary's construction filters — its type/class, and the columns of the bridge row or the
+   * culvert row. The Detailed report has none of them.
+   */
+  private static void constructionCriteria(
       CriteriaBuilder builder,
       CriteriaQuery<?> query,
       Root<CrossingStructureEntity> root,
       StructureInventorySummaryCriteria criteria,
       List<Predicate> predicates) {
+    equalsText(builder, root.get(TYPE_CLASS_CODE), criteria.structureTypeClassCode())
+        .ifPresent(predicates::add);
     bridgeHas(builder, query, root, SUPERSTRUCTURE_TYPE, criteria.superstructureTypeCode())
         .ifPresent(predicates::add);
     bridgeHas(builder, query, root, DECK_TYPE, criteria.deckTypeCode())
-        .ifPresent(predicates::add);
-    bridgeHas(builder, query, root, PORTABLE_STATUS, criteria.portableSuperstructureStatusCode())
         .ifPresent(predicates::add);
     culvertHas(builder, query, root, CULVERT_TYPE, criteria.culvertTypeCode())
         .ifPresent(predicates::add);

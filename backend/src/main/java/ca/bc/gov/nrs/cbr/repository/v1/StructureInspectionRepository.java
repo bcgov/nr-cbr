@@ -176,6 +176,22 @@ public interface StructureInspectionRepository
       @Param("structureIds") Collection<Long> structureIds);
 
   /**
+   * Each structure's last routine inspection date, whatever the inspection's status — the
+   * Structure Inventory – Detailed report's "Last Inspection Date". Legacy's
+   * {@code STRCTRE_INVNTRY_DTL_RPT} asks for no status, where the Summary's asks for one.
+   */
+  @Query("""
+      SELECT new ca.bc.gov.nrs.cbr.repository.v1.StructureValue(
+               inspection.crossingStructureId, MAX(inspection.inspectionDate))
+        FROM StructureInspectionEntity inspection
+       WHERE inspection.crossingStructureId IN :structureIds
+         AND inspection.strctreInspectionTypeCode = 'ROUT'
+       GROUP BY inspection.crossingStructureId
+      """)
+  List<StructureValue<LocalDate>> findLastRoutineInspectionDatesAnyStatus(
+      @Param("structureIds") Collection<Long> structureIds);
+
+  /**
    * Each structure's newest routine status row — the report's "Inspection Status", whose code is
    * read by id afterwards. Legacy's rule: the highest {@code INSPECTION_REPORT_STATUS_ID} across
    * all the structure's {@code ROUT} inspections, which is not always the status of the inspection
