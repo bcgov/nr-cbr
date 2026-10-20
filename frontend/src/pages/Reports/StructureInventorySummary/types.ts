@@ -1,3 +1,7 @@
+import type { ReportFormat, StructureInventorySort } from '../types';
+
+export { SORT_OPTIONS, type ReportFormat, type StructureInventorySort } from '../types';
+
 /**
  * The Structure Inventory – Summary report's criteria (legacy CBR008).
  *
@@ -53,22 +57,8 @@ export type StructureInventorySummaryCriteria = {
   maintainerLabel: string;
 };
 
-/** Legacy's four orders, all ascending. */
-export type StructureInventorySort =
-  'PROJECT_BRANCH_USER_KM' | 'ROAD_NAME_USER_KM' | 'SITE_ID' | 'STRUCTURE_ID';
-
-export const SORT_OPTIONS: { value: StructureInventorySort; label: string }[] = [
-  { value: 'PROJECT_BRANCH_USER_KM', label: 'Project Number, Branch, User KM' },
-  { value: 'ROAD_NAME_USER_KM', label: 'Road Name, User KM' },
-  { value: 'SITE_ID', label: 'Site Id' },
-  { value: 'STRUCTURE_ID', label: 'Structure Id' },
-];
-
-/**
- * PDF to print, CSV to work with — a button each. Legacy offered PDF, Word and Excel. Chosen per run,
- * so not one of the kept criteria.
- */
-export type ReportFormat = 'PDF' | 'CSV';
+/** PDF to print, CSV to work with — a button each. Legacy offered PDF, Word and Excel. */
+export const FORMATS: readonly ReportFormat[] = ['CSV', 'PDF'];
 
 /** Legacy's defaults: nothing set, sorted by project, branch and user km. */
 export const EMPTY_CRITERIA: StructureInventorySummaryCriteria = {

@@ -1,31 +1,18 @@
-import { Download } from '@carbon/icons-react';
-import {
-  Button,
-  RadioButton,
-  RadioButtonGroup,
-  Select,
-  SelectItem,
-  TextInput,
-  Toggle,
-} from '@carbon/react';
-
-import ClientCombo from '@/components/core/ClientCombo';
+import { criteriaFields } from '../criteriaFields';
+import MaintainerFields from '../MaintainerFields';
+import { ReportButtons, SortBy } from '../ReportOutput';
 
 import {
-  SORT_OPTIONS,
+  FORMATS,
   type ReportFormat,
-  type StructureInventorySort,
   type StructureInventorySummaryCriteria as Criteria,
 } from './types';
 import { criteriaErrors } from './validation';
 
-import type { ClientSuggestion } from '@/types/client';
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 import type { FC, SubmitEventHandler } from 'react';
 
-import { useClientLocations } from '@/hooks/useClientSearch';
-import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
-import { clientLabel, locationLabel } from '@/utils/clientSearch';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
 
 export type CodeTables = {
   siteStatusCodes: CodeOption[];
@@ -52,16 +39,10 @@ type Props = {
   onChange: <K extends keyof Criteria>(field: K, value: Criteria[K]) => void;
   /** Runs the report as this format, once the criteria pass. */
   onRun: (format: ReportFormat) => void;
-  /** The format being produced, while one is: both buttons wait, and that one says so. */
+  /** The format being produced, while one is: the buttons wait, and that one says so. */
   running?: ReportFormat | null;
   onReset: () => void;
-  /** Bumped on Clear, to remount the maintainer lookup and forget which boxes were visited. */
-  resetToken: number;
 };
-
-/** "PB - Permanent Bridge"; a missing half degrades to the other rather than "PB - undefined". */
-const label = (code: string | null, description: string | null): string =>
-  [code, description].filter(Boolean).join(' - ');
 
 const ID = 'structure-inventory-summary';
 
@@ -71,7 +52,7 @@ const ID = 'structure-inventory-summary';
  * <p>Laid out as Structure Search is, in the same four-column grid: the structure's own criteria
  * first, then its site's, then who holds it, then legacy's "Replacement Date" pair — and below them
  * the order. Labels are legacy's. A button per format, rather than legacy's format radio and one
- * Run Report: the choice and the action are one click.
+ * Run Report: the choice and the action are one click. Built from the boxes every report shares.
  */
 const StructureInventorySummaryCriteriaForm: FC<Props> = ({
   criteria,
@@ -81,10 +62,17 @@ const StructureInventorySummaryCriteriaForm: FC<Props> = ({
   onChange,
   onRun,
   onReset,
-  resetToken,
   running = null,
 }) => {
   const { shown, leave, submit: check } = useFieldErrors(criteriaErrors(criteria));
+  const { text, codeSelect, orgUnitSelect, range, toggle } = criteriaFields({
+    id: ID,
+    criteria,
+    shown,
+    leave,
+    onChange,
+    codeTablesLoading,
+  });
 
   const run = (format: ReportFormat) => {
     if (check()) {
@@ -99,153 +87,6 @@ const StructureInventorySummaryCriteriaForm: FC<Props> = ({
       run('PDF');
     }
   };
-
-  const locations = useClientLocations(criteria.clientNumber);
-
-  /** A maintainer was picked, or cleared: either way the old location no longer applies. */
-  const selectMaintainer = (client: ClientSuggestion | null) => {
-    onChange('clientNumber', client?.clientNumber ?? '');
-    onChange('maintainerLabel', client ? clientLabel(client) : '');
-    onChange('clientLocationCode', '');
-  };
-
-  /**
-   * Typed text that is not a pick filters nothing — legacy's report takes a client number, not a
-   * name — so it clears a pick it no longer matches.
-   */
-  const typeMaintainer = (term: string) => {
-    if (criteria.clientNumber !== '' && term !== criteria.maintainerLabel) {
-      selectMaintainer(null);
-    }
-  };
-
-  const text = (
-    field: keyof Criteria,
-    labelText: string,
-    maxLength: number,
-    extra?: { placeholder?: string; inputMode?: 'decimal' | 'numeric'; hideLabel?: boolean },
-  ) => (
-    <TextInput
-      id={`${ID}-${field}`}
-      data-testid={`${ID}-${field}`}
-      labelText={labelText}
-      maxLength={maxLength}
-      value={String(criteria[field])}
-      invalid={Boolean(shown[field])}
-      invalidText={shown[field]}
-      onChange={(event) => onChange(field, event.target.value as never)}
-      onBlur={() => leave(field)}
-      {...extra}
-    />
-  );
-
-  const codeSelect = (
-    field: keyof Criteria,
-    labelText: string,
-    anyText: string,
-    options: CodeOption[],
-  ) => (
-    <Select
-      id={`${ID}-${field}`}
-      data-testid={`${ID}-${field}`}
-      labelText={labelText}
-      disabled={codeTablesLoading}
-      value={String(criteria[field])}
-      onChange={(event) => onChange(field, event.target.value as never)}
-    >
-      <SelectItem value="" text={anyText} />
-      {options.map((option) => (
-        <SelectItem
-          key={option.code}
-          value={option.code}
-          text={label(option.code, option.description)}
-        />
-      ))}
-    </Select>
-  );
-
-  const orgUnitSelect = (
-    field: keyof Criteria,
-    labelText: string,
-    anyText: string,
-    options: OrgUnitOption[],
-    loading = codeTablesLoading,
-  ) => (
-    <Select
-      id={`${ID}-${field}`}
-      data-testid={`${ID}-${field}`}
-      labelText={labelText}
-      disabled={loading}
-      value={String(criteria[field])}
-      onChange={(event) => onChange(field, event.target.value as never)}
-    >
-      <SelectItem value="" text={anyText} />
-      {options.map((option) => (
-        <SelectItem
-          key={option.orgUnitNo}
-          value={option.orgUnitNo}
-          text={label(option.orgUnitCode, option.orgUnitName)}
-        />
-      ))}
-    </Select>
-  );
-
-  /**
-   * A "from – to" pair, as on Structure Search: the legend names the pair and the boxes carry
-   * hidden labels and a placeholder.
-   */
-  const range = (
-    from: keyof Criteria,
-    to: keyof Criteria,
-    labelText: string,
-    kind: 'kilometres' | 'year' | 'millimetres',
-  ) => {
-    const box = (field: keyof Criteria, end: 'From' | 'To') => {
-      const common = { hideLabel: true } as const;
-      if (kind === 'year') {
-        return text(field, `${labelText} ${end}`, 4, {
-          ...common,
-          inputMode: 'numeric',
-          placeholder: `${end} yyyy`,
-        });
-      }
-      if (kind === 'millimetres') {
-        return text(field, `${labelText} ${end}`, 6, {
-          ...common,
-          inputMode: 'numeric',
-          placeholder: end,
-        });
-      }
-      return text(field, `${labelText} ${end}`, 9, {
-        ...common,
-        inputMode: 'decimal',
-        placeholder: end,
-      });
-    };
-    return (
-      <fieldset className="report-criteria__range">
-        <legend className="cds--label">{labelText}</legend>
-        <div className="report-criteria__range-inputs">
-          {box(from, 'From')}
-          <span aria-hidden="true" className="report-criteria__range-dash">
-            –
-          </span>
-          {box(to, 'To')}
-        </div>
-      </fieldset>
-    );
-  };
-
-  const toggle = (field: keyof Criteria, labelText: string) => (
-    <Toggle
-      id={`${ID}-${field}`}
-      data-testid={`${ID}-${field}`}
-      labelText={labelText}
-      size="sm"
-      toggled={Boolean(criteria[field])}
-      onToggle={(checked) => onChange(field, checked as never)}
-    />
-  );
 
   return (
     <form onSubmit={submit} data-testid={`${ID}-form`} className="report-criteria__form">
@@ -321,34 +162,13 @@ const StructureInventorySummaryCriteriaForm: FC<Props> = ({
           'Any business area',
           codeTables.businessAreas,
         )}
-        <ClientCombo
-          key={resetToken}
-          id={`${ID}-maintainer`}
-          titleText="Designated Maintainer"
-          selectedLabel={criteria.maintainerLabel}
-          onSelect={selectMaintainer}
-          onTermChange={typeMaintainer}
+        <MaintainerFields
+          id={ID}
+          clientNumber={criteria.clientNumber}
+          clientLocationCode={criteria.clientLocationCode}
+          maintainerLabel={criteria.maintainerLabel}
+          onChange={onChange}
         />
-        <Select
-          id={`${ID}-clientLocationCode`}
-          data-testid={`${ID}-clientLocationCode`}
-          labelText="Maintainer Location"
-          disabled={criteria.clientNumber === '' || locations.isFetching}
-          value={criteria.clientLocationCode}
-          onChange={(event) => onChange('clientLocationCode', event.target.value)}
-        >
-          <SelectItem
-            value=""
-            text={criteria.clientNumber === '' ? 'Pick a maintainer first' : 'Any location'}
-          />
-          {(locations.data ?? []).map((location) => (
-            <SelectItem
-              key={location.clientLocnCode}
-              value={location.clientLocnCode ?? ''}
-              text={locationLabel(location)}
-            />
-          ))}
-        </Select>
 
         {/* Legacy's "Replacement Date" fieldset */}
         {range(
@@ -360,58 +180,8 @@ const StructureInventorySummaryCriteriaForm: FC<Props> = ({
         {range('replacementYearStart', 'replacementYearEnd', 'Estimated Replacement', 'year')}
       </div>
 
-      <div className="report-criteria__output">
-        <RadioButtonGroup
-          legendText="Sort By"
-          name={`${ID}-sortBy`}
-          orientation="vertical"
-          valueSelected={criteria.sortBy}
-          onChange={(value) => onChange('sortBy', value as StructureInventorySort)}
-        >
-          {SORT_OPTIONS.map((option) => (
-            <RadioButton
-              key={option.value}
-              id={`${ID}-sortBy-${option.value}`}
-              data-testid={`${ID}-sortBy-${option.value}`}
-              labelText={option.label}
-              value={option.value}
-            />
-          ))}
-        </RadioButtonGroup>
-      </div>
-
-      <div className="report-criteria__actions">
-        <Button
-          kind="ghost"
-          type="button"
-          onClick={onReset}
-          onMouseDown={holdFocus}
-          data-testid={`${ID}-reset`}
-        >
-          Clear
-        </Button>
-        <Button
-          kind="tertiary"
-          type="button"
-          renderIcon={Download}
-          onClick={() => run('CSV')}
-          onMouseDown={holdFocus}
-          disabled={running !== null}
-          data-testid={`${ID}-run-CSV`}
-        >
-          {running === 'CSV' ? 'Producing CSV…' : 'Download CSV'}
-        </Button>
-        <Button
-          kind="tertiary"
-          type="submit"
-          renderIcon={Download}
-          onMouseDown={holdFocus}
-          disabled={running !== null}
-          data-testid={`${ID}-run-PDF`}
-        >
-          {running === 'PDF' ? 'Producing PDF…' : 'Download PDF'}
-        </Button>
-      </div>
+      <SortBy id={ID} sortBy={criteria.sortBy} onChange={(sortBy) => onChange('sortBy', sortBy)} />
+      <ReportButtons id={ID} formats={FORMATS} running={running} onRun={run} onReset={onReset} />
     </form>
   );
 };

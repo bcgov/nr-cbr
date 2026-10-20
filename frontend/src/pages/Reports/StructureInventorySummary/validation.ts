@@ -1,23 +1,9 @@
-import type { StructureInventorySummaryCriteria } from './types';
+import { checkFields, isKilometre, isYear, KILOMETRES_MESSAGE, YEAR_MESSAGE } from '../validation';
 
-import { isKilometre } from '@/pages/SiteSearch/validation';
-import { isYear } from '@/pages/StructureSearch/validation';
+import type { StructureInventorySummaryCriteria } from './types';
 
 /** An opening width bound: unset, or whole millimetres — legacy's `######`. */
 const isOpeningWidth = (value: string): boolean => value === '' || /^\d{1,6}$/.test(value);
-
-const KILOMETRE_FIELDS = ['kiloStart', 'kiloEnd'] as const;
-
-const YEAR_FIELDS = [
-  'yearBuiltStart',
-  'yearBuiltEnd',
-  'loadRestrictionYearStart',
-  'loadRestrictionYearEnd',
-  'replacementYearStart',
-  'replacementYearEnd',
-] as const;
-
-const OPENING_WIDTH_FIELDS = ['openingWidthMin', 'openingWidthMax'] as const;
 
 export type CriteriaErrors = Partial<Record<keyof StructureInventorySummaryCriteria, string>>;
 
@@ -28,20 +14,27 @@ export type CriteriaErrors = Partial<Record<keyof StructureInventorySummaryCrite
  */
 export const criteriaErrors = (criteria: StructureInventorySummaryCriteria): CriteriaErrors => {
   const errors: CriteriaErrors = {};
-  for (const field of KILOMETRE_FIELDS) {
-    if (!isKilometre(criteria[field])) {
-      errors[field] = 'Kilometres must be a number, e.g. 12.5';
-    }
-  }
-  for (const field of YEAR_FIELDS) {
-    if (!isYear(criteria[field])) {
-      errors[field] = 'Enter a year as yyyy, e.g. 2030';
-    }
-  }
-  for (const field of OPENING_WIDTH_FIELDS) {
-    if (!isOpeningWidth(criteria[field])) {
-      errors[field] = 'Opening width must be whole millimetres, e.g. 1200';
-    }
-  }
+  checkFields(criteria, ['kiloStart', 'kiloEnd'], isKilometre, KILOMETRES_MESSAGE, errors);
+  checkFields(
+    criteria,
+    [
+      'yearBuiltStart',
+      'yearBuiltEnd',
+      'loadRestrictionYearStart',
+      'loadRestrictionYearEnd',
+      'replacementYearStart',
+      'replacementYearEnd',
+    ],
+    isYear,
+    YEAR_MESSAGE,
+    errors,
+  );
+  checkFields(
+    criteria,
+    ['openingWidthMin', 'openingWidthMax'],
+    isOpeningWidth,
+    'Opening width must be whole millimetres, e.g. 1200',
+    errors,
+  );
   return errors;
 };

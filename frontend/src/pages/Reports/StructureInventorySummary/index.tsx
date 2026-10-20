@@ -208,7 +208,6 @@ const StructureInventorySummaryPage: FC = () => {
           onRun={run}
           running={running}
           onReset={reset}
-          resetToken={resetToken}
         />
       </Column>
     </Grid>
