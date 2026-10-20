@@ -28,7 +28,21 @@ import {
   useStructureTypeClassCodes,
   useSuperstructureTypeCodes,
 } from '@/hooks/useConfiguration';
+import { useStructureInventorySummaryReport } from '@/hooks/useReports';
+import { apiErrorMessage } from '@/utils/apiError';
+import { saveFile } from '@/utils/saveFile';
 import { readSessionState, writeSessionState } from '@/utils/sessionState';
+
+/**
+ * "StructureInventorySummaryReport_2026-10-20.pdf" — the name the server gives it: legacy's pattern
+ * for its reports' files, dated today.
+ */
+const reportFilename = (format: ReportFormat): string => {
+  const today = new Date();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const date = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  return `StructureInventorySummaryReport_${date}.${format.toLowerCase()}`;
+};
 
 /** Where the page keeps its criteria for the tab. */
 export const STRUCTURE_INVENTORY_SUMMARY_STATE_KEY = 'cbr.report.structureInventorySummary';
@@ -45,8 +59,8 @@ export const STRUCTURE_INVENTORY_SUMMARY_STATE_KEY = 'cbr.report.structureInvent
  * finds them as they were left; Clear forgets them. Legacy's Save As / Delete Report Favourite are
  * not carried over for now.
  *
- * <p>Download PDF and Download CSV check the criteria and stop there: the report itself is not
- * built yet.
+ * <p>Download PDF and Download CSV check the criteria, then fetch the report from the server and
+ * save it. Legacy's PDF layout is the server's; the CSV is the same columns.
  */
 const StructureInventorySummaryPage: FC = () => {
   const [criteria, setCriteria] = useState<StructureInventorySummaryCriteria>(() => ({
@@ -126,16 +140,31 @@ const StructureInventorySummaryPage: FC = () => {
     [],
   );
 
+  const report = useStructureInventorySummaryReport();
+  /** The format being produced, while it is; the buttons wait for it. */
+  const running = report.isPending ? (report.variables?.format ?? null) : null;
+
   const run = useCallback(
     (format: ReportFormat) => {
-      display({
-        kind: 'info',
-        title: 'This report is not available yet',
-        subtitle: `The criteria are valid. The ${format} is still being built.`,
-        timeout: 6000,
-      });
+      report.mutate(
+        { criteria, format },
+        {
+          onSuccess: (file) => saveFile(file, reportFilename(format)),
+          onError: (error) => {
+            display({
+              kind: 'error',
+              title: `The ${format} could not be produced`,
+              subtitle: apiErrorMessage(
+                error,
+                'Try again, or narrow the criteria. Contact support if this continues.',
+              ),
+              timeout: 0,
+            });
+          },
+        },
+      );
     },
-    [display],
+    [report, criteria, display],
   );
 
   const reset = useCallback(() => {
@@ -177,6 +206,7 @@ const StructureInventorySummaryPage: FC = () => {
           managementAreasLoading={managementAreas.isFetching}
           onChange={updateCriteria}
           onRun={run}
+          running={running}
           onReset={reset}
           resetToken={resetToken}
         />

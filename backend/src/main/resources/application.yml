@@ -78,6 +78,13 @@ spring:
     properties:
       hibernate:
         format_sql: false
+        # Rows read per round trip to Oracle. The Oracle driver's own default is 10, so a query
+        # returning thousands of rows — a province-wide report — made hundreds of round trips, and
+        # at the latency to the database that was most of a 45-second report: every lookup took
+        # about 2.5 ms a row, however simple. A page of search results is unaffected: it is one
+        # round trip either way.
+        jdbc:
+          fetch_size: 500
   security:
     oauth2:
       resourceserver:

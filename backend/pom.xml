@@ -108,14 +108,12 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
     <!--
-      JasperReports core — powers ReportService (compile JRXML on first request,
-      fill against the Oracle datasource, export PDF/CSV). Pinned to 6.21.5 to
-      match the ministry's other report apps so report templates port between them. JR 6.x
-      bundles the Eclipse JDT expression compiler + PDF exporter in the core jar,
-      so no jasperreports-jdt / jasperreports-pdf sub-artifacts are needed.
+      JasperReports core — powers ReportRenderer (compile a JRXML on first use, fill it with the
+      rows a report service built, export the PDF). Pinned to 6.21.5 to match the ministry's other
+      report apps so templates port between them. JR 6.x bundles the Eclipse JDT expression compiler
+      and the PDF exporter (OpenPDF) in the core jar, so no sub-artifacts are needed.
     -->
-    <!-- Apache Commons CSV — CSVReportService writes the biodiversity data-extract
-         CSVs directly from the proc cursor (no Jasper). -->
+    <!-- Apache Commons CSV — the reports' CSV, written from the same rows as the PDF. -->
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-csv</artifactId>

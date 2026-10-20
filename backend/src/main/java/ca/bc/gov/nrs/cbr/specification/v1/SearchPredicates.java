@@ -94,6 +94,15 @@ final class SearchPredicates {
     return range(builder, path, integer(from), integer(to));
   }
 
+  /** A range over a {@code NUMBER} column mapped as {@code Long} — a culvert's opening width. */
+  static Optional<Predicate> longRange(
+      CriteriaBuilder builder, Expression<Long> path, String from, String to) {
+    Integer lower = integer(from);
+    Integer upper = integer(to);
+    return range(builder, path,
+        lower == null ? null : lower.longValue(), upper == null ? null : upper.longValue());
+  }
+
   /**
    * Whether this execution returns entities rather than a count. Spring Data runs both from one
    * specification, and a fetch or an ordering is invalid in the count.

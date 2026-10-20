@@ -20,10 +20,16 @@ const api = vi.hoisted(() => ({
   getManagementAreas: vi.fn(),
 }));
 const clientApi = vi.hoisted(() => ({ searchClients: vi.fn(), clientLocations: vi.fn() }));
+const reportApi = vi.hoisted(() => ({ structureInventorySummary: vi.fn() }));
 
 vi.mock('@/services/APIs', () => ({
-  default: { configuration: api, client: clientApi },
+  default: { configuration: api, client: clientApi, report: reportApi },
 }));
+
+// The browser's save is asserted on what the page asked to save.
+// The browser's save is asserted on what the page asked to save.
+const saveFile = vi.hoisted(() => vi.fn());
+vi.mock('@/utils/saveFile', () => ({ saveFile }));
 
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
@@ -52,6 +58,9 @@ const run = (format: 'PDF' | 'CSV' = 'PDF') => fireEvent.click(byId(`run-${forma
 beforeEach(() => {
   sessionStorage.clear();
   display.mockReset();
+  saveFile.mockReset();
+  reportApi.structureInventorySummary.mockReset();
+  reportApi.structureInventorySummary.mockResolvedValue(new Blob(['%PDF']));
   Object.values(api).forEach((fn) => {
     fn.mockReset();
     fn.mockResolvedValue([]);
@@ -118,27 +127,61 @@ describe('StructureInventorySummaryPage', () => {
     expect(
       await screen.findByText('Opening width must be whole millimetres, e.g. 1200'),
     ).toBeInTheDocument();
-    expect(display).not.toHaveBeenCalled();
+    expect(reportApi.structureInventorySummary).not.toHaveBeenCalled();
   });
 
   it.each(['PDF', 'CSV'] as const)(
-    'says the %s is not available yet when the criteria are valid',
-    (format) => {
+    'fetches the %s for the criteria and saves it, dated today',
+    async (format) => {
       renderPage();
 
       type('kiloStart', '1.5');
       type('openingWidthMin', '600');
       run(format);
 
-      expect(display).toHaveBeenCalledWith(
-        expect.objectContaining({
-          kind: 'info',
-          title: 'This report is not available yet',
-          subtitle: `The criteria are valid. The ${format} is still being built.`,
-        }),
+      await waitFor(() => expect(saveFile).toHaveBeenCalled());
+      expect(reportApi.structureInventorySummary).toHaveBeenCalledWith(
+        expect.objectContaining({ kiloStart: '1.5', openingWidthMin: '600' }),
+        format,
+      );
+      expect(saveFile.mock.calls[0][1]).toMatch(
+        new RegExp(
+          `^StructureInventorySummaryReport_\\d{4}-\\d{2}-\\d{2}\\.${format.toLowerCase()}$`,
+        ),
       );
     },
   );
+
+  it('waits while a report is produced, and says which', async () => {
+    let finish: (file: Blob) => void = () => {};
+    reportApi.structureInventorySummary.mockReturnValue(
+      new Promise<Blob>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderPage();
+
+    run('CSV');
+
+    expect(await screen.findByRole('button', { name: 'Producing CSV…' })).toBeDisabled();
+    expect(byId('run-PDF')).toBeDisabled();
+    finish(new Blob(['a,b']));
+    expect(await screen.findByRole('button', { name: 'Download CSV' })).toBeEnabled();
+  });
+
+  it('says so when the report could not be produced, and saves nothing', async () => {
+    reportApi.structureInventorySummary.mockRejectedValue(new Error('down'));
+    renderPage();
+
+    run();
+
+    await waitFor(() =>
+      expect(display).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: 'The PDF could not be produced' }),
+      ),
+    );
+    expect(saveFile).not.toHaveBeenCalled();
+  });
 
   it('checks the criteria for the CSV too', async () => {
     renderPage();
@@ -147,7 +190,7 @@ describe('StructureInventorySummaryPage', () => {
     run('CSV');
 
     expect(await screen.findByText('Kilometres must be a number, e.g. 12.5')).toBeInTheDocument();
-    expect(display).not.toHaveBeenCalled();
+    expect(reportApi.structureInventorySummary).not.toHaveBeenCalled();
   });
 
   it("loads the district's management areas, and drops the area when the district changes", async () => {
@@ -191,6 +234,6 @@ describe('StructureInventorySummaryPage', () => {
       await screen.findByTestId('structure-inventory-summary-codes-error'),
     ).toBeInTheDocument();
     run();
-    expect(display).toHaveBeenCalled();
+    await waitFor(() => expect(reportApi.structureInventorySummary).toHaveBeenCalled());
   });
 });
