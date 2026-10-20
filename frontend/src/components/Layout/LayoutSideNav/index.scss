@@ -180,6 +180,28 @@
   }
 }
 
+// A child's label wraps rather than truncating: legacy's report names ("Inspections Conducted –
+// Summary") are longer than the panel, and cut to "Inspections Conducted …" two of them read the
+// same. The row keeps its 3rem as a minimum and grows to fit a second line. Children only, and
+// only in the open panel — the rail's labels are its tooltips, which must stay on one line.
+.side-nav-drawer--open .#{vars.$bcgov-prefix}--side-nav__menu {
+  .#{vars.$bcgov-prefix}--side-nav__menu-item,
+  a.#{vars.$bcgov-prefix}--side-nav__link {
+    block-size: auto;
+    min-block-size: vars.$layout-side-nav-row-height;
+  }
+
+  a.#{vars.$bcgov-prefix}--side-nav__link {
+    padding-block: $spacing-03;
+  }
+
+  a.#{vars.$bcgov-prefix}--side-nav__link > .#{vars.$bcgov-prefix}--side-nav__link-text {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+
 // Carbon draws top-level entries in `heading-compact-01`, which is 600 — the same weight it uses to
 // mark the *current* page. That leaves the selected row distinguishable only by its grey fill. The
 // design separates the two: everything is regular, and weight means "you are here".
@@ -214,10 +236,22 @@
   flex-direction: column;
 }
 
+// The list fills the drawer and no more: a zero basis and no minimum, so a list longer than the
+// drawer (Reports open, on a short screen) scrolls inside it rather than running off the bottom,
+// clipped by the drawer's `overflow: hidden`. An `auto` basis sized it to its content instead, and
+// nothing below the fold could be reached.
 .side-nav-drawer .#{vars.$bcgov-prefix}--side-nav__items {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   flex-direction: column;
+  min-block-size: 0;
+
+  // Its entries never shrink. Flex items do by default, and Carbon's `__item` clips, so an open
+  // section taller than the space left was squeezed to fit and cut off its own last children —
+  // and the list, never outgrowing the drawer, had nothing to scroll.
+  > * {
+    flex-shrink: 0;
+  }
 }
 
 // The rule above the support block. Carbon already gives `__divider` its 1px line and 0.5rem/1rem

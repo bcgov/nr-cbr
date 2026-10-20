@@ -1,4 +1,8 @@
-import { Inspection as InspectionIcon, Location as LocationIcon } from '@carbon/icons-react';
+import {
+  Inspection as InspectionIcon,
+  Location as LocationIcon,
+  Report as ReportIcon,
+} from '@carbon/icons-react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 
 import Layout from '@/components/Layout';
@@ -11,6 +15,8 @@ import InspectionSearchPage from '@/pages/InspectionSearch';
 import LandingPage from '@/pages/Landing';
 import NewInspectionPage from '@/pages/NewInspection';
 import NotFoundPage from '@/pages/NotFound';
+import ReportPlaceholderPage from '@/pages/Reports';
+import StructureInventorySummaryPage from '@/pages/Reports/StructureInventorySummary';
 import RoleErrorPage from '@/pages/RoleError';
 import SiteDetailPage from '@/pages/SiteDetail';
 import SiteSearchPage from '@/pages/SiteSearch';
@@ -23,6 +29,7 @@ import type { ROLE_TYPE } from '@/context/auth/types';
 
 import { LANDING_AFTER_LOGIN } from '@/constants/routes';
 import { ROLE_CAPABILITIES } from '@/context/auth/types';
+import { REPORTS } from '@/pages/Reports/reports';
 
 /**
  * Route table. Three sets, selected by auth state in AppRoutes: public
@@ -324,6 +331,35 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         roles: [...ROLE_CAPABILITIES.read],
       },
     ],
+  },
+  {
+    // Reports — the legacy menu's third section, eleven reports as its children, as legacy listed
+    // them (cbr-navigation.local.md §1). Same shape as Inventory above. Each page is a placeholder
+    // until its report is built.
+    path: '/reports',
+    id: 'Reports',
+    icon: ReportIcon,
+    element: <Navigate to={`/reports/${REPORTS[0].path}`} replace />,
+    isSideMenu: true,
+    children: REPORTS.map((report) => ({
+      path: report.path,
+      id: report.name,
+      element: (
+        <ProtectedRoute>
+          <Layout>
+            {report.path === 'structure-inventory-summary' ? (
+              <StructureInventorySummaryPage />
+            ) : (
+              <ReportPlaceholderPage name={report.name} />
+            )}
+          </Layout>
+        </ProtectedRoute>
+      ),
+      isSideMenu: true,
+      // Legacy gate: each report's /show…Report privilege, at the GENERAL floor — every role that
+      // can read holds them (cbr-navigation.local.md §4).
+      roles: [...ROLE_CAPABILITIES.read],
+    })),
   },
   {
     path: '/unauthorized',

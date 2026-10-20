@@ -8,6 +8,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.DeckTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.EngineeredClvrtMaterialCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileAttachmentTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileMimeTypeXrefRepository;
@@ -15,6 +16,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.PierTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.PrtbleSuperstructureStsCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairPriorityCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairStatusCodeRepository;
@@ -112,6 +114,8 @@ public class ConfigurationService {
   private final DeckTypeCodeRepository deckTypeCodeRepository;
   private final RunningSurfaceCodeRepository runningSurfaceCodeRepository;
   private final AbutmentCodeRepository abutmentCodeRepository;
+  private final EngineeredClvrtMaterialCodeRepository engineeredClvrtMaterialCodeRepository;
+  private final PrtbleSuperstructureStsCodeRepository prtbleSuperstructureStsCodeRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -139,7 +143,9 @@ public class ConfigurationService {
       StructureSourceCodeRepository structureSourceCodeRepository,
       DeckTypeCodeRepository deckTypeCodeRepository,
       RunningSurfaceCodeRepository runningSurfaceCodeRepository,
-      AbutmentCodeRepository abutmentCodeRepository) {
+      AbutmentCodeRepository abutmentCodeRepository,
+      EngineeredClvrtMaterialCodeRepository engineeredClvrtMaterialCodeRepository,
+      PrtbleSuperstructureStsCodeRepository prtbleSuperstructureStsCodeRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -166,6 +172,8 @@ public class ConfigurationService {
     this.deckTypeCodeRepository = deckTypeCodeRepository;
     this.runningSurfaceCodeRepository = runningSurfaceCodeRepository;
     this.abutmentCodeRepository = abutmentCodeRepository;
+    this.engineeredClvrtMaterialCodeRepository = engineeredClvrtMaterialCodeRepository;
+    this.prtbleSuperstructureStsCodeRepository = prtbleSuperstructureStsCodeRepository;
   }
 
   /**
@@ -410,6 +418,42 @@ public class ConfigurationService {
     return engineeredCulvertTypeCodeRepository.findAllByOrderByDescriptionAsc().stream()
         .map(entity ->
             new CodeOptionResponse(entity.getEngineeredCulvertTypeCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * Deck types — {@code THE.DECK_TYPE_CODE}, every code by description. The Deck Type filter on the
+   * Structure Inventory – Summary report; the Bridge card's select reads the current ones only.
+   */
+  @Cacheable("deckTypeCodes")
+  public List<CodeOptionResponse> getDeckTypeCodes() {
+    return deckTypeCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity -> new CodeOptionResponse(entity.getDeckTypeCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * Culvert materials — {@code THE.ENGINEERED_CLVRT_MATERIAL_CODE}, every code by description. The
+   * Culvert Material filter on the Structure Inventory – Summary report; the Culvert card's select
+   * reads the current ones only.
+   */
+  @Cacheable("culvertMaterialCodes")
+  public List<CodeOptionResponse> getCulvertMaterialCodes() {
+    return engineeredClvrtMaterialCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getEngineeredClvrtMaterialCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * Portable superstructure statuses — {@code THE.PRTBLE_SUPERSTRUCTURE_STS_CODE}, by description.
+   * The Portable Superstructure Status filter on the Structure Inventory reports.
+   */
+  @Cacheable("portableSuperstructureStatusCodes")
+  public List<CodeOptionResponse> getPortableSuperstructureStatusCodes() {
+    return prtbleSuperstructureStsCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getPrtbleSuperstructureStsCode(), entity.getDescription()))
         .toList();
   }
 

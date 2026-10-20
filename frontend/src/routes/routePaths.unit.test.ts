@@ -108,9 +108,31 @@ describe('getMenuEntries', () => {
     },
   );
 
-  it('orders the sections as the legacy menu did — Inventory, then Inspection', () => {
-    expect(idsOf(['CBR_GENERAL'])).toEqual(['Inventory', 'Inspection']);
+  it('orders the sections as the legacy menu did — Inventory, Inspection, then Reports', () => {
+    expect(idsOf(['CBR_GENERAL'])).toEqual(['Inventory', 'Inspection', 'Reports']);
   });
+
+  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
+    "offers %s Reports with legacy's eleven reports, in legacy's order",
+    (role) => {
+      const reports = entry([role], 'Reports');
+
+      expect(reports?.path).toBe('/reports');
+      expect(reports?.children?.map((child) => child.id)).toEqual([
+        'Structure Inventory – Summary',
+        'Structure Inventory – Detailed',
+        'Structure Detail Report',
+        'Repairs Summary',
+        'Monitors Summary',
+        'Inspections Conducted – Summary',
+        'Inspections Conducted – Detail',
+        'Inspections Due – Summary',
+        'Inspections Due – Detailed',
+        'Inspections – Blank Report',
+        'Replacement Structures Summary',
+      ]);
+    },
+  );
 
   it('drops a section entirely when the user can reach none of its children', () => {
     // The legacy defect this exists to avoid: MenuTag wrote the section header before testing
@@ -119,6 +141,7 @@ describe('getMenuEntries', () => {
     expect(idsOf([])).not.toContain('Inventory');
     expect(idsOf(['SOME_UNRELATED_ROLE'])).not.toContain('Inventory');
     expect(idsOf(['SOME_UNRELATED_ROLE'])).not.toContain('Inspection');
+    expect(idsOf(['SOME_UNRELATED_ROLE'])).not.toContain('Reports');
   });
 
   it('never returns a parent with an empty children array', () => {
@@ -160,11 +183,14 @@ describe('getProtectedRoutes', () => {
   it('registers each child at its absolute path', () => {
     expect(paths()).toContain('/inventory/site-search');
     expect(paths()).toContain('/inspection/inspection-search');
+    expect(paths()).toContain('/reports/structure-inventory-summary');
+    expect(paths()).toContain('/reports/replacement-structures-summary');
   });
 
-  it('keeps the section path itself, so /inventory and /inspection resolve', () => {
+  it('keeps the section path itself, so /inventory, /inspection and /reports resolve', () => {
     expect(paths()).toContain('/inventory');
     expect(paths()).toContain('/inspection');
+    expect(paths()).toContain('/reports');
   });
 
   it('registers every path exactly once', () => {

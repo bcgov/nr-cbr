@@ -10,6 +10,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DeckTypeCodeRepository extends JpaRepository<DeckTypeCodeEntity, String> {
 
+  /**
+   * Every code, by description — the Deck Type select on the Structure Inventory – Summary report,
+   * a filter, where structures still carry codes that have since expired.
+   */
+  List<DeckTypeCodeEntity> findAllByOrderByDescriptionAsc();
+
   /** The current codes, by description; expired ones are left out, as legacy's select left them. */
   @Query("""
       SELECT code

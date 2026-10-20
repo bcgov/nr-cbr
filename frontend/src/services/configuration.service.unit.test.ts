@@ -49,6 +49,9 @@ describe('ConfigurationService', () => {
     ['getStructureCurbTypeCodes', 'structure-curb-type-codes'],
     ['getCulvertTypeCodes', 'culvert-type-codes'],
     ['getSpecialEquipmentCodes', 'special-equipment-codes'],
+    ['getDeckTypeCodes', 'deck-type-codes'],
+    ['getCulvertMaterialCodes', 'culvert-material-codes'],
+    ['getPortableSuperstructureStatusCodes', 'portable-superstructure-status-codes'],
     ['getMonitoringStatusCodes', 'monitoring-status-codes'],
     ['getMonitorFrequencyCodes', 'monitor-frequency-codes'],
   ] as const)('calls the %s endpoint', async (method, path) => {

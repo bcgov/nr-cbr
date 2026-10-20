@@ -111,6 +111,21 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   }
 
   @Override
+  public ResponseEntity<List<CodeOptionResponse>> getDeckTypeCodes() {
+    return ResponseEntity.ok(configurationService.getDeckTypeCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getCulvertMaterialCodes() {
+    return ResponseEntity.ok(configurationService.getCulvertMaterialCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getPortableSuperstructureStatusCodes() {
+    return ResponseEntity.ok(configurationService.getPortableSuperstructureStatusCodes());
+  }
+
+  @Override
   public ResponseEntity<List<CodeOptionResponse>> getSpecialEquipmentCodes() {
     return ResponseEntity.ok(configurationService.getSpecialEquipmentCodes());
   }

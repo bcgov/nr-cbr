@@ -62,6 +62,19 @@ class ConfigurationApiControllerTest {
   }
 
   @Test
+  @DisplayName("each report filter list comes from its own service method")
+  void reportFilterListsDelegate() {
+    when(service.getDeckTypeCodes()).thenReturn(codes("deck"));
+    when(service.getCulvertMaterialCodes()).thenReturn(codes("material"));
+    when(service.getPortableSuperstructureStatusCodes()).thenReturn(codes("portable"));
+
+    assertThat(controller.getDeckTypeCodes().getBody()).isEqualTo(codes("deck"));
+    assertThat(controller.getCulvertMaterialCodes().getBody()).isEqualTo(codes("material"));
+    assertThat(controller.getPortableSuperstructureStatusCodes().getBody())
+        .isEqualTo(codes("portable"));
+  }
+
+  @Test
   @DisplayName("each org-unit list comes from its own service method")
   void orgUnitListsDelegate() {
     when(service.getForestDistricts()).thenReturn(orgUnits("district"));

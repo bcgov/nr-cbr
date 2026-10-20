@@ -105,6 +105,30 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Deck types, expired ones included. A Structure Inventory – Summary filter. */
+  getDeckTypeCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/deck-type-codes',
+    });
+  }
+
+  /** Culvert materials, expired ones included. A Structure Inventory – Summary filter. */
+  getCulvertMaterialCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/culvert-material-codes',
+    });
+  }
+
+  /** Portable superstructure statuses, by description. A Structure Inventory report filter. */
+  getPortableSuperstructureStatusCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/portable-superstructure-status-codes',
+    });
+  }
+
   /** Special equipment requirements, by description. */
   getSpecialEquipmentCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {
