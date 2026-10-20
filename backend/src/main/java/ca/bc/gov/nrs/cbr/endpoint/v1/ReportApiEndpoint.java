@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -34,5 +35,20 @@ public interface ReportApiEndpoint {
   @GetMapping("/structure-inventory-summary")
   ResponseEntity<byte[]> structureInventorySummary(
       @Valid @ModelAttribute StructureInventorySummaryCriteria criteria,
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+
+  /**
+   * Structure Inventory – Detailed (legacy CBR007), as a PDF in legacy's layout — a block of
+   * labelled fields per structure — or a CSV of legacy's fuller export, downloaded as an
+   * attachment. Its KMZ is still to come.
+   *
+   * <p>{@code @Valid} turns a kilometre or a year that is not one into a 400 naming the field.
+   *
+   * @param format {@code PDF} (the default) or {@code CSV}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/structure-inventory-detailed")
+  ResponseEntity<byte[]> structureInventoryDetailed(
+      @Valid @ModelAttribute StructureInventoryDetailedCriteria criteria,
       @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
 }

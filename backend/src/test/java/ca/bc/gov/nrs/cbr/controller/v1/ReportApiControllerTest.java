@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.service.v1.ReportFile;
+import ca.bc.gov.nrs.cbr.service.v1.StructureInventoryDetailedService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventorySummaryService;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
@@ -18,7 +19,8 @@ class ReportApiControllerTest {
 
   private final StructureInventorySummaryService service =
       mock(StructureInventorySummaryService.class);
-  private final ReportApiController controller = new ReportApiController(service);
+  private final ReportApiController controller = new ReportApiController(service,
+      mock(StructureInventoryDetailedService.class));
 
   @Test
   @DisplayName("sends the report as a typed attachment under its own name")

@@ -4,6 +4,7 @@ import { ReportService } from './report.service';
 
 import type { APIConfig } from '@/config/api/types';
 
+import { EMPTY_CRITERIA as DETAILED_EMPTY } from '@/pages/Reports/StructureInventoryDetailed/types';
 import { EMPTY_CRITERIA } from '@/pages/Reports/StructureInventorySummary/types';
 
 const config: APIConfig = {
@@ -68,5 +69,27 @@ describe('ReportService', () => {
     expect(url).not.toContain('downrated');
     expect(url).not.toContain('kiloStart');
     expect(url).not.toContain('maintainerLabel');
+  });
+
+  it('asks for the Structure Inventory – Detailed PDF with only the criteria set', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.structureInventoryDetailed(
+      {
+        ...DETAILED_EMPTY,
+        yearBuiltStart: '1990',
+        maintainerLabel: 'CANFOR CORPORATION (00001012)',
+      },
+      'CSV',
+    );
+
+    const url = urlOf(request);
+    expect(url).toContain('/api/v1/reports/structure-inventory-detailed?');
+    expect(url).toContain('yearBuiltStart=1990');
+    expect(url).toContain('format=CSV');
+    expect(url).not.toContain('maintainerLabel');
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', responseType: 'blob' }),
+    );
   });
 });

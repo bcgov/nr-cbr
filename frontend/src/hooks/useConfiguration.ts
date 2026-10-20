@@ -270,6 +270,15 @@ const STRUCTURE_INVENTORY_SUMMARY_LOOKUPS = [
   deckTypeCodesQuery,
 ] as const;
 
+const STRUCTURE_INVENTORY_DETAILED_LOOKUPS = [
+  siteStatusCodesQuery,
+  siteTypeCodesQuery,
+  forestDistrictsQuery,
+  businessAreasQuery,
+  specialAccessCodesQuery,
+  portableSuperstructureStatusCodesQuery,
+] as const;
+
 /**
  * Management areas for one forest district.
  *
@@ -421,6 +430,10 @@ export const useStructureReferenceDataState = (): ReferenceDataState =>
 /** The same, for the lookups the Structure Inventory – Summary report draws on. */
 export const useStructureInventorySummaryReferenceDataState = (): ReferenceDataState =>
   useQueries({ queries: STRUCTURE_INVENTORY_SUMMARY_LOOKUPS, combine: combineReferenceData });
+
+/** The same, for the lookups the Structure Inventory – Detailed report draws on. */
+export const useStructureInventoryDetailedReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: STRUCTURE_INVENTORY_DETAILED_LOOKUPS, combine: combineReferenceData });
 
 /**
  * Warms the parameterless lookups once, in the background, as soon as there is a session.

@@ -32,4 +32,24 @@ public interface ForestServiceCulvertRepository
       """)
   List<StructureValue<BigDecimal>> findLengths(
       @Param("structureIds") Collection<Long> structureIds);
+
+  /**
+   * These structures' culverts as the Structure Inventory – Detailed CSV writes them, oldest
+   * culvert record first. Legacy's {@code STRCTRE_INVNTRY_DTL_CSV} left-joins the type and material
+   * code tables, so a code with no row there writes blank rather than dropping the culvert.
+   */
+  @Query("""
+      SELECT new ca.bc.gov.nrs.cbr.repository.v1.StructureCulvertDetail(
+               culvert.crossingStructureId, type.description, material.description,
+               culvert.openingHeight, culvert.openingWidth, culvert.culvertLength, culvert.slope,
+               culvert.inletCoverDepth, culvert.outletCoverDepth)
+        FROM ForestServiceCulvertEntity culvert
+        LEFT JOIN EngineeredCulvertTypeCodeEntity type
+               ON type.engineeredCulvertTypeCode = culvert.engineeredCulvertTypeCode
+        LEFT JOIN EngineeredClvrtMaterialCodeEntity material
+               ON material.engineeredClvrtMaterialCode = culvert.engineeredCulvertMaterialCode
+       WHERE culvert.crossingStructureId IN :structureIds
+       ORDER BY culvert.forestServiceCulvertId
+      """)
+  List<StructureCulvertDetail> findDetails(@Param("structureIds") Collection<Long> structureIds);
 }

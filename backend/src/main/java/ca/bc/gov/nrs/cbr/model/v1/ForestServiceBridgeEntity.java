@@ -63,6 +63,14 @@ public class ForestServiceBridgeEntity {
   @Column(name = "PRTBLE_SUPERSTRUCTURE_STS_CODE", length = 10)
   private String portableSuperstructureStatusCode;
 
+  /**
+   * Where a portable superstructure is — the Structure Inventory – Detailed report's "Location
+   * Details". Read only: nothing in this application edits it yet.
+   */
+  @Column(name = "PORTABLE_SPRSTRCTRE_LOCN_DTL", length = 2000, insertable = false,
+      updatable = false)
+  private String portableSuperstructureLocationDetail;
+
   @Column(name = "RIGHT_ABUTMENT_CODE", length = 10)
   private String rightAbutmentCode;
 

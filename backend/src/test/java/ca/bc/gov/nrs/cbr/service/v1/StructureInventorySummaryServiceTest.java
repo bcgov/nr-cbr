@@ -49,11 +49,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * not Oracle's behaviour.
  */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import({StructureInventorySummaryService.class, ReportRenderer.class})
+@Import({StructureInventorySummaryService.class, StructureInventoryReportSupport.class,
+    ReportRenderer.class})
 class StructureInventorySummaryServiceTest {
 
   @Autowired
   private StructureInventorySummaryService service;
+
+  @Autowired
+  private StructureInventoryReportSupport support;
 
   @Autowired
   private EntityManager entityManager;
@@ -287,7 +291,7 @@ class StructureInventorySummaryServiceTest {
   @Test
   @DisplayName("describes the criteria in legacy's words, codes as their descriptions")
   void selectedCriteria() {
-    assertThat(service.selectedCriteria(StructureInventorySummaryCriteria.builder()
+    assertThat(support.selectedCriteria(StructureInventorySummaryCriteria.builder()
         .orgUnit("18").deckTypeCode("TMB").yearBuiltStart("1990").kiloStart("1").kiloEnd("20")
         .capitalRoad(true).downrated(true).build()))
         .isEqualTo("Forest District: Prince George Natural Resource District "

@@ -52,4 +52,11 @@ public class OrgUnitEntity {
   /** The District Code column's tooltip — the column is too narrow for the name. */
   @Column(name = "ORG_UNIT_NAME")
   private String orgUnitName;
+
+  /**
+   * The region the org unit rolls up to for reporting — the Structure Inventory – Detailed CSV's
+   * "Regional Org Unit". Read only.
+   */
+  @Column(name = "ROLLUP_REGION_NO", insertable = false, updatable = false)
+  private Long rollupRegionNo;
 }

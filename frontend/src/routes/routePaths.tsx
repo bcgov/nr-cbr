@@ -15,8 +15,7 @@ import InspectionSearchPage from '@/pages/InspectionSearch';
 import LandingPage from '@/pages/Landing';
 import NewInspectionPage from '@/pages/NewInspection';
 import NotFoundPage from '@/pages/NotFound';
-import ReportPlaceholderPage from '@/pages/Reports';
-import StructureInventorySummaryPage from '@/pages/Reports/StructureInventorySummary';
+import ReportPage from '@/pages/Reports/ReportPage';
 import RoleErrorPage from '@/pages/RoleError';
 import SiteDetailPage from '@/pages/SiteDetail';
 import SiteSearchPage from '@/pages/SiteSearch';
@@ -347,11 +346,7 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
       element: (
         <ProtectedRoute>
           <Layout>
-            {report.path === 'structure-inventory-summary' ? (
-              <StructureInventorySummaryPage />
-            ) : (
-              <ReportPlaceholderPage name={report.name} />
-            )}
+            <ReportPage path={report.path} name={report.name} />
           </Layout>
         </ProtectedRoute>
       ),
