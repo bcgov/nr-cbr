@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.ReportApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.ReportFile;
+import ca.bc.gov.nrs.cbr.service.v1.StructureDetailReportService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventoryDetailedService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventorySummaryService;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
@@ -19,12 +20,15 @@ public class ReportApiController implements ReportApiEndpoint {
 
   private final StructureInventorySummaryService structureInventorySummary;
   private final StructureInventoryDetailedService structureInventoryDetailed;
+  private final StructureDetailReportService structureDetail;
 
   public ReportApiController(
       StructureInventorySummaryService structureInventorySummary,
-      StructureInventoryDetailedService structureInventoryDetailed) {
+      StructureInventoryDetailedService structureInventoryDetailed,
+      StructureDetailReportService structureDetail) {
     this.structureInventorySummary = structureInventorySummary;
     this.structureInventoryDetailed = structureInventoryDetailed;
+    this.structureDetail = structureDetail;
   }
 
   @Override
@@ -37,6 +41,11 @@ public class ReportApiController implements ReportApiEndpoint {
   public ResponseEntity<byte[]> structureInventoryDetailed(
       StructureInventoryDetailedCriteria criteria, ReportFormat format) {
     return download(structureInventoryDetailed.generate(criteria, format));
+  }
+
+  @Override
+  public ResponseEntity<byte[]> structureDetail(long structureId, ReportFormat format) {
+    return download(structureDetail.generate(structureId, format));
   }
 
   /** Always an attachment: a report is saved, and the page asks for it to be. */

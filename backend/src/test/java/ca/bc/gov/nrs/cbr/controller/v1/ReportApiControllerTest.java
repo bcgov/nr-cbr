@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.service.v1.ReportFile;
+import ca.bc.gov.nrs.cbr.service.v1.StructureDetailReportService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventoryDetailedService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventorySummaryService;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
@@ -19,8 +20,10 @@ class ReportApiControllerTest {
 
   private final StructureInventorySummaryService service =
       mock(StructureInventorySummaryService.class);
+  private final StructureDetailReportService structureDetail =
+      mock(StructureDetailReportService.class);
   private final ReportApiController controller = new ReportApiController(service,
-      mock(StructureInventoryDetailedService.class));
+      mock(StructureInventoryDetailedService.class), structureDetail);
 
   @Test
   @DisplayName("sends the report as a typed attachment under its own name")
@@ -38,5 +41,21 @@ class ReportApiControllerTest {
         .startsWith("attachment;")
         .contains("StructureInventorySummaryReport_2026-10-20.csv");
     assertThat(response.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
+  }
+
+  @Test
+  @DisplayName("sends a structure's detail report as a PDF attachment")
+  void downloadsTheStructureDetailReport() {
+    byte[] pdf = "%PDF".getBytes();
+    when(structureDetail.generate(42L, ReportFormat.PDF)).thenReturn(new ReportFile(
+        pdf, "StructureDetailReport_B1_2026-10-20.pdf", MediaType.APPLICATION_PDF));
+
+    ResponseEntity<byte[]> response = controller.structureDetail(42L, ReportFormat.PDF);
+
+    assertThat(response.getBody()).isEqualTo(pdf);
+    assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PDF);
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .startsWith("attachment;")
+        .contains("StructureDetailReport_B1_2026-10-20.pdf");
   }
 }

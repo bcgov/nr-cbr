@@ -34,3 +34,10 @@ export const useStructureInventoryDetailedReport = () =>
       format: ReportFormat;
     }) => API.report.structureInventoryDetailed(criteria, format),
   });
+
+/** Produces one structure's Structure Detail Report as a file. A mutation, as the others are. */
+export const useStructureDetailReport = () =>
+  useMutation({
+    mutationFn: ({ structureId, format }: { structureId: string; format: ReportFormat }) =>
+      API.report.structureDetail(structureId, format),
+  });

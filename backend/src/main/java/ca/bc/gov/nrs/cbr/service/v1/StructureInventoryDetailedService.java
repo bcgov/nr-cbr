@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.blankIfNull;
+import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.format;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.formatDate;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.filename;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.firstOf;
@@ -21,14 +22,10 @@ import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -304,15 +301,6 @@ public class StructureInventoryDetailedService {
     }
   }
 
-  /** A number in one of legacy's template patterns, or blank. Made per call: not thread-safe. */
-  private static String format(BigDecimal value, String pattern) {
-    if (value == null) {
-      return "";
-    }
-    DecimalFormat format = new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(Locale.CANADA));
-    format.setRoundingMode(RoundingMode.HALF_EVEN);
-    return format.format(value);
-  }
 
   /** One structure's block, every value as it prints. */
   record Block(

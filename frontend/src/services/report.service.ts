@@ -59,4 +59,18 @@ export class ReportService extends HttpClient {
       responseType: 'blob',
     });
   }
+
+  /**
+   * Structure Detail Report (legacy CBR006): the full record of one structure, as a PDF in legacy's
+   * layout or a CSV of the same fields. 404 when the structure no longer exists or has been
+   * archived.
+   */
+  structureDetail(structureId: string, format: ReportFormat): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: `/v1/reports/structure-detail/${encodeURIComponent(structureId)}`,
+      query: { format },
+      responseType: 'blob',
+    });
+  }
 }

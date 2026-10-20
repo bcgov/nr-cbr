@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -50,5 +51,19 @@ public interface ReportApiEndpoint {
   @GetMapping("/structure-inventory-detailed")
   ResponseEntity<byte[]> structureInventoryDetailed(
       @Valid @ModelAttribute StructureInventoryDetailedCriteria criteria,
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+
+  /**
+   * Structure Detail Report (legacy CBR006): the full record of one structure, as a PDF in
+   * legacy's layout or a CSV of the same fields, downloaded as an attachment. A 404 when there is
+   * no such structure, or it is archived.
+   *
+   * @param structureId the structure's {@code CROSSING_STRUCTURE_ID}
+   * @param format      {@code PDF} (the default) or {@code CSV}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/structure-detail/{structureId}")
+  ResponseEntity<byte[]> structureDetail(
+      @PathVariable("structureId") long structureId,
       @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
 }

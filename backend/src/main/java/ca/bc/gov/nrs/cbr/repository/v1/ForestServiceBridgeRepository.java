@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeSpanEntity;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
@@ -18,6 +19,24 @@ public interface ForestServiceBridgeRepository
   /** A structure's bridge record. One at most in practice; the first if there are more. */
   Optional<ForestServiceBridgeEntity> findFirstByCrossingStructureIdOrderByForestServiceBridgeId(
       Long crossingStructureId);
+
+  /** Every bridge record of a structure, oldest first — the Structure Detail Report prints each. */
+  List<ForestServiceBridgeEntity> findByCrossingStructureIdOrderByForestServiceBridgeId(
+      Long crossingStructureId);
+
+  /**
+   * The spans of every bridge record of a structure, by span number — legacy's
+   * {@code STRCTRE_DTL_RPT} span cursor, from which the Structure Detail Report lists the lengths
+   * and counts each bridge's spans.
+   */
+  @Query("""
+      SELECT span
+        FROM ForestServiceBridgeSpanEntity span, ForestServiceBridgeEntity bridge
+       WHERE span.forestServiceBridgeId = bridge.forestServiceBridgeId
+         AND bridge.crossingStructureId = :structureId
+       ORDER BY span.spanNumber, span.forestServiceBridgeSpanId
+      """)
+  List<ForestServiceBridgeSpanEntity> findSpans(@Param("structureId") Long structureId);
 
   /**
    * The total length of each of these structures' bridges, oldest bridge record first — the

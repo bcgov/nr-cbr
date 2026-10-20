@@ -270,6 +270,8 @@ const STRUCTURE_INVENTORY_SUMMARY_LOOKUPS = [
   deckTypeCodesQuery,
 ] as const;
 
+const STRUCTURE_DETAIL_REPORT_LOOKUPS = [siteTypeCodesQuery, forestDistrictsQuery] as const;
+
 const STRUCTURE_INVENTORY_DETAILED_LOOKUPS = [
   siteStatusCodesQuery,
   siteTypeCodesQuery,
@@ -430,6 +432,10 @@ export const useStructureReferenceDataState = (): ReferenceDataState =>
 /** The same, for the lookups the Structure Inventory – Summary report draws on. */
 export const useStructureInventorySummaryReferenceDataState = (): ReferenceDataState =>
   useQueries({ queries: STRUCTURE_INVENTORY_SUMMARY_LOOKUPS, combine: combineReferenceData });
+
+/** The same, for the lookups the Structure Detail Report's search draws on. */
+export const useStructureDetailReportReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: STRUCTURE_DETAIL_REPORT_LOOKUPS, combine: combineReferenceData });
 
 /** The same, for the lookups the Structure Inventory – Detailed report draws on. */
 export const useStructureInventoryDetailedReferenceDataState = (): ReferenceDataState =>
