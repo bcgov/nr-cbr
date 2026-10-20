@@ -52,6 +52,8 @@ type Props = {
   onChange: <K extends keyof Criteria>(field: K, value: Criteria[K]) => void;
   /** Runs the report as this format, once the criteria pass. */
   onRun: (format: ReportFormat) => void;
+  /** The format being produced, while one is: both buttons wait, and that one says so. */
+  running?: ReportFormat | null;
   onReset: () => void;
   /** Bumped on Clear, to remount the maintainer lookup and forget which boxes were visited. */
   resetToken: number;
@@ -80,6 +82,7 @@ const StructureInventorySummaryCriteriaForm: FC<Props> = ({
   onRun,
   onReset,
   resetToken,
+  running = null,
 }) => {
   const { shown, leave, submit: check } = useFieldErrors(criteriaErrors(criteria));
 
@@ -89,10 +92,12 @@ const StructureInventorySummaryCriteriaForm: FC<Props> = ({
     }
   };
 
-  /** Enter in a box runs the PDF, the first button. */
+  /** Enter in a box runs the PDF, the primary button — unless a report is already on its way. */
   const submit: SubmitEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
-    run('PDF');
+    if (running === null) {
+      run('PDF');
+    }
   };
 
   const locations = useClientLocations(criteria.clientNumber);
@@ -391,18 +396,20 @@ const StructureInventorySummaryCriteriaForm: FC<Props> = ({
           renderIcon={Download}
           onClick={() => run('CSV')}
           onMouseDown={holdFocus}
+          disabled={running !== null}
           data-testid={`${ID}-run-CSV`}
         >
-          Download CSV
+          {running === 'CSV' ? 'Producing CSV…' : 'Download CSV'}
         </Button>
         <Button
           kind="tertiary"
           type="submit"
           renderIcon={Download}
           onMouseDown={holdFocus}
+          disabled={running !== null}
           data-testid={`${ID}-run-PDF`}
         >
-          Download PDF
+          {running === 'PDF' ? 'Producing PDF…' : 'Download PDF'}
         </Button>
       </div>
     </form>

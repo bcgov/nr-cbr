@@ -1,6 +1,7 @@
 import { ClientService } from './client.service';
 import { ConfigurationService } from './configuration.service';
 import { InspectionSearchService } from './inspectionSearch.service';
+import { ReportService } from './report.service';
 import { RoadService } from './road.service';
 import { SiteSearchService } from './siteSearch.service';
 import { StructureSearchService } from './structureSearch.service';
@@ -59,6 +60,7 @@ const API = {
   inspectionSearch: new InspectionSearchService(BackendApiConfig),
   structureSearch: new StructureSearchService(BackendApiConfig),
   road: new RoadService(BackendApiConfig),
+  report: new ReportService(BackendApiConfig),
 } as const;
 
 export default API;

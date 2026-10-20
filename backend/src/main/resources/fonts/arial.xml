@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- "Arial" in the report templates, drawn and embedded as Liberation Sans (SIL OFL 1.1, see
+     LICENSE.LiberationFonts), which shares Arial's metrics. -->
+<fontFamilies>
+  <fontFamily name="Arial">
+    <normal>fonts/LiberationSans-Regular.ttf</normal>
+    <bold>fonts/LiberationSans-Bold.ttf</bold>
+    <italic>fonts/LiberationSans-Italic.ttf</italic>
+    <boldItalic>fonts/LiberationSans-BoldItalic.ttf</boldItalic>
+    <pdfEncoding>Identity-H</pdfEncoding>
+    <pdfEmbedded>true</pdfEmbedded>
+  </fontFamily>
+</fontFamilies>

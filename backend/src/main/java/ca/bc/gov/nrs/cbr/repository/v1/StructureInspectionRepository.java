@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -155,4 +156,43 @@ public interface StructureInspectionRepository
       """)
   boolean existsOnDateExcept(@Param("structureId") Long structureId,
       @Param("date") LocalDate date, @Param("inspectionId") Long inspectionId);
+
+  /**
+   * Each structure's last routine inspection date — the Structure Inventory report's "Last Inspctn
+   * Date". Legacy's {@code STRCTRE_INVNTRY_SUMMRY_RPT}: the latest {@code ROUT} inspection that has
+   * any status at all, whatever that status is.
+   */
+  @Query("""
+      SELECT new ca.bc.gov.nrs.cbr.repository.v1.StructureValue(
+               inspection.crossingStructureId, MAX(inspection.inspectionDate))
+        FROM StructureInspectionEntity inspection
+       WHERE inspection.crossingStructureId IN :structureIds
+         AND inspection.strctreInspectionTypeCode = 'ROUT'
+         AND EXISTS (SELECT 1 FROM InspectionReportStatusEntity status
+                      WHERE status.inspectionId = inspection.inspectionId)
+       GROUP BY inspection.crossingStructureId
+      """)
+  List<StructureValue<LocalDate>> findLastRoutineInspectionDates(
+      @Param("structureIds") Collection<Long> structureIds);
+
+  /**
+   * Each structure's newest routine status row — the report's "Inspection Status", whose code is
+   * read by id afterwards. Legacy's rule: the highest {@code INSPECTION_REPORT_STATUS_ID} across
+   * all the structure's {@code ROUT} inspections, which is not always the status of the inspection
+   * with the latest date.
+   *
+   * <p>A plain grouped join rather than legacy's correlated subquery, which made Oracle look for
+   * the newest status again for every status row it considered.
+   */
+  @Query("""
+      SELECT new ca.bc.gov.nrs.cbr.repository.v1.StructureValue(
+               inspection.crossingStructureId, MAX(status.inspectionReportStatusId))
+        FROM InspectionReportStatusEntity status, StructureInspectionEntity inspection
+       WHERE status.inspectionId = inspection.inspectionId
+         AND inspection.crossingStructureId IN :structureIds
+         AND inspection.strctreInspectionTypeCode = 'ROUT'
+       GROUP BY inspection.crossingStructureId
+      """)
+  List<StructureValue<Long>> findLatestRoutineStatusIds(
+      @Param("structureIds") Collection<Long> structureIds);
 }
