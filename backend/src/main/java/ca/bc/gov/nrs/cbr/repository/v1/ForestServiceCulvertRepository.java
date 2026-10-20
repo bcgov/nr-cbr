@@ -19,6 +19,10 @@ public interface ForestServiceCulvertRepository
   Optional<ForestServiceCulvertEntity> findFirstByCrossingStructureIdOrderByForestServiceCulvertId(
       Long crossingStructureId);
 
+  /** Every culvert record of a structure, oldest first — the Structure Detail Report prints each. */
+  List<ForestServiceCulvertEntity> findByCrossingStructureIdOrderByForestServiceCulvertId(
+      Long crossingStructureId);
+
   /**
    * The length of each of these structures' culverts, oldest culvert record first — the Structure
    * Inventory report's "Total Length" for a structure with no bridge.

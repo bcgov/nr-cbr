@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 
+import StructureDetailReportPage from './StructureDetailReport';
 import StructureInventoryDetailedPage from './StructureInventoryDetailed';
 import StructureInventorySummaryPage from './StructureInventorySummary';
 
@@ -12,6 +13,8 @@ const ReportPage: FC<{ path: string; name: string }> = ({ path, name }) => {
       return <StructureInventorySummaryPage />;
     case 'structure-inventory-detailed':
       return <StructureInventoryDetailedPage />;
+    case 'structure-detail':
+      return <StructureDetailReportPage />;
     default:
       return <ReportPlaceholderPage name={name} />;
   }

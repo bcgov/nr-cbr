@@ -1,4 +1,5 @@
 @use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
 
 // A report's criteria page — the same layout as Structure Search (see structureSearch.scss), shared
 // by the reports so their criteria pages read alike.
@@ -79,4 +80,22 @@
   justify-content: flex-end;
   gap: $spacing-03;
   margin-block-start: $spacing-05;
+}
+
+// A search's results under a report's criteria — the Structure Detail Report's.
+.report-criteria__results-column {
+  margin-block-start: $spacing-07;
+}
+
+.report-criteria__numeric {
+  text-align: end;
+}
+
+// A row's Download menu: its icon in the tertiary buttons' blue. Carbon's ghost icon button fills
+// the icon's paths, not just the svg, so the paths are named here too; disabled keeps Carbon's grey.
+.report-criteria__download.cds--btn--ghost:not([disabled]) .cds--overflow-menu__icon,
+.report-criteria__download.cds--btn--ghost:not([disabled])
+  .cds--overflow-menu__icon
+  path:not([data-icon-path]):not([fill='none']) {
+  fill: $link-primary;
 }

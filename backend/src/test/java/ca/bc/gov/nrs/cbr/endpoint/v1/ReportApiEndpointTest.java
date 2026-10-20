@@ -43,4 +43,14 @@ class ReportApiEndpointTest {
     assertThat(method.getAnnotation(GetMapping.class).value())
         .containsExactly("/structure-inventory-summary");
   }
+
+  @Test
+  @DisplayName("serves the Structure Detail Report by structure id")
+  void structureDetailPath() throws NoSuchMethodException {
+    Method method = ReportApiEndpoint.class.getMethod("structureDetail", long.class,
+        ca.bc.gov.nrs.cbr.struct.v1.ReportFormat.class);
+
+    assertThat(method.getAnnotation(GetMapping.class).value())
+        .containsExactly("/structure-detail/{structureId}");
+  }
 }

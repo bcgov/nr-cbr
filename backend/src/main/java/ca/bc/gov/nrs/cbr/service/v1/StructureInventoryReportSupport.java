@@ -14,7 +14,10 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -35,7 +38,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 /**
- * What the Structure Inventory reports share: legacy's report header — the ministry line, the logo,
+ * What the reports share: legacy's report header — the ministry line, the logo,
  * the user, the database, the date and the criteria line — the file's name, and the batching and
  * formatting every report's rows need.
  */
@@ -91,13 +94,19 @@ public class StructureInventoryReportSupport {
     return report + "_" + printed.replace('/', '-') + "." + format.extension();
   }
 
-  /** The header every report's template takes. */
+  /** The header every Structure Inventory report's template takes, its criteria line included. */
   Map<String, Object> parameters(
       StructureInventoryCriteria criteria, String reportId, String printed) {
+    Map<String, Object> parameters = parameters(reportId, printed);
+    parameters.put("P_SELECTED_CRITERIA", selectedCriteria(criteria));
+    return parameters;
+  }
+
+  /** The header every report's template takes. */
+  Map<String, Object> parameters(String reportId, String printed) {
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("P_USERID", loggedUser.getLoggedUserId());
     parameters.put("P_DATABASE", environment.toUpperCase(Locale.ROOT));
-    parameters.put("P_SELECTED_CRITERIA", selectedCriteria(criteria));
     parameters.put("P_DATE_PRINTED", printed);
     parameters.put("P_MINISTRY", MINISTRY);
     parameters.put("P_LOGO", LOGO);
@@ -260,6 +269,16 @@ public class StructureInventoryReportSupport {
 
   static String number(Integer value) {
     return value == null ? "" : value.toString();
+  }
+
+  /** A number in one of legacy's template patterns, or blank. Made per call: not thread-safe. */
+  static String format(BigDecimal value, String pattern) {
+    if (value == null) {
+      return "";
+    }
+    DecimalFormat format = new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(Locale.CANADA));
+    format.setRoundingMode(RoundingMode.HALF_EVEN);
+    return format.format(value);
   }
 
   /** A date as the reports print it, or blank. */
