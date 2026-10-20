@@ -141,6 +141,24 @@ public interface ConfigurationApiEndpoint {
   @GetMapping("/culvert-type-codes")
   ResponseEntity<List<CodeOptionResponse>> getCulvertTypeCodes();
 
+  /** Deck types, expired ones included — the Deck Type filter on Structure Inventory – Summary. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/deck-type-codes")
+  ResponseEntity<List<CodeOptionResponse>> getDeckTypeCodes();
+
+  /**
+   * Culvert materials, expired ones included — the Culvert Material filter on Structure Inventory –
+   * Summary.
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/culvert-material-codes")
+  ResponseEntity<List<CodeOptionResponse>> getCulvertMaterialCodes();
+
+  /** Portable superstructure statuses — the filter on the Structure Inventory reports. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/portable-superstructure-status-codes")
+  ResponseEntity<List<CodeOptionResponse>> getPortableSuperstructureStatusCodes();
+
   /** Special equipment requirements — the Special Equipment Requirements select. */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/special-equipment-codes")

@@ -111,6 +111,24 @@ export const culvertTypeCodesQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const deckTypeCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'deck-type-codes'],
+  queryFn: () => API.configuration.getDeckTypeCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const culvertMaterialCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'culvert-material-codes'],
+  queryFn: () => API.configuration.getCulvertMaterialCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const portableSuperstructureStatusCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'portable-superstructure-status-codes'],
+  queryFn: () => API.configuration.getPortableSuperstructureStatusCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 export const specialEquipmentCodesQuery = queryOptions({
   queryKey: [CONFIGURATION_QUERY_KEY, 'special-equipment-codes'],
   queryFn: () => API.configuration.getSpecialEquipmentCodes(),
@@ -238,6 +256,20 @@ const STRUCTURE_SEARCH_LOOKUPS = [
   specialEquipmentCodesQuery,
 ] as const;
 
+const STRUCTURE_INVENTORY_SUMMARY_LOOKUPS = [
+  siteStatusCodesQuery,
+  siteTypeCodesQuery,
+  structureTypeClassCodesQuery,
+  forestDistrictsQuery,
+  businessAreasQuery,
+  specialAccessCodesQuery,
+  portableSuperstructureStatusCodesQuery,
+  culvertTypeCodesQuery,
+  superstructureTypeCodesQuery,
+  culvertMaterialCodesQuery,
+  deckTypeCodesQuery,
+] as const;
+
 /**
  * Management areas for one forest district.
  *
@@ -283,6 +315,17 @@ export const useForestDistricts = (): UseQueryResult<OrgUnitOption[]> =>
 
 export const useSuperstructureTypeCodes = (): UseQueryResult<CodeOption[]> =>
   useQuery(superstructureTypeCodesQuery);
+
+/** Deck types, expired ones included — a report filter. */
+export const useDeckTypeCodes = (): UseQueryResult<CodeOption[]> => useQuery(deckTypeCodesQuery);
+
+/** Culvert materials, expired ones included — a report filter. */
+export const useCulvertMaterialCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(culvertMaterialCodesQuery);
+
+/** Portable superstructure statuses — a report filter. */
+export const usePortableSuperstructureStatusCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(portableSuperstructureStatusCodesQuery);
 
 export const useStructureCurbTypeCodes = (): UseQueryResult<CodeOption[]> =>
   useQuery(structureCurbTypeCodesQuery);
@@ -375,6 +418,10 @@ export const useInspectionReferenceDataState = (): ReferenceDataState =>
 export const useStructureReferenceDataState = (): ReferenceDataState =>
   useQueries({ queries: STRUCTURE_SEARCH_LOOKUPS, combine: combineReferenceData });
 
+/** The same, for the lookups the Structure Inventory – Summary report draws on. */
+export const useStructureInventorySummaryReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: STRUCTURE_INVENTORY_SUMMARY_LOOKUPS, combine: combineReferenceData });
+
 /**
  * Warms the parameterless lookups once, in the background, as soon as there is a session.
  *
@@ -428,6 +475,9 @@ export const usePrefetchConfiguration = (enabled: boolean): void => {
     void queryClient.query(structureCurbTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(culvertTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(specialEquipmentCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(deckTypeCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(culvertMaterialCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(portableSuperstructureStatusCodesQuery).catch(ignoreWarmUpFailure);
   }, [enabled, queryClient]);
 };
 

@@ -1,0 +1,82 @@
+@use '@carbon/react/scss/spacing' as *;
+
+// A report's criteria page — the same layout as Structure Search (see structureSearch.scss), shared
+// by the reports so their criteria pages read alike.
+
+.report-criteria__form {
+  margin-block-end: 0;
+}
+
+.report-criteria__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: $spacing-05;
+  align-items: start;
+
+  @media (max-width: 1055px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.report-criteria__paired {
+  display: flex;
+  gap: $spacing-03;
+
+  > :first-child {
+    flex: 1 1 auto;
+  }
+
+  > :last-child {
+    flex: 0 0 6rem;
+  }
+}
+
+.report-criteria__range {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.report-criteria__range-inputs {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-03;
+}
+
+.report-criteria__range-inputs .cds--form-item {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.report-criteria__range-dash {
+  block-size: 2.5rem;
+  line-height: 2.5rem;
+}
+
+.report-criteria__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  align-self: start;
+  column-gap: $spacing-06;
+  row-gap: $spacing-05;
+}
+
+// The order and the format: what the report looks like, apart from what it includes.
+.report-criteria__output {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-09;
+  margin-block-start: $spacing-07;
+}
+
+.report-criteria__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-03;
+  margin-block-start: $spacing-05;
+}

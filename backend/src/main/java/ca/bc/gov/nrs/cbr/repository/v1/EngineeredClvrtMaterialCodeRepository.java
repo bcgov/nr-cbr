@@ -10,6 +10,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface EngineeredClvrtMaterialCodeRepository extends JpaRepository<EngineeredClvrtMaterialCodeEntity, String> {
 
+  /**
+   * Every code, by description — the Culvert Material select on the Structure Inventory – Summary
+   * report, a filter, where structures still carry codes that have since expired.
+   */
+  List<EngineeredClvrtMaterialCodeEntity> findAllByOrderByDescriptionAsc();
+
   /** The current codes, by description; expired ones are left out, as legacy's select left them. */
   @Query("""
       SELECT code

@@ -15,12 +15,14 @@ import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.DeckTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.EngineeredClvrtMaterialCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.EngineeredCulvertTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.FileAttachmentTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitorFrequencyCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.PierTypeCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.PrtbleSuperstructureStsCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
@@ -40,6 +42,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.DeckTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.EngineeredClvrtMaterialCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.EngineeredCulvertTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileAttachmentTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.FileMimeTypeXrefRepository;
@@ -47,6 +50,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.PierTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.PrtbleSuperstructureStsCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairPriorityCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RepairStatusCodeRepository;
@@ -121,6 +125,10 @@ class ConfigurationServiceTest {
   private final DeckTypeCodeRepository deckTypes = mock(DeckTypeCodeRepository.class);
   private final RunningSurfaceCodeRepository surfaces = mock(RunningSurfaceCodeRepository.class);
   private final AbutmentCodeRepository abutments = mock(AbutmentCodeRepository.class);
+  private final EngineeredClvrtMaterialCodeRepository culvertMaterials =
+      mock(EngineeredClvrtMaterialCodeRepository.class);
+  private final PrtbleSuperstructureStsCodeRepository portableStatuses =
+      mock(PrtbleSuperstructureStsCodeRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes,
@@ -148,7 +156,9 @@ class ConfigurationServiceTest {
       sources,
       deckTypes,
       surfaces,
-      abutments);
+      abutments,
+      culvertMaterials,
+      portableStatuses);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -216,6 +226,30 @@ class ConfigurationServiceTest {
         .containsExactly(new CodeOptionResponse("CV", "from the culvert table"));
     assertThat(service.getSpecialEquipmentCodes())
         .containsExactly(new CodeOptionResponse("EQ", "from the equipment table"));
+  }
+
+  @Test
+  @DisplayName("reads every deck type, culvert material and portable status for the report filters")
+  void reportFilterListsReadEveryCode() {
+    // The whole table, not the current codes the Details tab's selects read: these filter a report,
+    // and structures recorded years ago still carry codes that have since expired.
+    when(deckTypes.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        DeckTypeCodeEntity.builder().deckTypeCode("DK").description("from the deck table").build()));
+    when(culvertMaterials.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        EngineeredClvrtMaterialCodeEntity.builder()
+            .engineeredClvrtMaterialCode("MT").description("from the material table").build()));
+    when(portableStatuses.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        PrtbleSuperstructureStsCodeEntity.builder()
+            .prtbleSuperstructureStsCode("S").description("from the portable table").build()));
+
+    assertThat(service.getDeckTypeCodes())
+        .containsExactly(new CodeOptionResponse("DK", "from the deck table"));
+    assertThat(service.getCulvertMaterialCodes())
+        .containsExactly(new CodeOptionResponse("MT", "from the material table"));
+    assertThat(service.getPortableSuperstructureStatusCodes())
+        .containsExactly(new CodeOptionResponse("S", "from the portable table"));
+    verify(deckTypes, never()).findAllCurrent();
+    verify(culvertMaterials, never()).findAllCurrent();
   }
 
   @Test

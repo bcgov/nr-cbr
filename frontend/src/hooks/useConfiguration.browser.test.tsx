@@ -16,6 +16,9 @@ const api = vi.hoisted(() => ({
   getStructureCurbTypeCodes: vi.fn(),
   getCulvertTypeCodes: vi.fn(),
   getSpecialEquipmentCodes: vi.fn(),
+  getDeckTypeCodes: vi.fn(),
+  getCulvertMaterialCodes: vi.fn(),
+  getPortableSuperstructureStatusCodes: vi.fn(),
   getManagementAreas: vi.fn(),
 }));
 
@@ -77,6 +80,9 @@ const PARAMETERLESS = [
   api.getStructureCurbTypeCodes,
   api.getCulvertTypeCodes,
   api.getSpecialEquipmentCodes,
+  api.getDeckTypeCodes,
+  api.getCulvertMaterialCodes,
+  api.getPortableSuperstructureStatusCodes,
 ];
 
 beforeEach(() => {

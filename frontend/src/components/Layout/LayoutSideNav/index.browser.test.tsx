@@ -242,14 +242,30 @@ describe('LayoutSideNav', () => {
    * still `display: inline` in this environment and reports a height of `auto` however tall the
    * rule makes it. Reading the declaration back still catches the rule ceasing to match, which is
    * the failure worth guarding. The rest of the nav's metrics are verified visually.
+   *
+   * <p>At least 48px, not exactly: in the open panel the row grows to fit a wrapped label (below).
    */
-  it('makes a child link fill its 48px row', async () => {
+  it('makes a child link fill its 48px row, growing for a second line', async () => {
     await renderWithProviders('/settings/profile');
 
     const child = screen.getByText('Profile').closest('a') as Element;
 
-    expect(getComputedStyle(child).blockSize).toBe('48px');
     expect(getComputedStyle(child).minBlockSize).toBe('48px');
+    expect(getComputedStyle(child).blockSize).toBe('auto');
+  });
+
+  /**
+   * Legacy's report names are longer than the panel, and truncated two of them read the same —
+   * "Inspections Conducted …". In the open panel a child's label wraps instead.
+   */
+  it("wraps a child's label in the open panel rather than truncating it", async () => {
+    await renderWithProviders('/settings/profile');
+
+    const label = screen.getByText('Profile');
+
+    expect(label).toHaveClass('cds--side-nav__link-text');
+    expect(getComputedStyle(label).whiteSpace).toBe('normal');
+    expect(getComputedStyle(label).textOverflow).toBe('clip');
   });
 
   /**
