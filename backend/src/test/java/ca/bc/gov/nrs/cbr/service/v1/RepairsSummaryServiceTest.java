@@ -35,6 +35,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
@@ -405,34 +406,32 @@ class RepairsSummaryServiceTest {
         .startsWith(String.join(",", RepairsSummaryCsv.COLUMNS) + "\r\n");
     List<List<String>> rows = service.csvRows(RepairsSummaryCriteria.builder().build());
     assertThat(RepairsSummaryCsv.COLUMNS).hasSize(41);
-    assertThat(rows).singleElement().satisfies(row -> {
-      assertThat(row).hasSameSizeAs(RepairsSummaryCsv.COLUMNS);
-      assertThat(column(row, "Forest File Id")).isEqualTo("R00123");
-      assertThat(column(row, "Road Name")).isEqualTo("Bowron FSR");
-      assertThat(column(row, "KM User")).isEqualTo("12.75");
-      assertThat(column(row, "KM")).isEqualTo("12.5");
-      assertThat(column(row, "Latitude")).isEqualTo("53.92");
-      assertThat(column(row, "Longitude")).isEqualTo("-122.7654");
-      assertThat(column(row, "Primary User Name")).isEqualTo("CANFOR CORPORATION");
-      assertThat(column(row, "Client Number")).isEqualTo("00001012");
-      assertThat(column(row, "Type")).isEqualTo("PB");
-      assertThat(column(row, "Load Rating")).isEqualTo("45.5");
-      assertThat(column(row, "Total Length")).isEqualTo("24.5");
-      assertThat(column(row, "Width")).isEqualTo("4.3");
-      assertThat(column(row, "Last Inspection Date")).isEqualTo("2025-06-12");
-      assertThat(column(row, "Next Inspection Date")).isEqualTo("2027-06-01");
-      assertThat(column(row, "Opening Width")).isEmpty();
-      assertThat(column(row, "Inspection Date")).isEqualTo("2025-06-12");
-      assertThat(column(row, "Repair Status")).isEqualTo("Required");
-      assertThat(column(row, "Estimate")).isEqualTo("125000");
-      assertThat(column(row, "Repair Type")).isEqualTo("Replace decking");
-      assertThat(column(row, "Repair Type Code")).isEqualTo("DECK");
-      assertThat(column(row, "Repair Class")).isEqualTo("Structural");
-      assertThat(column(row, "Repair Group Code")).isEqualTo("SUPER");
-      assertThat(column(row, "Repair Group")).isEqualTo("Superstructure");
-      assertThat(column(row, "Repair Qty")).isEqualTo("40");
-      assertThat(column(row, "Repair Units")).isEqualTo("m2");
-    });
+    assertThat(rows).singleElement().satisfies(row -> assertThat(byHeading(row)).contains(
+        entry("Forest File Id", "R00123"),
+        entry("Road Name", "Bowron FSR"),
+        entry("KM User", "12.75"),
+        entry("KM", "12.5"),
+        entry("Latitude", "53.92"),
+        entry("Longitude", "-122.7654"),
+        entry("Primary User Name", "CANFOR CORPORATION"),
+        entry("Client Number", "00001012"),
+        entry("Type", "PB"),
+        entry("Load Rating", "45.5"),
+        entry("Total Length", "24.5"),
+        entry("Width", "4.3"),
+        entry("Last Inspection Date", "2025-06-12"),
+        entry("Next Inspection Date", "2027-06-01"),
+        entry("Opening Width", ""),
+        entry("Inspection Date", "2025-06-12"),
+        entry("Repair Status", "Required"),
+        entry("Estimate", "125000"),
+        entry("Repair Type", "Replace decking"),
+        entry("Repair Type Code", "DECK"),
+        entry("Repair Class", "Structural"),
+        entry("Repair Group Code", "SUPER"),
+        entry("Repair Group", "Superstructure"),
+        entry("Repair Qty", "40"),
+        entry("Repair Units", "m2")));
   }
 
   @Test
@@ -456,5 +455,15 @@ class RepairsSummaryServiceTest {
 
   private static String column(List<String> row, String heading) {
     return row.get(RepairsSummaryCsv.COLUMNS.indexOf(heading));
+  }
+
+  /** A CSV row as heading → value, so a test checks many columns in one assertion. */
+  private static Map<String, String> byHeading(List<String> row) {
+    assertThat(row).hasSameSizeAs(RepairsSummaryCsv.COLUMNS);
+    Map<String, String> values = new LinkedHashMap<>();
+    for (int index = 0; index < row.size(); index++) {
+      values.put(RepairsSummaryCsv.COLUMNS.get(index), row.get(index));
+    }
+    return values;
   }
 }
