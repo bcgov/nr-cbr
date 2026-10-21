@@ -6,11 +6,11 @@ import { readSessionState, writeSessionState } from '@/utils/sessionState';
  * A report page's criteria: kept for the browser tab under the report's key, so leaving and coming
  * back finds them as they were left, and forgotten by Clear.
  *
- * <p>Changing the Forest District clears the Management Area: an area belongs to one district, and
- * keeping it would apply a filter the user can no longer see. `resetToken` changes on Clear — key
+ * <p>Changing the Forest District clears the Management Area, on a report that has one: an area
+ * belongs to one district, and keeping it would apply a filter the user can no longer see. `resetToken` changes on Clear — key
  * the form on it, so the boxes visited before it stop showing their errors.
  */
-export const useReportCriteria = <C extends { orgUnit: string; managementOrgUnit: string }>(
+export const useReportCriteria = <C extends { orgUnit: string; managementOrgUnit?: string }>(
   stateKey: string,
   empty: C,
 ) => {
@@ -28,7 +28,7 @@ export const useReportCriteria = <C extends { orgUnit: string; managementOrgUnit
     setCriteria((current) => ({
       ...current,
       [field]: value,
-      ...(field === 'orgUnit' ? { managementOrgUnit: '' } : {}),
+      ...(field === 'orgUnit' && 'managementOrgUnit' in current ? { managementOrgUnit: '' } : {}),
     }));
   }, []);
 

@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
@@ -79,5 +80,18 @@ public interface ReportApiEndpoint {
   @GetMapping("/repairs-summary")
   ResponseEntity<byte[]> repairsSummary(
       @Valid @ModelAttribute RepairsSummaryCriteria criteria,
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+
+  /**
+   * Monitors Summary (legacy CBR011): the monitoring items recorded against structures, a block
+   * per structure grouped by inspection, as a PDF in legacy's layout or a CSV of what it prints,
+   * downloaded as an attachment.
+   *
+   * @param format {@code PDF} (the default) or {@code CSV}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/monitors-summary")
+  ResponseEntity<byte[]> monitorsSummary(
+      @Valid @ModelAttribute MonitorsSummaryCriteria criteria,
       @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
 }
