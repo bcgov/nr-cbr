@@ -26,6 +26,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureSourceCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
@@ -116,6 +117,7 @@ public class ConfigurationService {
   private final AbutmentCodeRepository abutmentCodeRepository;
   private final EngineeredClvrtMaterialCodeRepository engineeredClvrtMaterialCodeRepository;
   private final PrtbleSuperstructureStsCodeRepository prtbleSuperstructureStsCodeRepository;
+  private final StructureRepairClassCodeRepository structureRepairClassCodeRepository;
 
   public ConfigurationService(
       CrossingSiteStatusCodeRepository crossingSiteStatusCodeRepository,
@@ -145,7 +147,8 @@ public class ConfigurationService {
       RunningSurfaceCodeRepository runningSurfaceCodeRepository,
       AbutmentCodeRepository abutmentCodeRepository,
       EngineeredClvrtMaterialCodeRepository engineeredClvrtMaterialCodeRepository,
-      PrtbleSuperstructureStsCodeRepository prtbleSuperstructureStsCodeRepository) {
+      PrtbleSuperstructureStsCodeRepository prtbleSuperstructureStsCodeRepository,
+      StructureRepairClassCodeRepository structureRepairClassCodeRepository) {
     this.crossingSiteStatusCodeRepository = crossingSiteStatusCodeRepository;
     this.structureInspectionStatusCodeRepository = structureInspectionStatusCodeRepository;
     this.specialAccessRequirementCodeRepository = specialAccessRequirementCodeRepository;
@@ -174,6 +177,7 @@ public class ConfigurationService {
     this.abutmentCodeRepository = abutmentCodeRepository;
     this.engineeredClvrtMaterialCodeRepository = engineeredClvrtMaterialCodeRepository;
     this.prtbleSuperstructureStsCodeRepository = prtbleSuperstructureStsCodeRepository;
+    this.structureRepairClassCodeRepository = structureRepairClassCodeRepository;
   }
 
   /**
@@ -504,6 +508,18 @@ public class ConfigurationService {
     return repairPriorityCodeRepository.findAllCurrent().stream()
         .map(entity ->
             new CodeOptionResponse(entity.getRepairPriorityCode(), entity.getDescription()))
+        .toList();
+  }
+
+  /**
+   * Repair classes — {@code THE.STRUCTURE_REPAIR_CLASS_CODE}, current ones by description. The
+   * Structural Safety filter on the Repairs Summary report.
+   */
+  @Cacheable("repairClassCodes")
+  public List<CodeOptionResponse> getRepairClassCodes() {
+    return structureRepairClassCodeRepository.findAllCurrent().stream()
+        .map(entity ->
+            new CodeOptionResponse(entity.getStructureRepairClassCode(), entity.getDescription()))
         .toList();
   }
 

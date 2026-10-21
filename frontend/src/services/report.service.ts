@@ -1,4 +1,6 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
+import type { MonitorsSummaryCriteria } from '@/pages/Reports/MonitorsSummary/types';
+import type { RepairsSummaryCriteria } from '@/pages/Reports/RepairsSummary/types';
 import type { StructureInventoryDetailedCriteria } from '@/pages/Reports/StructureInventoryDetailed/types';
 import type {
   ReportFormat,
@@ -70,6 +72,36 @@ export class ReportService extends HttpClient {
       method: 'GET',
       url: `/v1/reports/structure-detail/${encodeURIComponent(structureId)}`,
       query: { format },
+      responseType: 'blob',
+    });
+  }
+
+  /**
+   * Repairs Summary (legacy CBR005): the repairs recorded against structures, a page per structure
+   * grouped by inspection, as a PDF in legacy's layout. A GET, the criteria as query parameters.
+   */
+  repairsSummary(criteria: RepairsSummaryCriteria, format: ReportFormat): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/repairs-summary',
+      query: { ...populated(criteria), format },
+      responseType: 'blob',
+    });
+  }
+
+  /**
+   * Monitors Summary (legacy CBR011): the monitoring items recorded against structures, a block
+   * per structure grouped by inspection, as a PDF in legacy's layout. A GET, the criteria as query
+   * parameters.
+   */
+  monitorsSummary(
+    criteria: MonitorsSummaryCriteria,
+    format: ReportFormat,
+  ): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/monitors-summary',
+      query: { ...populated(criteria), format },
       responseType: 'blob',
     });
   }

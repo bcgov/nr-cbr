@@ -46,12 +46,14 @@ public interface ForestServiceCulvertRepository
       SELECT new ca.bc.gov.nrs.cbr.repository.v1.StructureCulvertDetail(
                culvert.crossingStructureId, type.description, material.description,
                culvert.openingHeight, culvert.openingWidth, culvert.culvertLength, culvert.slope,
-               culvert.inletCoverDepth, culvert.outletCoverDepth)
+               culvert.inletCoverDepth, culvert.outletCoverDepth, substructure.description)
         FROM ForestServiceCulvertEntity culvert
         LEFT JOIN EngineeredCulvertTypeCodeEntity type
                ON type.engineeredCulvertTypeCode = culvert.engineeredCulvertTypeCode
         LEFT JOIN EngineeredClvrtMaterialCodeEntity material
                ON material.engineeredClvrtMaterialCode = culvert.engineeredCulvertMaterialCode
+        LEFT JOIN OpnBtomClvrtSubstrctreCodeEntity substructure
+               ON substructure.opnBtomClvrtSubstrctreCode = culvert.opnBtomClvrtSubstrctreCode
        WHERE culvert.crossingStructureId IN :structureIds
        ORDER BY culvert.forestServiceCulvertId
       """)

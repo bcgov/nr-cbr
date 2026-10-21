@@ -286,11 +286,11 @@ public class StructureInventoryReportSupport {
     return value == null ? "" : value.format(DATE);
   }
 
-  private static Optional<String> text(String value) {
+  static Optional<String> text(String value) {
     return StringUtils.hasText(value) ? Optional.of(value.trim()) : Optional.empty();
   }
 
-  private static Optional<String> range(String from, String to) {
+  static Optional<String> range(String from, String to) {
     boolean hasFrom = StringUtils.hasText(from);
     boolean hasTo = StringUtils.hasText(to);
     if (hasFrom && hasTo) {
@@ -303,7 +303,7 @@ public class StructureInventoryReportSupport {
   }
 
   /** A code's description, or the code itself when the list does not hold it. */
-  private static Optional<String> code(List<CodeOptionResponse> options, String code) {
+  static Optional<String> code(List<CodeOptionResponse> options, String code) {
     return text(code).map(wanted -> options.stream()
         .filter(option -> wanted.equals(option.code()))
         .map(CodeOptionResponse::description)
@@ -312,7 +312,7 @@ public class StructureInventoryReportSupport {
         .orElse(wanted));
   }
 
-  private static Optional<String> orgUnit(List<OrgUnitResponse> options, String orgUnitNo) {
+  static Optional<String> orgUnit(List<OrgUnitResponse> options, String orgUnitNo) {
     return text(orgUnitNo).map(wanted -> options.stream()
         .filter(option -> wanted.equals(option.orgUnitNo()))
         .map(OrgUnitResponse::orgUnitName)

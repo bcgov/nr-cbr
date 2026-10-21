@@ -73,8 +73,19 @@ export const toggles = <C extends StructureInventoryCommonCriteria>({
   </div>
 );
 
+/** The criteria {@link ownerGroup} binds — every report with a district and a maintainer has them. */
+export type OwnerCriteria = Pick<
+  StructureInventoryCommonCriteria,
+  | 'orgUnit'
+  | 'managementOrgUnit'
+  | 'businessAreaOrgUnit'
+  | 'clientNumber'
+  | 'clientLocationCode'
+  | 'maintainerLabel'
+>;
+
 /** Who the structure belongs to: its district and area, its business area, its maintainer. */
-export const ownerGroup = <C extends StructureInventoryCommonCriteria>(
+export const ownerGroup = <C extends OwnerCriteria>(
   { orgUnitSelect }: CriteriaFields<C>,
   codeTables: CommonCodeTables,
   options: {

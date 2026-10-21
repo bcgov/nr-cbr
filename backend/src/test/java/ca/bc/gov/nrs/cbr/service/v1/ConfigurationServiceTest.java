@@ -32,6 +32,7 @@ import ca.bc.gov.nrs.cbr.model.v1.SpecialEquipmentRequirementCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StrctreInspectionTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureCurbTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureRepairClassCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairGroupCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureSourceCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
@@ -60,6 +61,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.SpecialEquipmentRequirementCodeRepository
 import ca.bc.gov.nrs.cbr.repository.v1.StrctreInspectionTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCurbTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionStatusCodeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureSourceCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
@@ -129,6 +131,8 @@ class ConfigurationServiceTest {
       mock(EngineeredClvrtMaterialCodeRepository.class);
   private final PrtbleSuperstructureStsCodeRepository portableStatuses =
       mock(PrtbleSuperstructureStsCodeRepository.class);
+  private final StructureRepairClassCodeRepository repairClasses =
+      mock(StructureRepairClassCodeRepository.class);
 
   private final ConfigurationService service = new ConfigurationService(
       siteStatusCodes,
@@ -158,7 +162,8 @@ class ConfigurationServiceTest {
       surfaces,
       abutments,
       culvertMaterials,
-      portableStatuses);
+      portableStatuses,
+      repairClasses);
 
   private static CbrOrgUnitEntity orgUnit(long orgUnitNo, String code, String name) {
     return CbrOrgUnitEntity.builder()
@@ -436,6 +441,17 @@ class ConfigurationServiceTest {
         .containsExactly(new CodeOptionResponse("H", "High"));
     assertThat(service.getRepairGroupCodes())
         .containsExactly(new CodeOptionResponse("APPR", "Approach"));
+  }
+
+  @Test
+  @DisplayName("lists the repair classes the Repairs Summary's Structural Safety offers")
+  void repairClassCodes() {
+    when(repairClasses.findAllCurrent()).thenReturn(List.of(
+        StructureRepairClassCodeEntity.builder().structureRepairClassCode("S")
+            .description("Structural").build()));
+
+    assertThat(service.getRepairClassCodes())
+        .containsExactly(new CodeOptionResponse("S", "Structural"));
   }
 
   @Test
