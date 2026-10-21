@@ -10,6 +10,7 @@ import {
 } from '../criteriaGroups';
 import ReportCriteriaForm from '../ReportCriteriaForm';
 import ReportPageLayout from '../ReportPageLayout';
+import { SORT_OPTIONS } from '../types';
 import { useCommonCodeTables } from '../useCommonCodeTables';
 import { useReportCriteria } from '../useReportCriteria';
 import { useReportDownload } from '../useReportDownload';
@@ -75,6 +76,7 @@ const StructureInventoryDetailedPage: FC = () => {
         key={resetToken}
         id={ID}
         criteria={criteria}
+        sortOptions={SORT_OPTIONS}
         errors={errors}
         formats={FORMATS}
         codeTablesLoading={referenceData.isLoading}

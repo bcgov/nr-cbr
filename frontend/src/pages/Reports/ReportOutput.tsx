@@ -1,30 +1,33 @@
 import { Download } from '@carbon/icons-react';
 import { Button, RadioButton, RadioButtonGroup } from '@carbon/react';
 
-import { SORT_OPTIONS, type ReportFormat, type StructureInventorySort } from './types';
-
+import type { ReportFormat } from './types';
 import type { FC } from 'react';
 
 import { holdFocus } from '@/hooks/useFieldErrors';
 
-type SortByProps = {
+/** A report's orders, each with its legacy label. */
+export type SortOption<S extends string> = { value: S; label: string };
+
+type SortByProps<S extends string> = {
   /** The prefix of the radios' ids — the report's. */
   id: string;
-  sortBy: StructureInventorySort;
-  onChange: (sortBy: StructureInventorySort) => void;
+  options: readonly SortOption<S>[];
+  sortBy: S;
+  onChange: (sortBy: S) => void;
 };
 
-/** The Structure Inventory reports' "Sort By" — legacy's four orders. */
-export const SortBy: FC<SortByProps> = ({ id, sortBy, onChange }) => (
+/** A report's "Sort By" — legacy's orders for it, one radio each. */
+export const SortBy = <S extends string>({ id, options, sortBy, onChange }: SortByProps<S>) => (
   <div className="report-criteria__output">
     <RadioButtonGroup
       legendText="Sort By"
       name={`${id}-sortBy`}
       orientation="vertical"
       valueSelected={sortBy}
-      onChange={(value) => onChange(value as StructureInventorySort)}
+      onChange={(value) => onChange(value as S)}
     >
-      {SORT_OPTIONS.map((option) => (
+      {options.map((option) => (
         <RadioButton
           key={option.value}
           id={`${id}-sortBy-${option.value}`}

@@ -14,7 +14,7 @@ import { useCommonCodeTables } from '../useCommonCodeTables';
 import { useReportCriteria } from '../useReportCriteria';
 import { useReportDownload } from '../useReportDownload';
 
-import { EMPTY_CRITERIA, FORMATS } from './types';
+import { EMPTY_CRITERIA, FORMATS, SORT_OPTIONS } from './types';
 import { criteriaErrors } from './validation';
 
 import type { FC } from 'react';
@@ -81,6 +81,7 @@ const StructureInventorySummaryPage: FC = () => {
         key={resetToken}
         id={ID}
         criteria={criteria}
+        sortOptions={SORT_OPTIONS}
         errors={errors}
         formats={FORMATS}
         codeTablesLoading={referenceData.isLoading}

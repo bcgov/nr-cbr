@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
@@ -65,5 +66,18 @@ public interface ReportApiEndpoint {
   @GetMapping("/structure-detail/{structureId}")
   ResponseEntity<byte[]> structureDetail(
       @PathVariable("structureId") long structureId,
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+
+  /**
+   * Repairs Summary (legacy CBR005): the repairs recorded against structures, a page per structure
+   * grouped by inspection, as a PDF in legacy's layout or a CSV of legacy's "Excel" export,
+   * downloaded as an attachment.
+   *
+   * @param format {@code PDF} (the default) or {@code CSV}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/repairs-summary")
+  ResponseEntity<byte[]> repairsSummary(
+      @Valid @ModelAttribute RepairsSummaryCriteria criteria,
       @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
 }

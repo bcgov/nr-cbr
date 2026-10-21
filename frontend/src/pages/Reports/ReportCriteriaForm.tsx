@@ -1,16 +1,18 @@
 import { criteriaFields } from './criteriaFields';
-import { ReportButtons, SortBy } from './ReportOutput';
+import { ReportButtons, SortBy, type SortOption } from './ReportOutput';
 
 import type { CriteriaFields } from './criteriaGroups';
-import type { ReportFormat, StructureInventorySort } from './types';
+import type { ReportFormat } from './types';
 import type { ReactNode, SubmitEventHandler } from 'react';
 
 import { useFieldErrors } from '@/hooks/useFieldErrors';
 
-type Props<C extends { sortBy: StructureInventorySort }> = {
+type Props<S extends string, C extends { sortBy: S }> = {
   /** The prefix of every box's id and test id — the report's. */
   id: string;
   criteria: C;
+  /** The report's orders, for Sort By. */
+  sortOptions: readonly SortOption<S>[];
   /** The form's rules applied to the current criteria. */
   errors: Partial<Record<keyof C & string, string>>;
   /** The formats offered, a Download button each. */
@@ -28,14 +30,15 @@ type Props<C extends { sortBy: StructureInventorySort }> = {
 };
 
 /**
- * A Structure Inventory report's criteria form: the boxes it lays out, then Sort By and a
+ * A report's criteria form: the boxes it lays out, then Sort By and a
  * Download button per format. Every error shows once its box is left, and all of them on a
  * Download, which runs only when there are none; Enter in a box runs the PDF, the primary button —
  * unless a report is already on its way.
  */
-const ReportCriteriaForm = <C extends { sortBy: StructureInventorySort }>({
+const ReportCriteriaForm = <S extends string, C extends { sortBy: S }>({
   id,
   criteria,
+  sortOptions,
   errors,
   formats,
   codeTablesLoading,
@@ -44,7 +47,7 @@ const ReportCriteriaForm = <C extends { sortBy: StructureInventorySort }>({
   running,
   onReset,
   children,
-}: Props<C>) => {
+}: Props<S, C>) => {
   const { shown, leave, submit: check } = useFieldErrors<keyof C & string>(errors);
   const fields = criteriaFields({ id, criteria, shown, leave, onChange, codeTablesLoading });
 
@@ -64,7 +67,12 @@ const ReportCriteriaForm = <C extends { sortBy: StructureInventorySort }>({
   return (
     <form onSubmit={submit} data-testid={`${id}-form`} className="report-criteria__form">
       <div className="report-criteria__grid">{children(fields)}</div>
-      <SortBy id={id} sortBy={criteria.sortBy} onChange={(sortBy) => onChange('sortBy', sortBy)} />
+      <SortBy
+        id={id}
+        options={sortOptions}
+        sortBy={criteria.sortBy}
+        onChange={(sortBy) => onChange('sortBy', sortBy as C['sortBy'])}
+      />
       <ReportButtons id={id} formats={formats} running={running} onRun={run} onReset={onReset} />
     </form>
   );

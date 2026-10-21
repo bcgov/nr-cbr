@@ -184,6 +184,11 @@ public interface ConfigurationApiEndpoint {
   @GetMapping("/repair-priority-codes")
   ResponseEntity<List<CodeOptionResponse>> getRepairPriorityCodes();
 
+  /** Repair classes — the Structural Safety filter on the Repairs Summary report. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/repair-class-codes")
+  ResponseEntity<List<CodeOptionResponse>> getRepairClassCodes();
+
   /** Repair groups — the checkboxes that narrow a repair's Repair Type list. */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/repair-group-codes")

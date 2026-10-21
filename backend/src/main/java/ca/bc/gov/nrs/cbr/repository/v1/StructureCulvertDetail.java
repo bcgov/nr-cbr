@@ -15,4 +15,5 @@ public record StructureCulvertDetail(
     BigDecimal culvertLength,
     BigDecimal slope,
     Long inletCoverDepth,
-    Long outletCoverDepth) {}
+    Long outletCoverDepth,
+    String openBottomSubstructure) {}

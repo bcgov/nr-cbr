@@ -207,6 +207,12 @@ export const repairPriorityCodesQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+export const repairClassCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'repair-class-codes'],
+  queryFn: () => API.configuration.getRepairClassCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 export const repairGroupCodesQuery = queryOptions({
   queryKey: [CONFIGURATION_QUERY_KEY, 'repair-group-codes'],
   queryFn: () => API.configuration.getRepairGroupCodes(),
@@ -279,6 +285,16 @@ const STRUCTURE_INVENTORY_DETAILED_LOOKUPS = [
   businessAreasQuery,
   specialAccessCodesQuery,
   portableSuperstructureStatusCodesQuery,
+] as const;
+
+const REPAIRS_SUMMARY_LOOKUPS = [
+  siteStatusCodesQuery,
+  siteTypeCodesQuery,
+  repairStatusCodesQuery,
+  repairPriorityCodesQuery,
+  repairClassCodesQuery,
+  forestDistrictsQuery,
+  businessAreasQuery,
 ] as const;
 
 /**
@@ -441,6 +457,10 @@ export const useStructureDetailReportReferenceDataState = (): ReferenceDataState
 export const useStructureInventoryDetailedReferenceDataState = (): ReferenceDataState =>
   useQueries({ queries: STRUCTURE_INVENTORY_DETAILED_LOOKUPS, combine: combineReferenceData });
 
+/** The same, for the lookups the Repairs Summary report draws on. */
+export const useRepairsSummaryReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: REPAIRS_SUMMARY_LOOKUPS, combine: combineReferenceData });
+
 /**
  * Warms the parameterless lookups once, in the background, as soon as there is a session.
  *
@@ -509,6 +529,9 @@ export const useRepairPriorityCodes = (): UseQueryResult<CodeOption[]> =>
   useQuery(repairPriorityCodesQuery);
 
 /** The group checkboxes that narrow a repair's Repair Type list. */
+export const useRepairClassCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(repairClassCodesQuery);
+
 export const useRepairGroupCodes = (): UseQueryResult<CodeOption[]> =>
   useQuery(repairGroupCodesQuery);
 

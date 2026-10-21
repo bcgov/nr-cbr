@@ -151,6 +151,11 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   }
 
   @Override
+  public ResponseEntity<List<CodeOptionResponse>> getRepairClassCodes() {
+    return ResponseEntity.ok(configurationService.getRepairClassCodes());
+  }
+
+  @Override
   public ResponseEntity<List<CodeOptionResponse>> getRepairGroupCodes() {
     return ResponseEntity.ok(configurationService.getRepairGroupCodes());
   }

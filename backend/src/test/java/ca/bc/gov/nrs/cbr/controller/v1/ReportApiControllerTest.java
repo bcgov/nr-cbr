@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import ca.bc.gov.nrs.cbr.service.v1.RepairsSummaryService;
 import ca.bc.gov.nrs.cbr.service.v1.ReportFile;
 import ca.bc.gov.nrs.cbr.service.v1.StructureDetailReportService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventoryDetailedService;
@@ -23,7 +24,8 @@ class ReportApiControllerTest {
   private final StructureDetailReportService structureDetail =
       mock(StructureDetailReportService.class);
   private final ReportApiController controller = new ReportApiController(service,
-      mock(StructureInventoryDetailedService.class), structureDetail);
+      mock(StructureInventoryDetailedService.class), structureDetail,
+      mock(RepairsSummaryService.class));
 
   @Test
   @DisplayName("sends the report as a typed attachment under its own name")

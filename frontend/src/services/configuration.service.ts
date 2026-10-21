@@ -161,6 +161,14 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Repair classes, current ones by description — the Repairs Summary's Structural Safety. */
+  getRepairClassCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/repair-class-codes',
+    });
+  }
+
   /** Repair priorities, current ones. */
   getRepairPriorityCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {
