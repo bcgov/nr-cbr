@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 import ca.bc.gov.nrs.cbr.model.v1.StructureMonitorItemEntity;
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -112,4 +113,8 @@ public interface StructureMonitorItemRepository
          AND monitor.monitoringStatusCode = 'SUG'
       """)
   int requireSuggested(@Param("structureId") Long structureId, @Param("user") String user);
+
+  /** The monitoring items recorded on these inspections, by monitor number — a report's. */
+  List<StructureMonitorItemEntity> findByInspectionIdInOrderByMonitorNumberAsc(
+      Collection<Long> inspectionIds);
 }

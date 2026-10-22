@@ -20,9 +20,6 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -86,9 +83,6 @@ public final class InspectionSearchSpecifications {
 
   private InspectionSearchSpecifications() {}
 
-
-  /** Legacy parses both date bounds with {@code SimpleDateFormat("yyyy/MM")}. */
-  private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy/M");
 
   /*
    * Entity attribute names — strings because the Criteria API takes strings. Named once for the
@@ -399,30 +393,8 @@ public final class InspectionSearchSpecifications {
    */
   private static Optional<Predicate> inspectionDateRange(
       CriteriaBuilder builder, Expression<LocalDate> path, InspectionSearchCriteria criteria) {
-    YearMonth from = month(criteria.inspectionDateStart());
-    YearMonth to = month(criteria.inspectionDateEnd());
-    if (from != null && to != null) {
-      return Optional.of(builder.between(path, from.atDay(1), to.atEndOfMonth()));
-    }
-    if (from != null) {
-      return Optional.of(builder.greaterThanOrEqualTo(path, from.atDay(1)));
-    }
-    if (to != null) {
-      return Optional.of(builder.lessThanOrEqualTo(path, to.atEndOfMonth()));
-    }
-    return Optional.empty();
-  }
-
-  private static YearMonth month(String value) {
-    if (!StringUtils.hasText(value)) {
-      return null;
-    }
-    try {
-      return YearMonth.parse(value.trim(), MONTH);
-    } catch (DateTimeParseException ex) {
-      // @Pattern on InspectionSearchCriteria rejects these with a 400 before they reach here.
-      return null;
-    }
+    return SearchPredicates.monthRange(
+        builder, path, criteria.inspectionDateStart(), criteria.inspectionDateEnd());
   }
 
   /** The joins a results row reads, made once in {@code matching} and reused by the ordering. */

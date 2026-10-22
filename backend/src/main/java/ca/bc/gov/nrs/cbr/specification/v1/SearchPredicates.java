@@ -7,6 +7,10 @@ import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.Optional;
 import org.springframework.util.StringUtils;
@@ -172,6 +176,44 @@ final class SearchPredicates {
     try {
       return Integer.valueOf(value.trim());
     } catch (NumberFormatException ex) {
+      return null;
+    }
+  }
+
+  /**
+   * {@code yyyy/M} accepts both {@code 2026/01} and {@code 2026/1}, as legacy's
+   * {@code SimpleDateFormat("yyyy/MM")} does, and as the {@code @Pattern}s on the criteria allow.
+   */
+  private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy/M");
+
+  /**
+   * A date within a range of whole months, {@code yyyy/mm}: the start month from its 1st, the end
+   * month through its last day, either end optional. A value that is not a month is treated as
+   * unset — {@code @Pattern} on the criteria rejects it with a 400 before it reaches here.
+   */
+  static Optional<Predicate> monthRange(
+      CriteriaBuilder builder, Expression<LocalDate> path, String start, String end) {
+    YearMonth from = month(start);
+    YearMonth to = month(end);
+    if (from != null && to != null) {
+      return Optional.of(builder.between(path, from.atDay(1), to.atEndOfMonth()));
+    }
+    if (from != null) {
+      return Optional.of(builder.greaterThanOrEqualTo(path, from.atDay(1)));
+    }
+    if (to != null) {
+      return Optional.of(builder.lessThanOrEqualTo(path, to.atEndOfMonth()));
+    }
+    return Optional.empty();
+  }
+
+  private static YearMonth month(String value) {
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+    try {
+      return YearMonth.parse(value.trim(), MONTH);
+    } catch (DateTimeParseException ex) {
       return null;
     }
   }

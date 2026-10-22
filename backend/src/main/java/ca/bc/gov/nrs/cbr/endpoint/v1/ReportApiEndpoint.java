@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionsConductedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
@@ -93,5 +94,33 @@ public interface ReportApiEndpoint {
   @GetMapping("/monitors-summary")
   ResponseEntity<byte[]> monitorsSummary(
       @Valid @ModelAttribute MonitorsSummaryCriteria criteria,
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+
+  /**
+   * Inspections Conducted – Summary (legacy CBR002): a line per inspection, as a PDF in legacy's
+   * landscape layout, downloaded as an attachment. Its CSV is still to come: a 501 for now.
+   *
+   * <p>{@code @Valid} turns an Inspection Date that is not a month into a 400 naming the field.
+   *
+   * @param format {@code PDF} (the default) or {@code CSV}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/inspections-conducted-summary")
+  ResponseEntity<byte[]> inspectionsConductedSummary(
+      @Valid @ModelAttribute InspectionsConductedCriteria criteria,
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+
+  /**
+   * Inspections Conducted – Detail (legacy CBR001): each inspection in full, a page of its own, as
+   * a PDF in legacy's layout, downloaded as an attachment. Its CSV is still to come: a 501 for now.
+   *
+   * <p>{@code @Valid} turns an Inspection Date that is not a month into a 400 naming the field.
+   *
+   * @param format {@code PDF} (the default) or {@code CSV}
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/inspections-conducted-detail")
+  ResponseEntity<byte[]> inspectionsConductedDetail(
+      @Valid @ModelAttribute InspectionsConductedCriteria criteria,
       @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
 }

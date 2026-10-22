@@ -104,7 +104,7 @@ describe('LayoutSideNav', () => {
     await renderWithProviders();
 
     const nav = document.querySelector('.side-nav-drawer');
-    expect(getComputedStyle(nav as Element).width).toBe('256px');
+    expect(getComputedStyle(nav as Element).width).toBe('320px');
   });
 
   /**
@@ -118,9 +118,9 @@ describe('LayoutSideNav', () => {
 
     const nav = document.querySelector('.side-nav-drawer') as Element;
     const style = getComputedStyle(nav);
-    expect(style.width).toBe('256px');
-    // translateX(-100%) of a 256px panel — matrix form, since that is what the browser computes.
-    expect(style.transform).toBe('matrix(1, 0, 0, 1, -256, 0)');
+    expect(style.width).toBe('320px');
+    // translateX(-100%) of a 320px panel — matrix form, since that is what the browser computes.
+    expect(style.transform).toBe('matrix(1, 0, 0, 1, -320, 0)');
   });
 
   it('renders menu links and menu items', async () => {

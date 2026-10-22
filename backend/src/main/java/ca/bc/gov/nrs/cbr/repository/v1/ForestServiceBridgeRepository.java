@@ -39,6 +39,22 @@ public interface ForestServiceBridgeRepository
   List<ForestServiceBridgeSpanEntity> findSpans(@Param("structureId") Long structureId);
 
   /**
+   * The span lengths of these structures' bridges, each structure's by span number — the
+   * Inspections Conducted – Detail report's "Span Length(s)", legacy's
+   * {@code FIND_STRUCTURE_SPAN_LENGTHS} for many structures at once.
+   */
+  @Query("""
+      SELECT new ca.bc.gov.nrs.cbr.repository.v1.StructureValue(
+               bridge.crossingStructureId, span.spanLength)
+        FROM ForestServiceBridgeSpanEntity span, ForestServiceBridgeEntity bridge
+       WHERE span.forestServiceBridgeId = bridge.forestServiceBridgeId
+         AND bridge.crossingStructureId IN :structureIds
+       ORDER BY bridge.crossingStructureId, span.spanNumber, span.forestServiceBridgeSpanId
+      """)
+  List<StructureValue<BigDecimal>> findSpanLengths(
+      @Param("structureIds") Collection<Long> structureIds);
+
+  /**
    * The total length of each of these structures' bridges, oldest bridge record first — the
    * Structure Inventory report's "Total Length" for a bridge.
    */
@@ -64,7 +80,7 @@ public interface ForestServiceBridgeRepository
                bridge.totalBridgeLength, bridge.portableSuperstructureLocationDetail,
                (SELECT COUNT(span) FROM ForestServiceBridgeSpanEntity span
                  WHERE span.forestServiceBridgeId = bridge.forestServiceBridgeId),
-               bridge.deckWidth)
+               bridge.deckWidth, surface.description)
         FROM ForestServiceBridgeEntity bridge
         LEFT JOIN SuperstructureTypeCodeEntity superstructure
                ON superstructure.superstructureTypeCode = bridge.superstructureTypeCode
@@ -75,6 +91,8 @@ public interface ForestServiceBridgeRepository
                ON rightAbutment.abutmentCode = bridge.rightAbutmentCode
         LEFT JOIN StructureCurbTypeCodeEntity curb
                ON curb.structureCurbTypeCode = bridge.structureCurbTypeCode
+        LEFT JOIN RunningSurfaceCodeEntity surface
+               ON surface.runningSurfaceCode = bridge.runningSurfaceCode
        WHERE bridge.crossingStructureId IN :structureIds
        ORDER BY bridge.forestServiceBridgeId
       """)
