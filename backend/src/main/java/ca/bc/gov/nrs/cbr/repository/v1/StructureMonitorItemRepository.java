@@ -114,6 +114,15 @@ public interface StructureMonitorItemRepository
       """)
   int requireSuggested(@Param("structureId") Long structureId, @Param("user") String user);
 
+  /**
+   * These structures' monitoring items in these statuses, each structure's by monitor number — the
+   * Blank Report's outstanding items (legacy's {@code BLANK_INSPECTION_MONITORS_SR}: Required and
+   * Suggested).
+   */
+  List<StructureMonitorItemEntity>
+      findByCrossingStructureIdInAndMonitoringStatusCodeInOrderByCrossingStructureIdAscMonitorNumberAsc(
+          Collection<Long> structureIds, Collection<String> statusCodes);
+
   /** The monitoring items recorded on these inspections, by monitor number — a report's. */
   List<StructureMonitorItemEntity> findByInspectionIdInOrderByMonitorNumberAsc(
       Collection<Long> inspectionIds);

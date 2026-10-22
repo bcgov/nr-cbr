@@ -3,6 +3,8 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgePierEntity;
+import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeSpanEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceCulvertEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionAnswerCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionAnswerOrderEntity;
@@ -33,6 +35,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -128,26 +131,93 @@ public class InspectionFormService {
         .orElseThrow(() -> new StructureNotFoundException(structureId));
     Optional<ForestServiceBridgeEntity> bridge =
         bridges.findFirstByCrossingStructureIdOrderByForestServiceBridgeId(structureId);
-    List<Part> spanParts = bridge.map(found -> spans
-            .findByForestServiceBridgeIdOrderBySpanNumberAsc(found.getForestServiceBridgeId())
-            .stream()
-            .map(span -> new Part(String.valueOf(span.getForestServiceBridgeSpanId()),
-                span.getSpanNumber() == null ? null : span.getSpanNumber().longValue()))
-            .toList())
+    List<Part> spanParts = bridge.map(found -> spanParts(spans
+            .findByForestServiceBridgeIdOrderBySpanNumberAsc(found.getForestServiceBridgeId())))
         .orElse(List.of());
-    List<Part> pierParts = bridge.map(found -> piers
-            .findByForestServiceBridgeIdOrderByPierNumberAsc(found.getForestServiceBridgeId())
-            .stream()
-            .map(pier -> new Part(String.valueOf(pier.getForestServiceBridgePierId()),
-                pier.getPierNumber()))
-            .toList())
+    List<Part> pierParts = bridge.map(found -> pierParts(piers
+            .findByForestServiceBridgeIdOrderByPierNumberAsc(found.getForestServiceBridgeId())))
         .orElse(List.of());
-    Fit fit = fitOf(structureId, bridge);
+    String openBottom = culverts.findFirstByCrossingStructureIdOrderByForestServiceCulvertId(
+            structureId)
+        .map(ForestServiceCulvertEntity::getOpnBtomClvrtSubstrctreCode)
+        .orElse(null);
+    return build(structureId, fitOf(bridge, openBottom), spanParts, pierParts,
+        catalogue(structure.getStructureTypeClassCode()));
+  }
 
-    List<InspectionSubsectionCodeEntity> groups =
-        subsections.findForTypeClass(structure.getStructureTypeClassCode()).stream()
-            .filter(group -> shown(group.getSubsectionCode(), fit, !pierParts.isEmpty()))
-            .toList();
+  /**
+   * The questions for an inspection of each of these structures — a report's blank forms. What a
+   * structure's type/class is asked is read once per type/class, and each structure's bridge,
+   * spans, piers and culvert a batch at a time, rather than a dozen queries per structure.
+   */
+  @Transactional(readOnly = true)
+  public Map<Long, InspectionFormResponse> forms(List<CrossingStructureEntity> listed) {
+    List<Long> ids = listed.stream().map(CrossingStructureEntity::getCrossingStructureId).toList();
+    Map<Long, ForestServiceBridgeEntity> firstBridges = new HashMap<>();
+    Map<Long, String> openBottoms = new HashMap<>();
+    for (List<Long> batch : batches(ids)) {
+      bridges.findByCrossingStructureIdInOrderByForestServiceBridgeId(batch)
+          .forEach(found -> firstBridges.putIfAbsent(found.getCrossingStructureId(), found));
+      culverts.findByCrossingStructureIdInOrderByForestServiceCulvertId(batch)
+          .forEach(found -> openBottoms.putIfAbsent(found.getCrossingStructureId(),
+              found.getOpnBtomClvrtSubstrctreCode()));
+    }
+    List<Long> bridgeIds = firstBridges.values().stream()
+        .map(ForestServiceBridgeEntity::getForestServiceBridgeId).toList();
+    Map<Long, List<ForestServiceBridgeSpanEntity>> spansByBridge = new HashMap<>();
+    Map<Long, List<ForestServiceBridgePierEntity>> piersByBridge = new HashMap<>();
+    for (List<Long> batch : batches(bridgeIds)) {
+      spans.findByForestServiceBridgeIdInOrderBySpanNumberAsc(batch).forEach(span -> spansByBridge
+          .computeIfAbsent(span.getForestServiceBridgeId(), id -> new ArrayList<>()).add(span));
+      piers.findByForestServiceBridgeIdInOrderByPierNumberAsc(batch).forEach(pier -> piersByBridge
+          .computeIfAbsent(pier.getForestServiceBridgeId(), id -> new ArrayList<>()).add(pier));
+    }
+    Map<String, Catalogue> catalogues = new HashMap<>();
+    Map<Long, InspectionFormResponse> result = new HashMap<>();
+    for (CrossingStructureEntity structure : listed) {
+      Long id = structure.getCrossingStructureId();
+      Optional<ForestServiceBridgeEntity> bridge = Optional.ofNullable(firstBridges.get(id));
+      Long bridgeId = bridge.map(ForestServiceBridgeEntity::getForestServiceBridgeId).orElse(null);
+      String typeClass = structure.getStructureTypeClassCode();
+      Catalogue catalogue = typeClass == null
+          ? catalogue(null)
+          : catalogues.computeIfAbsent(typeClass, this::catalogue);
+      result.put(id, build(id, fitOf(bridge, openBottoms.get(id)),
+          spanParts(spansByBridge.getOrDefault(bridgeId, List.of())),
+          pierParts(piersByBridge.getOrDefault(bridgeId, List.of())), catalogue));
+    }
+    return result;
+  }
+
+  /** A structure's form from its type/class's catalogue: the groups and questions that fit it. */
+  private static InspectionFormResponse build(long structureId, Fit fit, List<Part> spanParts,
+      List<Part> pierParts, Catalogue catalogue) {
+    List<Subsection> result = new ArrayList<>();
+    for (InspectionSubsectionCodeEntity group : catalogue.groups()) {
+      String code = group.getSubsectionCode();
+      if (!shown(code, fit, !pierParts.isEmpty())) {
+        continue;
+      }
+      List<Question> groupQuestions = catalogue.links().stream()
+          .filter(link -> link.getSubsectionCode().equals(code))
+          .map(link -> catalogue.asked().get(link.getQuestionCode()))
+          .filter(Objects::nonNull)
+          .filter(question -> fit.matchesAny(catalogue.rules().get(question.getQuestionCode())))
+          .map(question -> new Question(question.getQuestionCode(), question.getDescription(),
+              PER_STRINGER.getOrDefault(code, Set.of()).contains(question.getQuestionCode()),
+              catalogue.choices().getOrDefault(question.getQuestionCode(), List.of())))
+          .toList();
+      result.add(new Subsection(code, group.getDescription(), scopeOf(code), groupQuestions));
+    }
+    return new InspectionFormResponse(String.valueOf(structureId), result, spanParts, pierParts);
+  }
+
+  /**
+   * What a type/class is asked: its groups in order, their questions in order (those not expired),
+   * each question's criteria and answers. Which of them a structure gets is {@link #build}'s.
+   */
+  private Catalogue catalogue(String typeClass) {
+    List<InspectionSubsectionCodeEntity> groups = subsections.findForTypeClass(typeClass);
     List<InspectionQuestionSubsectionXrefEntity> links = groups.isEmpty()
         ? List.of()
         : questionLinks.findInOrder(
@@ -163,23 +233,37 @@ public class InspectionFormService {
     Map<String, List<InspectionQuestionCriteriaEntity>> rules = criteria
         .findByQuestionCodeIn(questionCodes).stream()
         .collect(Collectors.groupingBy(InspectionQuestionCriteriaEntity::getQuestionCode));
-    Map<String, List<CodeOptionResponse>> choices = choicesFor(questionCodes);
+    return new Catalogue(groups, links, asked, rules, choicesFor(questionCodes));
+  }
 
-    List<Subsection> result = new ArrayList<>();
-    for (InspectionSubsectionCodeEntity group : groups) {
-      String code = group.getSubsectionCode();
-      List<Question> groupQuestions = links.stream()
-          .filter(link -> link.getSubsectionCode().equals(code))
-          .map(link -> asked.get(link.getQuestionCode()))
-          .filter(Objects::nonNull)
-          .filter(question -> fit.matchesAny(rules.get(question.getQuestionCode())))
-          .map(question -> new Question(question.getQuestionCode(), question.getDescription(),
-              PER_STRINGER.getOrDefault(code, Set.of()).contains(question.getQuestionCode()),
-              choices.getOrDefault(question.getQuestionCode(), List.of())))
-          .toList();
-      result.add(new Subsection(code, group.getDescription(), scopeOf(code), groupQuestions));
+  /** A type/class's groups, their questions, and each question's criteria and answers. */
+  private record Catalogue(
+      List<InspectionSubsectionCodeEntity> groups,
+      List<InspectionQuestionSubsectionXrefEntity> links,
+      Map<String, InspectionQuestionCodeEntity> asked,
+      Map<String, List<InspectionQuestionCriteriaEntity>> rules,
+      Map<String, List<CodeOptionResponse>> choices) {}
+
+  private static List<Part> spanParts(List<ForestServiceBridgeSpanEntity> found) {
+    return found.stream()
+        .map(span -> new Part(String.valueOf(span.getForestServiceBridgeSpanId()),
+            span.getSpanNumber() == null ? null : span.getSpanNumber().longValue()))
+        .toList();
+  }
+
+  private static List<Part> pierParts(List<ForestServiceBridgePierEntity> found) {
+    return found.stream()
+        .map(pier -> new Part(String.valueOf(pier.getForestServiceBridgePierId()),
+            pier.getPierNumber()))
+        .toList();
+  }
+
+  private static List<List<Long>> batches(List<Long> ids) {
+    List<List<Long>> batches = new ArrayList<>();
+    for (int from = 0; from < ids.size(); from += StructureInventoryReportSupport.BATCH) {
+      batches.add(ids.subList(from, Math.min(ids.size(), from + StructureInventoryReportSupport.BATCH)));
     }
-    return new InspectionFormResponse(String.valueOf(structureId), result, spanParts, pierParts);
+    return batches;
   }
 
   /** Whom a group's questions are asked of. */
@@ -225,11 +309,7 @@ public class InspectionFormService {
                 codes.get(link.getAnswerCode()).getDescription()), Collectors.toList())));
   }
 
-  private Fit fitOf(long structureId, Optional<ForestServiceBridgeEntity> bridge) {
-    String openBottom = culverts.findFirstByCrossingStructureIdOrderByForestServiceCulvertId(
-            structureId)
-        .map(ForestServiceCulvertEntity::getOpnBtomClvrtSubstrctreCode)
-        .orElse(null);
+  private static Fit fitOf(Optional<ForestServiceBridgeEntity> bridge, String openBottom) {
     return bridge
         .map(found -> new Fit(openBottom, found.getSuperstructureTypeCode(),
             found.getDeckTypeCode(), found.getRunningSurfaceCode(), found.getLeftAbutmentCode(),

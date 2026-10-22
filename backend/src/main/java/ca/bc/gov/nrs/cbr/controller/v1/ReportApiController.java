@@ -91,7 +91,7 @@ public class ReportApiController implements ReportApiEndpoint {
   }
 
   /** Always an attachment: a report is saved, and the page asks for it to be. */
-  private static ResponseEntity<byte[]> download(ReportFile file) {
+  static ResponseEntity<byte[]> download(ReportFile file) {
     return ResponseEntity.ok()
         .contentType(file.mediaType())
         .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()

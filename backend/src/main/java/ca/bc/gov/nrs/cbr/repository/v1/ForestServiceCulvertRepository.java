@@ -58,4 +58,8 @@ public interface ForestServiceCulvertRepository
        ORDER BY culvert.forestServiceCulvertId
       """)
   List<StructureCulvertDetail> findDetails(@Param("structureIds") Collection<Long> structureIds);
+
+  /** These structures' culverts, oldest record first — a report's, each structure's first used. */
+  List<ForestServiceCulvertEntity> findByCrossingStructureIdInOrderByForestServiceCulvertId(
+      Collection<Long> structureIds);
 }

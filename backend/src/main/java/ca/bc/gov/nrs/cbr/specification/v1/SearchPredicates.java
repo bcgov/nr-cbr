@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.Locale;
 import java.util.Optional;
 import org.springframework.util.StringUtils;
@@ -205,6 +206,34 @@ final class SearchPredicates {
       return Optional.of(builder.lessThanOrEqualTo(path, to.atEndOfMonth()));
     }
     return Optional.empty();
+  }
+
+  /**
+   * {@code uuuu/M/d}, strictly: {@code 2026/02/30} is not a day. Accepts {@code 2026/1/5} as legacy's
+   * {@code SimpleDateFormat("yyyy/MM/dd")} does, and as the {@code @Pattern}s on the criteria allow.
+   */
+  private static final DateTimeFormatter DAY =
+      DateTimeFormatter.ofPattern("uuuu/M/d").withResolverStyle(ResolverStyle.STRICT);
+
+  /**
+   * A date within a range of days, {@code yyyy/mm/dd}, both ends included, either end optional. A
+   * value that is not a day is treated as unset — the criteria's {@code @Pattern} rejects a
+   * malformed one with a 400 first, and the form a day that does not exist.
+   */
+  static Optional<Predicate> dayRange(
+      CriteriaBuilder builder, Expression<LocalDate> path, String start, String end) {
+    return range(builder, path, day(start), day(end));
+  }
+
+  private static LocalDate day(String value) {
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+    try {
+      return LocalDate.parse(value.trim(), DAY);
+    } catch (DateTimeParseException ex) {
+      return null;
+    }
   }
 
   private static YearMonth month(String value) {

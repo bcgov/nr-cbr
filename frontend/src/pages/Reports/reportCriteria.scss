@@ -53,14 +53,24 @@
   min-inline-size: 0;
 }
 
-// A month box holds a calendar icon at its right edge; keep its text clear of it in a narrow cell.
-.report-criteria__month-range .cds--date-picker__input {
+// A month or day box holds a calendar icon at its right edge; keep its text clear of it in a narrow
+// cell.
+.report-criteria__calendar-range .cds--date-picker__input {
   padding-inline-end: $spacing-09;
 }
 
 .report-criteria__range-dash {
   block-size: 2.5rem;
   line-height: 2.5rem;
+}
+
+// A criterion two cells wide — a range of days, whose boxes would not fit "yyyy/mm/dd" in one.
+.report-criteria__wide {
+  grid-column: span 2;
+
+  @media (max-width: 671px) {
+    grid-column: auto;
+  }
 }
 
 .report-criteria__toggles {

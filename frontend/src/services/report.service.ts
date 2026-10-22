@@ -1,5 +1,6 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type { InspectionsConductedCriteria } from '@/pages/Reports/InspectionsConducted/types';
+import type { InspectionsDueCriteria } from '@/pages/Reports/InspectionsDue/types';
 import type { MonitorsSummaryCriteria } from '@/pages/Reports/MonitorsSummary/types';
 import type { RepairsSummaryCriteria } from '@/pages/Reports/RepairsSummary/types';
 import type { StructureInventoryDetailedCriteria } from '@/pages/Reports/StructureInventoryDetailed/types';
@@ -136,6 +137,57 @@ export class ReportService extends HttpClient {
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
       url: '/v1/reports/inspections-conducted-detail',
+      query: { ...populated(criteria), format },
+      responseType: 'blob',
+    });
+  }
+
+  /**
+   * Inspections Due – Summary (legacy CBR004): a line per structure under its forest district, as
+   * a PDF in legacy's landscape layout. A GET, the criteria as query parameters; 400 with
+   * `fieldErrors` for a Next Planned Inspection Date that is not yyyy/mm/dd.
+   */
+  inspectionsDueSummary(
+    criteria: InspectionsDueCriteria,
+    format: ReportFormat,
+  ): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/inspections-due-summary',
+      query: { ...populated(criteria), format },
+      responseType: 'blob',
+    });
+  }
+
+  /**
+   * Inspections Due – Detailed (legacy CBR003): a box per structure under its forest district, as
+   * a PDF on legacy's portrait page. A GET, the criteria as query parameters; 400 with
+   * `fieldErrors` for a Next Planned Inspection Date that is not yyyy/mm/dd.
+   */
+  inspectionsDueDetailed(
+    criteria: InspectionsDueCriteria,
+    format: ReportFormat,
+  ): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/inspections-due-detailed',
+      query: { ...populated(criteria), format },
+      responseType: 'blob',
+    });
+  }
+
+  /**
+   * Inspections – Blank Report (legacy CBR010): a blank routine inspection form per structure, as
+   * a PDF. A GET, the criteria as query parameters; 400 with `fieldErrors` for a Next Planned
+   * Inspection Date that is not yyyy/mm/dd.
+   */
+  inspectionsBlank(
+    criteria: InspectionsDueCriteria,
+    format: ReportFormat,
+  ): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/inspections-blank',
       query: { ...populated(criteria), format },
       responseType: 'blob',
     });

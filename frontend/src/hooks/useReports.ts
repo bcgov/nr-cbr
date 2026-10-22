@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 
 import type { InspectionsConductedCriteria } from '@/pages/Reports/InspectionsConducted/types';
+import type { InspectionsDueCriteria } from '@/pages/Reports/InspectionsDue/types';
 import type { MonitorsSummaryCriteria } from '@/pages/Reports/MonitorsSummary/types';
 import type { RepairsSummaryCriteria } from '@/pages/Reports/RepairsSummary/types';
 import type { StructureInventoryDetailedCriteria } from '@/pages/Reports/StructureInventoryDetailed/types';
@@ -91,4 +92,40 @@ export const useInspectionsConductedDetailReport = () =>
       criteria: InspectionsConductedCriteria;
       format: ReportFormat;
     }) => API.report.inspectionsConductedDetail(criteria, format),
+  });
+
+/** Produces the Inspections Due – Summary report as a file. A mutation, as the others are. */
+export const useInspectionsDueSummaryReport = () =>
+  useMutation({
+    mutationFn: ({
+      criteria,
+      format,
+    }: {
+      criteria: InspectionsDueCriteria;
+      format: ReportFormat;
+    }) => API.report.inspectionsDueSummary(criteria, format),
+  });
+
+/** Produces the Inspections Due – Detailed report as a file. A mutation, as the others are. */
+export const useInspectionsDueDetailedReport = () =>
+  useMutation({
+    mutationFn: ({
+      criteria,
+      format,
+    }: {
+      criteria: InspectionsDueCriteria;
+      format: ReportFormat;
+    }) => API.report.inspectionsDueDetailed(criteria, format),
+  });
+
+/** Produces the Inspections – Blank Report as a file. A mutation, as the others are. */
+export const useInspectionsBlankReport = () =>
+  useMutation({
+    mutationFn: ({
+      criteria,
+      format,
+    }: {
+      criteria: InspectionsDueCriteria;
+      format: ReportFormat;
+    }) => API.report.inspectionsBlank(criteria, format),
   });

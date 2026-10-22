@@ -1,6 +1,7 @@
 import { Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
-import MonthRangeField from './MonthRangeField';
+import { DAY, MONTH, type Calendar } from './calendar';
+import CalendarRangeField from './CalendarRangeField';
 
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 
@@ -23,7 +24,7 @@ type Context<C extends object> = {
 
 /**
  * The boxes a report's criteria form is built from — a text box, a code or org-unit select, a
- * "from – to" range of numbers or of months, a toggle — each bound to one criterion by name, as
+ * "from – to" range of numbers, months or days, a toggle — each bound to one criterion by name, as
  * Structure Search builds its form. Shared by the reports so their criteria read and behave alike.
  */
 export const criteriaFields = <C extends object>({
@@ -56,7 +57,13 @@ export const criteriaFields = <C extends object>({
     />
   );
 
-  const codeSelect = (field: Field, labelText: string, anyText: string, options: CodeOption[]) => (
+  /** A select of fixed choices, "any" first — legacy's Yes/No selects, and the code selects. */
+  const select = (
+    field: Field,
+    labelText: string,
+    anyText: string,
+    choices: readonly { value: string; text: string }[],
+  ) => (
     <Select
       id={`${id}-${field}`}
       data-testid={`${id}-${field}`}
@@ -66,15 +73,27 @@ export const criteriaFields = <C extends object>({
       onChange={(event) => onChange(field, event.target.value as C[Field])}
     >
       <SelectItem value="" text={anyText} />
-      {options.map((option) => (
-        <SelectItem
-          key={option.code}
-          value={option.code}
-          text={label(option.code, option.description)}
-        />
+      {choices.map((choice) => (
+        <SelectItem key={choice.value} value={choice.value} text={choice.text} />
       ))}
     </Select>
   );
+
+  /** A code table's select, each code as "PB - Permanent Bridge"; `first` goes before the codes. */
+  const codeSelect = (
+    field: Field,
+    labelText: string,
+    anyText: string,
+    options: CodeOption[],
+    first: readonly { value: string; text: string }[] = [],
+  ) =>
+    select(field, labelText, anyText, [
+      ...first,
+      ...options.map((option) => ({
+        value: option.code,
+        text: label(option.code, option.description),
+      })),
+    ]);
 
   const orgUnitSelect = (
     field: Field,
@@ -159,9 +178,15 @@ export const criteriaFields = <C extends object>({
     />
   );
 
-  /** A "from – to" pair of months, `yyyy/mm` — the inspection reports' Inspection Date. */
-  const monthRange = (from: Field, to: Field, legend: string) => (
-    <MonthRangeField
+  const calendarRange = (
+    calendar: Calendar,
+    from: Field,
+    to: Field,
+    legend: string,
+    disabled?: boolean,
+  ) => (
+    <CalendarRangeField
+      calendar={calendar}
       startId={`${id}-${from}`}
       endId={`${id}-${to}`}
       legend={legend}
@@ -169,10 +194,19 @@ export const criteriaFields = <C extends object>({
       end={String(criteria[to])}
       startError={shown[from]}
       endError={shown[to]}
+      disabled={disabled}
       onChange={(which, value) => onChange(which === 'start' ? from : to, value as C[Field])}
       onLeave={(which) => leave(which === 'start' ? from : to)}
     />
   );
 
-  return { text, codeSelect, orgUnitSelect, range, monthRange, toggle };
+  /** A "from – to" pair of months, `yyyy/mm` — the inspection reports' Inspection Date. */
+  const monthRange = (from: Field, to: Field, legend: string) =>
+    calendarRange(MONTH, from, to, legend);
+
+  /** A "from – to" pair of days, `yyyy/mm/dd` — the Inspections Due reports' Next Planned date. */
+  const dateRange = (from: Field, to: Field, legend: string, disabled?: boolean) =>
+    calendarRange(DAY, from, to, legend, disabled);
+
+  return { text, select, codeSelect, orgUnitSelect, range, monthRange, dateRange, toggle };
 };

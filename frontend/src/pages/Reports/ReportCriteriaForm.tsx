@@ -11,7 +11,7 @@ type Props<S extends string, C extends { sortBy: S }> = {
   /** The prefix of every box's id and test id — the report's. */
   id: string;
   criteria: C;
-  /** The report's orders, for Sort By. */
+  /** The report's orders, for Sort By; none for a report whose order is fixed. */
   sortOptions: readonly SortOption<S>[];
   /** The form's rules applied to the current criteria. */
   errors: Partial<Record<keyof C & string, string>>;
@@ -30,7 +30,7 @@ type Props<S extends string, C extends { sortBy: S }> = {
 };
 
 /**
- * A report's criteria form: the boxes it lays out, then Sort By and a
+ * A report's criteria form: the boxes it lays out, then Sort By (where the order is the user's) and a
  * Download button per format. Every error shows once its box is left, and all of them on a
  * Download, which runs only when there are none; Enter in a box runs the PDF, the primary button —
  * unless a report is already on its way.
@@ -69,12 +69,14 @@ const ReportCriteriaForm = <S extends string, C extends { sortBy: S }>({
     // month picker's `pattern` — would otherwise stop the submit with a bubble of its own instead.
     <form noValidate onSubmit={submit} data-testid={`${id}-form`} className="report-criteria__form">
       <div className="report-criteria__grid">{children(fields)}</div>
-      <SortBy
-        id={id}
-        options={sortOptions}
-        sortBy={criteria.sortBy}
-        onChange={(sortBy) => onChange('sortBy', sortBy as C['sortBy'])}
-      />
+      {sortOptions.length > 0 && (
+        <SortBy
+          id={id}
+          options={sortOptions}
+          sortBy={criteria.sortBy}
+          onChange={(sortBy) => onChange('sortBy', sortBy as C['sortBy'])}
+        />
+      )}
       <ReportButtons id={id} formats={formats} running={running} onRun={run} onReset={onReset} />
     </form>
   );

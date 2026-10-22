@@ -1,0 +1,736 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CBR004 Inspections Due (Summary), ported from legacy's JasperServer report
+  (cbr-legacy jasper-server .../CBR004_InspectionsDueSummary.rpt_jrxml), its layout kept but for
+  two faults. Legacy printed "Forest District:" in the page header from the page's first row, so a
+  page that ran on into the next district labelled it wrongly; the district line and the column
+  headings are now a group header, printed where each district starts and again on each page it
+  continues onto. And every value was one fixed line - the Planned Inspection Comments two - so a
+  long Road Name, Crossing Name or comment was cut off; each value now wraps, and the row's column
+  lines grow with it - but a number or a date, which shrinks to fit its column instead. The title band, printed only for legacy's Excel export, is left out.
+
+  As in the other reports, the port fills from rows rather than SQL - legacy called
+  CBR_INSPCTNS_DUE_SUMMARY with a WHERE clause built as a string - every field already formatted
+  as legacy's patterns printed it, but STRUCTURE_TYPE_CLASS_CODE, which the template abbreviates
+  and the totals count. The ministry line (the CBR_HEADER subreport) is P_MINISTRY, the logo comes
+  from the classpath through P_LOGO, and Date Printed is P_DATE_PRINTED, in Pacific time.
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="INSPECTIONS_DUE_SUMMARY" pageWidth="792" pageHeight="612" orientation="Landscape" whenNoDataType="AllSectionsNoDetail" columnWidth="768" leftMargin="12" rightMargin="12" topMargin="12" bottomMargin="12" uuid="0204ffad-3d73-4a46-b6a0-ff85128c1dc1">
+	<parameter name="P_USERID" class="java.lang.String"/>
+	<parameter name="P_DATABASE" class="java.lang.String"/>
+	<parameter name="P_SELECTED_CRITERIA" class="java.lang.String"/>
+	<parameter name="P_DATE_PRINTED" class="java.lang.String"/>
+	<parameter name="P_MINISTRY" class="java.lang.String"/>
+	<parameter name="P_LOGO" class="java.lang.String"/>
+	<parameter name="p_report_id" class="java.lang.String" isForPrompting="false">
+		<defaultValueExpression><![CDATA["CBR004"]]></defaultValueExpression>
+	</parameter>
+	<field name="CROSSING_STRUCTURE_NAME" class="java.lang.String"/>
+	<field name="CROSSING_SITE_ID" class="java.lang.String"/>
+	<field name="ROAD_SECT_NAME" class="java.lang.String"/>
+	<field name="POINT_OF_COMMENCEMENT_DISTANCE" class="java.lang.String"/>
+	<field name="USER_KM" class="java.lang.String"/>
+	<field name="CROSSING_NAME" class="java.lang.String"/>
+	<field name="LAST_INSPECTION_DATE" class="java.lang.String"/>
+	<field name="NEXT_PLANNED_INSPECTION_DATE" class="java.lang.String"/>
+	<field name="FOREST_FILE_ID" class="java.lang.String"/>
+	<field name="ROAD_SECTION_ID" class="java.lang.String"/>
+	<field name="TOTAL_LENGTH" class="java.lang.String"/>
+	<field name="STRUCTURE_TYPE_CLASS_CODE" class="java.lang.String"/>
+	<field name="PIER_COUNT" class="java.lang.String"/>
+	<field name="FOREST_DISTRICT" class="java.lang.String"/>
+	<field name="FOREST_DISTRICT_KEY" class="java.lang.String"/>
+	<field name="SPECIAL_EQUIPMENT_RQMT_CODE" class="java.lang.String"/>
+	<field name="SPECIAL_ACCESS_RQMT_CODE" class="java.lang.String"/>
+	<field name="PLN_INSP_CMT" class="java.lang.String"/>
+	<variable name="Permanent_Bridge_Count" class="java.lang.Integer" calculation="Sum">
+		<variableExpression><![CDATA[( $F{STRUCTURE_TYPE_CLASS_CODE} != null && !($F{STRUCTURE_TYPE_CLASS_CODE}.isEmpty()) && $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase( "PB" )
+? 1
+: 0
+)]]></variableExpression>
+	</variable>
+	<variable name="Temporary_Bridge_Count" class="java.lang.Integer" calculation="Sum">
+		<variableExpression><![CDATA[( $F{STRUCTURE_TYPE_CLASS_CODE} != null && !($F{STRUCTURE_TYPE_CLASS_CODE}.isEmpty()) && $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase( "TB" )
+? 1
+: 0
+)]]></variableExpression>
+	</variable>
+	<variable name="Major_Culvert_Count" class="java.lang.Integer" calculation="Sum">
+		<variableExpression><![CDATA[( $F{STRUCTURE_TYPE_CLASS_CODE} != null && !($F{STRUCTURE_TYPE_CLASS_CODE}.isEmpty()) && $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase( "CUL" )
+? 1
+: 0
+)]]></variableExpression>
+	</variable>
+	<variable name="Woodbox_Log_Culvert_Count" class="java.lang.Integer" calculation="Sum">
+		<variableExpression><![CDATA[( $F{STRUCTURE_TYPE_CLASS_CODE} != null && !($F{STRUCTURE_TYPE_CLASS_CODE}.isEmpty()) && $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase( "WLC" )
+? 1
+: 0
+)]]></variableExpression>
+	</variable>
+	<group name="DISTRICT" isReprintHeaderOnEachPage="true" minHeightToStartNewPage="140">
+		<groupExpression><![CDATA[$F{FOREST_DISTRICT_KEY}]]></groupExpression>
+		<groupHeader>
+			<band height="91" splitType="Prevent">
+			<rectangle>
+				<reportElement x="0" y="0" width="756" height="12" backcolor="#FFFFFF"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</rectangle>
+			<rectangle>
+				<reportElement x="0" y="12" width="756" height="42" backcolor="#FFFFFF" uuid="150bea79-6348-4a82-a324-ac3f60902f18"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</rectangle>
+			<rectangle>
+				<reportElement x="0" y="54" width="756" height="37" backcolor="#FFFFFF" uuid="fefe0078-0b58-4c00-a166-b616c057b834"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</rectangle>
+			<line>
+				<reportElement x="19" y="13" width="1" height="41" uuid="1442232c-6fea-4607-80a1-3f74997d3d38"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="74" y="13" width="1" height="78" uuid="776ece09-a684-4d1c-8503-f7336f7c7514"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="147" y="13" width="1" height="77" uuid="d866c42a-37dc-44c7-a810-798a7633e865"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="209" y="13" width="1" height="41" uuid="0f7ceeaf-a517-4a70-a233-87fb98958616"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="268" y="13" width="1" height="41" uuid="7e0301f1-7d75-4913-a4ba-f8f36fa03f93"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="318" y="13" width="1" height="41" uuid="3d18f766-2f61-4596-a12f-794e8ed7a2d4"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="379" y="13" width="1" height="41" uuid="e8807c4e-76c7-49ee-a188-d218ace98709"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="418" y="13" width="1" height="41" uuid="e1b3f4c8-d0ef-4e53-af52-7bfe40298eb1"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="450" y="13" width="1" height="41" uuid="47adc27a-16e1-4a81-bc98-d926f60ced3c"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="577" y="13" width="1" height="41" uuid="e427adf6-961e-45d9-8661-01e20b6cb04e"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="610" y="13" width="1" height="41" uuid="fdd24749-2687-4702-b34c-057fd95ae5d7"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement x="646" y="13" width="1" height="41" uuid="9d9cb72e-8d08-48b2-9cc6-ca3b47c81d1c"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<textField isBlankWhenNull="true">
+				<reportElement x="12" y="0" width="726" height="12" uuid="344c3517-4b17-410a-a848-eb415368e854"/>
+				<textElement>
+					<font fontName="Arial" size="10" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Forest District: " + ( $F{FOREST_DISTRICT} == null || $F{FOREST_DISTRICT}.isEmpty() ? "" : $F{FOREST_DISTRICT} )]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="0" y="18" width="18" height="12" uuid="7fe6bad7-b74d-4076-9c1b-510f37a81767"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[No.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="21" y="18" width="52" height="12" uuid="105cd5bb-2f5e-429d-b9b5-19ea4a079392"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Site #]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="75" y="18" width="72" height="12" uuid="075e959c-60a1-43b8-a6d0-469d155c10ba"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Structure #]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="155" y="18" width="50" height="36" uuid="f824ccd1-3b9b-4974-9fc4-c37cfdbc2500"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Last Inspection Date]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="214" y="18" width="50" height="36" uuid="87803fea-f6bb-45f2-9ccc-a1d6af07ac9b"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Next Inspection Date]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="269" y="18" width="49" height="24" uuid="797089e4-f48f-4753-844b-694c62832424"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Structure Type/Class]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="328" y="18" width="44" height="36" uuid="b1574026-ab7f-4607-bf7c-30ce0defae47"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Project File
+ ID# / Br.]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="383" y="18" width="34" height="36" uuid="07a80200-5822-4b66-9468-152280f7e4dc"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Total
+Length]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="381" y="39" width="36" height="17" uuid="07a80200-5822-4b66-9468-152280f7e4dc"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[(metres)]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="419" y="18" width="33" height="36" uuid="3961304a-9b2e-4dca-979b-712140f77469"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[# Piers]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="452" y="18" width="126" height="12" uuid="1cf14e92-4c1e-4364-8f88-37af695b943b"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Road Name]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="581" y="18" width="30" height="12" uuid="8f9c5216-39a0-4b68-ab82-e2737fe75bf3"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[KM]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="612" y="18" width="30" height="28" uuid="4c5e3091-7d1b-4511-8382-158bc92a857c"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[User
+ KM]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="647" y="18" width="105" height="12" uuid="5353f07c-6fd3-4967-8784-0860a2291848"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Crossing Name]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="21" y="56" width="54" height="35" uuid="77b68b95-1ad7-4397-a13c-1135972efc04"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Special
+Equipment
+Required]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="85" y="56" width="50" height="35" uuid="5333a869-9a22-47b6-a890-9ccb54d6a635"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Special Access Required]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="151" y="56" width="57" height="35" uuid="48cceeb3-a0cf-4e3c-a34c-1391efe4c92e"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Planned Inspection Comment]]></text>
+			</staticText>
+			</band>
+		</groupHeader>
+	</group>
+	<pageHeader>
+		<band height="91" splitType="Stretch">
+			<rectangle>
+				<reportElement x="0" y="0" width="756" height="91" backcolor="#FFFFFF" uuid="f9f9f6b7-5b9c-4cd4-88e8-0ab5401c151e"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</rectangle>
+			<image>
+				<reportElement x="42" y="6" width="60" height="69" uuid="c34d1df0-9d77-49dd-9f48-ae504804a76e"/>
+				<imageExpression><![CDATA[$P{P_LOGO}]]></imageExpression>
+			</image>
+			<textField isBlankWhenNull="true">
+				<reportElement x="120" y="16" width="466" height="20" uuid="ab73e1b0-16dc-4a9d-9216-0e21d7a01ed7"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="14" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{P_MINISTRY}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="252" y="36" width="258" height="18" uuid="ea2aa9e8-b4ee-415f-9825-1ead7be876dc"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="12" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Inspections Due - Summary]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="586" y="8" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Page:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="688" y="8" width="19" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[of]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="586" y="20" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Date Printed:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="586" y="32" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[User Id:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="586" y="44" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Database:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="586" y="56" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Report Id:]]></text>
+			</staticText>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="650" y="8" width="38" height="12" uuid="7da22937-1a13-46e5-9634-8d2d945a76fc"/>
+				<textElement textAlignment="Left">
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" evaluationTime="Report" isBlankWhenNull="true">
+				<reportElement x="706" y="8" width="38" height="12" uuid="d1f8f628-2285-42c2-98aa-2b9fb136db4b"/>
+				<textElement textAlignment="Left">
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="650" y="20" width="94" height="12" uuid="d5d40342-1023-464a-ba09-b4bdfd4bbda6"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{P_DATE_PRINTED}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="650" y="32" width="94" height="12" uuid="369018ac-9718-4ad4-87e3-24d3ddb9ab0f"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{P_USERID}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="650" y="44" width="94" height="12" uuid="bf179c2d-c526-4fec-b0b6-d3d9a717717d"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{P_DATABASE}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="650" y="56" width="94" height="12" uuid="2c406dcc-7b82-4cd7-9137-482fc6c57b78"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{p_report_id}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="12" y="78" width="744" height="12" uuid="1ad7f16e-3a6e-4bc3-b9c4-a147aaf9d9fd"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[( $P{P_SELECTED_CRITERIA} == null || $P{P_SELECTED_CRITERIA}.isEmpty() ? "" : $P{P_SELECTED_CRITERIA} )]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageHeader>
+	<detail>
+		<band height="19">
+			<line>
+				<reportElement x="0" y="0" width="756" height="1" uuid="f0bf05ba-0e08-4297-8b30-db622463989f"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="18" width="756" height="1" uuid="f0bf05ba-0e08-4297-8b30-db622463989f"/>
+				<graphicElement>
+					<pen lineWidth="0.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="0" y="0" width="1" height="19" uuid="db7b804b-5066-49e1-b351-49686d337f03"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="19" y="0" width="1" height="19" uuid="db7b804b-5066-49e1-b351-49686d337f03"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="74" y="0" width="1" height="19" uuid="db7b804b-5066-49e1-b351-49686d337f03"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="147" y="0" width="1" height="19" uuid="8ca96813-fb43-4a1d-865f-165c3018da92"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="209" y="0" width="1" height="19" uuid="e727ea55-f70e-44a0-8e2f-69eda6f9fcc0"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="269" y="0" width="1" height="19" uuid="504342a2-ae30-4450-a9b9-4c11e364332d"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="318" y="0" width="1" height="19" uuid="1e3f1e30-7a04-4848-879b-fc0d411dbaeb"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="379" y="0" width="1" height="19" uuid="164d4999-ff14-40d5-8820-520df0c3f4f0"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="418" y="0" width="1" height="19" uuid="430ee568-42df-446c-9301-d03a4e5a19d0"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="450" y="0" width="1" height="19" uuid="f5785ec4-98c2-40ee-ab29-e149629279d2"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="578" y="0" width="1" height="19" uuid="ddb9e052-dd05-409d-953c-dafae9eeb011"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="610" y="0" width="1" height="19" uuid="699b1459-d5e8-4a45-abac-a6fcffe6254c"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="646" y="0" width="1" height="19" uuid="f6dc9a4f-b0bd-4423-ae4f-ba249a928f2f"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="756" y="0" width="1" height="19" uuid="db7b804b-5066-49e1-b351-49686d337f03"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="0" y="6" width="18" height="13" uuid="199d0d1b-9bf2-428d-aec6-4ace954ef516"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="10" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{REPORT_COUNT}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="30" y="6" width="41" height="12" uuid="49bb214f-6f18-42a5-ad23-68b452e4f809"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{CROSSING_SITE_ID}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="81" y="6" width="65" height="12" uuid="39bd004e-adcb-4db4-8b58-f2a7c4997193"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{CROSSING_STRUCTURE_NAME}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="151" y="6" width="48" height="12" uuid="0bd82e57-ce17-4e30-8a67-fd3e45e06580"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{LAST_INSPECTION_DATE}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="216" y="6" width="48" height="12" uuid="36ed0994-a52c-44f7-b1a0-e8ba273cc4b6"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{NEXT_PLANNED_INSPECTION_DATE}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="276" y="6" width="32" height="13" uuid="db76529a-a1ce-40f1-9803-dbf6a80cc3d4"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="10" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[( $F{STRUCTURE_TYPE_CLASS_CODE} == null || $F{STRUCTURE_TYPE_CLASS_CODE}.isEmpty() ? "" :
+   ( $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase( "PB" )  ? "P"  :
+   ( $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase( "TB" )  ? "T"  :
+   ( $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase( "CUL" ) ? "MC" :
+   ( $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase( "WLC" ) ? "W"  : ""
+   ))))
+)]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="319" y="6" width="61" height="12" uuid="0bfd26a7-c679-4799-8784-18d5137be5d6"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[( $F{FOREST_FILE_ID}  == null || $F{FOREST_FILE_ID}.isEmpty()  ? "" : $F{FOREST_FILE_ID}        ) +
+( $F{ROAD_SECTION_ID} == null || $F{ROAD_SECTION_ID}.isEmpty() ? "" : "-" + $F{ROAD_SECTION_ID} )]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="383" y="6" width="26" height="12" uuid="a27095b4-d61f-4920-b943-8d729e6ac512"/>
+				<textElement textAlignment="Right">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{TOTAL_LENGTH}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="423" y="6" width="24" height="12" uuid="da00fa06-b9e6-4e44-9e7c-aed0ee680c97"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{PIER_COUNT}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="452" y="6" width="123" height="12" uuid="b561d450-11f7-4168-814f-e3711cd303ae"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{ROAD_SECT_NAME}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="581" y="6" width="25" height="12" uuid="e59321c0-bf07-4de1-ad6e-1f6fcd7c06d9"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{POINT_OF_COMMENCEMENT_DISTANCE}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="612" y="6" width="35" height="12" uuid="c64c55da-9616-4e11-9f1a-8642f5d10412"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{USER_KM}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="648" y="6" width="105" height="12" uuid="1702ce1c-b7a6-4031-a365-5f6d274839a7"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{CROSSING_NAME}]]></textFieldExpression>
+			</textField>
+		</band>
+		<band height="32">
+			<line>
+				<reportElement x="0" y="0" width="756" height="1" uuid="f0bf05ba-0e08-4297-8b30-db622463989f"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="31" width="754" height="1" uuid="648486b7-f3ee-4fac-ba8a-d158e9d2e5fc"/>
+				<graphicElement>
+					<pen lineWidth="0.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="0" y="0" width="1" height="32" uuid="db7b804b-5066-49e1-b351-49686d337f03"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="19" y="0" width="1" height="32" uuid="776ece09-a684-4d1c-8503-f7336f7c7514"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="74" y="0" width="1" height="32" uuid="776ece09-a684-4d1c-8503-f7336f7c7514"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="147" y="0" width="1" height="32" uuid="776ece09-a684-4d1c-8503-f7336f7c7514"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="756" y="0" width="1" height="32" uuid="db7b804b-5066-49e1-b351-49686d337f03"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="24" y="3" width="46" height="28" uuid="222cd130-fa27-4352-9332-ae4a46e86b2f"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{SPECIAL_EQUIPMENT_RQMT_CODE}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="80" y="3" width="65" height="28" uuid="7a7c1538-e167-482b-b937-24c4ad636f65"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{SPECIAL_ACCESS_RQMT_CODE}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="151" y="3" width="600" height="28" uuid="7467492d-7963-4c76-8a89-f0622d8eb586"/>
+				<textElement>
+					<font fontName="Arial" size="9"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{PLN_INSP_CMT}]]></textFieldExpression>
+			</textField>
+		</band>
+		<band/>
+	</detail>
+	<pageFooter>
+		<band height="25">
+			<rectangle>
+				<reportElement x="0" y="0" width="756" height="25" backcolor="#FFFFFF" uuid="7b27c385-eb13-4e1b-8e0a-9122899ed9f0"/>
+				<graphicElement>
+					<pen lineWidth="2.0" lineStyle="Solid"/>
+				</graphicElement>
+			</rectangle>
+			<staticText>
+				<reportElement x="12" y="6" width="198" height="12" uuid="82417f89-4138-4492-9ca7-390f0d736d6a"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Corporate Bridge Register (CBR)]]></text>
+			</staticText>
+		</band>
+	</pageFooter>
+	<summary>
+		<band height="43">
+			<line>
+				<reportElement x="0" y="0" width="756" height="1" uuid="f0bf05ba-0e08-4297-8b30-db622463989f"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<textField isBlankWhenNull="true">
+				<reportElement x="12" y="6" width="173" height="12" uuid="532e20a8-4463-48fe-b7bb-8121a4d2330e"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Permanent Bridge Total: " + ( $V{Permanent_Bridge_Count} == null ? "0" : new DecimalFormat("#,##0").format( $V{Permanent_Bridge_Count} ) )]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="186" y="6" width="167" height="12" uuid="f5ce1cba-bed0-41a4-be9c-f07159f37a34"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Temporary Bridge Total: " + ( $V{Temporary_Bridge_Count} == null ? "0" : new DecimalFormat("#,##0").format( $V{Temporary_Bridge_Count} ) )]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="373" y="6" width="174" height="12" uuid="3d8a167e-002a-4570-aa57-4f19f87cf426"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Major Culvert Total: " + ( $V{Major_Culvert_Count} == null ? "0" : new DecimalFormat("#,##0").format( $V{Major_Culvert_Count} ) )]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="570" y="6" width="174" height="12" uuid="4f5ffb26-310e-495e-8022-88c9d9f1ff53"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Woodbox/Log Culvert Total: " + ( $V{Woodbox_Log_Culvert_Count} == null ? "0" : new DecimalFormat("#,##0").format( $V{Woodbox_Log_Culvert_Count} ) )]]></textFieldExpression>
+			</textField>
+		</band>
+	</summary>
+</jasperReport>

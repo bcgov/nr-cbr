@@ -292,7 +292,8 @@ public class StructureDetailRows {
         .collect(Collectors.joining("\n"));
   }
 
-  private static String comment(StructureCommentEntity comment) {
+  /** A comment as the reports print it: who entered it, when it was last updated, what it says. */
+  static String comment(StructureCommentEntity comment) {
     String updated = comment.getUpdateTimestamp() == null
         ? ""
         : comment.getUpdateTimestamp().format(COMMENT_DATE);

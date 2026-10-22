@@ -140,6 +140,15 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
       """)
   int requireSuggested(@Param("structureId") Long structureId, @Param("user") String user);
 
+  /**
+   * These structures' repairs in these statuses, each structure's by repair number — the Blank
+   * Report's outstanding repairs (legacy's {@code BLANK_INSPECTION_REPAIRS_SR}: Required and
+   * Suggested).
+   */
+  List<StructureRepairEntity>
+      findByCrossingStructureIdInAndRepairStatusCodeInOrderByCrossingStructureIdAscRepairNumberAsc(
+          Collection<Long> structureIds, Collection<String> statusCodes);
+
   /** The repairs recorded on these inspections, each's by repair number — a report's. */
   List<StructureRepairEntity> findByInspectionIdInOrderByRepairNumberAsc(
       Collection<Long> inspectionIds);
