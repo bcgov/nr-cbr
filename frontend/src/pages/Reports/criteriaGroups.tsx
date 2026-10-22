@@ -31,12 +31,19 @@ export const siteGroup = <C extends StructureInventoryCommonCriteria>(
   <>
     {codeSelect('siteStatusCode', 'Site Status', 'Any status', codeTables.siteStatusCodes)}
     {codeSelect('siteTypeCode', 'Site Type', 'Any site type', codeTables.siteTypeCodes)}
-    <div className="report-criteria__paired">
-      {text('forestFileId', 'Project File ID#', 10)}
-      {text('roadSectionId', 'Br.', 30)}
-    </div>
+    {roadFields({ text })}
     {range('kiloStart', 'kiloEnd', 'Kilometres', 'kilometres')}
   </>
+);
+
+/** The road: Project File ID# and Br., paired in one cell. */
+export const roadFields = <C extends { forestFileId: string; roadSectionId: string }>({
+  text,
+}: Pick<CriteriaFields<C>, 'text'>) => (
+  <div className="report-criteria__paired">
+    {text('forestFileId', 'Project File ID#', 10)}
+    {text('roadSectionId', 'Br.', 30)}
+  </div>
 );
 
 /** Special Access Requirements — a select on the site. */
@@ -84,9 +91,42 @@ export type OwnerCriteria = Pick<
   | 'maintainerLabel'
 >;
 
+/** The criteria {@link areaGroup} binds: the district, its management area, the business area. */
+export type AreaCriteria = Pick<
+  OwnerCriteria,
+  'orgUnit' | 'managementOrgUnit' | 'businessAreaOrgUnit'
+>;
+
+/**
+ * Where the structure is held: its Forest District, the district's Management Area — loading, or
+ * waiting on a district — and its BCTS Business Area.
+ */
+export const areaGroup = <C extends AreaCriteria>(
+  { orgUnitSelect }: Pick<CriteriaFields<C>, 'orgUnitSelect'>,
+  codeTables: Pick<CommonCodeTables, 'forestDistricts' | 'managementAreas' | 'businessAreas'>,
+  options: { criteria: C; loading: boolean },
+) => (
+  <>
+    {orgUnitSelect('orgUnit', 'Forest District', 'Any district', codeTables.forestDistricts)}
+    {orgUnitSelect(
+      'managementOrgUnit',
+      'Management Area',
+      options.criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
+      codeTables.managementAreas,
+      options.loading,
+    )}
+    {orgUnitSelect(
+      'businessAreaOrgUnit',
+      'BCTS Business Area',
+      'Any business area',
+      codeTables.businessAreas,
+    )}
+  </>
+);
+
 /** Who the structure belongs to: its district and area, its business area, its maintainer. */
 export const ownerGroup = <C extends OwnerCriteria>(
-  { orgUnitSelect }: CriteriaFields<C>,
+  fields: CriteriaFields<C>,
   codeTables: CommonCodeTables,
   options: {
     id: string;
@@ -97,20 +137,10 @@ export const ownerGroup = <C extends OwnerCriteria>(
   },
 ) => (
   <>
-    {orgUnitSelect('orgUnit', 'Forest District', 'Any district', codeTables.forestDistricts)}
-    {orgUnitSelect(
-      'managementOrgUnit',
-      'Management Area',
-      options.criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
-      codeTables.managementAreas,
-      options.codeTablesLoading || options.managementAreasLoading,
-    )}
-    {orgUnitSelect(
-      'businessAreaOrgUnit',
-      'BCTS Business Area',
-      'Any business area',
-      codeTables.businessAreas,
-    )}
+    {areaGroup(fields, codeTables, {
+      criteria: options.criteria,
+      loading: options.codeTablesLoading || options.managementAreasLoading,
+    })}
     <MaintainerFields
       id={options.id}
       clientNumber={options.criteria.clientNumber}

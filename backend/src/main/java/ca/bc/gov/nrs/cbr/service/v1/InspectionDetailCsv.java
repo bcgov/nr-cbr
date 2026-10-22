@@ -170,7 +170,7 @@ final class InspectionDetailCsv {
       return "";
     }
     return records.stream()
-        .map(record -> Stream.of(parts).map(record::get)
+        .map(fields -> Stream.of(parts).map(fields::get)
             .filter(part -> part != null && !part.isBlank())
             .collect(Collectors.joining(PART)))
         .collect(Collectors.joining("\n"));

@@ -17,10 +17,12 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import org.springframework.stereotype.Component;
 
 /**
@@ -59,51 +61,86 @@ public class InspectionReportRecords {
 
   /** The records of these inspections. */
   Records of(List<Long> inspectionIds, Collection<Long> reviewerIds) {
-    Names names = repairNames.names();
-    Map<Long, List<Map<String, String>>> repairRows = new HashMap<>();
-    Map<Long, List<Map<String, String>>> monitorRows = new HashMap<>();
+    List<InspectionReportStatusEntity> statusRows =
+        fetch(inspectionIds, statuses::findByInspectionIdIn);
+    Map<Long, String> reviewerNames = new HashMap<>();
+    reviewers.findAllById(reviewerIds.stream().filter(Objects::nonNull).distinct().toList())
+        .forEach(reviewer -> reviewerNames.put(reviewer.getInspectionReviewerId(), name(reviewer)));
+    return new Records(
+        repairRows(fetch(inspectionIds, repairs::findByInspectionIdInOrderByRepairNumberAsc),
+            repairNames.names()),
+        monitorRows(fetch(inspectionIds, monitors::findByInspectionIdInOrderByMonitorNumberAsc)),
+        current(statusRows),
+        accepted(fetch(inspectionIds, loadRatings::findByInspectionIdIn), statusRows),
+        reviewerNames);
+  }
+
+  private static Map<Long, List<Map<String, String>>> repairRows(
+      List<StructureRepairEntity> found, Names names) {
+    Map<Long, List<Map<String, String>>> rows = new HashMap<>();
+    for (StructureRepairEntity repair : found) {
+      Map<String, String> row = new HashMap<>();
+      row.put("NUMBER", plain(repair.getRepairNumber()));
+      row.put("STATUS", names.statuses().get(repair.getRepairStatusCode()));
+      row.put("PRIORITY", names.priorities().get(repair.getRepairPriorityCode()));
+      row.put("TYPE", names.types().get(repair.getStructureRepairTypeCode()));
+      row.put("DESCRIPTION", repair.getDescription());
+      rows.computeIfAbsent(repair.getInspectionId(), id -> new ArrayList<>()).add(row);
+    }
+    return rows;
+  }
+
+  private static Map<Long, List<Map<String, String>>> monitorRows(
+      List<StructureMonitorItemEntity> found) {
+    Map<Long, List<Map<String, String>>> rows = new HashMap<>();
+    for (StructureMonitorItemEntity monitor : found) {
+      Map<String, String> row = new HashMap<>();
+      row.put("NUMBER", plain(monitor.getMonitorNumber()));
+      row.put("DESCRIPTION", monitor.getDescription());
+      rows.computeIfAbsent(monitor.getInspectionId(), id -> new ArrayList<>()).add(row);
+    }
+    return rows;
+  }
+
+  /** Each inspection's current status: its latest row. */
+  private static Map<Long, InspectionReportStatusEntity> current(
+      List<InspectionReportStatusEntity> found) {
     Map<Long, InspectionReportStatusEntity> current = new HashMap<>();
-    Map<Long, Boolean> rated = new HashMap<>();
-    Map<Long, StructureLoadRatingEntity> ratings = new HashMap<>();
-    for (List<Long> batch : batches(inspectionIds)) {
-      for (StructureRepairEntity repair : repairs.findByInspectionIdInOrderByRepairNumberAsc(batch)) {
-        Map<String, String> row = new HashMap<>();
-        row.put("NUMBER", plain(repair.getRepairNumber()));
-        row.put("STATUS", names.statuses().get(repair.getRepairStatusCode()));
-        row.put("PRIORITY", names.priorities().get(repair.getRepairPriorityCode()));
-        row.put("TYPE", names.types().get(repair.getStructureRepairTypeCode()));
-        row.put("DESCRIPTION", repair.getDescription());
-        repairRows.computeIfAbsent(repair.getInspectionId(), id -> new ArrayList<>()).add(row);
+    for (InspectionReportStatusEntity status : found) {
+      current.merge(status.getInspectionId(), status, (one, other) ->
+          one.getInspectionReportStatusId() >= other.getInspectionReportStatusId() ? one : other);
+    }
+    return current;
+  }
+
+  /** Each inspection's latest load rating, once any of its statuses is Reviewed or Accepted. */
+  private static Map<Long, BigDecimal> accepted(
+      List<StructureLoadRatingEntity> found, List<InspectionReportStatusEntity> statusRows) {
+    Set<Long> rated = new HashSet<>();
+    for (InspectionReportStatusEntity status : statusRows) {
+      if (RATED.contains(status.getInspectionReportStatusCode())) {
+        rated.add(status.getInspectionId());
       }
-      for (StructureMonitorItemEntity monitor
-          : monitors.findByInspectionIdInOrderByMonitorNumberAsc(batch)) {
-        Map<String, String> row = new HashMap<>();
-        row.put("NUMBER", plain(monitor.getMonitorNumber()));
-        row.put("DESCRIPTION", monitor.getDescription());
-        monitorRows.computeIfAbsent(monitor.getInspectionId(), id -> new ArrayList<>()).add(row);
-      }
-      for (InspectionReportStatusEntity status : statuses.findByInspectionIdIn(batch)) {
-        current.merge(status.getInspectionId(), status, (one, other) ->
-            one.getInspectionReportStatusId() >= other.getInspectionReportStatusId() ? one : other);
-        if (RATED.contains(status.getInspectionReportStatusCode())) {
-          rated.put(status.getInspectionId(), true);
-        }
-      }
-      for (StructureLoadRatingEntity rating : loadRatings.findByInspectionIdIn(batch)) {
-        ratings.merge(rating.getInspectionId(), rating, (one, other) ->
+    }
+    Map<Long, StructureLoadRatingEntity> latest = new HashMap<>();
+    for (StructureLoadRatingEntity rating : found) {
+      if (rated.contains(rating.getInspectionId())) {
+        latest.merge(rating.getInspectionId(), rating, (one, other) ->
             one.getStructureLoadRatingId() >= other.getStructureLoadRatingId() ? one : other);
       }
     }
     Map<Long, BigDecimal> accepted = new HashMap<>();
-    ratings.forEach((id, rating) -> {
-      if (rated.containsKey(id)) {
-        accepted.put(id, rating.getLoadRating());
-      }
-    });
-    Map<Long, String> reviewerNames = new HashMap<>();
-    reviewers.findAllById(reviewerIds.stream().filter(Objects::nonNull).distinct().toList())
-        .forEach(reviewer -> reviewerNames.put(reviewer.getInspectionReviewerId(), name(reviewer)));
-    return new Records(repairRows, monitorRows, current, accepted, reviewerNames);
+    latest.forEach((id, rating) -> accepted.put(id, rating.getLoadRating()));
+    return accepted;
+  }
+
+  /** What a finder returns for these inspections, a batch at a time. */
+  private static <T> List<T> fetch(List<Long> ids, Function<List<Long>, List<T>> finder) {
+    List<T> found = new ArrayList<>();
+    for (List<Long> batch : batches(ids)) {
+      found.addAll(finder.apply(batch));
+    }
+    return found;
   }
 
   private static String name(StructureInspectionReviewerEntity reviewer) {

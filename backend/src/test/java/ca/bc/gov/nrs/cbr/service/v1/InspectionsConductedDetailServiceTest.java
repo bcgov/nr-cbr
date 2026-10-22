@@ -290,12 +290,12 @@ class InspectionsConductedDetailServiceTest {
     List<Map<String, Object>> found = rows(c -> c);
 
     assertThat(found).hasSize(2);
-    assertThat(found.getFirst().get("REPAIRS")).isEqualTo(List.of(Map.of("NUMBER", "1",
-        "STATUS", "Required", "PRIORITY", "High", "TYPE", "Replace decking",
-        "DESCRIPTION", "Replace planks")));
-    assertThat(found.getFirst().get("MONITORS"))
-        .isEqualTo(List.of(Map.of("NUMBER", "1", "DESCRIPTION", "Watch the scour")));
-    assertThat(found.get(1).get("REPAIRS")).isEqualTo(List.of());
+    assertThat(found.getFirst())
+        .containsEntry("REPAIRS", List.of(Map.of("NUMBER", "1", "STATUS", "Required",
+            "PRIORITY", "High", "TYPE", "Replace decking", "DESCRIPTION", "Replace planks")))
+        .containsEntry("MONITORS",
+            List.of(Map.of("NUMBER", "1", "DESCRIPTION", "Watch the scour")));
+    assertThat(found.get(1)).containsEntry("REPAIRS", List.of());
   }
 
   @Test

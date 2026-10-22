@@ -21,9 +21,9 @@ public interface InspectionReportStatusRepository
   void deleteByInspectionId(Long inspectionId);
 
   /** An inspection's status history, newest first — legacy's FIND_INSPECTION_STATUS_HIST. */
-  /** Every status row of these inspections — a report's, a batch at a time. */
-  List<InspectionReportStatusEntity> findByInspectionIdIn(Collection<Long> inspectionIds);
-
   List<InspectionReportStatusEntity> findByInspectionIdOrderByInspectionReportStatusIdDesc(
       Long inspectionId);
+
+  /** Every status row of these inspections — a report's, a batch at a time. */
+  List<InspectionReportStatusEntity> findByInspectionIdIn(Collection<Long> inspectionIds);
 }

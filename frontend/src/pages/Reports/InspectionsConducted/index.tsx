@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { areaGroup, roadFields } from '../criteriaGroups';
 import MaintainerFields from '../MaintainerFields';
 import ReportCriteriaForm from '../ReportCriteriaForm';
 import ReportPageLayout from '../ReportPageLayout';
@@ -153,29 +154,11 @@ const InspectionsConductedPage: FC<{ variant: InspectionsConductedVariant }> = (
             {fields.monthRange('inspectionDateStart', 'inspectionDateEnd', 'Inspection Date')}
 
             {/* Where the structure is held, and its road */}
-            {fields.orgUnitSelect(
-              'orgUnit',
-              'Forest District',
-              'Any district',
-              codeTables.forestDistricts,
-            )}
-            {fields.orgUnitSelect(
-              'managementOrgUnit',
-              'Management Area',
-              criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
-              codeTables.managementAreas,
-              referenceData.isLoading || managementAreasLoading,
-            )}
-            {fields.orgUnitSelect(
-              'businessAreaOrgUnit',
-              'BCTS Business Area',
-              'Any business area',
-              codeTables.businessAreas,
-            )}
-            <div className="report-criteria__paired">
-              {fields.text('forestFileId', 'Project File ID#', 10)}
-              {fields.text('roadSectionId', 'Br.', 30)}
-            </div>
+            {areaGroup(fields, codeTables, {
+              criteria,
+              loading: referenceData.isLoading || managementAreasLoading,
+            })}
+            {roadFields(fields)}
 
             {/* Who maintains it, and who inspected */}
             <MaintainerFields

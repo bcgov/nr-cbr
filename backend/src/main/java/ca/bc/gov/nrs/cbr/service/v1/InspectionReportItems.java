@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -98,8 +99,8 @@ public class InspectionReportItems {
    * each a row of their own rather than folded into one. An inspection with no items has none.
    */
   Map<Long, List<List<String>>> answers(Collection<Long> inspectionIds) {
-    Map<Long, List<List<String>>> answers = new HashMap<>();
-    items(inspectionIds).forEach((id, list) -> answers.put(id, sorted(list).stream()
+    Map<Long, List<List<String>>> byInspection = new HashMap<>();
+    items(inspectionIds).forEach((id, list) -> byInspection.put(id, sorted(list).stream()
         .sorted(Comparator.comparing(Item::subsectionDescription,
             Comparator.nullsFirst(Comparator.naturalOrder())))
         .map(item -> List.of(
@@ -111,7 +112,7 @@ public class InspectionReportItems {
             item.stringerMeasure() ? blank(item.answerValue()) : item.answer(),
             blank(item.comment())))
         .toList()));
-    return answers;
+    return byInspection;
   }
 
   /** The items of these inspections, with their codes named, by inspection id. */
@@ -131,14 +132,10 @@ public class InspectionReportItems {
         InspectionQuestionCodeEntity::getQuestionCode, InspectionQuestionCodeEntity::getDescription);
     Map<String, String> answerNames = names(answers.findAll(),
         InspectionAnswerCodeEntity::getAnswerCode, InspectionAnswerCodeEntity::getDescription);
-    Map<Long, Long> spanNumbers = numbers(spans.findAllById(ids(rows,
-        StructureInspectionItemEntity::getForestServiceBridgeSpanId)),
-        ForestServiceBridgeSpanEntity::getForestServiceBridgeSpanId,
-        span -> span.getSpanNumber() == null ? null : span.getSpanNumber().longValue());
-    Map<Long, Long> pierNumbers = numbers(piers.findAllById(ids(rows,
-        StructureInspectionItemEntity::getForestServiceBridgePierId)),
-        ForestServiceBridgePierEntity::getForestServiceBridgePierId,
-        ForestServiceBridgePierEntity::getPierNumber);
+    Map<Long, Long> spanNumbers = spanNumbers(spans.findAllById(ids(rows,
+        StructureInspectionItemEntity::getForestServiceBridgeSpanId)));
+    Map<Long, Long> pierNumbers = pierNumbers(piers.findAllById(ids(rows,
+        StructureInspectionItemEntity::getForestServiceBridgePierId)));
 
     Map<Long, List<Item>> byInspection = new HashMap<>();
     for (StructureInspectionItemEntity row : rows) {
@@ -174,7 +171,8 @@ public class InspectionReportItems {
   /**
    * The items as legacy's procedure returned them: a row per item without a stringer, and a row
    * per stringer of STR or WDC, its questions folded in, written when the stringer, the span or
-   * the subsection changes.
+   * the subsection changes. A stringer number on any other subsection: legacy printed nothing for
+   * it.
    */
   private static List<Row> rows(List<Item> sorted) {
     List<Row> rows = new ArrayList<>();
@@ -192,9 +190,6 @@ public class InspectionReportItems {
           stringer = new Stringer(item);
         }
         stringer.add(item);
-      } else {
-        // A stringer number on any other subsection: legacy printed nothing for it.
-        continue;
       }
     }
     if (stringer != null) {
@@ -216,38 +211,51 @@ public class InspectionReportItems {
     List<Map<String, String>> lines = new ArrayList<>();
     Row previous = null;
     for (Row row : ordered) {
-      if (previous == null
-          || !Objects.equals(previous.subsectionDescription(), row.subsectionDescription())) {
-        lines.add(line(Kind.SUBSECTION, Map.of("TEXT",
-            Objects.toString(row.subsectionDescription(), "").toUpperCase(Locale.ROOT))));
-      }
-      String previousSpan = previous == null ? "" : previous.spanKey();
-      if (row.span() != null && !row.spanKey().equals(previousSpan)) {
-        lines.add(line(Kind.SPAN, Map.of("TEXT", "Span " + row.span())));
-      }
-      String previousPier = previous == null ? "" : previous.pierKey();
-      if (row.pier() != null && !row.pierKey().equals(previousPier)) {
-        lines.add(line(Kind.PIER, Map.of("TEXT", "Pier " + row.pier())));
-      }
-      boolean afterStringer = previous != null && previous.stringer() != null;
-      if (row.kind() == Kind.WDC) {
-        if (!afterStringer) {
-          lines.add(line(Kind.WDC_HEADING, Map.of()));
-        }
-        lines.add(row.fields());
-      } else if (row.kind() == Kind.STR) {
-        boolean newSpan = previous != null && previous.span() != null
-            && !previous.span().equals(row.span());
-        if (!afterStringer || newSpan) {
-          lines.add(line(Kind.STR_HEADING, Map.of()));
-        }
-        lines.add(row.fields());
-      } else if (StringUtils.hasText(row.questionCode())) {
+      lines.addAll(bars(previous, row));
+      // A stringer row, or a question; a row with neither prints nothing of its own.
+      if (row.stringer() != null || StringUtils.hasText(row.questionCode())) {
+        tableHeading(previous, row).ifPresent(lines::add);
         lines.add(row.fields());
       }
       previous = row;
     }
     return lines;
+  }
+
+  /** The subsection heading, and the span or pier bar, the row starts — where the row before differs. */
+  private static List<Map<String, String>> bars(Row previous, Row row) {
+    List<Map<String, String>> bars = new ArrayList<>();
+    if (previous == null
+        || !Objects.equals(previous.subsectionDescription(), row.subsectionDescription())) {
+      bars.add(line(Kind.SUBSECTION, Map.of("TEXT",
+          Objects.toString(row.subsectionDescription(), "").toUpperCase(Locale.ROOT))));
+    }
+    String previousSpan = previous == null ? "" : previous.spanKey();
+    if (row.span() != null && !row.spanKey().equals(previousSpan)) {
+      bars.add(line(Kind.SPAN, Map.of("TEXT", "Span " + row.span())));
+    }
+    String previousPier = previous == null ? "" : previous.pierKey();
+    if (row.pier() != null && !row.pierKey().equals(previousPier)) {
+      bars.add(line(Kind.PIER, Map.of("TEXT", "Pier " + row.pier())));
+    }
+    return bars;
+  }
+
+  /**
+   * A stringer table's heading, where one starts: a WDC table after anything but a stringer, an STR
+   * table after anything but a stringer, or on a new span.
+   */
+  private static Optional<Map<String, String>> tableHeading(Row previous, Row row) {
+    boolean afterStringer = previous != null && previous.stringer() != null;
+    if (row.kind() == Kind.WDC && !afterStringer) {
+      return Optional.of(line(Kind.WDC_HEADING, Map.of()));
+    }
+    boolean newSpan = previous != null && previous.span() != null
+        && !previous.span().equals(row.span());
+    if (row.kind() == Kind.STR && (!afterStringer || newSpan)) {
+      return Optional.of(line(Kind.STR_HEADING, Map.of()));
+    }
+    return Optional.empty();
   }
 
   private static Map<String, String> line(Kind kind, Map<String, String> fields) {
@@ -274,10 +282,22 @@ public class InspectionReportItems {
     return map;
   }
 
-  private static <E> Map<Long, Long> numbers(
-      List<E> rows, Function<E, Long> key, Function<E, Long> number) {
+  /** Each span's number, by its id. */
+  private static Map<Long, Long> spanNumbers(List<ForestServiceBridgeSpanEntity> found) {
     Map<Long, Long> map = new HashMap<>();
-    rows.forEach(row -> map.put(key.apply(row), number.apply(row)));
+    for (ForestServiceBridgeSpanEntity span : found) {
+      map.put(span.getForestServiceBridgeSpanId(),
+          span.getSpanNumber() == null ? null : span.getSpanNumber().longValue());
+    }
+    return map;
+  }
+
+  /** Each pier's number, by its id. */
+  private static Map<Long, Long> pierNumbers(List<ForestServiceBridgePierEntity> found) {
+    Map<Long, Long> map = new HashMap<>();
+    for (ForestServiceBridgePierEntity pier : found) {
+      map.put(pier.getForestServiceBridgePierId(), pier.getPierNumber());
+    }
     return map;
   }
 
@@ -391,9 +411,9 @@ public class InspectionReportItems {
       };
       if (field != null) {
         // Peeled is a yes/no answer, printed by its description; the rest are measures.
-        fields.put(field, "PEEL".equals(item.questionCode())
-            ? blank(item.answerDescription())
-            : blank(item.answerValue()));
+        fields.put(field, blank("PEEL".equals(item.questionCode())
+            ? item.answerDescription()
+            : item.answerValue()));
       }
       if (StringUtils.hasText(item.comment())) {
         comments.add(item.comment());
