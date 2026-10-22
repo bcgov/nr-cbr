@@ -242,6 +242,16 @@ class InspectionCreateServiceTest {
   }
 
   @Test
+  @DisplayName("gives a report's batch of forms the very form the page gets")
+  void batchedForms() {
+    InspectionFormResponse single = form();
+    CrossingStructureEntity structure = entityManager.find(CrossingStructureEntity.class, 7L);
+
+    assertThat(forms.forms(List.of(structure))).containsOnlyKeys(7L)
+        .containsEntry(7L, single);
+  }
+
+  @Test
   @DisplayName("adds the inspection In Progress, with its answers, at the structure's site")
   void addsInspection() {
     String spanId = form().spans().get(0).id();

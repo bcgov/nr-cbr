@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgePierEntity;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -18,4 +19,8 @@ public interface ForestServiceBridgePierRepository
 
   /** A bridge's pier of this number, if any — legacy's {@code FIND_PIER_BY_BRDGE_ID_NMBR}. */
   boolean existsByForestServiceBridgeIdAndPierNumber(Long forestServiceBridgeId, Long pierNumber);
+
+  /** These bridges' piers, each bridge's in number order — a report's. */
+  List<ForestServiceBridgePierEntity> findByForestServiceBridgeIdInOrderByPierNumberAsc(
+      Collection<Long> bridgeIds);
 }

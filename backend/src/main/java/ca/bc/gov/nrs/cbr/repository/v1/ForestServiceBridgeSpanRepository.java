@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeSpanEntity;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -21,4 +22,8 @@ public interface ForestServiceBridgeSpanRepository
 
   /** A bridge's span of this number, if any — legacy's {@code FIND_SPAN_BY_BRDGE_ID_NMBR}. */
   boolean existsByForestServiceBridgeIdAndSpanNumber(Long forestServiceBridgeId, Integer spanNumber);
+
+  /** These bridges' spans, each bridge's in number order — a report's. */
+  List<ForestServiceBridgeSpanEntity> findByForestServiceBridgeIdInOrderBySpanNumberAsc(
+      Collection<Long> bridgeIds);
 }

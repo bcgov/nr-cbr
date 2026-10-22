@@ -305,6 +305,17 @@ const MONITORS_SUMMARY_LOOKUPS = [
   businessAreasQuery,
 ] as const;
 
+const INSPECTIONS_DUE_LOOKUPS = [
+  siteTypeCodesQuery,
+  structureTypeClassCodesQuery,
+  structureInspectionStatusCodesQuery,
+  siteStatusCodesQuery,
+  specialAccessCodesQuery,
+  specialEquipmentCodesQuery,
+  forestDistrictsQuery,
+  businessAreasQuery,
+] as const;
+
 const INSPECTIONS_CONDUCTED_LOOKUPS = [
   siteTypeCodesQuery,
   inspectionReportStatusCodesQuery,
@@ -480,6 +491,10 @@ export const useRepairsSummaryReferenceDataState = (): ReferenceDataState =>
 /** The same, for the lookups the Monitors Summary report draws on. */
 export const useMonitorsSummaryReferenceDataState = (): ReferenceDataState =>
   useQueries({ queries: MONITORS_SUMMARY_LOOKUPS, combine: combineReferenceData });
+
+/** The same, for the lookups the Inspections Due and Blank reports draw on. */
+export const useInspectionsDueReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: INSPECTIONS_DUE_LOOKUPS, combine: combineReferenceData });
 
 /** The same, for the lookups the Inspections Conducted reports draw on. */
 export const useInspectionsConductedReferenceDataState = (): ReferenceDataState =>

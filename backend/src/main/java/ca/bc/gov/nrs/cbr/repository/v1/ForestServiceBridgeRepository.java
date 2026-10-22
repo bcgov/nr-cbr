@@ -55,6 +55,23 @@ public interface ForestServiceBridgeRepository
       @Param("structureIds") Collection<Long> structureIds);
 
   /**
+   * Each of these structures' bridges — its total length and how many piers it has — oldest bridge
+   * record first: the Inspections Due reports' Total Length and # Piers, a line per bridge record
+   * as legacy's left join made it.
+   */
+  @Query("""
+      SELECT new ca.bc.gov.nrs.cbr.repository.v1.StructureBridgeLength(
+               bridge.crossingStructureId, bridge.totalBridgeLength,
+               (SELECT COUNT(pier) FROM ForestServiceBridgePierEntity pier
+                 WHERE pier.forestServiceBridgeId = bridge.forestServiceBridgeId))
+        FROM ForestServiceBridgeEntity bridge
+       WHERE bridge.crossingStructureId IN :structureIds
+       ORDER BY bridge.forestServiceBridgeId
+      """)
+  List<StructureBridgeLength> findLengthsAndPiers(
+      @Param("structureIds") Collection<Long> structureIds);
+
+  /**
    * The total length of each of these structures' bridges, oldest bridge record first — the
    * Structure Inventory report's "Total Length" for a bridge.
    */
@@ -97,4 +114,8 @@ public interface ForestServiceBridgeRepository
        ORDER BY bridge.forestServiceBridgeId
       """)
   List<StructureBridgeDetail> findDetails(@Param("structureIds") Collection<Long> structureIds);
+
+  /** These structures' bridges, oldest record first — a report's, each structure's first used. */
+  List<ForestServiceBridgeEntity> findByCrossingStructureIdInOrderByForestServiceBridgeId(
+      Collection<Long> structureIds);
 }

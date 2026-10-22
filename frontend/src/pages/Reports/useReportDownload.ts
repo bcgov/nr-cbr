@@ -10,8 +10,11 @@ import { apiErrorMessage } from '@/utils/apiError';
 import { saveFile } from '@/utils/saveFile';
 
 type Options<C> = {
-  /** The report's mutation — `useStructureInventorySummaryReport()` and its kin. */
-  report: UseMutationResult<Blob, unknown, { criteria: C; format: ReportFormat }>;
+  /**
+   * The report's mutation — `useStructureInventorySummaryReport()` and its kin. None for a report
+   * whose criteria page is built before the report: every format then says it is not available.
+   */
+  report?: UseMutationResult<Blob, unknown, { criteria: C; format: ReportFormat }>;
   criteria: C;
   /** The file's name before the date, e.g. `StructureInventorySummaryReport`. */
   filename: string;
@@ -31,11 +34,11 @@ export const useReportDownload = <C>({
   notYetAvailable = [],
 }: Options<C>) => {
   const { display } = useNotification();
-  const running = report.isPending ? (report.variables?.format ?? null) : null;
+  const running = report?.isPending ? (report.variables?.format ?? null) : null;
 
   const run = useCallback(
     (format: ReportFormat) => {
-      if (notYetAvailable.includes(format)) {
+      if (!report || notYetAvailable.includes(format)) {
         display({
           kind: 'info',
           title: 'This report is not available yet',
