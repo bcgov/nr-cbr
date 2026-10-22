@@ -3,6 +3,7 @@ import type { InspectionsConductedCriteria } from '@/pages/Reports/InspectionsCo
 import type { InspectionsDueCriteria } from '@/pages/Reports/InspectionsDue/types';
 import type { MonitorsSummaryCriteria } from '@/pages/Reports/MonitorsSummary/types';
 import type { RepairsSummaryCriteria } from '@/pages/Reports/RepairsSummary/types';
+import type { ReplacementStructuresSummaryCriteria } from '@/pages/Reports/ReplacementStructuresSummary/types';
 import type { StructureInventoryDetailedCriteria } from '@/pages/Reports/StructureInventoryDetailed/types';
 import type {
   ReportFormat,
@@ -188,6 +189,19 @@ export class ReportService extends HttpClient {
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
       url: '/v1/reports/inspections-blank',
+      query: { ...populated(criteria), format },
+      responseType: 'blob',
+    });
+  }
+
+  /** Replacement Structures Summary (legacy CBR009), as a PDF or a CSV. */
+  replacementStructuresSummary(
+    criteria: ReplacementStructuresSummaryCriteria,
+    format: ReportFormat,
+  ): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/replacement-structures-summary',
       query: { ...populated(criteria), format },
       responseType: 'blob',
     });

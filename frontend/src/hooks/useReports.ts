@@ -4,6 +4,7 @@ import type { InspectionsConductedCriteria } from '@/pages/Reports/InspectionsCo
 import type { InspectionsDueCriteria } from '@/pages/Reports/InspectionsDue/types';
 import type { MonitorsSummaryCriteria } from '@/pages/Reports/MonitorsSummary/types';
 import type { RepairsSummaryCriteria } from '@/pages/Reports/RepairsSummary/types';
+import type { ReplacementStructuresSummaryCriteria } from '@/pages/Reports/ReplacementStructuresSummary/types';
 import type { StructureInventoryDetailedCriteria } from '@/pages/Reports/StructureInventoryDetailed/types';
 import type {
   ReportFormat,
@@ -128,4 +129,16 @@ export const useInspectionsBlankReport = () =>
       criteria: InspectionsDueCriteria;
       format: ReportFormat;
     }) => API.report.inspectionsBlank(criteria, format),
+  });
+
+/** Produces the Replacement Structures Summary as a file. A mutation, as the others are. */
+export const useReplacementStructuresSummaryReport = () =>
+  useMutation({
+    mutationFn: ({
+      criteria,
+      format,
+    }: {
+      criteria: ReplacementStructuresSummaryCriteria;
+      format: ReportFormat;
+    }) => API.report.replacementStructuresSummary(criteria, format),
   });

@@ -316,6 +316,13 @@ const INSPECTIONS_DUE_LOOKUPS = [
   businessAreasQuery,
 ] as const;
 
+const REPLACEMENT_STRUCTURES_SUMMARY_LOOKUPS = [
+  siteStatusCodesQuery,
+  siteTypeCodesQuery,
+  forestDistrictsQuery,
+  businessAreasQuery,
+] as const;
+
 const INSPECTIONS_CONDUCTED_LOOKUPS = [
   siteTypeCodesQuery,
   inspectionReportStatusCodesQuery,
@@ -499,6 +506,10 @@ export const useInspectionsDueReferenceDataState = (): ReferenceDataState =>
 /** The same, for the lookups the Inspections Conducted reports draw on. */
 export const useInspectionsConductedReferenceDataState = (): ReferenceDataState =>
   useQueries({ queries: INSPECTIONS_CONDUCTED_LOOKUPS, combine: combineReferenceData });
+
+/** The same, for the lookups the Replacement Structures Summary report draws on. */
+export const useReplacementStructuresSummaryReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: REPLACEMENT_STRUCTURES_SUMMARY_LOOKUPS, combine: combineReferenceData });
 
 /**
  * Warms the parameterless lookups once, in the background, as soon as there is a session.

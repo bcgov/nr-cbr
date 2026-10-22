@@ -151,10 +151,17 @@ export const ownerGroup = <C extends OwnerCriteria>(
   </>
 );
 
+/** The criteria {@link replacementGroup} binds: the two year ranges. */
+export type ReplacementCriteria = Pick<
+  StructureInventoryCommonCriteria,
+  | 'loadRestrictionYearStart'
+  | 'loadRestrictionYearEnd'
+  | 'replacementYearStart'
+  | 'replacementYearEnd'
+>;
+
 /** Legacy's "Replacement Date" fieldset: when the structure is due for restriction or replacement. */
-export const replacementGroup = <C extends StructureInventoryCommonCriteria>({
-  range,
-}: CriteriaFields<C>) => (
+export const replacementGroup = <C extends ReplacementCriteria>({ range }: CriteriaFields<C>) => (
   <>
     {range(
       'loadRestrictionYearStart',

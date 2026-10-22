@@ -1,0 +1,678 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CBR009 Replacement Structures Summary, ported from legacy's JasperServer report
+  (cbr-legacy jasper-server .../CBR009_ReplacementStructureSummary.rpt_jrxml), its layout kept but
+  for three faults:
+  - Legacy printed "REPLACEMENT YEAR / REPLACEMENT FOR" only where a year started, so a page it ran
+    onto showed column headings under no year; it is now on every page, marked "(continued)".
+  - Every value was one fixed line, so a long Structure #, Road Name, Crossing Name or Primary User
+    Name was cut off; each value now wraps, and the row's column lines grow with it - but a number,
+    which shrinks to fit its column instead.
+  - The column headed "Year Superstructure Fabricated" printed ORIGINAL_REPLACEMENT_DATE, the
+    structure's End of Design Life, under a stray "End of Design Life" label above the table; the
+    column is now headed so, and the stray label is gone.
+  As in the other reports, the port fills from rows rather than SQL - legacy called
+  CBR_RPLCMNT_STRUCTURE_RPT with a WHERE clause built as a string - every field already formatted
+  as legacy's patterns printed it, and each year's totals computed with the rows (TOTAL_COST,
+  TOTAL_COUNT). SECTION_KEY is the district and management area a page is for, YEAR_KEY the year
+  and section within it. The ministry line (the CBR_HEADER subreport) is P_MINISTRY, the logo
+  P_LOGO, and Date Printed P_DATE_PRINTED, in Pacific time.
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="REPLACEMENT_STRUCTURES_SUMMARY" pageWidth="792" pageHeight="612" orientation="Landscape" whenNoDataType="AllSectionsNoDetail" columnWidth="768" leftMargin="12" rightMargin="12" topMargin="12" bottomMargin="12" uuid="2cb306b4-1e35-4109-ad5f-7110dc53e443">
+	<parameter name="P_USERID" class="java.lang.String"/>
+	<parameter name="P_DATABASE" class="java.lang.String"/>
+	<parameter name="P_SELECTED_CRITERIA" class="java.lang.String"/>
+	<parameter name="P_DATE_PRINTED" class="java.lang.String"/>
+	<parameter name="P_MINISTRY" class="java.lang.String"/>
+	<parameter name="P_LOGO" class="java.lang.String"/>
+	<parameter name="p_report_id" class="java.lang.String" isForPrompting="false">
+		<defaultValueExpression><![CDATA["CBR009"]]></defaultValueExpression>
+	</parameter>
+	<field name="SECTION_KEY" class="java.lang.String"/>
+	<field name="YEAR_KEY" class="java.lang.String"/>
+	<field name="FOREST_REGION_NAME" class="java.lang.String"/>
+	<field name="FOREST_DISTRICT_NAME" class="java.lang.String"/>
+	<field name="MANAGEMENT_AREA_NAME" class="java.lang.String"/>
+	<field name="YEAR" class="java.lang.String"/>
+	<field name="REPLACEMENT_FOR" class="java.lang.String"/>
+	<field name="CROSSING_STRUCTURE_NAME" class="java.lang.String"/>
+	<field name="CROSSING_SITE_ID" class="java.lang.String"/>
+	<field name="FOREST_SERVICE_ROAD" class="java.lang.String"/>
+	<field name="FOREST_FILE_ID" class="java.lang.String"/>
+	<field name="ROAD_SECTION_ID" class="java.lang.String"/>
+	<field name="CROSSING_NAME" class="java.lang.String"/>
+	<field name="STRUCTURE_TYPE_CLASS_CODE" class="java.lang.String"/>
+	<field name="TOTAL_LENGTH" class="java.lang.String"/>
+	<field name="DESIGN_LOAD_RATING" class="java.lang.String"/>
+	<field name="LOAD_RATING" class="java.lang.String"/>
+	<field name="CLIENT_NAME" class="java.lang.String"/>
+	<field name="ESTIMATED_REPLACEMENT_COST" class="java.lang.String"/>
+	<field name="END_OF_DESIGN_LIFE" class="java.lang.String"/>
+	<field name="CAPITAL_ROAD_IND" class="java.lang.String"/>
+	<field name="TOTAL_COST" class="java.lang.String"/>
+	<field name="TOTAL_COUNT" class="java.lang.String"/>
+	<group name="PageBreakGroup - District+Management Area" isStartNewPage="true">
+		<groupExpression><![CDATA[$F{SECTION_KEY}]]></groupExpression>
+	</group>
+	<group name="Sort_Year" isReprintHeaderOnEachPage="true" keepTogether="true">
+		<groupExpression><![CDATA[$F{YEAR_KEY}]]></groupExpression>
+		<groupHeader>
+			<band height="36" splitType="Prevent">
+				<rectangle>
+					<reportElement x="0" y="0" width="756" height="36" backcolor="#FFFFFF" uuid="212386c1-793c-41b4-a80a-39499c80dc27"/>
+					<graphicElement>
+						<pen lineWidth="1.5" lineStyle="Solid"/>
+					</graphicElement>
+				</rectangle>
+				<textField isBlankWhenNull="true">
+					<reportElement x="6" y="4" width="284" height="16" uuid="085148b9-31e8-44e9-8a47-4022ff4908f9"/>
+					<textElement>
+						<font fontName="Arial" size="11" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA["REPLACEMENT YEAR: "]]></textFieldExpression>
+				</textField>
+				<textField isBlankWhenNull="true">
+					<reportElement x="143" y="4" width="289" height="16" uuid="085148b9-31e8-44e9-8a47-4022ff4908f9"/>
+					<textElement>
+						<font fontName="Arial" size="11" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{YEAR} + ($V{Sort_Year_COUNT} > 0 ? " (continued)" : "")]]></textFieldExpression>
+				</textField>
+				<textField isBlankWhenNull="true">
+					<reportElement x="7" y="20" width="252" height="16" uuid="de659e53-f80f-4b7d-999e-81dca8bddc0a"/>
+					<textElement>
+						<font fontName="Arial" size="11" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA["REPLACEMENT FOR: "]]></textFieldExpression>
+				</textField>
+				<textField isBlankWhenNull="true">
+					<reportElement x="136" y="20" width="288" height="16" uuid="de659e53-f80f-4b7d-999e-81dca8bddc0a"/>
+					<textElement>
+						<font fontName="Arial" size="11" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{REPLACEMENT_FOR}]]></textFieldExpression>
+				</textField>
+			</band>
+			<band height="46" splitType="Prevent">
+				<rectangle>
+					<reportElement stretchType="RelativeToBandHeight" x="0" y="0" width="756" height="46" backcolor="#FFFFFF" uuid="212386c1-793c-41b4-a80a-39499c80dc27"/>
+					<graphicElement>
+						<pen lineWidth="1.5" lineStyle="Solid"/>
+					</graphicElement>
+				</rectangle>
+				<line>
+					<reportElement x="79" y="0" width="1" height="46" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="159" y="0" width="1" height="46" uuid="cdf0d565-10e3-4167-a4fe-c865952274c6"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="284" y="0" width="1" height="46" uuid="631db8bc-244d-48fb-9fcf-e2ee74cffda7"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="341" y="0" width="1" height="46" uuid="706f8c59-8ba3-4b59-8417-e78606641850"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="417" y="0" width="1" height="46" uuid="41f0b8ca-da63-4e94-bce1-597b1861aec4"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="454" y="0" width="1" height="46" uuid="b38cd5fa-d6a4-40e0-b949-df3fe3c2324a"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="497" y="0" width="1" height="46" uuid="743fc02d-67b3-4e65-a655-2cea0c63a920"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="543" y="0" width="1" height="46" uuid="0f07b00f-3e61-4e27-8cba-a8adcce92eb2"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="594" y="0" width="1" height="46" uuid="3fac85ed-39b6-4278-906e-0ecac8479b30"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="643" y="0" width="1" height="46" uuid="a4fddaee-4935-49dc-8c91-8b041c5d6c3e"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<line>
+					<reportElement x="683" y="0" width="1" height="46" uuid="c34f72b5-9b2e-4959-9e15-7122513d1875"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<staticText>
+					<reportElement x="0" y="6" width="78" height="12" uuid="22e0b2ff-b2ce-4c5e-b670-8ca1834d8443"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Structure #]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="80" y="6" width="77" height="12" uuid="3ca8dfe8-dd25-4a09-b865-8354d46c1038"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Site #]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="160" y="6" width="124" height="12" uuid="4cef6398-5ede-42d7-908f-f979f001683a"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Road Name]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="285" y="6" width="54" height="24" uuid="08bf3dd5-6b45-48a9-8e85-2a99a58ba3d8"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Project File ID # / Br.]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="341" y="6" width="75" height="12" uuid="be2b56b4-e6d4-490a-854f-305e51fcf310"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Crossing Name]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="419" y="6" width="35" height="36" uuid="337f1470-dc5f-4f68-948e-801f9c484d29"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Strctre Type/ Class]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="456" y="6" width="40" height="36" uuid="6f147898-4a64-4e95-91fd-da5a788e0125"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Total Length]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="456" y="26" width="40" height="12" uuid="6f147898-4a64-4e95-91fd-da5a788e0125"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[(metres)]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="498" y="6" width="45" height="24" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Dsgn Load
+Rtng GVW]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="498" y="27" width="45" height="14" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[(tonnes)]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="545" y="0" width="49" height="36" uuid="cc19002f-2694-46c1-92f7-ed6e06de18aa"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Current Load
+Rtng GVW
+]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="544" y="29" width="49" height="14" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[(tonnes)]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="595" y="6" width="48" height="24" uuid="3900706c-7827-4ab0-9f0a-e56dcc552193"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Primary User Name]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="644" y="6" width="38" height="24" uuid="42417ca3-552b-4606-80a9-9993c1a4a6b3"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Rplcmnt Cost     ]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="660" y="16" width="22" height="12" uuid="42417ca3-552b-4606-80a9-9993c1a4a6b3"/>
+					<textElement textAlignment="Right">
+						<font fontName="Arial" size="9" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[($)]]></text>
+				</staticText>
+				<staticText>
+					<reportElement x="684" y="0" width="40" height="46" uuid="f16c9a97-5efb-48cb-a0e4-13ecaf22b355"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[End of Design Life]]></text>
+				</staticText>
+				<line>
+					<reportElement x="724" y="0" width="1" height="46" uuid="c34f72b5-9b2e-4959-9e15-7122513d1875"/>
+					<graphicElement>
+						<pen lineWidth="1.0" lineStyle="Solid"/>
+					</graphicElement>
+				</line>
+				<staticText>
+					<reportElement x="724" y="5" width="34" height="36" uuid="337f1470-dc5f-4f68-948e-801f9c484d29"/>
+					<textElement textAlignment="Center">
+						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<text><![CDATA[Capital Road]]></text>
+				</staticText>
+			</band>
+		</groupHeader>
+		<groupFooter>
+			<band height="34">
+				<rectangle>
+					<reportElement x="0" y="0" width="756" height="34" printWhenGroupChanges="Sort_Year" backcolor="#FFFFFF" uuid="212386c1-793c-41b4-a80a-39499c80dc27"/>
+					<graphicElement>
+						<pen lineWidth="1.5" lineStyle="Solid"/>
+					</graphicElement>
+				</rectangle>
+				<textField isBlankWhenNull="true">
+					<reportElement x="521" y="6" width="167" height="12" printWhenGroupChanges="Sort_Year" uuid="f1986eb8-32b7-40d7-84d0-1926f3b1cf8e"/>
+					<textElement>
+						<font fontName="Arial" size="10" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA["TOTAL REPLACEMENT COST: "]]></textFieldExpression>
+				</textField>
+				<textField isBlankWhenNull="true">
+					<reportElement x="521" y="18" width="216" height="12" printWhenGroupChanges="Sort_Year" uuid="a4292d62-cd62-485d-afb8-77a958bad468"/>
+					<textElement>
+						<font fontName="Arial" size="10" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA["TOTAL REPLACEMENTS: "]]></textFieldExpression>
+				</textField>
+				<textField isBlankWhenNull="true">
+					<reportElement x="689" y="6" width="61" height="12" printWhenGroupChanges="Sort_Year" uuid="f1986eb8-32b7-40d7-84d0-1926f3b1cf8e"/>
+					<textElement>
+						<font fontName="Arial" size="10" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{TOTAL_COST}]]></textFieldExpression>
+				</textField>
+				<textField isBlankWhenNull="true">
+					<reportElement x="689" y="18" width="61" height="12" printWhenGroupChanges="Sort_Year" uuid="a4292d62-cd62-485d-afb8-77a958bad468"/>
+					<textElement>
+						<font fontName="Arial" size="10" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{TOTAL_COUNT}]]></textFieldExpression>
+				</textField>
+			</band>
+		</groupFooter>
+	</group>
+	<pageHeader>
+		<band height="136">
+			<rectangle>
+				<reportElement x="0" y="0" width="756" height="136" backcolor="#FFFFFF" uuid="2c168d03-a26e-4ae8-9517-0f0e50546489"/>
+				<graphicElement>
+					<pen lineWidth="1.5" lineStyle="Solid"/>
+				</graphicElement>
+			</rectangle>
+			<image>
+				<reportElement x="42" y="6" width="60" height="69" uuid="6ef60144-64d0-4a44-83f1-a9853ffd0c16"/>
+				<imageExpression><![CDATA[$P{P_LOGO}]]></imageExpression>
+			</image>
+			<textField isBlankWhenNull="true">
+				<reportElement x="102" y="18" width="491" height="20" uuid="54653538-2298-4d00-a81c-49a243d3d810"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="14" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{P_MINISTRY}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="252" y="36" width="258" height="18" uuid="c327d52e-aaf5-497e-8703-1fd84781cff4"/>
+				<textElement textAlignment="Center">
+					<font fontName="Arial" size="12" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Replacement Structures - Summary Report]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="593" y="8" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Page:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="695" y="8" width="19" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[of]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="593" y="20" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Date Printed:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="593" y="32" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[User Id:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="593" y="44" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Database:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="593" y="56" width="71" height="12" uuid="524f87c4-bb25-4fc5-b636-444c91840ef4"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Report Id:]]></text>
+			</staticText>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="657" y="8" width="38" height="12" uuid="7da22937-1a13-46e5-9634-8d2d945a76fc"/>
+				<textElement textAlignment="Left">
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" evaluationTime="Report" isBlankWhenNull="true">
+				<reportElement x="713" y="8" width="38" height="12" uuid="d1f8f628-2285-42c2-98aa-2b9fb136db4b"/>
+				<textElement textAlignment="Left">
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="657" y="20" width="94" height="12" uuid="d5d40342-1023-464a-ba09-b4bdfd4bbda6"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{P_DATE_PRINTED}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="657" y="32" width="94" height="12" uuid="369018ac-9718-4ad4-87e3-24d3ddb9ab0f"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{P_USERID}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="657" y="44" width="94" height="12" uuid="bf179c2d-c526-4fec-b0b6-d3d9a717717d"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{P_DATABASE}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="657" y="56" width="94" height="12" uuid="2c406dcc-7b82-4cd7-9137-482fc6c57b78"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{p_report_id}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="6" y="76" width="594" height="14" uuid="161ba338-08d4-42c2-b76e-8acea3d447aa"/>
+				<textElement>
+					<font fontName="Arial" size="11" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Forest Region: " + ( $F{FOREST_REGION_NAME} == null || $F{FOREST_REGION_NAME}.isEmpty() ? "" : $F{FOREST_REGION_NAME} )]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="6" y="90" width="594" height="14" uuid="65c84ddc-2ebf-46ab-99e5-489e0c7d13a1"/>
+				<textElement>
+					<font fontName="Arial" size="11" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Forest District: " + ( $F{FOREST_DISTRICT_NAME} == null || $F{FOREST_DISTRICT_NAME}.isEmpty() ? "" : $F{FOREST_DISTRICT_NAME} )]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="6" y="104" width="594" height="14" uuid="d0eeb99a-3e80-4ec8-9083-904fc9569846"/>
+				<textElement>
+					<font fontName="Arial" size="11" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA["Management Area: " + ( $F{MANAGEMENT_AREA_NAME} == null || $F{MANAGEMENT_AREA_NAME}.isEmpty() ? "" : $F{MANAGEMENT_AREA_NAME} )]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="6" y="120" width="744" height="12" uuid="2dec8a80-23e0-4b17-a868-f2f3063c0c22"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[( $P{P_SELECTED_CRITERIA} == null || $P{P_SELECTED_CRITERIA}.isEmpty() ? "" : $P{P_SELECTED_CRITERIA} )]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageHeader>
+	<detail>
+		<band height="16" splitType="Prevent">
+			<rectangle>
+				<reportElement stretchType="ContainerHeight" x="0" y="0" width="756" height="16" backcolor="#FFFFFF" uuid="212386c1-793c-41b4-a80a-39499c80dc27"/>
+				<graphicElement>
+					<pen lineWidth="1.5" lineStyle="Solid"/>
+				</graphicElement>
+			</rectangle>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="79" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="159" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="284" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="341" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="417" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="454" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="497" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="543" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="594" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="643" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="683" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="6" y="2" width="72" height="12" uuid="d2954201-1893-446c-a85b-42bebba7155a"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{CROSSING_STRUCTURE_NAME}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="85" y="2" width="72" height="12" uuid="aaa7d3d9-964e-4e80-9c7f-8c0e387a8fda"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{CROSSING_SITE_ID}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="167" y="2" width="114" height="12" uuid="6ba1aa75-966a-40bf-9c3d-2c265965f04f"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{FOREST_SERVICE_ROAD}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="290" y="2" width="48" height="12" uuid="dc8425d8-9091-4bf1-9968-ec90e6ae9f52"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[( $F{FOREST_FILE_ID} == null || $F{FOREST_FILE_ID}.isEmpty() ? "" : $F{FOREST_FILE_ID}) +
+( $F{ROAD_SECTION_ID} == null || $F{ROAD_SECTION_ID}.isEmpty() ? "" : "-" + $F{ROAD_SECTION_ID} )]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="345" y="2" width="72" height="12" uuid="690ecacb-4518-48e2-8646-73be9d291c80"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{CROSSING_NAME}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="422" y="2" width="25" height="12" uuid="96b1ce01-38eb-4e5b-9bc9-24badea2f86f"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[( $F{STRUCTURE_TYPE_CLASS_CODE} == null || $F{STRUCTURE_TYPE_CLASS_CODE}.isEmpty() ? " " :
+  ( $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase("PB") ? "P" :
+    ( $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase("TB") ? "T" :
+      ( $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase("CUL") ? "MC" :
+        ( $F{STRUCTURE_TYPE_CLASS_CODE}.equalsIgnoreCase("WLC") ? "W" : " "
+        )
+      )
+    )
+  )
+)]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="461" y="2" width="30" height="12" uuid="e97b7c04-f7f6-46b4-a9c4-16e7954cbb43"/>
+				<textElement textAlignment="Right">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{TOTAL_LENGTH}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="499" y="2" width="42" height="12" uuid="7e6ab94d-865a-4a8b-9c15-e79cfd764204"/>
+				<textElement textAlignment="Right">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{DESIGN_LOAD_RATING}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="553" y="2" width="37" height="12" uuid="207ee824-0c65-4c6e-8e09-bfe058befada"/>
+				<textElement textAlignment="Right">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{LOAD_RATING}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="StretchHeight" isBlankWhenNull="true">
+				<reportElement x="597" y="2" width="46" height="12" uuid="9dd1bd27-377a-4b02-b81b-de1b8ce0544b"/>
+				<textElement>
+					<font fontName="Arial" size="8" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{CLIENT_NAME}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="647" y="2" width="36" height="12" uuid="880fc699-055e-4cbd-9bd0-6f537db16273"/>
+				<textElement textAlignment="Right">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{ESTIMATED_REPLACEMENT_COST}]]></textFieldExpression>
+			</textField>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="689" y="2" width="30" height="12" uuid="f54f1b1f-933c-47cb-b6a8-1a5eb871b0b1"/>
+				<textElement textAlignment="Right">
+					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{END_OF_DESIGN_LIFE}]]></textFieldExpression>
+			</textField>
+			<line>
+				<reportElement stretchType="ContainerHeight" x="724" y="0" width="1" height="16" uuid="00f7a0bf-e597-4c81-ab26-1b6593b9b958"/>
+				<graphicElement>
+					<pen lineWidth="1.0" lineStyle="Solid"/>
+				</graphicElement>
+			</line>
+			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
+				<reportElement x="734" y="2" width="19" height="14" uuid="f3f083d8-db02-427e-9d6e-ee6aa4e4e272"/>
+				<textElement>
+					<font fontName="Arial" size="9"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{CAPITAL_ROAD_IND}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="25">
+			<rectangle>
+				<reportElement x="0" y="0" width="756" height="25" backcolor="#FFFFFF" uuid="4867a5cd-05f1-4532-ac8c-f83d165b6d83"/>
+				<graphicElement>
+					<pen lineWidth="1.5" lineStyle="Solid"/>
+				</graphicElement>
+			</rectangle>
+			<staticText>
+				<reportElement x="6" y="6" width="180" height="12" uuid="c3d3db2f-b8e5-4ac6-9b7a-869dd2fc8794"/>
+				<textElement>
+					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+				</textElement>
+				<text><![CDATA[Corporate Bridge Register (CBR)]]></text>
+			</staticText>
+		</band>
+	</pageFooter>
+</jasperReport>

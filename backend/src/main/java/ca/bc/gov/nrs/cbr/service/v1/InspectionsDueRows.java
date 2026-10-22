@@ -366,7 +366,7 @@ public class InspectionsDueRows {
   }
 
   /** A lookup's rows by structure, in the order it returns them, a batch at a time. */
-  private static <R> Map<Long, List<R>> grouped(
+  static <R> Map<Long, List<R>> grouped(
       List<Long> ids, Function<Collection<Long>, List<R>> lookup, ToLongFunction<R> structureId) {
     Map<Long, List<R>> grouped = new LinkedHashMap<>();
     for (int from = 0; from < ids.size(); from += BATCH) {
@@ -378,7 +378,7 @@ public class InspectionsDueRows {
   }
 
   /** The records, or a single none — a left join's one row for a structure without any. */
-  private static <R> List<R> orNone(List<R> records) {
+  static <R> List<R> orNone(List<R> records) {
     return records == null || records.isEmpty() ? Collections.singletonList(null) : records;
   }
 
