@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -366,11 +367,11 @@ public class InspectionsDueRows {
 
   /** A lookup's rows by structure, in the order it returns them, a batch at a time. */
   private static <R> Map<Long, List<R>> grouped(
-      List<Long> ids, Function<Collection<Long>, List<R>> lookup, Function<R, Long> structureId) {
+      List<Long> ids, Function<Collection<Long>, List<R>> lookup, ToLongFunction<R> structureId) {
     Map<Long, List<R>> grouped = new LinkedHashMap<>();
     for (int from = 0; from < ids.size(); from += BATCH) {
       for (R found : lookup.apply(ids.subList(from, Math.min(ids.size(), from + BATCH)))) {
-        grouped.computeIfAbsent(structureId.apply(found), id -> new ArrayList<>()).add(found);
+        grouped.computeIfAbsent(structureId.applyAsLong(found), id -> new ArrayList<>()).add(found);
       }
     }
     return grouped;

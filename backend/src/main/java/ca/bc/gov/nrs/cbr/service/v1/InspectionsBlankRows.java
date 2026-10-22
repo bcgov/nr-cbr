@@ -105,7 +105,7 @@ public class InspectionsBlankRows {
 
   private final EntityManager entityManager;
   private final InspectionFormService forms;
-  private final ForestServiceBridgeRepository bridges;
+  private final ForestServiceBridgeRepository forestServiceBridges;
   private final StructureRepairRepository repairs;
   private final StructureMonitorItemRepository monitors;
   private final RepairsSummaryNames repairNames;
@@ -114,14 +114,14 @@ public class InspectionsBlankRows {
   public InspectionsBlankRows(
       EntityManager entityManager,
       InspectionFormService forms,
-      ForestServiceBridgeRepository bridges,
+      ForestServiceBridgeRepository forestServiceBridges,
       StructureRepairRepository repairs,
       StructureMonitorItemRepository monitors,
       RepairsSummaryNames repairNames,
       ConfigurationService codes) {
     this.entityManager = entityManager;
     this.forms = forms;
-    this.bridges = bridges;
+    this.forestServiceBridges = forestServiceBridges;
     this.repairs = repairs;
     this.monitors = monitors;
     this.repairNames = repairNames;
@@ -234,9 +234,9 @@ public class InspectionsBlankRows {
     Map<Long, List<StructureMonitorItemEntity>> outstandingMonitors = new HashMap<>();
     for (int from = 0; from < ids.size(); from += BATCH) {
       List<Long> batch = ids.subList(from, Math.min(ids.size(), from + BATCH));
-      bridges.findByCrossingStructureIdInOrderByForestServiceBridgeId(batch)
+      forestServiceBridges.findByCrossingStructureIdInOrderByForestServiceBridgeId(batch)
           .forEach(found -> firstBridges.putIfAbsent(found.getCrossingStructureId(), found));
-      bridges.findDetails(batch)
+      forestServiceBridges.findDetails(batch)
           .forEach(found -> details.putIfAbsent(found.crossingStructureId(), found));
       repairs.findByCrossingStructureIdInAndRepairStatusCodeInOrderByCrossingStructureIdAscRepairNumberAsc(
               batch, OUTSTANDING)
@@ -261,7 +261,7 @@ public class InspectionsBlankRows {
   /** What the forms read beside their structures, by structure id. */
   private record Beside(
       Map<Long, InspectionFormResponse> forms,
-      Map<Long, ForestServiceBridgeEntity> bridges,
+      Map<Long, ForestServiceBridgeEntity> firstBridges,
       Map<Long, StructureBridgeDetail> bridgeDetails,
       Map<Long, List<StructureRepairEntity>> repairs,
       Map<Long, List<StructureMonitorItemEntity>> monitors,
@@ -300,7 +300,7 @@ public class InspectionsBlankRows {
       this.structure = structure;
       this.beside = beside;
       Long id = structure.getCrossingStructureId();
-      bridge = Optional.ofNullable(beside.bridges().get(id));
+      bridge = Optional.ofNullable(beside.firstBridges().get(id));
       bridgeDetail = Optional.ofNullable(beside.bridgeDetails().get(id));
       String typeClass = structure.getStructureTypeClassCode();
       boolean isBridge = typeClass != null && BRIDGES.contains(typeClass);
