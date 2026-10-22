@@ -17,4 +17,5 @@ public record StructureBridgeDetail(
     BigDecimal totalLength,
     String portableLocationDetail,
     Long spanCount,
-    BigDecimal deckWidth) {}
+    BigDecimal deckWidth,
+    String runningSurface) {}

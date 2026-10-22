@@ -65,7 +65,9 @@ const ReportCriteriaForm = <S extends string, C extends { sortBy: S }>({
   };
 
   return (
-    <form onSubmit={submit} data-testid={`${id}-form`} className="report-criteria__form">
+    // `noValidate`: the form's own rules show their messages beside each box; the browser's — a
+    // month picker's `pattern` — would otherwise stop the submit with a bubble of its own instead.
+    <form noValidate onSubmit={submit} data-testid={`${id}-form`} className="report-criteria__form">
       <div className="report-criteria__grid">{children(fields)}</div>
       <SortBy
         id={id}

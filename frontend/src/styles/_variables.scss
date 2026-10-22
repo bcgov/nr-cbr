@@ -1,7 +1,9 @@
 $bcgov-prefix: 'cds';
 
-// Expanded side nav width (Carbon default is 16rem; was previously trimmed to 12rem).
-$layout-side-nav-width: 16rem;
+// Expanded side nav width (Carbon default is 16rem; was previously trimmed to 12rem). 20rem so the
+// Reports menu's longest names ("Inspections Conducted – Summary", "Replacement Structures
+// Summary") fit on one line.
+$layout-side-nav-width: 20rem;
 
 // Collapsed side nav: an icon-only rail rather than an off-screen drawer, so the icons stay
 // reachable. Fixed so the content margin (components/Layout/index.scss) tracks it exactly.

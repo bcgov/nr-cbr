@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 
+import InspectionsConductedPage from './InspectionsConducted';
 import MonitorsSummaryPage from './MonitorsSummary';
 import RepairsSummaryPage from './RepairsSummary';
 import StructureDetailReportPage from './StructureDetailReport';
@@ -21,6 +22,11 @@ const ReportPage: FC<{ path: string; name: string }> = ({ path, name }) => {
       return <RepairsSummaryPage />;
     case 'monitors-summary':
       return <MonitorsSummaryPage />;
+    // One form for both, keyed so moving between them starts each with its own criteria.
+    case 'inspections-conducted-summary':
+      return <InspectionsConductedPage key="summary" variant="summary" />;
+    case 'inspections-conducted-detail':
+      return <InspectionsConductedPage key="detail" variant="detail" />;
     default:
       return <ReportPlaceholderPage name={name} />;
   }

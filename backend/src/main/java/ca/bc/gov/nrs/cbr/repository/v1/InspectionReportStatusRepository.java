@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -20,6 +21,9 @@ public interface InspectionReportStatusRepository
   void deleteByInspectionId(Long inspectionId);
 
   /** An inspection's status history, newest first — legacy's FIND_INSPECTION_STATUS_HIST. */
+  /** Every status row of these inspections — a report's, a batch at a time. */
+  List<InspectionReportStatusEntity> findByInspectionIdIn(Collection<Long> inspectionIds);
+
   List<InspectionReportStatusEntity> findByInspectionIdOrderByInspectionReportStatusIdDesc(
       Long inspectionId);
 }

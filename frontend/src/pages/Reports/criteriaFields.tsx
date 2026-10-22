@@ -1,5 +1,7 @@
 import { Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
+import MonthRangeField from './MonthRangeField';
+
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 
 /** "PB - Permanent Bridge"; a missing half degrades to the other rather than "PB - undefined". */
@@ -21,8 +23,8 @@ type Context<C extends object> = {
 
 /**
  * The boxes a report's criteria form is built from — a text box, a code or org-unit select, a
- * "from – to" range, a toggle — each bound to one criterion by name, as Structure Search builds
- * its form. Shared by the reports so their criteria read and behave alike.
+ * "from – to" range of numbers or of months, a toggle — each bound to one criterion by name, as
+ * Structure Search builds its form. Shared by the reports so their criteria read and behave alike.
  */
 export const criteriaFields = <C extends object>({
   id,
@@ -157,5 +159,20 @@ export const criteriaFields = <C extends object>({
     />
   );
 
-  return { text, codeSelect, orgUnitSelect, range, toggle };
+  /** A "from – to" pair of months, `yyyy/mm` — the inspection reports' Inspection Date. */
+  const monthRange = (from: Field, to: Field, legend: string) => (
+    <MonthRangeField
+      startId={`${id}-${from}`}
+      endId={`${id}-${to}`}
+      legend={legend}
+      start={String(criteria[from])}
+      end={String(criteria[to])}
+      startError={shown[from]}
+      endError={shown[to]}
+      onChange={(which, value) => onChange(which === 'start' ? from : to, value as C[Field])}
+      onLeave={(which) => leave(which === 'start' ? from : to)}
+    />
+  );
+
+  return { text, codeSelect, orgUnitSelect, range, monthRange, toggle };
 };

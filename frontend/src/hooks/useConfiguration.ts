@@ -305,6 +305,14 @@ const MONITORS_SUMMARY_LOOKUPS = [
   businessAreasQuery,
 ] as const;
 
+const INSPECTIONS_CONDUCTED_LOOKUPS = [
+  siteTypeCodesQuery,
+  inspectionReportStatusCodesQuery,
+  inspectionTypeCodesQuery,
+  forestDistrictsQuery,
+  businessAreasQuery,
+] as const;
+
 /**
  * Management areas for one forest district.
  *
@@ -472,6 +480,10 @@ export const useRepairsSummaryReferenceDataState = (): ReferenceDataState =>
 /** The same, for the lookups the Monitors Summary report draws on. */
 export const useMonitorsSummaryReferenceDataState = (): ReferenceDataState =>
   useQueries({ queries: MONITORS_SUMMARY_LOOKUPS, combine: combineReferenceData });
+
+/** The same, for the lookups the Inspections Conducted reports draw on. */
+export const useInspectionsConductedReferenceDataState = (): ReferenceDataState =>
+  useQueries({ queries: INSPECTIONS_CONDUCTED_LOOKUPS, combine: combineReferenceData });
 
 /**
  * Warms the parameterless lookups once, in the background, as soon as there is a session.

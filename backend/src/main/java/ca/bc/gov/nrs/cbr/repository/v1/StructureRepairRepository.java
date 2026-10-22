@@ -139,4 +139,8 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
          AND repair.repairStatusCode = 'SUG'
       """)
   int requireSuggested(@Param("structureId") Long structureId, @Param("user") String user);
+
+  /** The repairs recorded on these inspections, each's by repair number — a report's. */
+  List<StructureRepairEntity> findByInspectionIdInOrderByRepairNumberAsc(
+      Collection<Long> inspectionIds);
 }

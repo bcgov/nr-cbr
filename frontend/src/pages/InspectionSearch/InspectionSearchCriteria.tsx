@@ -10,7 +10,7 @@ import {
 } from '@carbon/react';
 import { useRef } from 'react';
 
-import { MONTH_PATTERN, criteriaErrors, isMonth } from './validation';
+import { criteriaErrors, isMonth } from './validation';
 
 import type {
   CodeOption,
@@ -19,6 +19,8 @@ import type {
   OrgUnitOption,
 } from './types';
 import type { ChangeEvent, FC, SubmitEventHandler } from 'react';
+
+import { MONTH_FORMAT, formatMonth, parseMonth } from '@/utils/month';
 
 export type CodeTables = {
   structureTypeClassCodes: CodeOption[];
@@ -75,36 +77,6 @@ type Props = {
  */
 const label = (code: string | null, description: string | null): string =>
   [code, description].filter(Boolean).join(' - ');
-
-/**
- * The calendar's date format: a month, because the criterion is a month.
- *
- * <p>flatpickr formats `m` zero-padded, so anything the calendar writes comes back as `2026/01` —
- * already the canonical form `validation.ts` compares and the backend will parse.
- */
-const MONTH_FORMAT = 'Y/m';
-
-/**
- * `yyyy/mm` (or `yyyy/m`) to the first of that month, and anything else to `false`.
- *
- * <p>flatpickr's own parser fills the fields a format does not mention from *today*, so `Y/m`
- * reading "2026/02" on the 31st of a month lands on 3 March and the box redraws itself as
- * `2026/03`. Anchoring the day to the 1st is what makes a month-granular format safe.
- *
- * <p>`false` is flatpickr's signal for "not a date": it leaves the box empty rather than inventing
- * one. That is the behaviour wanted for a half-typed or misformatted month — see the blur handler
- * on {@link monthPicker}, which is what keeps this form's own state in step with it.
- */
-const parseMonth = (value: string): Date | false => {
-  if (!MONTH_PATTERN.test(value)) {
-    return false;
-  }
-  const [year, month] = value.split('/');
-  return new Date(Number(year), Number(month) - 1, 1);
-};
-
-const formatMonth = (date: Date): string =>
-  `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}`;
 
 const InspectionSearchCriteriaForm: FC<Props> = ({
   criteria,

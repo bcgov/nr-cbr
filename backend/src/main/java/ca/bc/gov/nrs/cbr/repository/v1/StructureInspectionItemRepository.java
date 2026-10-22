@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionItemEntity;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -14,6 +15,9 @@ public interface StructureInspectionItemRepository
 
   /** An inspection's answers. */
   List<StructureInspectionItemEntity> findByInspectionId(Long inspectionId);
+
+  /** The items of these inspections — a report's, a batch at a time. */
+  List<StructureInspectionItemEntity> findByInspectionIdIn(Collection<Long> inspectionIds);
 
   /** An inspection's answers to one question group — a Condition card. */
   List<StructureInspectionItemEntity> findByInspectionIdAndSubsectionCode(Long inspectionId,

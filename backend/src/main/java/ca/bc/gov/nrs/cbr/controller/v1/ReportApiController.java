@@ -1,12 +1,15 @@
 package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.ReportApiEndpoint;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionsConductedDetailService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionsConductedSummaryService;
 import ca.bc.gov.nrs.cbr.service.v1.MonitorsSummaryService;
 import ca.bc.gov.nrs.cbr.service.v1.RepairsSummaryService;
 import ca.bc.gov.nrs.cbr.service.v1.ReportFile;
 import ca.bc.gov.nrs.cbr.service.v1.StructureDetailReportService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventoryDetailedService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureInventorySummaryService;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionsConductedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
@@ -27,18 +30,24 @@ public class ReportApiController implements ReportApiEndpoint {
   private final StructureDetailReportService structureDetail;
   private final RepairsSummaryService repairsSummary;
   private final MonitorsSummaryService monitorsSummary;
+  private final InspectionsConductedSummaryService inspectionsConductedSummary;
+  private final InspectionsConductedDetailService inspectionsConductedDetail;
 
   public ReportApiController(
       StructureInventorySummaryService structureInventorySummary,
       StructureInventoryDetailedService structureInventoryDetailed,
       StructureDetailReportService structureDetail,
       RepairsSummaryService repairsSummary,
-      MonitorsSummaryService monitorsSummary) {
+      MonitorsSummaryService monitorsSummary,
+      InspectionsConductedSummaryService inspectionsConductedSummary,
+      InspectionsConductedDetailService inspectionsConductedDetail) {
     this.structureInventorySummary = structureInventorySummary;
     this.structureInventoryDetailed = structureInventoryDetailed;
     this.structureDetail = structureDetail;
     this.repairsSummary = repairsSummary;
     this.monitorsSummary = monitorsSummary;
+    this.inspectionsConductedSummary = inspectionsConductedSummary;
+    this.inspectionsConductedDetail = inspectionsConductedDetail;
   }
 
   @Override
@@ -67,6 +76,18 @@ public class ReportApiController implements ReportApiEndpoint {
   public ResponseEntity<byte[]> monitorsSummary(
       MonitorsSummaryCriteria criteria, ReportFormat format) {
     return download(monitorsSummary.generate(criteria, format));
+  }
+
+  @Override
+  public ResponseEntity<byte[]> inspectionsConductedSummary(
+      InspectionsConductedCriteria criteria, ReportFormat format) {
+    return download(inspectionsConductedSummary.generate(criteria, format));
+  }
+
+  @Override
+  public ResponseEntity<byte[]> inspectionsConductedDetail(
+      InspectionsConductedCriteria criteria, ReportFormat format) {
+    return download(inspectionsConductedDetail.generate(criteria, format));
   }
 
   /** Always an attachment: a report is saved, and the page asks for it to be. */

@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 
+import type { InspectionsConductedCriteria } from '@/pages/Reports/InspectionsConducted/types';
 import type { MonitorsSummaryCriteria } from '@/pages/Reports/MonitorsSummary/types';
 import type { RepairsSummaryCriteria } from '@/pages/Reports/RepairsSummary/types';
 import type { StructureInventoryDetailedCriteria } from '@/pages/Reports/StructureInventoryDetailed/types';
@@ -66,4 +67,28 @@ export const useMonitorsSummaryReport = () =>
       criteria: MonitorsSummaryCriteria;
       format: ReportFormat;
     }) => API.report.monitorsSummary(criteria, format),
+  });
+
+/** Produces the Inspections Conducted – Summary report as a file. A mutation, as the others are. */
+export const useInspectionsConductedSummaryReport = () =>
+  useMutation({
+    mutationFn: ({
+      criteria,
+      format,
+    }: {
+      criteria: InspectionsConductedCriteria;
+      format: ReportFormat;
+    }) => API.report.inspectionsConductedSummary(criteria, format),
+  });
+
+/** Produces the Inspections Conducted – Detail report as a file. A mutation, as the others are. */
+export const useInspectionsConductedDetailReport = () =>
+  useMutation({
+    mutationFn: ({
+      criteria,
+      format,
+    }: {
+      criteria: InspectionsConductedCriteria;
+      format: ReportFormat;
+    }) => API.report.inspectionsConductedDetail(criteria, format),
   });

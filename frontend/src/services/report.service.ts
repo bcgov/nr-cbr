@@ -1,4 +1,5 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
+import type { InspectionsConductedCriteria } from '@/pages/Reports/InspectionsConducted/types';
 import type { MonitorsSummaryCriteria } from '@/pages/Reports/MonitorsSummary/types';
 import type { RepairsSummaryCriteria } from '@/pages/Reports/RepairsSummary/types';
 import type { StructureInventoryDetailedCriteria } from '@/pages/Reports/StructureInventoryDetailed/types';
@@ -101,6 +102,40 @@ export class ReportService extends HttpClient {
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
       url: '/v1/reports/monitors-summary',
+      query: { ...populated(criteria), format },
+      responseType: 'blob',
+    });
+  }
+
+  /**
+   * Inspections Conducted – Summary (legacy CBR002): a line per inspection, as a PDF in legacy's
+   * landscape layout or a CSV of its columns. A GET, the criteria as query parameters; 400 with `fieldErrors` for an
+   * Inspection Date that is not a month.
+   */
+  inspectionsConductedSummary(
+    criteria: InspectionsConductedCriteria,
+    format: ReportFormat,
+  ): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/inspections-conducted-summary',
+      query: { ...populated(criteria), format },
+      responseType: 'blob',
+    });
+  }
+
+  /**
+   * Inspections Conducted – Detail (legacy CBR001): each inspection in full, a page of its own, as
+   * a PDF in legacy's layout; or a CSV, a row per inspection item. A GET, the criteria as query parameters; 400 with `fieldErrors` for
+   * an Inspection Date that is not a month.
+   */
+  inspectionsConductedDetail(
+    criteria: InspectionsConductedCriteria,
+    format: ReportFormat,
+  ): CancelablePromise<Blob> {
+    return this.doRequest<Blob>(this.config, {
+      method: 'GET',
+      url: '/v1/reports/inspections-conducted-detail',
       query: { ...populated(criteria), format },
       responseType: 'blob',
     });

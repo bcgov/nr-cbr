@@ -106,6 +106,14 @@ public class ReportRenderer {
     }
   }
 
+  /**
+   * A template compiled, to hand to another as a subreport parameter — the Inspections Conducted –
+   * Detail's items, repairs and monitoring items.
+   */
+  public JasperReport compiled(String template) {
+    return compiled.computeIfAbsent(template, ReportRenderer::compile);
+  }
+
   private static JasperReport compile(String template) {
     ClassPathResource resource = new ClassPathResource("reports/" + template + ".jrxml");
     try (InputStream jrxml = resource.getInputStream()) {
