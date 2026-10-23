@@ -30,6 +30,11 @@ const SAVED = {
   updatedAt: '2026-10-20T09:30:00',
 };
 
+/** Drafts and what the server keeps of them — the cleaning itself is the server's, tested there. */
+const PREVIEWS: Record<string, string> = {
+  'Bridge <i>open</i><script>x</script>': 'Bridge <i>open</i>',
+};
+
 const renderPage = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -50,9 +55,9 @@ beforeEach(() => {
   bulletinApi.saveBulletin.mockReset();
   bulletinApi.previewBulletin.mockReset();
   bulletinApi.bulletin.mockResolvedValue(SAVED);
-  // The server's rules, as far as these cases need them: a script is dropped.
+  // The server's answers for the drafts these cases type; any other comes back as it went.
   bulletinApi.previewBulletin.mockImplementation((message: string) =>
-    Promise.resolve({ message: message.replace(/<script>.*?<\/script>/g, '').trim() }),
+    Promise.resolve({ message: PREVIEWS[message] ?? message }),
   );
 });
 

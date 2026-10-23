@@ -129,7 +129,8 @@ class BulletinServiceTest {
   @DisplayName("refuses an empty message, or one longer than the column, beside the field")
   void refuses() {
     for (String message : new String[] {null, "  ", "<script>x</script>"}) {
-      assertThatThrownBy(() -> service.save(new BulletinRequest(message)))
+      BulletinRequest empty = new BulletinRequest(message);
+      assertThatThrownBy(() -> service.save(empty))
           .isInstanceOf(FieldValidationException.class)
           .extracting(failure -> ((FieldValidationException) failure).getFieldErrors())
           .isEqualTo(Map.of("message", "Bulletin Message is required."));
