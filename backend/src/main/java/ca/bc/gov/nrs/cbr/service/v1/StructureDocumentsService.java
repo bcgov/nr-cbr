@@ -82,6 +82,7 @@ public class StructureDocumentsService {
   private final StructureInspectionRepository inspections;
   private final FileMimeTypeXrefRepository mimeTypes;
   private final LoggedUserHelper loggedUser;
+  private final VirusScanner virusScanner;
   private final EntityManager entityManager;
 
   public StructureDocumentsService(
@@ -92,6 +93,7 @@ public class StructureDocumentsService {
       StructureInspectionRepository inspections,
       FileMimeTypeXrefRepository mimeTypes,
       LoggedUserHelper loggedUser,
+      VirusScanner virusScanner,
       EntityManager entityManager) {
     this.structures = structures;
     this.details = details;
@@ -100,6 +102,7 @@ public class StructureDocumentsService {
     this.inspections = inspections;
     this.mimeTypes = mimeTypes;
     this.loggedUser = loggedUser;
+    this.virusScanner = virusScanner;
     this.entityManager = entityManager;
   }
 
@@ -238,6 +241,10 @@ public class StructureDocumentsService {
    * {@code FILE_MIME_TYPE_XREF}, its name at most 255 bytes. JPEGs are stored as sent; legacy
    * re-encoded them to a fixed width.
    *
+   * <p>Once its details pass, the file is scanned for viruses, and refused on the {@code file} field
+   * when it is infected or the scanner cannot check it — before anything is stored. The bytes
+   * scanned are the bytes stored.
+   *
    * <p>One file a call: the page sends legacy's batch of up to fifteen one at a time, so a request
    * stays under the frontend WAF's body limit. As legacy, which committed file by file, a batch can
    * therefore be partly stored; the page keeps the files that were not.
@@ -255,6 +262,11 @@ public class StructureDocumentsService {
       throw new StructureNotFoundException(structureId);
     }
     String mimeCode = validateUpload(part, request);
+    byte[] content = bytes(part);
+    virusScanner.refusal(content).ifPresent(refusal -> {
+      log.warn("Refused a document for structure {}: {}", structureId, refusal);
+      throw new FieldValidationException("Document cannot be added", Map.of("file", refusal));
+    });
 
     String user = loggedUser.getLoggedUserId();
     LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
@@ -276,7 +288,7 @@ public class StructureDocumentsService {
     // persist, not save: the file row's id is assigned, so save would merge — a SELECT first, and
     // a second copy of the bytes.
     entityManager.persist(detail);
-    entityManager.persist(new CrossingStructureFileEntity(detail.getFileId(), bytes(part)));
+    entityManager.persist(new CrossingStructureFileEntity(detail.getFileId(), content));
     // Ids only: the file name is the browser's, and could carry line breaks into the log.
     log.info("Added document {} to structure {}", detail.getFileId(), structureId);
     return String.valueOf(detail.getFileId());

@@ -87,6 +87,11 @@ on:
       object_storage_secret_key:
         description: The bucket's secret access key (OBJECT_STORAGE_SECRET_KEY)
         required: true
+      clamav_host:
+        description: |
+          The shared clamd's host for CLAMAV_HOST
+          (<service>.bd657f-<env>.svc.cluster.local).
+        required: true
       vanity_tls_certificate:
         description: |
           PEM leaf/server certificate for the PROD vanity Route hostname
@@ -168,6 +173,7 @@ jobs:
             -p OBJECT_STORAGE_BUCKET="${{ secrets.object_storage_bucket }}"
             -p OBJECT_STORAGE_ACCESS_KEY="$OBJECT_STORAGE_ACCESS_KEY"
             -p OBJECT_STORAGE_SECRET_KEY="$OBJECT_STORAGE_SECRET_KEY"
+            -p CLAMAV_HOST="${{ secrets.clamav_host }}"
           triggers: ${{ inputs.triggers }}
 
   frontend:

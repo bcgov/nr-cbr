@@ -2,6 +2,9 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.exception.DocumentNotFoundException;
@@ -25,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +56,10 @@ class StructureDocumentsServiceTest {
 
   @MockitoBean
   private LoggedUserHelper loggedUser;
+
+  /** Passes every file unless a case says otherwise: Mockito's empty Optional. */
+  @MockitoBean
+  private VirusScanner virusScanner;
 
   @BeforeEach
   void setUp() {
@@ -307,6 +315,31 @@ class StructureDocumentsServiceTest {
             Map.entry("createdDate", "Photo/Doc Created is required."),
             Map.entry("description", "Description can be at most 2000 characters."));
     assertThat(documents(7L)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("scans the bytes it stores, and stores nothing the scanner refuses, beside the file")
+  void scans() {
+    byte[] bytes = "jpeg bytes".getBytes();
+    MultipartFile photo = new MockMultipartFile("file", "deck.jpg", "image/jpeg", bytes);
+    String id = service.upload(7L, null, photo, row("PHOTO", null));
+    verify(virusScanner).refusal(bytes);
+    assertThat(service.file(7L, Long.parseLong(id)).content()).isEqualTo(bytes);
+
+    when(virusScanner.refusal(any()))
+        .thenReturn(Optional.of("This file was rejected: a virus was detected (Eicar-Test)."));
+    assertThat(uploadRefused(part("eicar.jpg", 68), row("PHOTO", null))).containsExactly(
+        Map.entry("file", "This file was rejected: a virus was detected (Eicar-Test)."));
+    assertThat(documents(7L)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("does not scan a file whose details are refused")
+  void scansOnlyWhatPasses() {
+    uploadRefused(part("notes.exe", 10), row("PHOTO", null));
+    uploadRefused(part("a.jpg", 10), row(" ", null));
+
+    verifyNoInteractions(virusScanner);
   }
 
   @Test

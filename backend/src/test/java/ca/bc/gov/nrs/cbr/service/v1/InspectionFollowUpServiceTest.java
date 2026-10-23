@@ -56,6 +56,10 @@ class InspectionFollowUpServiceTest {
   @MockitoBean
   private LoggedUserHelper loggedUser;
 
+  /** Passes every file: scanning is {@link VirusScanner}'s, tested there. */
+  @MockitoBean
+  private VirusScanner virusScanner;
+
   @BeforeEach
   void setUp() {
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\INSPECTOR");

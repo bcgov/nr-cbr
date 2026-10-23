@@ -147,6 +147,16 @@ cbr:
     bucket: ${OBJECT_STORAGE_BUCKET:}
     access-key: ${OBJECT_STORAGE_ACCESS_KEY:}
     secret-key: ${OBJECT_STORAGE_SECRET_KEY:}
+  # ClamAV (clamd) that scans every uploaded document before it is stored (ClamAvProperties): the
+  # shared one in bd657f-<env>, so the host is <service>.bd657f-<env>.svc.cluster.local and bd657f's
+  # ingress policy must admit this namespace. Fail-closed: a file it cannot check is refused. On
+  # unless turned off — the local profile turns it off, as there is no clamd locally.
+  clamav:
+    enabled: ${CLAMAV_ENABLED:true}
+    host: ${CLAMAV_HOST:}
+    port: ${CLAMAV_PORT:3310}
+    connect-timeout: 5s
+    read-timeout: 30s
   # ConsignO e-signature — P.Eng sealing of reviewed inspection reports.
   # Secrets come from the environment; the legacy app committed them to application.properties.
   # See docs/legacy-cbr-overview.md §14.
