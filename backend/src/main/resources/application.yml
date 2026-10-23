@@ -139,8 +139,9 @@ cbr:
   # See cbr-auth-and-roles.local.md §3.1.
   regional-engineer-package-name: CBR_REGIONAL_ENGINEER
   contract-engineer-package-name: CBR_CONTRACT_REGIONAL_ENGINEER
-  # S3-compatible object storage for inspection attachments. Replaces the CROSSING_STRUCTURE_FILE
-  # BLOBs; the legacy data is a separate migration.
+  # The NRS object store bucket for the documents and photos' files (ObjectStorageProperties), keyed
+  # docs/<FILE_ID>. Replaces the CROSSING_STRUCTURE_FILE BLOBs; the legacy data is a separate
+  # migration. Required when deployed; left empty locally, the app starts and file calls refuse.
   object-storage:
     host: ${OBJECT_STORAGE_HOST:}
     bucket: ${OBJECT_STORAGE_BUCKET:}
