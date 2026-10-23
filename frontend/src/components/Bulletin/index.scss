@@ -1,0 +1,42 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as type;
+
+.cbr-bulletin {
+  .cbr-bulletin__heading {
+    @include type.type-style('heading-03');
+
+    margin-block-end: $spacing-04;
+  }
+
+  .cbr-bulletin__message {
+    @include type.type-style('body-01');
+
+    // The administrator's line breaks, as legacy kept them in its welcome page.
+    white-space: pre-line;
+
+    p,
+    ul,
+    ol {
+      margin-block-end: $spacing-03;
+    }
+
+    ul,
+    ol {
+      padding-inline-start: 1.25rem;
+    }
+
+    ul {
+      list-style: disc;
+    }
+
+    ol {
+      list-style: decimal;
+    }
+  }
+
+  .cbr-bulletin__none {
+    @include type.type-style('body-01');
+
+    color: var(--cds-text-secondary);
+  }
+}

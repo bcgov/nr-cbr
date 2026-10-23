@@ -383,6 +383,16 @@ describe('catchErrorCodes', () => {
     expect(handleUnauthorizedMock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the session on a 401 to a request sent without its token', () => {
+    // The bulletin is read without a token. A server that refuses that has not rejected the
+    // session; ending it signed the user out the moment Site Search loaded.
+    handleUnauthorizedMock.mockClear();
+    const result = { status: 401, ok: false, url: '', statusText: '', body: '' };
+
+    expect(() => requestModule.catchErrorCodes(validOptions, result, false)).toThrow(ApiError);
+    expect(handleUnauthorizedMock).not.toHaveBeenCalled();
+  });
+
   it('leaves other error codes alone', () => {
     // A 403 is an authorization problem, not an expired session — signing the user out would be
     // wrong, and would hide the real message.

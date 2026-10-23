@@ -1,0 +1,38 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/breakpoint' as *;
+
+// As Add Site's: beside the page heading, pushed to its end.
+.bulletin-admin__header-actions {
+  display: flex;
+  align-self: center;
+  flex-shrink: 0;
+  gap: $spacing-03;
+  margin-inline-start: auto;
+}
+
+.bulletin-admin {
+  .bulletin-admin__updated {
+    margin-block-start: $spacing-03;
+  }
+
+  // The box and its preview side by side from Carbon's lg breakpoint; stacked below it.
+  .bulletin-admin__editor {
+    display: grid;
+    gap: $spacing-07;
+    grid-template-columns: minmax(0, 1fr);
+
+    @include breakpoint(lg) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
+  .bulletin-admin__preview {
+    border: 1px solid var(--cds-border-subtle);
+    padding: $spacing-05;
+  }
+
+  .bulletin-admin__preview-note {
+    color: var(--cds-text-secondary);
+  }
+}

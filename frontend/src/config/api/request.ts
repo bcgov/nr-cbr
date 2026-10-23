@@ -287,7 +287,11 @@ export const getResponseBody = (response: AxiosResponse<any>): any => {
   return undefined;
 };
 
-export const catchErrorCodes = (options: ApiRequestOptions, result: ApiResult): void => {
+export const catchErrorCodes = (
+  options: ApiRequestOptions,
+  result: ApiResult,
+  authenticated = true,
+): void => {
   const errors: Record<number, string> = {
     400: 'Bad Request',
     401: 'Unauthorized',
@@ -303,7 +307,11 @@ export const catchErrorCodes = (options: ApiRequestOptions, result: ApiResult): 
   // user back through login. Fire-and-forget: the ApiError is still thrown so the caller's own
   // error handling runs, while the redirect proceeds. handleUnauthorized no-ops when there is no
   // session to end, so an unauthenticated call from a signed-out user does not bounce.
-  if (result.status === 401) {
+  //
+  // Only for a request that carried the session's token. One sent without it — the bulletin, read
+  // the same way signed in or out — says nothing about the session when it is refused, and ending
+  // the session over it signed a user out the moment they landed.
+  if (result.status === 401 && authenticated) {
     void handleUnauthorized();
   }
 
@@ -373,7 +381,7 @@ export const request = <T>(
           body: responseHeader ?? responseBody,
         };
 
-        catchErrorCodes(options, result);
+        catchErrorCodes(options, result, Boolean(headers['Authorization']));
 
         resolve(result.body as T);
       }

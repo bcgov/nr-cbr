@@ -1,3 +1,4 @@
+import { BulletinService } from './bulletin.service';
 import { ClientService } from './client.service';
 import { ConfigurationService } from './configuration.service';
 import { InspectionSearchService } from './inspectionSearch.service';
@@ -61,6 +62,7 @@ const API = {
   structureSearch: new StructureSearchService(BackendApiConfig),
   road: new RoadService(BackendApiConfig),
   report: new ReportService(BackendApiConfig),
+  bulletin: new BulletinService(BackendApiConfig),
 } as const;
 
 export default API;

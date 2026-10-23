@@ -68,6 +68,8 @@ export const ROLE_CAPABILITIES = {
   destructive: ['CBR_LEVEL_2', 'CBR_PENG'],
   /** Inspection sign-off. Not `CBR_ADMIN` — see the note above. */
   approve: ['CBR_PENG'],
+  /** Administration: the bulletin and the inspection reviewers. `CBR_ADMIN` alone. */
+  admin: ['CBR_ADMIN'],
 } as const satisfies Record<string, readonly ROLE_TYPE[]>;
 
 export type ROLE_TYPE = (typeof AVAILABLE_ROLES)[number];

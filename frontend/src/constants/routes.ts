@@ -10,9 +10,7 @@
 
 /**
  * Where a signed-in user lands: from `/`, from the OAuth callback once the session exists, and from
- * the header brand link.
- *
- * <p>CBR has no dashboard or home screen, so this points at the first real page. Revisit if one is
- * added.
+ * the header brand link — the Dashboard, with the administrator's bulletin, as legacy landed users
+ * on its welcome page.
  */
-export const LANDING_AFTER_LOGIN = '/inventory/site-search';
+export const LANDING_AFTER_LOGIN = '/dashboard';
