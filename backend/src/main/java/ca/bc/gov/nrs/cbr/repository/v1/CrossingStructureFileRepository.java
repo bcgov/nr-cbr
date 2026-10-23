@@ -20,4 +20,15 @@ public interface CrossingStructureFileRepository
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query("DELETE FROM CrossingStructureFileEntity file WHERE file.fileId IN :fileIds")
   void deleteByFileIdIn(@Param("fileIds") Collection<Long> fileIds);
+
+  /**
+   * The file row of a document whose bytes are in the object store: an empty BLOB, as
+   * {@code STRUCTURE_FILE} is {@code NOT NULL} and every detail row has its file row. Native, for
+   * Oracle's {@code EMPTY_BLOB()}: bound as a zero-length {@code byte[]}, an empty value may reach
+   * Oracle as NULL.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(value = "INSERT INTO THE.CROSSING_STRUCTURE_FILE (FILE_ID, STRUCTURE_FILE) "
+      + "VALUES (:fileId, EMPTY_BLOB())", nativeQuery = true)
+  void insertEmpty(@Param("fileId") long fileId);
 }

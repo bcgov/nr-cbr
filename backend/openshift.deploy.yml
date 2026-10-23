@@ -93,14 +93,26 @@ parameters:
     required: true
   - name: KEYSTORE_SECRET
     required: true
-  # NOTE: no OBJECT_STORAGE_* parameters. CBR will store inspection photos and as-built drawings in
-  # S3-compatible object storage (application.yml reads OBJECT_STORAGE_* with empty defaults), but
-  # attachments are Phase 4 and no bucket is provisioned yet. Re-add the four parameters, their
-  # secretKeyRef env entries and their Secret stringData keys together with the feature — they were
-  # `required: true` here, so a half-restore fails `oc process` outright.
-  # NOTE: no CLAMAV_* parameters. Uploaded attachments are not virus-scanned yet; when a scan is
-  # added (a shared clamd), add its parameters here together with the cross-namespace egress it
-  # needs.
+  # The NRS object store bucket that holds the documents and photos' files (ObjectStorageService).
+  # Host and bucket are plain env values; the two keys go through the Secret below.
+  - name: OBJECT_STORAGE_HOST
+    description: Object store gateway URL, scheme included
+    required: true
+  - name: OBJECT_STORAGE_BUCKET
+    required: true
+  - name: OBJECT_STORAGE_ACCESS_KEY
+    required: true
+  - name: OBJECT_STORAGE_SECRET_KEY
+    required: true
+  # The shared clamd that scans every upload (VirusScanner). It runs in bd657f-<env>, not in this
+  # project set, so the host is a cross-namespace service name and bd657f's ingress policy must
+  # admit this namespace on the port — applied by hand by bd657f's owners, nothing here creates it.
+  # Scanning is always on when deployed (cbr.clamav.enabled defaults to true) and fail-closed.
+  - name: CLAMAV_HOST
+    description: clamd service host (<service>.bd657f-<env>.svc.cluster.local)
+    required: true
+  - name: CLAMAV_PORT
+    value: "3310"
 
 objects:
   # ── Deployment ────────────────────────────────────────────
@@ -212,6 +224,24 @@ objects:
                     secretKeyRef:
                       name: ${NAME}-backend-secret-${ZONE}
                       key: DATABASE_PASSWORD
+                - name: OBJECT_STORAGE_HOST
+                  value: ${OBJECT_STORAGE_HOST}
+                - name: OBJECT_STORAGE_BUCKET
+                  value: ${OBJECT_STORAGE_BUCKET}
+                - name: OBJECT_STORAGE_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NAME}-backend-secret-${ZONE}
+                      key: OBJECT_STORAGE_ACCESS_KEY
+                - name: OBJECT_STORAGE_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NAME}-backend-secret-${ZONE}
+                      key: OBJECT_STORAGE_SECRET_KEY
+                - name: CLAMAV_HOST
+                  value: ${CLAMAV_HOST}
+                - name: CLAMAV_PORT
+                  value: ${CLAMAV_PORT}
                 - name: APP_LOG_LEVEL
                   value: ${APP_LOG_LEVEL}
                 - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY
@@ -371,6 +401,8 @@ objects:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       KEYSTORE_SECRET: ${KEYSTORE_SECRET}
       USER_LOOKUP_CLIENT_SECRET: ${USER_LOOKUP_CLIENT_SECRET}
+      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY}
+      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY}
 
   # ── NetworkPolicy: ingress from same-zone frontend + cluster monitoring ──
   - apiVersion: networking.k8s.io/v1
@@ -395,9 +427,14 @@ objects:
       policyTypes:
         - Ingress
 
-  # ── NetworkPolicy: permit-all egress (Oracle, object storage, BC Gov SSO, nr-user-lookup-api).
-  #    Explicit permit-all — nr-cbr relies on default-allow egress today; this documents intent
-  #    without restricting existing traffic. ──
+  # ── NetworkPolicy: permit-all egress (Oracle, object storage, BC Gov SSO, nr-user-lookup-api,
+  #    the shared clamd). Explicit permit-all — nr-cbr relies on default-allow egress today; this
+  #    documents intent without restricting existing traffic.
+  #
+  #    clamd runs in bd657f-<env>, another project set: leaving here is allowed, but arriving there
+  #    needs bd657f's own ingress policy to admit this namespace on 3310, applied by hand by its
+  #    owners. If every upload is refused as "could not check", check that rule first — nothing in
+  #    this repo creates or validates it. ──
   - apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
