@@ -92,4 +92,15 @@ describe('ReportService', () => {
       expect.objectContaining({ method: 'GET', responseType: 'blob' }),
     );
   });
+
+  it('asks for the Structure Inventory – Detailed KMZ at its own address, without a format', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.structureInventoryDetailed({ ...DETAILED_EMPTY, yearBuiltStart: '1990' }, 'KMZ');
+
+    const url = urlOf(request);
+    expect(url).toContain('/api/v1/reports/structure-inventory-detailed/kmz?');
+    expect(url).toContain('yearBuiltStart=1990');
+    expect(url).not.toContain('format=');
+  });
 });

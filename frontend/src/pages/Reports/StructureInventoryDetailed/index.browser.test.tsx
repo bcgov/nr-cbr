@@ -119,7 +119,7 @@ describe('StructureInventoryDetailedPage', () => {
     expect(display).not.toHaveBeenCalled();
   });
 
-  it.each(['PDF', 'CSV'] as const)(
+  it.each(['PDF', 'CSV', 'KMZ'] as const)(
     "fetches the %s for the criteria and saves it under legacy's name, dated today",
     async (format) => {
       renderPage();
@@ -170,25 +170,6 @@ describe('StructureInventoryDetailedPage', () => {
     );
     expect(saveFile).not.toHaveBeenCalled();
   });
-
-  it.each(['KMZ'] as const)(
-    'says the %s is not available yet when the criteria are valid',
-    (format) => {
-      renderPage();
-
-      type('kiloStart', '1.5');
-      run(format);
-
-      expect(display).toHaveBeenCalledWith(
-        expect.objectContaining({
-          kind: 'info',
-          title: 'This report is not available yet',
-          subtitle: `The criteria are valid. The ${format} is still being built.`,
-        }),
-      );
-      expect(reportApi.structureInventoryDetailed).not.toHaveBeenCalled();
-    },
-  );
 
   it("loads the district's management areas, and drops the area when the district changes", async () => {
     renderPage();

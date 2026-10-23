@@ -31,13 +31,15 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The Structure Inventory – Detailed report (legacy CBR007): a block of labelled fields per active
  * structure, filtered by the criteria, as a PDF in legacy's layout — or as a CSV of legacy's
- * fuller export, the one its "Excel" format wrote, a row per structure.
+ * fuller export, the one its "Excel" format wrote, a row per structure — or as a KMZ of those rows
+ * to see on a map.
  *
  * <p>Legacy filled its template from {@code CBR_REPORTING.STRCTRE_INVNTRY_DTL_RPT}. Which
  * structures, in what order, and what a block shows of the structure and its site are one query
@@ -124,6 +126,23 @@ public class StructureInventoryDetailedService {
     log.info("Structure Inventory - Detailed: {} structures as {} ({} bytes) in {} ms",
         facts.size(), format, content.length, millisSince(started));
     return new ReportFile(content, filename(FILENAME, printed, format), format.mediaType());
+  }
+
+  /** The KMZ's media type: Google Earth's. */
+  static final MediaType KMZ = MediaType.parseMediaType("application/vnd.google-earth.kmz");
+
+  /**
+   * The report as a KMZ, to see on a map: a placemark per structure with a latitude and longitude,
+   * its pop-up legacy's fields, written from the CSV's rows ({@link StructureInventoryKmz}).
+   */
+  public ReportFile kmz(StructureInventoryDetailedCriteria criteria) {
+    long started = System.nanoTime();
+    List<Facts> facts = facts(criteria);
+    String printed = support.today();
+    byte[] content = StructureInventoryKmz.kmz(CSV_COLUMNS, csvRows(facts));
+    log.info("Structure Inventory - Detailed: {} structures as KMZ ({} bytes) in {} ms",
+        facts.size(), content.length, millisSince(started));
+    return new ReportFile(content, FILENAME + "_" + printed.replace('/', '-') + ".kmz", KMZ);
   }
 
   /** The PDF's blocks, in order, every value as legacy's template printed it. */
