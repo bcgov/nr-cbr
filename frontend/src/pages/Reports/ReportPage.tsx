@@ -4,6 +4,7 @@ import InspectionsConductedPage from './InspectionsConducted';
 import InspectionsDuePage from './InspectionsDue';
 import MonitorsSummaryPage from './MonitorsSummary';
 import RepairsSummaryPage from './RepairsSummary';
+import ReplacementStructuresSummaryPage from './ReplacementStructuresSummary';
 import StructureDetailReportPage from './StructureDetailReport';
 import StructureInventoryDetailedPage from './StructureInventoryDetailed';
 import StructureInventorySummaryPage from './StructureInventorySummary';
@@ -35,6 +36,8 @@ const ReportPage: FC<{ path: string; name: string }> = ({ path, name }) => {
       return <InspectionsDuePage key="detailed" variant="detailed" />;
     case 'inspections-blank':
       return <InspectionsDuePage key="blank" variant="blank" />;
+    case 'replacement-structures-summary':
+      return <ReplacementStructuresSummaryPage />;
     default:
       return <ReportPlaceholderPage name={name} />;
   }
