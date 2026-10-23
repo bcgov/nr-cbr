@@ -2,10 +2,14 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.configuration.ObjectStorageProperties;
 import java.net.URI;
+import java.util.Collection;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
@@ -102,6 +106,55 @@ public class ObjectStorageService implements DisposableBean {
   /** Deletes the object; nothing happens when there is none. */
   public void deleteObject(String key) {
     client().deleteObject(builder -> builder.bucket(bucket).key(key));
+  }
+
+  /**
+   * Deletes the objects once the transaction deleting their rows commits — at once when there is
+   * none. Rows first: an object left behind by a failed delete is harmless and logged, a row whose
+   * object is gone is a document that cannot be opened.
+   */
+  public void deleteAfterCommit(Collection<String> keys) {
+    if (keys.isEmpty()) {
+      return;
+    }
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      keys.forEach(this::deleteQuietly);
+      return;
+    }
+    List<String> deleted = List.copyOf(keys);
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        deleted.forEach(ObjectStorageService.this::deleteQuietly);
+      }
+    });
+  }
+
+  /**
+   * Deletes the object just put if the transaction storing its row rolls back, so a row that was
+   * never saved leaves no object behind.
+   */
+  public void deleteOnRollback(String key) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCompletion(int status) {
+        if (status == STATUS_ROLLED_BACK) {
+          deleteQuietly(key);
+        }
+      }
+    });
+  }
+
+  /** After the rows are settled, a failed delete only leaves an orphan: logged, not thrown. */
+  private void deleteQuietly(String key) {
+    try {
+      deleteObject(key);
+    } catch (RuntimeException failed) {
+      log.error("Object {} could not be deleted and is orphaned in the bucket", key, failed);
+    }
   }
 
   @Override

@@ -2,6 +2,8 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 
 import ca.bc.gov.nrs.cbr.exception.InspectionNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.InspectionNotOfflineException;
@@ -28,6 +30,7 @@ import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,6 +40,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -78,6 +82,9 @@ class InspectionServiceTest {
   private CrossingStructureFileRepository attachmentBytes;
   @Autowired
   private CrossingStructureFileDetailRepository attachments;
+
+  @MockitoBean
+  private ObjectStorageService storage;
 
   private long nextId = 1000L;
 
@@ -212,6 +219,9 @@ class InspectionServiceTest {
     void removesEverything() {
       givenAnOfflineInspectionWithEverything();
       flush();
+      List<String> keys = attachments.findAll().stream()
+          .map(attachment -> ObjectStorageService.fileKey(attachment.getFileId()))
+          .toList();
 
       service.delete(INSPECTION);
       flush();
@@ -224,6 +234,10 @@ class InspectionServiceTest {
       assertThat(loadRatings.count()).isZero();
       assertThat(attachments.count()).as("attachment metadata").isZero();
       assertThat(attachmentBytes.count()).as("attachment bytes").isZero();
+      // Their objects in the bucket, once the delete commits.
+      assertThat(keys).isNotEmpty();
+      verify(storage).deleteAfterCommit(argThat(deleted ->
+          deleted.size() == keys.size() && deleted.containsAll(keys)));
     }
 
     @Test

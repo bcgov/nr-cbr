@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import ca.bc.gov.nrs.cbr.configuration.ObjectStorageProperties;
 import com.sun.net.httpserver.Headers;
@@ -18,6 +19,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /**
@@ -188,6 +191,57 @@ class ObjectStorageServiceTest {
 
     assertThat(only().method()).isEqualTo("DELETE");
     assertThat(only().path()).isEqualTo("/cbr-bucket/docs/42");
+  }
+
+  @Test
+  @DisplayName("deletes the objects only once the rows' delete commits, and only if it does")
+  void deletesAfterCommit() {
+    answer(204, "");
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      storage.deleteAfterCommit(List.of("docs/1", "docs/2"));
+      assertThat(received).isEmpty();
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+
+    assertThat(received).extracting(Received::method, Received::path).containsExactly(
+        tuple("DELETE", "/cbr-bucket/docs/1"), tuple("DELETE", "/cbr-bucket/docs/2"));
+  }
+
+  @Test
+  @DisplayName("deletes at once outside a transaction, and logs a delete that fails")
+  void deletesNow() {
+    answer(500, """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <Error><Code>InternalError</Code><Message>down</Message></Error>""");
+
+    storage.deleteAfterCommit(List.of("docs/1"));
+
+    assertThat(received).extracting(Received::method).contains("DELETE");
+  }
+
+  @Test
+  @DisplayName("deletes an object just put when its rows roll back, and keeps it when they commit")
+  void deletesOnRollback() {
+    answer(204, "");
+    for (int status : new int[] {
+        TransactionSynchronization.STATUS_COMMITTED, TransactionSynchronization.STATUS_ROLLED_BACK}) {
+      TransactionSynchronizationManager.initSynchronization();
+      try {
+        storage.deleteOnRollback("docs/" + status);
+        TransactionSynchronizationManager.getSynchronizations()
+            .forEach(synchronization -> synchronization.afterCompletion(status));
+      } finally {
+        TransactionSynchronizationManager.clearSynchronization();
+      }
+    }
+
+    assertThat(only().path())
+        .isEqualTo("/cbr-bucket/docs/" + TransactionSynchronization.STATUS_ROLLED_BACK);
   }
 
   @Test

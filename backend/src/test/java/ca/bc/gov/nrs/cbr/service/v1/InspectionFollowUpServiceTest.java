@@ -60,6 +60,10 @@ class InspectionFollowUpServiceTest {
   @MockitoBean
   private VirusScanner virusScanner;
 
+  /** Files go nowhere: storing them is {@link StructureDocumentsService}'s, tested there. */
+  @MockitoBean
+  private ObjectStorageService storage;
+
   @BeforeEach
   void setUp() {
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\INSPECTOR");

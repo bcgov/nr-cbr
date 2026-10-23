@@ -43,14 +43,16 @@ import org.springframework.http.MediaTypeFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.exception.SdkException;
 
 /**
  * A structure's documents and photos — the structure page's Documents &amp; Photos tab, legacy's
  * {@code documentTab.jsp} fed by {@code FIND_FILE_DTLS_BY_STRCTRE} — and the file behind each.
  *
- * <p>Lists, opens, adds, edits and deletes them. The bytes live in {@code CROSSING_STRUCTURE_FILE},
- * as legacy keeps them; once they move to object storage only {@link #file}, {@link #upload} and
- * {@link #delete} change.
+ * <p>Lists, opens, adds, edits and deletes them. Oracle holds what each document is and whose; its
+ * file is in the object store at {@link ObjectStorageService#fileKey}. Files added before the move
+ * are still in {@code CROSSING_STRUCTURE_FILE}'s BLOB until they are migrated, and are read from
+ * there when the bucket has no object for them.
  */
 @Service
 public class StructureDocumentsService {
@@ -74,6 +76,7 @@ public class StructureDocumentsService {
   private static final String OTHER = "OTH";
   private static final String TYPE = "attachmentTypeCode";
   private static final String DESCRIPTION = "description";
+  static final String NOT_STORED = "The file could not be stored. Try again shortly.";
 
   private final CrossingStructureRepository structures;
   private final CrossingStructureFileDetailRepository details;
@@ -83,6 +86,7 @@ public class StructureDocumentsService {
   private final FileMimeTypeXrefRepository mimeTypes;
   private final LoggedUserHelper loggedUser;
   private final VirusScanner virusScanner;
+  private final ObjectStorageService storage;
   private final EntityManager entityManager;
 
   public StructureDocumentsService(
@@ -94,6 +98,7 @@ public class StructureDocumentsService {
       FileMimeTypeXrefRepository mimeTypes,
       LoggedUserHelper loggedUser,
       VirusScanner virusScanner,
+      ObjectStorageService storage,
       EntityManager entityManager) {
     this.structures = structures;
     this.details = details;
@@ -103,6 +108,7 @@ public class StructureDocumentsService {
     this.mimeTypes = mimeTypes;
     this.loggedUser = loggedUser;
     this.virusScanner = virusScanner;
+    this.storage = storage;
     this.entityManager = entityManager;
   }
 
@@ -205,7 +211,11 @@ public class StructureDocumentsService {
   }
 
   /**
-   * One file's bytes, found only through the structure it belongs to.
+   * One file's bytes, found only through the structure it belongs to: from the object store, or —
+   * for a file added before the move and not yet migrated — from its BLOB.
+   *
+   * <p>Only a missing object falls back to the BLOB; the store failing otherwise is an error, not
+   * an empty file.
    *
    * <p>The type is read from the file's name, then its extension code; legacy sent its MIME type
    * code, a ten-character code rather than a media type.
@@ -217,9 +227,16 @@ public class StructureDocumentsService {
     CrossingStructureFileDetailEntity detail = details.findById(fileId)
         .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
         .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
-    byte[] content = files.findById(fileId)
-        .map(CrossingStructureFileEntity::getStructureFile)
-        .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
+    byte[] content = storage.getObjectBytesIfPresent(ObjectStorageService.fileKey(fileId));
+    if (content == null) {
+      content = files.findById(fileId)
+          .map(CrossingStructureFileEntity::getStructureFile)
+          .filter(blob -> blob.length > 0)
+          .orElseThrow(() -> {
+            log.warn("Document {} of structure {} has no object and no BLOB", fileId, structureId);
+            return new DocumentNotFoundException(structureId, fileId);
+          });
+    }
 
     MediaType mediaType = mediaType(detail);
     boolean inline = SHOWN_INLINE.contains(mediaType);
@@ -244,6 +261,10 @@ public class StructureDocumentsService {
    * <p>Once its details pass, the file is scanned for viruses, and refused on the {@code file} field
    * when it is infected or the scanner cannot check it — before anything is stored. The bytes
    * scanned are the bytes stored.
+   *
+   * <p>The rows are written first — the details, and an empty BLOB for the file row legacy's schema
+   * requires — then the file is put in the object store at its id's key, all in one transaction:
+   * a put that fails undoes the rows, and rows that fail to commit delete the object.
    *
    * <p>One file a call: the page sends legacy's batch of up to fifteen one at a time, so a request
    * stays under the frontend WAF's body limit. As legacy, which committed file by file, a batch can
@@ -285,10 +306,18 @@ public class StructureDocumentsService {
         .updateUserid(user)
         .updateTimestamp(now)
         .build();
-    // persist, not save: the file row's id is assigned, so save would merge — a SELECT first, and
-    // a second copy of the bytes.
     entityManager.persist(detail);
-    entityManager.persist(new CrossingStructureFileEntity(detail.getFileId(), content));
+    files.insertEmpty(detail.getFileId());
+    String key = ObjectStorageService.fileKey(detail.getFileId());
+    try {
+      storage.putObject(key, mediaType(detail).toString(), content);
+    } catch (SdkException failed) {
+      log.error("Could not store document {} of structure {} at {}", detail.getFileId(),
+          structureId, key, failed);
+      throw new FieldValidationException("Document cannot be added",
+          Map.of("file", NOT_STORED));
+    }
+    storage.deleteOnRollback(key);
     // Ids only: the file name is the browser's, and could carry line breaks into the log.
     log.info("Added document {} to structure {}", detail.getFileId(), structureId);
     return String.valueOf(detail.getFileId());
@@ -323,8 +352,8 @@ public class StructureDocumentsService {
 
   /**
    * Deletes a document and its file — legacy's delete icon ({@code CBR.DELETE_FILE_ATTACHMENT}):
-   * the bytes first, which the foreign key requires, then the details. As legacy, a document an
-   * inspection brought is deleted here too.
+   * the file row first, which the foreign key requires, then the details, then — once that commits
+   * — the object. As legacy, a document an inspection brought is deleted here too.
    *
    * @throws DocumentNotFoundException if the structure has no such document
    */
@@ -335,6 +364,7 @@ public class StructureDocumentsService {
         .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
     files.deleteByFileIdIn(List.of(fileId));
     details.deleteById(fileId);
+    storage.deleteAfterCommit(List.of(ObjectStorageService.fileKey(fileId)));
     log.info("Deleted document {} of structure {}", fileId, structureId);
   }
 
