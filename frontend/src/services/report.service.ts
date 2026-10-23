@@ -57,6 +57,15 @@ export class ReportService extends HttpClient {
     criteria: StructureInventoryDetailedCriteria,
     format: ReportFormat,
   ): CancelablePromise<Blob> {
+    // The KMZ has a mapping of its own: the format is no other report's.
+    if (format === 'KMZ') {
+      return this.doRequest<Blob>(this.config, {
+        method: 'GET',
+        url: '/v1/reports/structure-inventory-detailed/kmz',
+        query: populated(criteria),
+        responseType: 'blob',
+      });
+    }
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
       url: '/v1/reports/structure-inventory-detailed',

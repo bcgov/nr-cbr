@@ -18,7 +18,6 @@ import { useReportDownload } from '../useReportDownload';
 import { EMPTY_CRITERIA, FORMATS } from './types';
 import { criteriaErrors } from './validation';
 
-import type { ReportFormat } from './types';
 import type { FC } from 'react';
 
 import { useStructureInventoryDetailedReferenceDataState } from '@/hooks/useConfiguration';
@@ -28,9 +27,6 @@ import { useStructureInventoryDetailedReport } from '@/hooks/useReports';
 export const STRUCTURE_INVENTORY_DETAILED_STATE_KEY = 'cbr.report.structureInventoryDetailed';
 
 const ID = 'structure-inventory-detailed';
-
-/** The KMZ is still to come. */
-const NOT_YET_AVAILABLE: readonly ReportFormat[] = ['KMZ'];
 
 /**
  * Structure Inventory – Detailed — a full record per structure (legacy CBR007).
@@ -44,10 +40,9 @@ const NOT_YET_AVAILABLE: readonly ReportFormat[] = ['KMZ'];
  * the structure, then who holds it, then legacy's "Replacement Date" pair. Labels are legacy's —
  * "Year Built" here, where the Summary says Year Superstructure Installed.
  *
- * <p>The criteria are kept for the tab, apart from the Summary's; Clear forgets them. Download PDF
- * and Download CSV check the criteria, then fetch the report from the server and save it: the PDF
- * in legacy's layout, the CSV as legacy's fuller export. Download KMZ checks the criteria and stops
- * there: it is still to come.
+ * <p>The criteria are kept for the tab, apart from the Summary's; Clear forgets them. Each Download
+ * checks the criteria, then fetches the report from the server and saves it: the PDF in legacy's
+ * layout, the CSV as legacy's fuller export, the KMZ as a placemark per structure for a map.
  */
 const StructureInventoryDetailedPage: FC = () => {
   const { criteria, updateCriteria, reset, resetToken } = useReportCriteria(
@@ -62,7 +57,6 @@ const StructureInventoryDetailedPage: FC = () => {
     report: useStructureInventoryDetailedReport(),
     criteria,
     filename: 'StructureInventoryDetailReport',
-    notYetAvailable: NOT_YET_AVAILABLE,
   });
 
   return (

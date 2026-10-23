@@ -42,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -315,6 +316,69 @@ class StructureInventoryDetailedServiceTest {
         .split("\r\n")[0];
     assertThat(header.split(",")).hasSize(52).startsWith("Structure #", "Site #")
         .endsWith("Curb Type", "Load Rating Review Required").doesNotContain("Structure ID");
+  }
+
+  @Test
+  @DisplayName("maps each structure with a location, its pop-up legacy's fields as the CSV writes them")
+  void kmz() throws Exception {
+    givenCsvNames();
+    entityManager.persist(CrossingSiteEntity.builder()
+        .crossingSiteId("62-002").crossingName("No GPS").crossingSiteStatusCode("ACT")
+        .orgUnitNo(18L).build());
+    long id = structure("B1 & <2>", s -> s.designVehicleLoadCode("L165")
+        .currentLoadRating(new BigDecimal("45.5")));
+    bridge(id, 2);
+    structure("NOWHERE", s -> s.crossingSiteId("62-002"));
+    entityManager.flush();
+    entityManager.clear();
+
+    ReportFile file = service.kmz(StructureInventoryDetailedCriteria.builder().build());
+
+    assertThat(file.mediaType().toString()).isEqualTo("application/vnd.google-earth.kmz");
+    assertThat(file.filename())
+        .matches("StructureInventoryDetailReport_\\d{4}-\\d{2}-\\d{2}\\.kmz");
+    org.w3c.dom.Document kml = kml(file.content());
+    org.w3c.dom.NodeList placemarks = kml.getElementsByTagName("Placemark");
+    // The structure with no latitude or longitude is left out.
+    assertThat(placemarks.getLength()).isEqualTo(1);
+    org.w3c.dom.Element placemark = (org.w3c.dom.Element) placemarks.item(0);
+    assertThat(text(placemark, "name")).isEqualTo("B1 & <2>");
+    assertThat(text(placemark, "coordinates")).isEqualTo("-122.75,53.9,0");
+    Map<String, String> data = new java.util.HashMap<>();
+    org.w3c.dom.NodeList values = placemark.getElementsByTagName("SimpleData");
+    for (int index = 0; index < values.getLength(); index++) {
+      org.w3c.dom.Element value = (org.w3c.dom.Element) values.item(index);
+      data.put(value.getAttribute("name"), value.getTextContent());
+    }
+    assertThat(data).hasSize(38).contains(
+        Map.entry("Site__", "62-001"), Map.entry("Structure__", "B1 & <2>"),
+        Map.entry("Site_Type", "Stream crossing"), Map.entry("Forest_District", "Prince George"),
+        Map.entry("Br_", "01"), Map.entry("KM", "12.5"), Map.entry("Design_Vehicle", "L-165"),
+        Map.entry("Current_Load_Rating_GVW__tonnes_", "45.5"),
+        Map.entry("Inspection_Status", "Inspected"), Map.entry("__Spans", "2"),
+        Map.entry("Total_Length__metres_", "24.56"),
+        Map.entry("GPS_Coordinates_in_decimal_degrees_Longs", "-122.75"));
+    String balloon = kml.getElementsByTagName("BalloonStyle").item(0).getTextContent();
+    assertThat(balloon).contains("<b>Site #</b>", "$[StructureInventoryDetailReport/Site__]",
+        "<b>Outlet Cover Depth</b>");
+    assertThat(kml.getElementsByTagName("href").item(0).getTextContent())
+        .endsWith("ylw-pushpin.png");
+  }
+
+  /** The KML inside a KMZ, parsed. */
+  private static org.w3c.dom.Document kml(byte[] kmz) throws Exception {
+    try (java.util.zip.ZipInputStream zip =
+        new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(kmz))) {
+      assertThat(zip.getNextEntry().getName()).isEqualTo("doc.kml");
+      javax.xml.parsers.DocumentBuilderFactory factory =
+          javax.xml.parsers.DocumentBuilderFactory.newInstance();
+      factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      return factory.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(zip.readAllBytes()));
+    }
+  }
+
+  private static String text(org.w3c.dom.Element element, String tag) {
+    return element.getElementsByTagName(tag).item(0).getTextContent();
   }
 
   @Test
