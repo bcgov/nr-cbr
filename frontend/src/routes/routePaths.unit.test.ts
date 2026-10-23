@@ -108,8 +108,8 @@ describe('getMenuEntries', () => {
     },
   );
 
-  it('orders the sections as the legacy menu did — Inventory, Inspection, then Reports', () => {
-    expect(idsOf(['CBR_GENERAL'])).toEqual(['Inventory', 'Inspection', 'Reports']);
+  it('puts the Dashboard first, then the sections as the legacy menu did', () => {
+    expect(idsOf(['CBR_GENERAL'])).toEqual(['Dashboard', 'Inventory', 'Inspection', 'Reports']);
   });
 
   it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
@@ -134,6 +134,24 @@ describe('getMenuEntries', () => {
     },
   );
 
+  it('offers Administration, with Bulletin Message, after Reports, to an administrator alone', () => {
+    expect(idsOf(['CBR_ADMIN'])).toEqual([
+      'Dashboard',
+      'Inventory',
+      'Inspection',
+      'Reports',
+      'Administration',
+    ]);
+    const admin = entry(['CBR_ADMIN'], 'Administration');
+    expect(admin?.path).toBe('/admin');
+    expect(admin?.children?.map((child) => [child.id, child.path])).toEqual([
+      ['Bulletin Message', 'bulletin-message'],
+    ]);
+    for (const role of ['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG']) {
+      expect(idsOf([role])).not.toContain('Administration');
+    }
+  });
+
   it('drops a section entirely when the user can reach none of its children', () => {
     // The legacy defect this exists to avoid: MenuTag wrote the section header before testing
     // whether any item survived authorization, so an administrator saw four empty headings above
@@ -155,8 +173,8 @@ describe('getMenuEntries', () => {
   });
 
   it('offers nothing to a user with no roles', () => {
-    // Every side-nav entry is role-gated now that Dashboard is gone, so an unrecognised user gets
-    // an empty nav rather than a lone ungated link.
+    // Every side-nav entry is role-gated, the Dashboard included, so an unrecognised user gets an
+    // empty nav rather than a lone ungated link.
     expect(idsOf([])).toEqual([]);
   });
 

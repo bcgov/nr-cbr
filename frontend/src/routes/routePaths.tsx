@@ -1,7 +1,9 @@
 import {
+  Dashboard as DashboardIcon,
   Inspection as InspectionIcon,
   Location as LocationIcon,
   Report as ReportIcon,
+  UserAdmin as AdminIcon,
 } from '@carbon/icons-react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 
@@ -9,6 +11,8 @@ import Layout from '@/components/Layout';
 import AddSitePage from '@/pages/AddSite';
 import AddStructurePage from '@/pages/AddStructure';
 import AuthCallbackPage from '@/pages/AuthCallback';
+import BulletinAdminPage from '@/pages/BulletinAdmin';
+import DashboardPage from '@/pages/Dashboard';
 import GlobalErrorPage from '@/pages/GlobalError';
 import InspectionDetailPage from '@/pages/InspectionDetail';
 import InspectionSearchPage from '@/pages/InspectionSearch';
@@ -135,6 +139,22 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
     id: 'Auth callback',
     element: <Navigate to={LANDING_AFTER_LOGIN} replace />,
     isSideMenu: false,
+  },
+  {
+    // Where a signed-in user lands (LANDING_AFTER_LOGIN): the administrator's bulletin, as legacy's
+    // welcome page. First in the menu, ahead of legacy's sections.
+    path: '/dashboard',
+    id: 'Dashboard',
+    icon: DashboardIcon,
+    element: (
+      <ProtectedRoute>
+        <Layout>
+          <DashboardPage />
+        </Layout>
+      </ProtectedRoute>
+    ),
+    isSideMenu: true,
+    roles: [...ROLE_CAPABILITIES.read],
   },
   {
     // Inventory — the legacy menu's first section (cbr-navigation.local.md §1).
@@ -355,6 +375,34 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
       // can read holds them (cbr-navigation.local.md §4).
       roles: [...ROLE_CAPABILITIES.read],
     })),
+  },
+  {
+    // Administration — the legacy menu's fourth section (cbr-navigation.local.md §1), after
+    // Reports. Inspection Reviewers joins Bulletin Message here when it is built. Same shape as
+    // Inventory above.
+    path: '/admin',
+    id: 'Administration',
+    icon: AdminIcon,
+    element: <Navigate to="/admin/bulletin-message" replace />,
+    isSideMenu: true,
+    children: [
+      {
+        path: 'bulletin-message',
+        id: 'Bulletin Message',
+        // Gated on the route too, not only hidden from the menu: a page that saves for
+        // administrators alone is not one to open by typing its address.
+        element: (
+          <ProtectedRoute roles={[...ROLE_CAPABILITIES.admin]}>
+            <Layout>
+              <BulletinAdminPage />
+            </Layout>
+          </ProtectedRoute>
+        ),
+        isSideMenu: true,
+        // Legacy gate: /showBulletinAdmin, the ADMINISTRATOR role's alone.
+        roles: [...ROLE_CAPABILITIES.admin],
+      },
+    ],
   },
   {
     path: '/unauthorized',

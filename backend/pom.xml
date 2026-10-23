@@ -119,6 +119,12 @@
       <artifactId>commons-csv</artifactId>
       <version>1.11.0</version>
     </dependency>
+    <!-- jsoup — the bulletin's HTML, kept to a safe set of tags (Safelist.basic). -->
+    <dependency>
+      <groupId>org.jsoup</groupId>
+      <artifactId>jsoup</artifactId>
+      <version>1.17.2</version>
+    </dependency>
     <dependency>
       <groupId>net.sf.jasperreports</groupId>
       <artifactId>jasperreports</artifactId>
