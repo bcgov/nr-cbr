@@ -283,7 +283,8 @@ public class StructureDocumentsService {
     String mimeCode = validateUpload(part, request);
     byte[] content = bytes(part);
     virusScanner.refusal(content).ifPresent(refusal -> {
-      log.warn("Refused a document for structure {}: {}", structureId, refusal);
+      // Not the refusal's text: it carries clamd's reply about the uploaded bytes.
+      log.warn("Refused a document for structure {} on its virus scan", structureId);
       throw new FieldValidationException("Document cannot be added", Map.of("file", refusal));
     });
 

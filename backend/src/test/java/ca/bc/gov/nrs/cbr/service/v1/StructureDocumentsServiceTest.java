@@ -369,8 +369,7 @@ class StructureDocumentsServiceTest {
     long id = Long.parseLong(service.upload(7L, null,
         new MockMultipartFile("file", "plan.pdf", "application/pdf", bytes), row("OTH", "Plan")));
 
-    assertThat(bucket).containsOnlyKeys("docs/" + id);
-    assertThat(bucket).containsEntry("docs/" + id, bytes);
+    assertThat(bucket).containsOnlyKeys("docs/" + id).containsEntry("docs/" + id, bytes);
     assertThat(bucketTypes).containsEntry("docs/" + id, "application/pdf");
     verify(storage).deleteOnRollback("docs/" + id);
     entityManager.flush();

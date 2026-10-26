@@ -59,7 +59,9 @@ public class ClamAvClient {
       out.flush();
       return parse(reply(socket.getInputStream()));
     } catch (IOException | IllegalArgumentException failed) {
-      // IllegalArgumentException: no host or a port out of range — still no verdict.
+      // IllegalArgumentException: no host or a port out of range — still no verdict. Logged here,
+      // where it is the connection's failure; VirusScanner logs no reply text.
+      log.warn("clamd could not scan at {}: {}", address(), failed.toString());
       return ScanResult.error(failed.getClass().getSimpleName() + ": " + failed.getMessage());
     }
   }

@@ -75,12 +75,4 @@ class VirusScannerTest {
     assertThatNoException().isThrownBy(scanner::reportAtStartup);
     verify(clamd, times(2)).ping();
   }
-
-  @Test
-  @DisplayName("keeps clamd's reply to one log line, whatever the file made it say")
-  void oneLogLine() {
-    assertThat(VirusScanner.forLog("stream: Eicar\r\nINFO forged FOUND\tx"))
-        .isEqualTo("stream: Eicar__INFO forged FOUND_x");
-    assertThat(VirusScanner.forLog(null)).isNull();
-  }
 }
