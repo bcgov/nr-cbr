@@ -55,6 +55,19 @@ export const STRUCTURE_SEARCH_QUERY_KEY = 'structure-search';
 export const STRUCTURE_QUERY_KEY = 'structure';
 
 /**
+ * Reads a structure's documents again after a save from an inspection's page, which may have
+ * stored the inspection's audit record among them — every structure's when the save does not know
+ * which.
+ */
+export const invalidateDocuments = (queryClient: QueryClient, structureId?: string) =>
+  queryClient.invalidateQueries({
+    predicate: ({ queryKey }) =>
+      queryKey[0] === STRUCTURE_QUERY_KEY &&
+      queryKey[2] === 'documents' &&
+      (structureId === undefined || queryKey[1] === structureId),
+  });
+
+/**
  * One structure, for its page.
  *
  * <p>No `staleTime`, as for a site: a structure's data changes while people work, and someone
@@ -576,8 +589,13 @@ export const useCreateStructureMonitor = (structureId: string, inspectionId?: st
       inspectionId === undefined
         ? API.structureSearch.createStructureMonitor(structureId, request)
         : API.inspectionSearch.addInspectionMonitor(inspectionId, request),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'],
+      });
+      // From an inspection's page, a save of the inspection: it may have made an audit record.
+      if (inspectionId !== undefined) await invalidateDocuments(queryClient, structureId);
+    },
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -593,8 +611,13 @@ export const useUpdateStructureMonitor = (structureId: string, inspectionId?: st
       inspectionId === undefined
         ? API.structureSearch.updateStructureMonitor(structureId, monitorId, request)
         : API.inspectionSearch.updateInspectionMonitor(inspectionId, monitorId, request),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'],
+      });
+      // From an inspection's page, a save of the inspection: it may have made an audit record.
+      if (inspectionId !== undefined) await invalidateDocuments(queryClient, structureId);
+    },
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -622,8 +645,13 @@ export const useCreateStructureRepair = (structureId: string, inspectionId?: str
       inspectionId === undefined
         ? API.structureSearch.createStructureRepair(structureId, request)
         : API.inspectionSearch.addInspectionRepair(inspectionId, request),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'],
+      });
+      // From an inspection's page, a save of the inspection: it may have made an audit record.
+      if (inspectionId !== undefined) await invalidateDocuments(queryClient, structureId);
+    },
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -639,8 +667,13 @@ export const useUpdateStructureRepair = (structureId: string, inspectionId?: str
       inspectionId === undefined
         ? API.structureSearch.updateStructureRepair(structureId, repairId, request)
         : API.inspectionSearch.updateInspectionRepair(inspectionId, repairId, request),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'],
+      });
+      // From an inspection's page, a save of the inspection: it may have made an audit record.
+      if (inspectionId !== undefined) await invalidateDocuments(queryClient, structureId);
+    },
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -659,8 +692,13 @@ export const useDeleteStructureRepair = (
       inspectionId === undefined
         ? API.structureSearch.deleteStructureRepair(structureId, repairId)
         : API.inspectionSearch.deleteInspectionRepair(inspectionId, repairId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'],
+      });
+      // From an inspection's page, a save of the inspection: it may have made an audit record.
+      if (inspectionId !== undefined) await invalidateDocuments(queryClient, structureId);
+    },
   });
 };
 
@@ -678,8 +716,13 @@ export const useDeleteStructureMonitor = (
       inspectionId === undefined
         ? API.structureSearch.deleteStructureMonitor(structureId, monitorId)
         : API.inspectionSearch.deleteInspectionMonitor(inspectionId, monitorId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [STRUCTURE_QUERY_KEY, structureId, 'monitors'],
+      });
+      // From an inspection's page, a save of the inspection: it may have made an audit record.
+      if (inspectionId !== undefined) await invalidateDocuments(queryClient, structureId);
+    },
   });
 };
 

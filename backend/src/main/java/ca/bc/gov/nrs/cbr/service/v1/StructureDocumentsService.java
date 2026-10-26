@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
+import ca.bc.gov.nrs.cbr.exception.AuditRecordLockedException;
 import ca.bc.gov.nrs.cbr.exception.DocumentNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
@@ -74,9 +75,17 @@ public class StructureDocumentsService {
   private static final int TEXT_MAX = 2000;
   /** The type whose file must be described — legacy's {@code FileAttachment.OTHER_CODE}. */
   private static final String OTHER = "OTH";
+  private static final String PDF = "PDF";
   private static final String TYPE = "attachmentTypeCode";
   private static final String DESCRIPTION = "description";
   static final String NOT_STORED = "The file could not be stored. Try again shortly.";
+  /**
+   * How an inspection's audit record's description starts — what marks it as one, it being of
+   * type Other like any document. Reserved: no one else's description may start so.
+   */
+  public static final String AUDIT_RECORD = "Audit record";
+  private static final String RESERVED =
+      "Descriptions starting \"" + AUDIT_RECORD + "\" are kept for inspection audit records.";
 
   private final CrossingStructureRepository structures;
   private final CrossingStructureFileDetailRepository details;
@@ -207,7 +216,18 @@ public class StructureDocumentsService {
         row.getFileCreateDate() == null ? null : row.getFileCreateDate().toLocalDate(),
         row.getEfileExtensionCode(),
         row.getDescription(),
-        row.getFilename());
+        row.getFilename(),
+        isAuditRecord(row));
+  }
+
+  /** Whether it is an inspection's audit record: Other, described as one. */
+  static boolean isAuditRecord(CrossingStructureFileDetailEntity row) {
+    return OTHER.equals(row.getFileAttachmentTypeCode()) && reserved(row.getDescription());
+  }
+
+  private static boolean reserved(String description) {
+    return description != null && description.strip().toLowerCase(Locale.ROOT)
+        .startsWith(AUDIT_RECORD.toLowerCase(Locale.ROOT));
   }
 
   /**
@@ -305,6 +325,55 @@ public class StructureDocumentsService {
         .updateUserid(user)
         .updateTimestamp(now)
         .build();
+    try {
+      store(detail, content);
+    } catch (SdkException failed) {
+      throw new FieldValidationException("Document cannot be added",
+          Map.of("file", NOT_STORED));
+    }
+    // Ids only: the file name is the browser's, and could carry line breaks into the log.
+    log.info("Added document {} to structure {}", detail.getFileId(), structureId);
+    return String.valueOf(detail.getFileId());
+  }
+
+  /**
+   * Stores an inspection's audit record ({@link InspectionAuditRecorder}): its report PDF as one of
+   * its documents, of type Other, described as an audit record — so it is never edited or deleted.
+   * Made by CBR, not uploaded, so not scanned for viruses.
+   *
+   * @param description starting {@link #AUDIT_RECORD}
+   * @return the new document's id
+   * @throws SdkException when the object store refuses it, the rows then rolled back
+   */
+  @Transactional
+  public long addAuditRecord(long structureId, long inspectionId, String filename,
+      String description, byte[] pdf) {
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    CrossingStructureFileDetailEntity detail = CrossingStructureFileDetailEntity.builder()
+        .crossingStructureId(structureId)
+        .inspectionId(inspectionId)
+        .filename(filename)
+        .fileCreateDate(now)
+        .efileExtensionCode(PDF)
+        .fileMimeTypeCode(mimeTypes.findMimeTypeCodes(PDF).stream().findFirst().orElse(null))
+        .fileAttachmentTypeCode(OTHER)
+        .description(description)
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build();
+    store(detail, pdf);
+    return detail.getFileId();
+  }
+
+  /**
+   * Writes the rows — the details, and an empty BLOB for the file row legacy's schema requires —
+   * then puts the file in the object store at its id's key, in the caller's transaction: a put
+   * that fails undoes the rows, and rows that fail to commit delete the object.
+   */
+  private void store(CrossingStructureFileDetailEntity detail, byte[] content) {
     entityManager.persist(detail);
     files.insertEmpty(detail.getFileId());
     String key = ObjectStorageService.fileKey(detail.getFileId());
@@ -312,29 +381,25 @@ public class StructureDocumentsService {
       storage.putObject(key, mediaType(detail).toString(), content);
     } catch (SdkException failed) {
       log.error("Could not store document {} of structure {} at {}", detail.getFileId(),
-          structureId, key, failed);
-      throw new FieldValidationException("Document cannot be added",
-          Map.of("file", NOT_STORED));
+          detail.getCrossingStructureId(), key, failed);
+      throw failed;
     }
     storage.deleteOnRollback(key);
-    // Ids only: the file name is the browser's, and could carry line breaks into the log.
-    log.info("Added document {} to structure {}", detail.getFileId(), structureId);
-    return String.valueOf(detail.getFileId());
   }
 
   /**
    * Changes a document's type and description — legacy's edit in its viewer
    * ({@code CBR.UPDATE_FILE_ATTACHMENT_DETAIL}), with who changed it and when. The file, its name
-   * and its date are kept. As legacy, a document an inspection brought is edited here too.
+   * and its date are kept. As legacy, a document an inspection brought is edited here too; an
+   * audit record is not.
    *
-   * @throws DocumentNotFoundException if the structure has no such document
-   * @throws FieldValidationException  with a message for each field at fault
+   * @throws DocumentNotFoundException   if the structure has no such document
+   * @throws AuditRecordLockedException  if it is an inspection's audit record
+   * @throws FieldValidationException    with a message for each field at fault
    */
   @Transactional
   public void update(long structureId, long fileId, DocumentUpdateRequest request) {
-    CrossingStructureFileDetailEntity detail = details.findById(fileId)
-        .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
-        .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
+    CrossingStructureFileDetailEntity detail = changeable(structureId, fileId);
     Map<String, String> errors = new LinkedHashMap<>();
     checkDetails(errors, request.attachmentTypeCode(), request.description());
     if (!errors.isEmpty()) {
@@ -352,19 +417,30 @@ public class StructureDocumentsService {
   /**
    * Deletes a document and its file — legacy's delete icon ({@code CBR.DELETE_FILE_ATTACHMENT}):
    * the file row first, which the foreign key requires, then the details, then — once that commits
-   * — the object. As legacy, a document an inspection brought is deleted here too.
+   * — the object. As legacy, a document an inspection brought is deleted here too; an audit
+   * record is not.
    *
-   * @throws DocumentNotFoundException if the structure has no such document
+   * @throws DocumentNotFoundException   if the structure has no such document
+   * @throws AuditRecordLockedException  if it is an inspection's audit record
    */
   @Transactional
   public void delete(long structureId, long fileId) {
-    details.findById(fileId)
-        .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
-        .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
+    changeable(structureId, fileId);
     files.deleteByFileIdIn(List.of(fileId));
     details.deleteById(fileId);
     storage.deleteAfterCommit(List.of(ObjectStorageService.fileKey(fileId)));
     log.info("Deleted document {} of structure {}", fileId, structureId);
+  }
+
+  /** The structure's document, once it is known not to be an audit record. */
+  private CrossingStructureFileDetailEntity changeable(long structureId, long fileId) {
+    CrossingStructureFileDetailEntity detail = details.findById(fileId)
+        .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
+        .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
+    if (isAuditRecord(detail)) {
+      throw new AuditRecordLockedException(fileId);
+    }
+    return detail;
   }
 
   /**
@@ -420,7 +496,10 @@ public class StructureDocumentsService {
     return codes.getFirst();
   }
 
-  /** A type ("Photo View") that exists, and a description when it is Other. */
+  /**
+   * A type ("Photo View") that exists, and a description when it is Other — not one an audit
+   * record's could be mistaken for.
+   */
   private void checkDetails(Map<String, String> errors, String typeCode, String text) {
     String type = trimmed(typeCode);
     String description = trimmed(text);
@@ -433,6 +512,8 @@ public class StructureDocumentsService {
       if (OTHER.equals(type)) {
         errors.put(DESCRIPTION, "Description is required for this Photo View.");
       }
+    } else if (reserved(description)) {
+      errors.put(DESCRIPTION, RESERVED);
     } else if (description.getBytes(StandardCharsets.UTF_8).length > TEXT_MAX) {
       // Bytes, because the column is declared in bytes and an accented character costs two.
       errors.put(DESCRIPTION, "Description can be at most " + TEXT_MAX + " characters.");

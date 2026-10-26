@@ -510,6 +510,7 @@ describe('InspectionDetailPage', () => {
       extension: 'JPG',
       description: 'Deck',
       filename: `${id}.jpg`,
+      auditRecord: false,
     });
 
     it("adds to this inspection's folder from Level 1, deletes any file at Level 2, never edits", async () => {

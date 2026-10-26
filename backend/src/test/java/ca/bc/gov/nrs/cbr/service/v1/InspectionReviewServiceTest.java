@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
@@ -52,6 +53,10 @@ class InspectionReviewServiceTest {
 
   @MockitoBean
   private LoggedUserHelper loggedUser;
+
+  /** Its rule and its PDF are its own test's; here, only that a save asks for it. */
+  @MockitoBean
+  private InspectionAuditRecorder audit;
 
   @BeforeEach
   void setUp() {
@@ -119,6 +124,7 @@ class InspectionReviewServiceTest {
     inspection(41L, "SUB", "ROUT");
 
     service.review(41L, review(40L, "INSP", "ignored"));
+    verify(audit).afterCommit(41L);
 
     StructureInspectionEntity inspection = found(StructureInspectionEntity.class, 41L);
     assertThat(inspection.getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("RVD");
@@ -219,6 +225,7 @@ class InspectionReviewServiceTest {
     inspection(41L, "SUB", "ROUT");
 
     service.updatePengComment(41L, new InspectionCommentRequest(" Sound. "));
+    verify(audit).afterCommit(41L);
     assertThat(found(StructureInspectionEntity.class, 41L).getPengComment()).isEqualTo("Sound.");
     InspectionCommentRequest tooLong = new InspectionCommentRequest("x".repeat(4001));
     assertThatThrownBy(() -> service.updatePengComment(41L, tooLong))

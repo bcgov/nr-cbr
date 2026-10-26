@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
@@ -42,6 +43,10 @@ class InspectionEditServiceHazardsTest {
 
   @MockitoBean
   private LoggedUserHelper loggedUser;
+
+  /** Its rule and its PDF are its own test's; here, only that a save asks for it. */
+  @MockitoBean
+  private InspectionAuditRecorder audit;
 
   @BeforeEach
   void setUp() {
@@ -91,6 +96,7 @@ class InspectionEditServiceHazardsTest {
     inspection(41L, "SUB", null);
 
     service.updateHazards(41L, hazards("1.5", "12", "3.2"));
+    verify(audit).afterCommit(41L);
     entityManager.flush();
     entityManager.clear();
 

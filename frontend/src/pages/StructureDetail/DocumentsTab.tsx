@@ -167,7 +167,7 @@ const DocumentsTable: FC<TableProps> = ({
                         {inTab ? ' (opens in a new tab)' : ' (downloads)'}
                       </span>
                     </Button>
-                    {onEdit && (
+                    {onEdit && !document.auditRecord && (
                       <Button
                         kind="ghost"
                         size="sm"
@@ -178,8 +178,9 @@ const DocumentsTable: FC<TableProps> = ({
                         Edit <span className="cds--visually-hidden">{name}</span>
                       </Button>
                     )}
-                    {/* danger--ghost, as every Delete in the app: red at rest and on hover. */}
-                    {onDelete && (
+                    {/* An audit record is kept as made: View alone, as the server insists.
+                        danger--ghost, as every Delete in the app: red at rest and on hover. */}
+                    {onDelete && !document.auditRecord && (
                       <Button
                         kind="danger--ghost"
                         size="sm"
@@ -223,7 +224,25 @@ const DocumentsTable: FC<TableProps> = ({
  * <p>On an inspection's page, legacy's inspection tab: Add (Level 1 up) on the inspection's folder,
  * shown first, its files the inspection's; Delete (Level 2 up) on any file, at any status; no Edit. Add goes
  * once the inspection is Reviewed or Accepted, as legacy disables its button.
+ *
+ * <p>An inspection's audit records — the report PDF stored on each save — are View alone, and only
+ * the latest of each inspection is shown until "Show earlier audit records" is ticked.
  */
+/**
+ * Each inspection's latest audit record, by id: a save makes one, and the ids rise with each, where
+ * the created date — a day — would tie. The rest are shown only when asked; none is ever removed.
+ */
+const latestAuditRecords = (documents: StructureDocument[]): Set<string> => {
+  const latest = new Map<string, StructureDocument>();
+  for (const document of documents) {
+    if (!document.auditRecord) continue;
+    const key = document.inspectionId ?? '';
+    const current = latest.get(key);
+    if (!current || Number(document.id) > Number(current.id)) latest.set(key, document);
+  }
+  return new Set([...latest.values()].map((document) => document.id));
+};
+
 const DocumentsTab: FC<Props> = ({
   structureId,
   opened,
@@ -233,6 +252,7 @@ const DocumentsTab: FC<Props> = ({
 }) => {
   const loaded = useStructureDocuments(structureId, opened);
   const [showEarly, setShowEarly] = useState(false);
+  const [showEarlierAudits, setShowEarlierAudits] = useState(false);
   /** The file being fetched, so its link can say so and not be pressed twice. */
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
@@ -273,7 +293,16 @@ const DocumentsTab: FC<Props> = ({
 
   const all = loaded.data.documents;
   const hidden = all.filter((document) => beforeInstall(document, yearBuilt)).length;
-  const shown = showEarly ? all : all.filter((document) => !beforeInstall(document, yearBuilt));
+  const afterInstall = showEarly
+    ? all
+    : all.filter((document) => !beforeInstall(document, yearBuilt));
+  const latest = latestAuditRecords(afterInstall);
+  const earlierAudits = afterInstall.filter(
+    (document) => document.auditRecord && !latest.has(document.id),
+  ).length;
+  const shown = showEarlierAudits
+    ? afterInstall
+    : afterInstall.filter((document) => !document.auditRecord || latest.has(document.id));
   const groups = groupDocuments(shown);
   // Add belongs to the folder files are added to — the structure's own, or on an inspection's page
   // the inspection's — so that card is there to hold it even before it has a file.
@@ -335,6 +364,14 @@ const DocumentsTab: FC<Props> = ({
           labelText={`Show documents from before the superstructure was installed (${hidden})`}
           checked={showEarly}
           onChange={(_, { checked }) => setShowEarly(checked)}
+        />
+      )}
+      {earlierAudits > 0 && (
+        <Checkbox
+          id="structure-show-earlier-audit-records"
+          labelText={`Show earlier audit records (${earlierAudits})`}
+          checked={showEarlierAudits}
+          onChange={(_, { checked }) => setShowEarlierAudits(checked)}
         />
       )}
 

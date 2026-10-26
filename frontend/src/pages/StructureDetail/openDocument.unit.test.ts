@@ -13,6 +13,7 @@ const document = (overrides: Partial<StructureDocument> = {}): StructureDocument
   extension: 'JPG',
   description: null,
   filename: 'deck.jpg',
+  auditRecord: false,
   ...overrides,
 });
 

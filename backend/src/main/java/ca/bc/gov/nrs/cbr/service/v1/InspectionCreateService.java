@@ -62,6 +62,7 @@ public class InspectionCreateService {
   private final StructureInspectionItemRepository items;
   private final StructureRepairRepository repairs;
   private final LoggedUserHelper loggedUser;
+  private final InspectionAuditRecorder audit;
 
   @SuppressWarnings("java:S107") // One repository per table a new inspection writes.
   public InspectionCreateService(
@@ -73,7 +74,8 @@ public class InspectionCreateService {
       InspectionReportStatusRepository statuses,
       StructureInspectionItemRepository items,
       StructureRepairRepository repairs,
-      LoggedUserHelper loggedUser) {
+      LoggedUserHelper loggedUser,
+      InspectionAuditRecorder audit) {
     this.forms = forms;
     this.validator = validator;
     this.structureDetails = structureDetails;
@@ -83,6 +85,7 @@ public class InspectionCreateService {
     this.items = items;
     this.repairs = repairs;
     this.loggedUser = loggedUser;
+    this.audit = audit;
   }
 
   /**
@@ -146,6 +149,7 @@ public class InspectionCreateService {
 
     log.info("Added inspection {} of structure {} ({} repairs carried forward)", inspectionId,
         structureId, carried);
+    audit.afterCommit(inspectionId);
     return new CreatedResponse(String.valueOf(inspectionId));
   }
 

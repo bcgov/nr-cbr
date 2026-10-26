@@ -2,6 +2,8 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
@@ -43,6 +45,10 @@ class InspectionEditServiceTest {
 
   @MockitoBean
   private LoggedUserHelper loggedUser;
+
+  /** Its rule and its PDF are its own test's; here, only that a save asks for it. */
+  @MockitoBean
+  private InspectionAuditRecorder audit;
 
   @BeforeEach
   void setUp() {
@@ -110,6 +116,8 @@ class InspectionEditServiceTest {
     assertThat(entityManager.createQuery(
         "SELECT COUNT(s) FROM InspectionReportStatusEntity s WHERE s.inspectionId = 41",
         Long.class).getSingleResult()).isEqualTo(2L);
+    // Each save may be recorded; whether it is, is the recorder's rule.
+    verify(audit, times(2)).afterCommit(41L);
   }
 
   @Test
@@ -174,6 +182,7 @@ class InspectionEditServiceTest {
     inspection(41L, "SUB", DAY, "Jo");
 
     service.updateComment(41L, new InspectionCommentRequest("  All sound.  "));
+    verify(audit).afterCommit(41L);
     assertThat(stored(41L).getInspectionComment()).isEqualTo("All sound.");
     InspectionCommentRequest tooLong = new InspectionCommentRequest("x".repeat(4001));
     assertThatThrownBy(() -> service.updateComment(41L, tooLong))

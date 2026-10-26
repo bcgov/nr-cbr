@@ -79,15 +79,17 @@ public class InspectionEditService {
   private final StructureInspectionItemRepository items;
   private final InspectionFormService forms;
   private final LoggedUserHelper loggedUser;
+  private final InspectionAuditRecorder audit;
 
   public InspectionEditService(StructureInspectionRepository inspections,
       InspectionReportStatusRepository statuses, StructureInspectionItemRepository items,
-      InspectionFormService forms, LoggedUserHelper loggedUser) {
+      InspectionFormService forms, LoggedUserHelper loggedUser, InspectionAuditRecorder audit) {
     this.inspections = inspections;
     this.statuses = statuses;
     this.items = items;
     this.forms = forms;
     this.loggedUser = loggedUser;
+    this.audit = audit;
   }
 
   /**
@@ -130,6 +132,7 @@ public class InspectionEditService {
           .build());
     }
     log.info("Updated inspection {}, status {}", inspectionId, status);
+    audit.afterCommit(inspectionId);
   }
 
   /** Every reason the card cannot be saved, refused together. */
@@ -189,6 +192,7 @@ public class InspectionEditService {
         .updateTimestamp(LocalDateTime.now(ZoneId.systemDefault()))
         .build());
     log.info("Updated the comments of inspection {}", inspectionId);
+    audit.afterCommit(inspectionId);
   }
 
   /**
@@ -253,6 +257,7 @@ public class InspectionEditService {
     }
     items.deleteAll(stored.values());
     log.info("Updated the {} answers of inspection {}", subsectionCode, inspectionId);
+    audit.afterCommit(inspectionId);
   }
 
   /** A stored answer as the request names one, for its key. */
@@ -290,6 +295,7 @@ public class InspectionEditService {
         .updateTimestamp(LocalDateTime.now(ZoneId.systemDefault()))
         .build());
     log.info("Updated the hydraulic hazards of inspection {}", inspectionId);
+    audit.afterCommit(inspectionId);
   }
 
   private static void validateHazards(HazardsUpdateRequest request, String status,

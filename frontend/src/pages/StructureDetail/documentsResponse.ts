@@ -14,6 +14,8 @@ export type StructureDocument = {
   extension: string | null;
   description: string | null;
   filename: string | null;
+  /** An inspection's audit record — its report PDF as saved — never edited or deleted. */
+  auditRecord: boolean;
 };
 
 /**

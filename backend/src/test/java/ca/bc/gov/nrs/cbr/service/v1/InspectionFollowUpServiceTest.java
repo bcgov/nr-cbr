@@ -2,6 +2,10 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.exception.InspectionLockedException;
@@ -55,6 +59,10 @@ class InspectionFollowUpServiceTest {
 
   @MockitoBean
   private LoggedUserHelper loggedUser;
+
+  /** Its rule and its PDF are its own test's; here, only that a save asks for it. */
+  @MockitoBean
+  private InspectionAuditRecorder audit;
 
   /** Passes every file: scanning is {@link VirusScanner}'s, tested there. */
   @MockitoBean
@@ -120,6 +128,8 @@ class InspectionFollowUpServiceTest {
     assertThat(repair.number()).isEqualTo(1L);
     assertThat(entityManager.find(StructureMonitorItemEntity.class, Long.valueOf(monitor.id()))
         .getInspectionId()).isEqualTo(41L);
+    // Each change a save of the inspection, as legacy's one Save.
+    verify(audit, times(2)).afterCommit(41L);
   }
 
   @Test
@@ -143,6 +153,7 @@ class InspectionFollowUpServiceTest {
     service.deleteRepair(41L, id);
     entityManager.flush();
     assertThat(entityManager.find(StructureRepairEntity.class, id)).isNull();
+    verify(audit, times(2)).afterCommit(41L);
   }
 
   @Test
@@ -161,6 +172,7 @@ class InspectionFollowUpServiceTest {
     service.deleteMonitor(41L, id);
     entityManager.flush();
     assertThat(entityManager.find(StructureMonitorItemEntity.class, id)).isNull();
+    verify(audit, times(3)).afterCommit(41L);
   }
 
   @Test
@@ -178,6 +190,7 @@ class InspectionFollowUpServiceTest {
         .hasMessageContaining("is Rejected");
     assertThatThrownBy(() -> service.addRepair(404L, repair))
         .isInstanceOf(InspectionNotFoundException.class);
+    verify(audit, never()).afterCommit(anyLong());
   }
 
   private static MockMultipartFile photo() {
@@ -203,6 +216,7 @@ class InspectionFollowUpServiceTest {
     entityManager.flush();
     entityManager.clear();
     assertThat(entityManager.find(CrossingStructureFileDetailEntity.class, id)).isNull();
+    verify(audit, times(2)).afterCommit(41L);
   }
 
   @Test
