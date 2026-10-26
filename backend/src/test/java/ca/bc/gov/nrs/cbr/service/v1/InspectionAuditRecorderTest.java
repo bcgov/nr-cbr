@@ -92,7 +92,7 @@ class InspectionAuditRecorderTest {
   void records(String status, boolean reviewer, String reads) {
     given(status, reviewer);
 
-    recorder.record(INSPECTION);
+    recorder.recordSafely(INSPECTION);
 
     String line = "Audit record - " + reads
         + " - saved by IDIR\\\\JSMITH on \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}";
@@ -113,7 +113,7 @@ class InspectionAuditRecorderTest {
   void recordsNothing(String status, boolean reviewer) {
     given(status, reviewer);
 
-    recorder.record(INSPECTION);
+    recorder.recordSafely(INSPECTION);
 
     verify(report, never()).auditPdf(anyLong(), anyString(), anyString());
     verify(documents, never()).addAuditRecord(anyLong(), anyLong(), anyString(), anyString(),
@@ -127,7 +127,7 @@ class InspectionAuditRecorderTest {
     when(documents.addAuditRecord(anyLong(), anyLong(), anyString(), anyString(), any()))
         .thenThrow(new IllegalStateException("bucket down"));
 
-    assertThatNoException().isThrownBy(() -> recorder.record(INSPECTION));
+    assertThatNoException().isThrownBy(() -> recorder.recordSafely(INSPECTION));
   }
 
   @Test

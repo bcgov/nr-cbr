@@ -243,6 +243,30 @@ const latestAuditRecords = (documents: StructureDocument[]): Set<string> => {
   return new Set([...latest.values()].map((document) => document.id));
 };
 
+/**
+ * The files the tab shows, and how many each checkbox would add: those from before the
+ * superstructure was installed (`hidden`), and each inspection's audit records but its latest
+ * (`earlierAudits`), counted among the files otherwise shown.
+ */
+const visibleDocuments = (
+  all: StructureDocument[],
+  yearBuilt: number | null,
+  showEarly: boolean,
+  showEarlierAudits: boolean,
+) => {
+  const hidden = all.filter((document) => beforeInstall(document, yearBuilt)).length;
+  const afterInstall = showEarly
+    ? all
+    : all.filter((document) => !beforeInstall(document, yearBuilt));
+  const latest = latestAuditRecords(afterInstall);
+  const earlier = (document: StructureDocument) => document.auditRecord && !latest.has(document.id);
+  return {
+    shown: showEarlierAudits ? afterInstall : afterInstall.filter((document) => !earlier(document)),
+    hidden,
+    earlierAudits: afterInstall.filter(earlier).length,
+  };
+};
+
 const DocumentsTab: FC<Props> = ({
   structureId,
   opened,
@@ -291,18 +315,12 @@ const DocumentsTab: FC<Props> = ({
     );
   }
 
-  const all = loaded.data.documents;
-  const hidden = all.filter((document) => beforeInstall(document, yearBuilt)).length;
-  const afterInstall = showEarly
-    ? all
-    : all.filter((document) => !beforeInstall(document, yearBuilt));
-  const latest = latestAuditRecords(afterInstall);
-  const earlierAudits = afterInstall.filter(
-    (document) => document.auditRecord && !latest.has(document.id),
-  ).length;
-  const shown = showEarlierAudits
-    ? afterInstall
-    : afterInstall.filter((document) => !document.auditRecord || latest.has(document.id));
+  const { shown, hidden, earlierAudits } = visibleDocuments(
+    loaded.data.documents,
+    yearBuilt,
+    showEarly,
+    showEarlierAudits,
+  );
   const groups = groupDocuments(shown);
   // Add belongs to the folder files are added to — the structure's own, or on an inspection's page
   // the inspection's — so that card is there to hold it even before it has a file.

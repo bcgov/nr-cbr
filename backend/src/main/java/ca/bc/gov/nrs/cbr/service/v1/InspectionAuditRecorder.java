@@ -74,7 +74,7 @@ public class InspectionAuditRecorder {
    */
   public void afterCommit(long inspectionId) {
     if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      record(inspectionId);
+      recordSafely(inspectionId);
       return;
     }
     boolean registered = TransactionSynchronizationManager.getSynchronizations().stream()
@@ -94,12 +94,12 @@ public class InspectionAuditRecorder {
 
     @Override
     public void afterCommit() {
-      record(inspectionId);
+      recordSafely(inspectionId);
     }
   }
 
   /** The record, if the inspection as saved calls for one; any failure logged, never thrown. */
-  void record(long inspectionId) {
+  void recordSafely(long inspectionId) {
     try {
       ownTransaction.executeWithoutResult(status -> make(inspectionId));
     } catch (RuntimeException failed) {

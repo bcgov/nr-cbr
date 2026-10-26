@@ -328,6 +328,8 @@ public class StructureDocumentsService {
     try {
       store(detail, content);
     } catch (SdkException failed) {
+      log.error("Could not store document {} of structure {}", detail.getFileId(), structureId,
+          failed);
       throw new FieldValidationException("Document cannot be added",
           Map.of("file", NOT_STORED));
     }
@@ -371,19 +373,14 @@ public class StructureDocumentsService {
   /**
    * Writes the rows — the details, and an empty BLOB for the file row legacy's schema requires —
    * then puts the file in the object store at its id's key, in the caller's transaction: a put
-   * that fails undoes the rows, and rows that fail to commit delete the object.
+   * that fails undoes the rows, and rows that fail to commit delete the object. The caller logs a
+   * failed put, with what it was storing.
    */
   private void store(CrossingStructureFileDetailEntity detail, byte[] content) {
     entityManager.persist(detail);
     files.insertEmpty(detail.getFileId());
     String key = ObjectStorageService.fileKey(detail.getFileId());
-    try {
-      storage.putObject(key, mediaType(detail).toString(), content);
-    } catch (SdkException failed) {
-      log.error("Could not store document {} of structure {} at {}", detail.getFileId(),
-          detail.getCrossingStructureId(), key, failed);
-      throw failed;
-    }
+    storage.putObject(key, mediaType(detail).toString(), content);
     storage.deleteOnRollback(key);
   }
 
