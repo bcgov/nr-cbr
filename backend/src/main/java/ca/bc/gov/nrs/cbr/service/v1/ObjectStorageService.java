@@ -48,7 +48,8 @@ public class ObjectStorageService implements DisposableBean {
     this.bucket = properties.bucket();
     if (properties.configured()) {
       this.client = client(properties);
-      log.info("Object storage: bucket {} at {}", properties.bucket(), properties.host());
+      // Configured, not where: the bucket's name and host stay out of the log.
+      log.info("Object storage is configured");
     } else {
       this.client = null;
       log.warn("Object storage is not configured (cbr.object-storage); document files are "

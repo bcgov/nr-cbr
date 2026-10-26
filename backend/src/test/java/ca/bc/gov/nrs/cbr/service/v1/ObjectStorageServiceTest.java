@@ -257,12 +257,12 @@ class ObjectStorageServiceTest {
   }
 
   @Test
-  @DisplayName("is configured only when all four are set, and never prints the keys")
+  @DisplayName("is configured only when all four are set, and prints none of them")
   void properties() {
     ObjectStorageProperties set = new ObjectStorageProperties("https://h", "b", "AKID", "SECRET");
 
     assertThat(set.configured()).isTrue();
     assertThat(new ObjectStorageProperties("https://h", "b", "AKID", " ").configured()).isFalse();
-    assertThat(set.toString()).contains("https://h", "b").doesNotContain("AKID", "SECRET");
+    assertThat(set).hasToString("ObjectStorageProperties[configured=true]");
   }
 }

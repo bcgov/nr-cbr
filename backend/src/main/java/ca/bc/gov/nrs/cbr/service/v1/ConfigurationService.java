@@ -546,8 +546,8 @@ public class ConfigurationService {
 
   /**
    * The file extensions a document may have, upper case — {@code THE.FILE_MIME_TYPE_XREF}, which
-   * a stored document's extension must be in. For the upload dialog to flag a file as it is
-   * picked; not shown to the user.
+   * a stored document's extension must be in. For the upload dialog to list in its hint and to
+   * flag a file as it is picked.
    */
   @Cacheable("documentExtensions")
   public List<String> getDocumentExtensions() {

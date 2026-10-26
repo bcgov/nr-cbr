@@ -24,10 +24,10 @@ public record ObjectStorageProperties(
     return isSet(host) && isSet(bucket) && isSet(accessKey) && isSet(secretKey);
   }
 
-  /** The secret key is never printed, nor the access key with it. */
+  /** None of the four is printed — not the keys, nor where the bucket is. */
   @Override
   public String toString() {
-    return "ObjectStorageProperties[host=" + host + ", bucket=" + bucket + "]";
+    return "ObjectStorageProperties[configured=" + configured() + "]";
   }
 
   private static boolean isSet(String value) {
