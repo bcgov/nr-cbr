@@ -75,6 +75,23 @@ on:
       keystore_secret:
         description: Oracle keystore passphrase
         required: true
+      object_storage_host:
+        description: Object store gateway URL (OBJECT_STORAGE_HOST)
+        required: true
+      object_storage_bucket:
+        description: Documents and photos bucket (OBJECT_STORAGE_BUCKET)
+        required: true
+      object_storage_access_key:
+        description: The bucket's access key id (OBJECT_STORAGE_ACCESS_KEY)
+        required: true
+      object_storage_secret_key:
+        description: The bucket's secret access key (OBJECT_STORAGE_SECRET_KEY)
+        required: true
+      clamav_host:
+        description: |
+          The shared clamd's host for CLAMAV_HOST
+          (<service>.bd657f-<env>.svc.cluster.local).
+        required: true
       vanity_tls_certificate:
         description: |
           PEM leaf/server certificate for the PROD vanity Route hostname
@@ -121,6 +138,8 @@ jobs:
     env:
       DATABASE_PASSWORD: ${{ secrets.database_password }}
       KEYSTORE_SECRET: ${{ secrets.keystore_secret }}
+      OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.object_storage_access_key }}
+      OBJECT_STORAGE_SECRET_KEY: ${{ secrets.object_storage_secret_key }}
     steps:
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         id: deploy
@@ -150,6 +169,11 @@ jobs:
             -p DATABASE_USER="${{ secrets.database_user }}"
             -p DATABASE_PASSWORD="$DATABASE_PASSWORD"
             -p KEYSTORE_SECRET="$KEYSTORE_SECRET"
+            -p OBJECT_STORAGE_HOST="${{ secrets.object_storage_host }}"
+            -p OBJECT_STORAGE_BUCKET="${{ secrets.object_storage_bucket }}"
+            -p OBJECT_STORAGE_ACCESS_KEY="$OBJECT_STORAGE_ACCESS_KEY"
+            -p OBJECT_STORAGE_SECRET_KEY="$OBJECT_STORAGE_SECRET_KEY"
+            -p CLAMAV_HOST="${{ secrets.clamav_host }}"
           triggers: ${{ inputs.triggers }}
 
   frontend:

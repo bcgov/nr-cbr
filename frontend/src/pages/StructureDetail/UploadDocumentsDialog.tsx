@@ -73,9 +73,8 @@ const today = () => {
 
 /**
  * One file's own problems: its name, size and type. The accepted types are `FILE_MIME_TYPE_XREF`'s,
- * as legacy's "File Type is invalid" — checked here as the file is picked, and again by the server,
- * but never listed, as legacy lists them nowhere. While the list has not arrived (or came back
- * empty) only the server checks.
+ * as legacy's "File Type is invalid" — listed in the hint, checked here as the file is picked, and
+ * again by the server. While the list has not arrived (or came back empty) only the server checks.
  */
 const fileError = (file: File, extensions: ReadonlySet<string>): string | undefined => {
   if (byteLength(file.name) > NAME_MAX) {
@@ -270,7 +269,12 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, inspectionId, onClose }
       <Stack gap={5}>
         <div>
           <span className="structure-detail__upload-label">{requiredLabel('Files', true)}</span>
-          <p className="structure-detail__upload-helper">Up to {MAX_FILES} files, 10 MB each.</p>
+          <p className="structure-detail__upload-helper" data-testid="upload-documents-helper">
+            Up to {MAX_FILES} files at a time, 10 MB each.
+            {extensionList.data && extensionList.data.length > 0 && (
+              <> Accepted formats: {extensionList.data.join(', ')}.</>
+            )}
+          </p>
           <FileUploaderDropContainer
             labelText="Drag and drop files here or click to upload"
             multiple

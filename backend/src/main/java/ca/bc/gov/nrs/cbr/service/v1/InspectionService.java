@@ -2,7 +2,6 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.exception.InspectionNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.InspectionNotOfflineException;
-import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileDetailEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
@@ -50,6 +49,7 @@ public class InspectionService {
   private final StructureLoadRatingRepository loadRatings;
   private final InspectionReportStatusRepository statusHistory;
   private final LoadRatingService loadRatingService;
+  private final ObjectStorageService storage;
 
   public InspectionService(
       StructureInspectionRepository inspections,
@@ -61,7 +61,8 @@ public class InspectionService {
       StructureInspectionItemRepository inspectionItems,
       StructureLoadRatingRepository loadRatings,
       InspectionReportStatusRepository statusHistory,
-      LoadRatingService loadRatingService) {
+      LoadRatingService loadRatingService,
+      ObjectStorageService storage) {
     this.inspections = inspections;
     this.structures = structures;
     this.attachmentBytes = attachmentBytes;
@@ -72,6 +73,7 @@ public class InspectionService {
     this.loadRatings = loadRatings;
     this.statusHistory = statusHistory;
     this.loadRatingService = loadRatingService;
+    this.storage = storage;
   }
 
   /**
@@ -155,6 +157,7 @@ public class InspectionService {
    * <p>The foreign key runs from {@code CROSSING_STRUCTURE_FILE} to
    * {@code CROSSING_STRUCTURE_FILE_DETAIL}, so the other order fails. Legacy walks a cursor and
    * deletes one pair at a time; the ids are collected here and deleted in two statements instead.
+   * Their objects in the store go once the delete commits.
    */
   private void deleteAttachments(Long inspectionId) {
     List<Long> fileIds = attachments.findByInspectionId(inspectionId).stream()
@@ -166,6 +169,7 @@ public class InspectionService {
     }
     attachmentBytes.deleteByFileIdIn(fileIds);
     attachments.deleteByInspectionId(inspectionId);
+    storage.deleteAfterCommit(fileIds.stream().map(ObjectStorageService::fileKey).toList());
     log.info("Deleted {} attachment(s) of inspection {}", fileIds.size(), inspectionId);
   }
 

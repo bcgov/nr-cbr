@@ -2175,7 +2175,17 @@ describe('StructureDetailPage — Documents & Photos', () => {
       expect(api.addDocument).not.toHaveBeenCalled();
     });
 
-    it('flags a file type that may not be added as soon as it is picked, listing none', async () => {
+    it('lists the accepted formats in the hint', async () => {
+      const dialog = await openUpload([]);
+
+      await vi.waitFor(() =>
+        expect(within(dialog).getByTestId('upload-documents-helper')).toHaveTextContent(
+          'Up to 15 files at a time, 10 MB each. Accepted formats: JPG, PDF.',
+        ),
+      );
+    });
+
+    it('flags a file type that may not be added as soon as it is picked', async () => {
       const dialog = await openUpload([fileOf('notes.exe'), fileOf('deck.jpg')]);
 
       const rows = within(dialog).getAllByRole('region');
@@ -2183,7 +2193,6 @@ describe('StructureDetailPage — Documents & Photos', () => {
         expect(rows[0]).toMatchTextContent('Files of type .exe cannot be added.'),
       );
       expect(rows[1]).not.toMatchTextContent('cannot be added');
-      expect(dialog).not.toMatchTextContent('Allowed:');
       await userEvent.click(within(dialog).getByTestId('upload-save'));
       expect(api.addDocument).not.toHaveBeenCalled();
     });

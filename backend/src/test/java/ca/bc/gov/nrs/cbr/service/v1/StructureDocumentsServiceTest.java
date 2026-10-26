@@ -2,6 +2,13 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.exception.DocumentNotFoundException;
@@ -23,8 +30,10 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse.Document;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +44,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /** The Documents &amp; Photos tab's data and files, against the database. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
@@ -53,9 +63,27 @@ class StructureDocumentsServiceTest {
   @MockitoBean
   private LoggedUserHelper loggedUser;
 
+  /** Passes every file unless a case says otherwise: Mockito's empty Optional. */
+  @MockitoBean
+  private VirusScanner virusScanner;
+
+  /** A bucket in memory: what is put can be read back; anything else is missing. */
+  @MockitoBean
+  private ObjectStorageService storage;
+
+  private final Map<String, byte[]> bucket = new HashMap<>();
+  private final Map<String, String> bucketTypes = new HashMap<>();
+
   @BeforeEach
   void setUp() {
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\EDITOR");
+    doAnswer(put -> {
+      bucket.put(put.getArgument(0), put.getArgument(2));
+      bucketTypes.put(put.getArgument(0), put.getArgument(1));
+      return null;
+    }).when(storage).putObject(anyString(), anyString(), any());
+    when(storage.getObjectBytesIfPresent(anyString()))
+        .thenAnswer(get -> Optional.ofNullable(bucket.get(get.<String>getArgument(0))));
     for (String entity : List.of("CrossingStructureFileEntity", "CrossingStructureFileDetailEntity",
         "FileAttachmentTypeCodeEntity", "FileMimeTypeXrefEntity", "StructureInspectionEntity",
         "CrossingStructureEntity")) {
@@ -310,6 +338,93 @@ class StructureDocumentsServiceTest {
   }
 
   @Test
+  @DisplayName("scans the bytes it stores, and stores nothing the scanner refuses, beside the file")
+  void scans() {
+    byte[] bytes = "jpeg bytes".getBytes();
+    MultipartFile photo = new MockMultipartFile("file", "deck.jpg", "image/jpeg", bytes);
+    String id = service.upload(7L, null, photo, row("PHOTO", null));
+    verify(virusScanner).refusal(bytes);
+    assertThat(service.file(7L, Long.parseLong(id)).content()).isEqualTo(bytes);
+
+    when(virusScanner.refusal(any()))
+        .thenReturn(Optional.of("This file was rejected: a virus was detected (Eicar-Test)."));
+    assertThat(uploadRefused(part("eicar.jpg", 68), row("PHOTO", null))).containsExactly(
+        Map.entry("file", "This file was rejected: a virus was detected (Eicar-Test)."));
+    assertThat(documents(7L)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("does not scan a file whose details are refused")
+  void scansOnlyWhatPasses() {
+    uploadRefused(part("notes.exe", 10), row("PHOTO", null));
+    uploadRefused(part("a.jpg", 10), row(" ", null));
+
+    verifyNoInteractions(virusScanner);
+  }
+
+  @Test
+  @DisplayName("puts the file in the bucket at its id's key, under its type, with an empty BLOB")
+  void storesInTheBucket() {
+    byte[] bytes = "%PDF-1.7".getBytes();
+    long id = Long.parseLong(service.upload(7L, null,
+        new MockMultipartFile("file", "plan.pdf", "application/pdf", bytes), row("OTH", "Plan")));
+
+    assertThat(bucket).containsOnlyKeys("docs/" + id).containsEntry("docs/" + id, bytes);
+    assertThat(bucketTypes).containsEntry("docs/" + id, "application/pdf");
+    verify(storage).deleteOnRollback("docs/" + id);
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(files.findById(id)).get()
+        .extracting(CrossingStructureFileEntity::getStructureFile).isEqualTo(new byte[0]);
+  }
+
+  @Test
+  @DisplayName("refuses the file beside it when the bucket cannot take it")
+  void bucketRefuses() {
+    doThrow(S3Exception.builder().message("Service Unavailable").statusCode(503).build())
+        .when(storage).putObject(anyString(), anyString(), any());
+
+    assertThat(uploadRefused(part("deck.jpg", 10), row("PHOTO", null)))
+        .containsExactly(Map.entry("file", StructureDocumentsService.NOT_STORED));
+    verify(storage, never()).deleteOnRollback(anyString());
+  }
+
+  @Test
+  @DisplayName("reads a file from the bucket before its BLOB, and the BLOB only when there is none")
+  void readsTheBucketFirst() {
+    long migrated = givenDocument(7L, null, "deck.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
+    long notYet = givenDocument(7L, null, "pier.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
+    bucket.put("docs/" + migrated, "bytes from the bucket".getBytes());
+    documents(7L);
+
+    assertThat(new String(service.file(7L, migrated).content()))
+        .isEqualTo("bytes from the bucket");
+    assertThat(new String(service.file(7L, notYet).content())).isEqualTo("bytes of pier.jpg");
+  }
+
+  @Test
+  @DisplayName("finds no file when neither the bucket nor the BLOB has it")
+  void neitherHasIt() {
+    long id = givenDocument(7L, null, "deck.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
+    entityManager.flush();
+    files.deleteByFileIdIn(List.of(id));
+    files.insertEmpty(id);
+
+    assertThatThrownBy(() -> service.file(7L, id)).isInstanceOf(DocumentNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("lets the bucket failing through, rather than read it as a file not yet migrated")
+  void bucketFails() {
+    long id = givenDocument(7L, null, "deck.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
+    documents(7L);
+    when(storage.getObjectBytesIfPresent("docs/" + id))
+        .thenThrow(S3Exception.builder().message("Access Denied").statusCode(403).build());
+
+    assertThatThrownBy(() -> service.file(7L, id)).isInstanceOf(S3Exception.class);
+  }
+
+  @Test
   @DisplayName("adds nothing to a structure that does not exist")
   void uploadMissingStructure() {
     MultipartFile part = part("a.jpg", 1);
@@ -369,5 +484,7 @@ class StructureDocumentsServiceTest {
     assertThat(documents(7L)).extracting(Document::id).containsExactly(String.valueOf(kept));
     assertThat(files.findAll()).extracting(CrossingStructureFileEntity::getFileId)
         .containsExactly(kept);
+    verify(storage).deleteAfterCommit(List.of("docs/" + gone));
+    verify(storage, never()).deleteAfterCommit(List.of("docs/" + kept));
   }
 }

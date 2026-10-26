@@ -46,6 +46,11 @@ jobs:
       database_host: ${{ secrets.database_host }}
       database_service_name: ${{ secrets.database_service_name }}
       keystore_secret: ${{ secrets.keystore_secret }}
+      object_storage_host: ${{ secrets.object_storage_host }}
+      object_storage_bucket: ${{ secrets.object_storage_bucket }}
+      object_storage_access_key: ${{ secrets.object_storage_access_key }}
+      object_storage_secret_key: ${{ secrets.object_storage_secret_key }}
+      clamav_host: ${{ secrets.clamav_host }}
     with:
       environment: test
       target: test
@@ -126,6 +131,11 @@ jobs:
   #     database_host: ${{ secrets.database_host }}
   #     database_service_name: ${{ secrets.database_service_name }}
   #     keystore_secret: ${{ secrets.keystore_secret }}
+  #     object_storage_host: ${{ secrets.object_storage_host }}
+  #     object_storage_bucket: ${{ secrets.object_storage_bucket }}
+  #     object_storage_access_key: ${{ secrets.object_storage_access_key }}
+  #     object_storage_secret_key: ${{ secrets.object_storage_secret_key }}
+  #     clamav_host: ${{ secrets.clamav_host }}
   #     # PROD vanity Route (cbr.nrs.gov.bc.ca) — the ONLY public URL on prod.
   #     # Consumed only when the `prod` environment also defines the VANITY_HOST
   #     # variable; the deploy step skips itself otherwise, which would leave
