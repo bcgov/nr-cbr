@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.configuration.ObjectStorageProperties;
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
@@ -82,14 +83,14 @@ public class ObjectStorageService implements DisposableBean {
   }
 
   /**
-   * The object's bytes, or {@code null} when there is none — the download's one round trip, with
-   * the BLOB to fall back to while files are being migrated.
+   * The object's bytes, or empty when there is none — the download's one round trip, with the BLOB
+   * to fall back to while files are being migrated.
    */
-  public byte[] getObjectBytesIfPresent(String key) {
+  public Optional<byte[]> getObjectBytesIfPresent(String key) {
     try {
-      return getObjectBytes(key);
+      return Optional.of(getObjectBytes(key));
     } catch (NoSuchKeyException missing) {
-      return null;
+      return Optional.empty();
     }
   }
 

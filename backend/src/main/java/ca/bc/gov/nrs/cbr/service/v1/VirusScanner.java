@@ -27,10 +27,13 @@ public class VirusScanner {
 
   private final ClamAvClient clamd;
   private final boolean enabled;
+  /** clamd's {@code host:port}, for the log. */
+  private final String address;
 
   public VirusScanner(ClamAvClient clamd, ClamAvProperties properties) {
     this.clamd = clamd;
     this.enabled = properties.enabled();
+    this.address = clamd.address();
   }
 
   /**
@@ -42,11 +45,11 @@ public class VirusScanner {
     if (!enabled) {
       log.warn("Virus scanning is OFF (cbr.clamav.enabled=false): uploads are stored unscanned");
     } else if (clamd.ping()) {
-      log.info("Virus scanning is on: clamd answers at {}", clamd.address());
+      log.info("Virus scanning is on: clamd answers at {}", address);
     } else {
       log.warn("Virus scanning is on but clamd does not answer at {}: every upload will be "
           + "refused until it does. Check the host and bd657f's ingress policy for this "
-          + "namespace.", clamd.address());
+          + "namespace.", address);
     }
   }
 
@@ -67,15 +70,24 @@ public class VirusScanner {
         yield Optional.empty();
       }
       case INFECTED -> {
-        log.warn("Virus scan INFECTED ({}): {} bytes refused", result.signature(), content.length);
+        log.warn("Virus scan INFECTED ({}): {} bytes refused", forLog(result.signature()),
+            content.length);
         yield Optional.of(
             "This file was rejected: a virus was detected (" + result.signature() + ").");
       }
       case ERROR -> {
-        log.error("Virus scan UNAVAILABLE ({}): {} bytes refused", result.detail(),
+        log.error("Virus scan UNAVAILABLE ({}): {} bytes refused", forLog(result.detail()),
             content.length);
         yield Optional.of(UNAVAILABLE);
       }
     };
+  }
+
+  /**
+   * clamd's reply on one line. It answers about the uploaded bytes, so a crafted file could put a
+   * line break in it and forge a log line after it.
+   */
+  static String forLog(String reply) {
+    return reply == null ? null : reply.replaceAll("[\\r\\n\\t]", "_");
   }
 }

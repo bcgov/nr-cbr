@@ -2,7 +2,6 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.exception.InspectionNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.InspectionNotOfflineException;
-import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileDetailEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;

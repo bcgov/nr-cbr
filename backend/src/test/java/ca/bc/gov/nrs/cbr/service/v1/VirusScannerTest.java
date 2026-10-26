@@ -1,8 +1,12 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.client.ClamAvClient;
@@ -57,16 +61,26 @@ class VirusScannerTest {
 
     assertThat(off.refusal(FILE)).isEmpty();
     off.reportAtStartup();
-    verifyNoInteractions(clamd);
+    verify(clamd, never()).scan(any());
+    verify(clamd, never()).ping();
   }
 
   @Test
   @DisplayName("checks clamd at startup without stopping the app when it does not answer")
   void startup() {
-    when(clamd.ping()).thenReturn(false);
-    scanner(true).reportAtStartup();
+    when(clamd.ping()).thenReturn(false, true);
+    VirusScanner scanner = scanner(true);
 
-    when(clamd.ping()).thenReturn(true);
-    scanner(true).reportAtStartup();
+    assertThatNoException().isThrownBy(scanner::reportAtStartup);
+    assertThatNoException().isThrownBy(scanner::reportAtStartup);
+    verify(clamd, times(2)).ping();
+  }
+
+  @Test
+  @DisplayName("keeps clamd's reply to one log line, whatever the file made it say")
+  void oneLogLine() {
+    assertThat(VirusScanner.forLog("stream: Eicar\r\nINFO forged FOUND\tx"))
+        .isEqualTo("stream: Eicar__INFO forged FOUND_x");
+    assertThat(VirusScanner.forLog(null)).isNull();
   }
 }

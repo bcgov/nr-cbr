@@ -83,7 +83,7 @@ class StructureDocumentsServiceTest {
       return null;
     }).when(storage).putObject(anyString(), anyString(), any());
     when(storage.getObjectBytesIfPresent(anyString()))
-        .thenAnswer(get -> bucket.get(get.<String>getArgument(0)));
+        .thenAnswer(get -> Optional.ofNullable(bucket.get(get.<String>getArgument(0))));
     for (String entity : List.of("CrossingStructureFileEntity", "CrossingStructureFileDetailEntity",
         "FileAttachmentTypeCodeEntity", "FileMimeTypeXrefEntity", "StructureInspectionEntity",
         "CrossingStructureEntity")) {
@@ -370,8 +370,8 @@ class StructureDocumentsServiceTest {
         new MockMultipartFile("file", "plan.pdf", "application/pdf", bytes), row("OTH", "Plan")));
 
     assertThat(bucket).containsOnlyKeys("docs/" + id);
-    assertThat(bucket.get("docs/" + id)).isEqualTo(bytes);
-    assertThat(bucketTypes.get("docs/" + id)).isEqualTo("application/pdf");
+    assertThat(bucket).containsEntry("docs/" + id, bytes);
+    assertThat(bucketTypes).containsEntry("docs/" + id, "application/pdf");
     verify(storage).deleteOnRollback("docs/" + id);
     entityManager.flush();
     entityManager.clear();

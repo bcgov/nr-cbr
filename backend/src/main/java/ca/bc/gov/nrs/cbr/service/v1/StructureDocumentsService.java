@@ -227,16 +227,14 @@ public class StructureDocumentsService {
     CrossingStructureFileDetailEntity detail = details.findById(fileId)
         .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
         .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
-    byte[] content = storage.getObjectBytesIfPresent(ObjectStorageService.fileKey(fileId));
-    if (content == null) {
-      content = files.findById(fileId)
-          .map(CrossingStructureFileEntity::getStructureFile)
-          .filter(blob -> blob.length > 0)
-          .orElseThrow(() -> {
-            log.warn("Document {} of structure {} has no object and no BLOB", fileId, structureId);
-            return new DocumentNotFoundException(structureId, fileId);
-          });
-    }
+    byte[] content = storage.getObjectBytesIfPresent(ObjectStorageService.fileKey(fileId))
+        .or(() -> files.findById(fileId)
+            .map(CrossingStructureFileEntity::getStructureFile)
+            .filter(blob -> blob.length > 0))
+        .orElseThrow(() -> {
+          log.warn("Document {} of structure {} has no object and no BLOB", fileId, structureId);
+          return new DocumentNotFoundException(structureId, fileId);
+        });
 
     MediaType mediaType = mediaType(detail);
     boolean inline = SHOWN_INLINE.contains(mediaType);

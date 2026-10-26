@@ -149,11 +149,11 @@ class ObjectStorageServiceTest {
   void reads() {
     answer(200, "photo bytes");
     assertThat(storage.getObjectBytesIfPresent("docs/42"))
-        .isEqualTo("photo bytes".getBytes(StandardCharsets.UTF_8));
+        .contains("photo bytes".getBytes(StandardCharsets.UTF_8));
     assertThat(only().path()).isEqualTo("/cbr-bucket/docs/42");
 
     answer(404, NO_SUCH_KEY);
-    assertThat(storage.getObjectBytesIfPresent("docs/43")).isNull();
+    assertThat(storage.getObjectBytesIfPresent("docs/43")).isEmpty();
   }
 
   @Test
