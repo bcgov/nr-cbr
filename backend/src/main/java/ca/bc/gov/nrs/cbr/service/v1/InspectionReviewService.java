@@ -91,6 +91,7 @@ public class InspectionReviewService {
   private final StructureMonitorItemRepository monitors;
   private final LoadRatingService current;
   private final LoggedUserHelper loggedUser;
+  private final InspectionAuditRecorder audit;
 
   @SuppressWarnings("java:S107") // One repository per table the review reads or writes.
   public InspectionReviewService(
@@ -104,7 +105,8 @@ public class InspectionReviewService {
       StructureRepairRepository repairs,
       StructureMonitorItemRepository monitors,
       LoadRatingService current,
-      LoggedUserHelper loggedUser) {
+      LoggedUserHelper loggedUser,
+      InspectionAuditRecorder audit) {
     this.inspections = inspections;
     this.statuses = statuses;
     this.reviewers = reviewers;
@@ -116,6 +118,7 @@ public class InspectionReviewService {
     this.monitors = monitors;
     this.current = current;
     this.loggedUser = loggedUser;
+    this.audit = audit;
   }
 
   /**
@@ -187,6 +190,7 @@ public class InspectionReviewService {
     monitors.requireSuggested(structureId, user);
     log.info("Inspection {} reviewed by reviewer {}", inspectionId,
         reviewer.getInspectionReviewerId());
+    audit.afterCommit(inspectionId);
   }
 
   /**
@@ -211,6 +215,7 @@ public class InspectionReviewService {
         .updateTimestamp(LocalDateTime.now(ZoneId.systemDefault()))
         .build());
     log.info("Updated the PEng comments of inspection {}", inspectionId);
+    audit.afterCommit(inspectionId);
   }
 
   /**

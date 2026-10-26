@@ -96,7 +96,15 @@ public class InspectionDetailRows {
   /** The report's rows, an inspection each, in its order. */
   public List<Map<String, Object>> rows(
       InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
-    Loaded loaded = load(criteria, sort);
+    return rows(load(ids(criteria, sort)));
+  }
+
+  /** One inspection's row, as the report would print it — for its audit record. */
+  public List<Map<String, Object>> rows(long inspectionId) {
+    return rows(load(List.of(inspectionId)));
+  }
+
+  private List<Map<String, Object>> rows(Loaded loaded) {
     Map<Long, List<Map<String, String>>> itemLines = items.lines(loaded.ids());
     Records other = loaded.records();
     List<Map<String, Object>> rows = new ArrayList<>();
@@ -127,14 +135,18 @@ public class InspectionDetailRows {
   /** The CSV's rows, in {@link InspectionDetailCsv#COLUMNS} order: a row per item, as it writes them. */
   public List<List<String>> csvRows(
       InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
-    Loaded loaded = load(criteria, sort);
+    Loaded loaded = load(ids(criteria, sort));
     return InspectionDetailCsv.rows(loaded, items.answers(loaded.ids()));
   }
 
-  /** The inspections for these criteria, in order, and everything read beside them. */
-  private Loaded load(InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
-    List<Long> ids = entityManager.createQuery(InspectionsConductedReportSpecifications.detailIds(
+  /** The inspections for these criteria, in order. */
+  private List<Long> ids(InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
+    return entityManager.createQuery(InspectionsConductedReportSpecifications.detailIds(
         entityManager.getCriteriaBuilder(), criteria, sort)).getResultList();
+  }
+
+  /** These inspections, in this order, and everything read beside them. */
+  private Loaded load(List<Long> ids) {
     if (ids.isEmpty()) {
       return new Loaded(List.of(), Map.of(), Map.of(), Map.of(), Map.of(),
           new Records(Map.of(), Map.of(), Map.of(), Map.of(), Map.of()),

@@ -17,6 +17,7 @@ import type {
 } from '@/pages/NewInspection/inspectionForm';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
+import { invalidateDocuments } from '@/hooks/useStructureSearch';
 import API from '@/services/APIs';
 import { apiFieldErrors } from '@/utils/apiError';
 
@@ -96,7 +97,12 @@ export const useUpdateInspectionHazards = (inspectionId: string) => {
   const mutation = useMutation({
     mutationFn: (request: InspectionHazardsRequest) =>
       API.inspectionSearch.updateInspectionHazards(inspectionId, request),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+    // A save of the inspection may have stored its audit record among the documents.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+        invalidateDocuments(queryClient),
+      ]),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -107,7 +113,12 @@ export const useUpdateInspection = (inspectionId: string) => {
   const mutation = useMutation({
     mutationFn: (request: InspectionUpdateRequest) =>
       API.inspectionSearch.updateInspection(inspectionId, request),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+    // A save of the inspection may have stored its audit record among the documents.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+        invalidateDocuments(queryClient),
+      ]),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -118,7 +129,12 @@ export const useUpdateInspectionComment = (inspectionId: string) => {
   const mutation = useMutation({
     mutationFn: (comment: string) =>
       API.inspectionSearch.updateInspectionComment(inspectionId, comment),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+    // A save of the inspection may have stored its audit record among the documents.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+        invalidateDocuments(queryClient),
+      ]),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -129,7 +145,12 @@ export const useUpdateInspectionCondition = (inspectionId: string, subsectionCod
   const mutation = useMutation({
     mutationFn: (items: InspectionItemRequest[]) =>
       API.inspectionSearch.updateInspectionCondition(inspectionId, subsectionCode, items),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+    // A save of the inspection may have stored its audit record among the documents.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+        invalidateDocuments(queryClient),
+      ]),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };
@@ -153,7 +174,12 @@ export const useUpdatePengComment = (inspectionId: string) => {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: (comment: string) => API.inspectionSearch.updatePengComment(inspectionId, comment),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+    // A save of the inspection may have stored its audit record among the documents.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+        invalidateDocuments(queryClient),
+      ]),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };

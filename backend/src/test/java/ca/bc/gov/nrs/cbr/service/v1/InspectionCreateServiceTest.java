@@ -3,7 +3,9 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
@@ -80,6 +82,10 @@ class InspectionCreateServiceTest {
 
   @MockitoBean
   private LoggedUserHelper loggedUser;
+
+  /** Its rule and its PDF are its own test's; here, only that a save asks for it. */
+  @MockitoBean
+  private InspectionAuditRecorder audit;
 
   /** The structure page's read, for whether the structure is complete. */
   @MockitoBean
@@ -298,6 +304,7 @@ class InspectionCreateServiceTest {
         Map.entry("inspectorCompanyName", "Inspection Company Name is required."));
 
     service.create(bare("sub", TODAY, "Jo Smith", "Bridges Ltd"));
+    verify(audit).afterCommit(anyLong());
 
     assertThat(all(InspectionReportStatusEntity.class)).singleElement()
         .extracting(InspectionReportStatusEntity::getInspectionReportStatusCode).isEqualTo("SUB");

@@ -78,4 +78,21 @@ public class InspectionsConductedDetailService {
         count, format, content.length, millisSince(started));
     return new ReportFile(content, filename(FILENAME, printed, format), format.mediaType());
   }
+
+  /**
+   * One inspection's report as its audit record ({@link InspectionAuditRecorder}): the same PDF,
+   * its criteria line saying which copy it is, and Date Printed when it was saved, to the minute.
+   *
+   * @param printed   e.g. {@code 2026/10/26 14:05}
+   * @param auditLine e.g. {@code Audit record - Submitted - saved by IDIR\JSMITH on 2026-10-26 14:05}
+   */
+  public byte[] auditPdf(long inspectionId, String printed, String auditLine) {
+    Map<String, Object> parameters = support.parameters("CBR001", printed);
+    parameters.put("P_SELECTED_CRITERIA", auditLine);
+    parameters.put("P_ITEMS_REPORT", renderer.compiled(ITEMS));
+    parameters.put("P_REPAIRS_REPORT", renderer.compiled(REPAIRS));
+    parameters.put("P_MONITORS_REPORT", renderer.compiled(MONITORS));
+    return renderer.pdf(TEMPLATE, parameters,
+        rows.rows(inspectionId).stream().<Map<String, ?>>map(row -> row).toList());
+  }
 }

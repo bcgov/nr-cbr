@@ -495,4 +495,33 @@ class InspectionsConductedDetailServiceTest {
         "PEng's Comment:", "Reviewed on site", "Roles and Responsibilities", "None",
         "Corporate Bridge Register (CBR)");
   }
+
+  @Test
+  @DisplayName("produces one inspection's audit record: its report, saying which copy and when to the minute")
+  void auditPdf() throws Exception {
+    long b1 = structure("B1", s -> s);
+    bridge(b1, "12", "9");
+    long id = inspection(b1, LocalDate.of(2025, 6, 12), i -> i.inspectionComment("All good"),
+        "SUB");
+    inspection(b1, LocalDate.of(2024, 6, 12), i -> i.inspectionComment("Another one"), "SUB");
+    entityManager.flush();
+    entityManager.clear();
+    String line = "Audit record - Submitted - saved by IDIR\\JSMITHERSON on 2026-10-26 14:05";
+
+    byte[] pdf = service.auditPdf(id, "2026/10/26 14:05", line);
+
+    PdfReader reader = new PdfReader(pdf);
+    PdfTextExtractor text = new PdfTextExtractor(reader);
+    StringBuilder all = new StringBuilder();
+    for (int page = 1; page <= reader.getNumberOfPages(); page++) {
+      String content = text.getTextFromPage(page).replaceAll("\\s+", " ");
+      // Every page says which copy it is.
+      assertThat(content).contains(line, "2026/10/26 14:05");
+      all.append(content).append('\n');
+    }
+    // Its own inspection alone, P.Eng's roles and all, as legacy's.
+    assertThat(all).contains("Permanent Bridge Inspection Report", "All good",
+            "Roles and Responsibilities")
+        .doesNotContain("Another one");
+  }
 }

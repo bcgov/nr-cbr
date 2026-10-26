@@ -8,14 +8,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { configDefaults } from 'vitest/config';
 
-// Per-build id injected into index.html (see the cbr-build-id plugin below). Without it, a deploy
-// that changes only response headers / infra config (e.g. the CSP in the Caddyfile) leaves index.html
-// byte-identical, so its Workbox precache revision is unchanged — the service worker keeps serving the
-// stale precached shell (with the OLD header) until users manually clear their cache. Tying the shell
-// to a per-commit id busts the shell precache on every deploy, so such changes propagate. Uses the CI
-// commit SHA when available (no churn on identical redeploys); falls back to a build timestamp.
-const BUILD_ID = process.env.GITHUB_SHA ?? process.env.VITE_BUILD_ID ?? String(Date.now());
-
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const projectRootDir = fileURLToPath(new URL('.', import.meta.url));
@@ -50,76 +42,11 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tsconfigPaths(),
-      // Stamp a build id into index.html so its precache revision changes each deploy — see BUILD_ID.
-      {
-        name: 'cbr-build-id',
-        transformIndexHtml() {
-          return [
-            { tag: 'meta', attrs: { name: 'cbr-build', content: BUILD_ID }, injectTo: 'head' },
-          ];
-        },
-      },
-      VitePWA({
-        registerType: 'autoUpdate',
-        // App shell is precached so the CHR editor loads with zero connectivity.
-        // Disabled in dev so HMR/dev server is unaffected; active for build/preview.
-        devOptions: { enabled: false },
-        manifest: {
-          name: 'CBR — Corporate Bridge Register',
-          short_name: 'CBR',
-          description: 'Forest and Range Evaluation Program checklists',
-          theme_color: '#036',
-          background_color: '#ffffff',
-          display: 'standalone',
-          start_url: '/',
-          icons: [{ src: '/vite.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
-        },
-        workbox: {
-          navigateFallback: '/index.html',
-          // png/jpg included so the landing page — which is the *offline* entry point
-          // (getOfflineRoutes serves it) — still has its logo and cover art with no network. They
-          // were missing, so both rendered as broken-image alt text offline.
-          globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,ico,woff,woff2}'],
-          // config.js is generated per-container at start-up by docker-entrypoint.sh — it is the
-          // ONLY file whose contents differ between environments and deploys. Precaching it froze
-          // the runtime config: Workbox fetches a precached URL once at service-worker install and
-          // keys it by a build-time revision hash, and that hash comes from the static placeholder
-          // in public/config.js, which never changes. So the copy cached on a user's first visit
-          // was served forever, and every later deploy's values — backend URL, logout endpoints,
-          // support mailbox, allowed attachment types — were silently ignored.
-          globIgnores: ['config.js'],
-          // The bundled app (Carbon) exceeds Workbox's 2 MiB default; raise the precache ceiling
-          // so the full app shell is cached for offline field use.
-          maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
-          // CHR checklists are persisted in IndexedDB; this just lets read-only
-          // GETs resolve from cache when briefly offline.
-          runtimeCaching: [
-            {
-              urlPattern: ({ url }) => url.pathname.startsWith('/api/v1/'),
-              method: 'GET',
-              handler: 'NetworkFirst',
-              options: { cacheName: 'cbr-api-get', networkTimeoutSeconds: 5 },
-            },
-            {
-              // Network first, cache as the offline fallback.
-              //
-              // NOT precached (see globIgnores): a precached config.js is keyed by a build-time
-              // revision hash taken from the static placeholder, so it never changes and the copy
-              // fetched on a user's first visit is served forever — every later deploy's backend
-              // URL, logout endpoints and feature config silently ignored.
-              //
-              // NOT NetworkOnly either: window.config is defined BY this file, so a failed offline
-              // fetch leaves it undefined, env falls back to build-time vars the container image
-              // does not carry, and the Keycloak UserManager is built with an empty issuer —
-              // breaking sign-in exactly when it is needed. NetworkFirst gives a fresh config
-              // whenever the network answers and the last-known-good one when it does not.
-              urlPattern: ({ url }) => url.pathname === '/config.js',
-              handler: 'NetworkFirst',
-              options: { cacheName: 'cbr-runtime-config', networkTimeoutSeconds: 3 },
-            },
-          ],
-        },
-      }),
+      // CBR has no offline mode, so no service worker. selfDestroying ships a sw.js that unregisters
+      // the one this app used to install and clears its caches, so browsers that already have it
+      // stop serving a stale build. Drop the plugin once that has had time to reach every browser
+      // (Caddy sends sw.js no-store, so the next visit fetches it).
+      VitePWA({ selfDestroying: true, injectRegister: false, manifest: false }),
     ],
     base: env.VITE_BASE_PATH || '/',
     build: {

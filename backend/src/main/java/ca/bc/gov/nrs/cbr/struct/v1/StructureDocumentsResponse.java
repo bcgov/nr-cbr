@@ -23,6 +23,7 @@ public record StructureDocumentsResponse(List<Document> documents) {
    * @param attachmentType what the file shows or is — the link text
    * @param created        when the photo was taken or the document made
    * @param extension      {@code EFILE_EXTENSION_CODE}, e.g. {@code JPG}
+   * @param auditRecord    an inspection's audit record, which is never edited or deleted
    */
   public record Document(
       String id,
@@ -32,5 +33,6 @@ public record StructureDocumentsResponse(List<Document> documents) {
       LocalDate created,
       String extension,
       String description,
-      String filename) {}
+      String filename,
+      boolean auditRecord) {}
 }

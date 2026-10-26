@@ -26,6 +26,9 @@ import org.springframework.web.multipart.MultipartFile;
  * narrower lock — see {@link #addDocument}. The rules are the structure page's — the same
  * services check them. Unlike legacy, which only disabled its page in the browser, a Reviewed,
  * Accepted or Rejected inspection is refused here (409).
+ *
+ * <p>Each change is a save of the inspection, so may make its audit record
+ * ({@link InspectionAuditRecorder}), as legacy's one Save did.
  */
 @Service
 public class InspectionFollowUpService {
@@ -46,50 +49,62 @@ public class InspectionFollowUpService {
   private final StructureRepairsService repairs;
   private final StructureMonitorsService monitors;
   private final StructureDocumentsService documents;
+  private final InspectionAuditRecorder audit;
 
   public InspectionFollowUpService(StructureInspectionRepository inspections,
       StructureRepairsService repairs, StructureMonitorsService monitors,
-      StructureDocumentsService documents) {
+      StructureDocumentsService documents, InspectionAuditRecorder audit) {
     this.inspections = inspections;
     this.repairs = repairs;
     this.monitors = monitors;
     this.documents = documents;
+    this.audit = audit;
   }
 
   /** Adds a repair to the inspection's structure, raised by the inspection. */
   @Transactional
   public RepairCreatedResponse addRepair(long inspectionId, RepairCreateRequest request) {
-    return repairs.create(openToFollowUp(inspectionId), inspectionId, request);
+    RepairCreatedResponse created =
+        repairs.create(openToFollowUp(inspectionId), inspectionId, request);
+    audit.afterCommit(inspectionId);
+    return created;
   }
 
   /** Saves an edit to one of the structure's repairs. */
   @Transactional
   public void updateRepair(long inspectionId, long repairId, RepairUpdateRequest request) {
     repairs.update(openToFollowUp(inspectionId), repairId, request);
+    audit.afterCommit(inspectionId);
   }
 
   /** Deletes one of the structure's repairs. */
   @Transactional
   public void deleteRepair(long inspectionId, long repairId) {
     repairs.delete(openToFollowUp(inspectionId), repairId);
+    audit.afterCommit(inspectionId);
   }
 
   /** Adds a monitoring item to the inspection's structure, raised by the inspection. */
   @Transactional
   public MonitorCreatedResponse addMonitor(long inspectionId, MonitorCreateRequest request) {
-    return monitors.create(openToFollowUp(inspectionId), inspectionId, request);
+    MonitorCreatedResponse created =
+        monitors.create(openToFollowUp(inspectionId), inspectionId, request);
+    audit.afterCommit(inspectionId);
+    return created;
   }
 
   /** Saves an edit to one of the structure's monitoring items. */
   @Transactional
   public void updateMonitor(long inspectionId, long monitorId, MonitorUpdateRequest request) {
     monitors.update(openToFollowUp(inspectionId), monitorId, request);
+    audit.afterCommit(inspectionId);
   }
 
   /** Deletes one of the structure's monitoring items. */
   @Transactional
   public void deleteMonitor(long inspectionId, long monitorId) {
     monitors.delete(openToFollowUp(inspectionId), monitorId);
+    audit.afterCommit(inspectionId);
   }
 
   /**
@@ -103,7 +118,9 @@ public class InspectionFollowUpService {
   public String addDocument(long inspectionId, MultipartFile file, DocumentDetailsRequest details) {
     long structureId = open(inspectionId, DOCUMENT_LOCKING_STATUSES,
         "documents and photos can no longer be added to it");
-    return documents.upload(structureId, inspectionId, file, details);
+    String added = documents.upload(structureId, inspectionId, file, details);
+    audit.afterCommit(inspectionId);
+    return added;
   }
 
   /**
@@ -113,6 +130,7 @@ public class InspectionFollowUpService {
   @Transactional
   public void deleteDocument(long inspectionId, long fileId) {
     documents.delete(open(inspectionId, Map.of(), ""), fileId);
+    audit.afterCommit(inspectionId);
   }
 
   /** The inspection's structure, for a change to its repairs or monitoring items. */

@@ -2068,6 +2068,7 @@ describe('StructureDetailPage — Documents & Photos', () => {
     extension: 'JPG',
     description: 'Deck from the north abutment',
     filename: `${id}.jpg`,
+    auditRecord: false,
     ...overrides,
   });
 
@@ -2109,6 +2110,80 @@ describe('StructureDetailPage — Documents & Photos', () => {
       expect(screen.queryByTestId('structure-documents-add')).not.toBeInTheDocument();
       expect(screen.getByTestId('structure-document-edit-1')).toBeInTheDocument();
       expect(screen.queryByTestId('structure-document-delete-1')).not.toBeInTheDocument();
+    });
+
+    it('offers View alone on an audit record, to every user', async () => {
+      authorization.canEdit = true;
+      authorization.canDelete = true;
+      api.getDocuments.mockResolvedValue({
+        documents: [
+          doc('1', {
+            inspectionId: '30',
+            attachmentType: { code: 'OTH', description: 'Other' },
+            extension: 'PDF',
+            description: 'Audit record - Submitted - saved by IDIR\\JSMITH on 2026-10-26 14:05',
+            filename: '62-001 - B1 - 2025 inspection - Submitted - 2026-10-26 1405.pdf',
+            auditRecord: true,
+          }),
+          doc('2'),
+        ],
+      });
+      await showing(bridge());
+      await openDocuments();
+
+      await screen.findByTestId('structure-document-1');
+      expect(screen.getByTestId('structure-document-view-1')).toBeInTheDocument();
+      expect(screen.queryByTestId('structure-document-edit-1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('structure-document-delete-1')).not.toBeInTheDocument();
+      // Any other file keeps its own.
+      expect(screen.getByTestId('structure-document-edit-2')).toBeInTheDocument();
+      expect(screen.getByTestId('structure-document-delete-2')).toBeInTheDocument();
+    });
+
+    it("shows each inspection's latest audit record, the earlier ones once asked", async () => {
+      const audit = (id: string, inspectionId: string, created: string) =>
+        doc(id, {
+          inspectionId,
+          inspectionDate: '2023-06-01',
+          attachmentType: { code: 'OTH', description: 'Other' },
+          created,
+          extension: 'PDF',
+          description: `Audit record - Submitted - saved by IDIR\\JSMITH on ${created} 10:00`,
+          filename: `audit-${id}.pdf`,
+          auditRecord: true,
+        });
+      api.getDocuments.mockResolvedValue({
+        documents: [
+          // The same day: the newest is the highest id, whatever the order.
+          audit('11', '30', '2026-10-26'),
+          audit('13', '30', '2026-10-26'),
+          audit('12', '30', '2026-10-26'),
+          audit('21', '31', '2026-10-20'),
+          doc('5', { inspectionId: '30', inspectionDate: '2023-06-01' }),
+        ],
+      });
+      await showing(bridge());
+      await openDocuments();
+
+      await screen.findByTestId('structure-document-13');
+      expect(screen.getByTestId('structure-document-21')).toBeInTheDocument();
+      expect(screen.getByTestId('structure-document-5')).toBeInTheDocument();
+      expect(screen.queryByTestId('structure-document-11')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('structure-document-12')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByLabelText('Show earlier audit records (2)'));
+
+      expect(screen.getByTestId('structure-document-11')).toBeInTheDocument();
+      expect(screen.getByTestId('structure-document-12')).toBeInTheDocument();
+    });
+
+    it('offers no audit-record checkbox when no inspection has more than one', async () => {
+      api.getDocuments.mockResolvedValue({ documents: [doc('1')] });
+      await showing(bridge());
+      await openDocuments();
+
+      await screen.findByTestId('structure-document-1');
+      expect(screen.queryByLabelText(/Show earlier audit records/)).not.toBeInTheDocument();
     });
 
     it('offers a read-only user View alone', async () => {

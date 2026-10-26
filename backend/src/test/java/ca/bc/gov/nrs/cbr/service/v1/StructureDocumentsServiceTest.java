@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ca.bc.gov.nrs.cbr.exception.AuditRecordLockedException;
 import ca.bc.gov.nrs.cbr.exception.DocumentNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
@@ -486,5 +488,65 @@ class StructureDocumentsServiceTest {
         .containsExactly(kept);
     verify(storage).deleteAfterCommit(List.of("docs/" + gone));
     verify(storage, never()).deleteAfterCommit(List.of("docs/" + kept));
+  }
+
+  @Test
+  @DisplayName("stores an inspection's audit record as one of its documents: Other, a PDF in the "
+      + "bucket, marked as an audit record, not scanned")
+  void storesAnAuditRecord() {
+    givenInspection(11L, 7L, LocalDate.of(2025, 6, 12));
+    byte[] pdf = "%PDF audit".getBytes();
+
+    long id = service.addAuditRecord(7L, 11L, "62-001 - B7 - 2025 inspection - Submitted - "
+        + "2026-10-26 1405.pdf", "Audit record - Submitted - saved by IDIR\\EDITOR on 2026-10-26 14:05", pdf);
+
+    assertThat(bucket).containsEntry("docs/" + id, pdf);
+    assertThat(bucketTypes).containsEntry("docs/" + id, "application/pdf");
+    Document document = documents(7L).getFirst();
+    assertThat(document.auditRecord()).isTrue();
+    assertThat(document.inspectionId()).isEqualTo("11");
+    assertThat(document.attachmentType()).isEqualTo(new CodeValue("OTH", "Other"));
+    assertThat(document.extension()).isEqualTo("PDF");
+    assertThat(storedDetail(id).getEntryUserid()).isEqualTo("IDIR\\EDITOR");
+    verifyNoInteractions(virusScanner);
+  }
+
+  @Test
+  @DisplayName("never edits or deletes an audit record, and marks no other document as one")
+  void locksAuditRecords() {
+    givenInspection(11L, 7L, LocalDate.of(2025, 6, 12));
+    long audit = service.addAuditRecord(7L, 11L, "a.pdf",
+        "Audit record - Reviewed - saved by IDIR\\EDITOR on 2026-10-26 14:05", "%PDF".getBytes());
+    long photo = givenDocument(7L, 11L, "deck.jpg", LocalDateTime.of(2023, 6, 2, 9, 30));
+    entityManager.flush();
+    entityManager.clear();
+    DocumentUpdateRequest edit = new DocumentUpdateRequest("OTH", "Something else");
+
+    assertThatThrownBy(() -> service.update(7L, audit, edit))
+        .isInstanceOf(AuditRecordLockedException.class);
+    assertThatThrownBy(() -> service.delete(7L, audit))
+        .isInstanceOf(AuditRecordLockedException.class);
+    assertThat(documents(7L)).extracting(Document::id, Document::auditRecord)
+        .containsExactlyInAnyOrder(tuple(String.valueOf(audit), true),
+            tuple(String.valueOf(photo), false));
+    verify(storage, never()).deleteAfterCommit(any());
+  }
+
+  @Test
+  @DisplayName("keeps an audit record's description for audit records, on an upload or an edit")
+  void reservesTheAuditDescription() {
+    long id = givenDocument(7L, null, "deck.jpg", LocalDateTime.of(2023, 6, 2, 9, 30));
+    entityManager.flush();
+    entityManager.clear();
+    String reserved = "Descriptions starting \"Audit record\" are kept for inspection audit "
+        + "records.";
+
+    assertThat(uploadRefused(part("a.pdf", 10), row("OTH", " AUDIT record of my own")))
+        .containsExactly(Map.entry("description", reserved));
+    assertThatThrownBy(() -> service.update(7L, id,
+        new DocumentUpdateRequest("PHOTO", "Audit record")))
+        .isInstanceOfSatisfying(FieldValidationException.class, refused ->
+            assertThat(refused.getFieldErrors()).containsExactly(
+                Map.entry("description", reserved)));
   }
 }
