@@ -56,9 +56,9 @@ public class VirusScanner {
   /**
    * Why {@code content} may not be stored, said for the person who uploaded it; empty when it may.
    *
-   * <p>One log line a scan, its outcome first, for the audit trail. Neither the file's name nor
-   * clamd's reply is logged: the name is the browser's, and the reply — the virus's name, or why
-   * there was none — is clamd's answer about the uploaded bytes, which a crafted file can shape.
+   * <p>One log line a scan, its outcome, for the audit trail; the caller logs whose upload it was.
+   * Nothing taken from the file is logged — not its name, which is the browser's, nor clamd's
+   * reply (the virus's name, or why there was none), which a crafted file can shape.
    * The virus's name goes to the person who uploaded it; a connection that failed is logged by
    * {@link ClamAvClient}.
    */
@@ -69,16 +69,16 @@ public class VirusScanner {
     ScanResult result = clamd.scan(content);
     return switch (result.status()) {
       case CLEAN -> {
-        log.info("Virus scan CLEAN: {} bytes", content.length);
+        log.info("Virus scan CLEAN");
         yield Optional.empty();
       }
       case INFECTED -> {
-        log.warn("Virus scan INFECTED: {} bytes refused", content.length);
+        log.warn("Virus scan INFECTED: refused");
         yield Optional.of(
             "This file was rejected: a virus was detected (" + result.signature() + ").");
       }
       case ERROR -> {
-        log.error("Virus scan UNAVAILABLE: {} bytes refused", content.length);
+        log.error("Virus scan UNAVAILABLE: refused");
         yield Optional.of(UNAVAILABLE);
       }
     };
