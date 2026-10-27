@@ -18,6 +18,7 @@ import { toBox, toIso } from './dateBox';
 import DateField from './DateField';
 import { number } from './format';
 import { useReviewerStatuses } from './reviewerStatuses';
+import StatusSelect from './StatusSelect';
 
 import type { RepairTypeOption, RepairUpdateRequest, StructureRepair } from './repairsResponse';
 import type { ChangeEvent, FC } from 'react';
@@ -317,22 +318,16 @@ const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose })
           // Locked on Add, as legacy locks it: a new repair is a suggestion until someone requires it.
           <ReadOnlyField label="Repair Status" value="Suggested" />
         ) : (
-          <Select
+          <StatusSelect
             id="repair-status"
-            data-testid="repair-status"
-            labelText={requiredLabel('Repair Status', true)}
+            label="Repair Status"
             value={values.statusCode}
-            disabled={statuses.isLoading}
-            invalid={Boolean(shown.statusCode)}
-            invalidText={shown.statusCode}
-            onChange={(event) => change('statusCode', event.target.value)}
+            options={offeredStatuses}
+            loading={statuses.isLoading}
+            error={shown.statusCode}
+            onChange={(code) => change('statusCode', code)}
             onBlur={() => form.leave('statusCode')}
-          >
-            <SelectItem value="" text="Choose a status" />
-            {offeredStatuses.map((option) => (
-              <SelectItem key={option.code} value={option.code} text={option.description} />
-            ))}
-          </Select>
+          />
         )}
         <Select
           id="repair-priority"
