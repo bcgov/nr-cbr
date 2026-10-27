@@ -28,7 +28,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,8 +78,6 @@ public class InspectionReviewService {
   private static final String YES = "Y";
   /** {@code FIRST_NAME}, {@code LAST_NAME VARCHAR2(50 BYTE)}. */
   private static final int NAME_MAX = 50;
-  /** The organization IDIR's display name ends with, e.g. {@code WLRS:EX}. */
-  private static final Pattern ORGANIZATION = Pattern.compile("\\s+\\S+:\\S+$");
 
   private static final String RATING = "loadRating";
   private static final String REASON = "reasonCode";
@@ -241,11 +238,17 @@ public class InspectionReviewService {
     if (comma > 0) {
       last = last.isEmpty() ? shown.substring(0, comma).strip() : last;
       first = first.isEmpty()
-          ? ORGANIZATION.matcher(shown.substring(comma + 1).strip()).replaceFirst("") : first;
+          ? withoutOrganization(shown.substring(comma + 1).strip()) : first;
     }
     String fallback = shown.isEmpty() ? user.substring(user.indexOf('\\') + 1) : shown;
     return new String[] {
         fitted(first.isEmpty() ? fallback : first), fitted(last.isEmpty() ? fallback : last)};
+  }
+
+  /** Drops the organization IDIR's display name ends with, e.g. {@code WLRS:EX}. */
+  private static String withoutOrganization(String name) {
+    int space = name.lastIndexOf(' ');
+    return space > 0 && name.indexOf(':', space) > 0 ? name.substring(0, space).strip() : name;
   }
 
   private static String fitted(String name) {

@@ -17,12 +17,12 @@ import { requiredLabel } from '@/utils/requiredLabel';
 import { toBox, toIso } from './dateBox';
 import DateField from './DateField';
 import { number } from './format';
+import { useReviewerStatuses } from './reviewerStatuses';
 
 import type { RepairTypeOption, RepairUpdateRequest, StructureRepair } from './repairsResponse';
 import type { ChangeEvent, FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
-import { useAuthorization } from '@/hooks/useAuthorization';
 import {
   useRepairGroupCodes,
   useRepairPriorityCodes,
@@ -53,8 +53,6 @@ type Props = {
 const SUGGESTED = 'SUG';
 /** The status that has a completed date and an actual cost. */
 const COMPLETED = 'COM';
-/** Required and Not Required: an inspection reviewer's, as legacy's list; the server agrees. */
-const REVIEWER_STATUSES: ReadonlySet<string> = new Set(['REQ', 'NRQ']);
 /** The type whose repair must be described — legacy's `Repair.validate`. */
 const DESCRIBED_TYPE = '800A';
 /** The description column, in bytes. */
@@ -143,7 +141,6 @@ const typesFor = (options: RepairTypeOption[], groups: ReadonlySet<string>) => {
  * A save that fails for no field's sake is a toast, as the app's other actions report one.
  */
 const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose }) => {
-  const { isInspectionReviewer } = useAuthorization();
   const statuses = useRepairStatusCodes();
   const priorities = useRepairPriorityCodes();
   const groups = useRepairGroupCodes();
@@ -154,14 +151,13 @@ const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose })
   const saving = create.isPending || update.isPending;
   const { display } = useNotification();
 
-  const offeredStatuses = (statuses.data ?? []).filter(
-    (option) => isInspectionReviewer || !REVIEWER_STATUSES.has(option.code),
+  const { offered: offeredStatuses, initial: initialStatus } = useReviewerStatuses(
+    statuses.data,
+    repair?.status.code ?? SUGGESTED,
   );
-  const storedStatus = repair?.status.code ?? SUGGESTED;
 
   const [values, setValues] = useState<Values>({
-    // A status this user may not set opens blank, as legacy's list opens without it.
-    statusCode: !isInspectionReviewer && REVIEWER_STATUSES.has(storedStatus) ? '' : storedStatus,
+    statusCode: initialStatus,
     priorityCode: repair?.priority.code ?? '',
     completedDate: toBox(repair?.completedDate ?? null),
     estimate: number(repair?.estimate),

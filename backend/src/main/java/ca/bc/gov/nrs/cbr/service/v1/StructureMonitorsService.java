@@ -62,6 +62,7 @@ public class StructureMonitorsService {
   private static final String OTHER_FREQUENCY = "OTH";
   /** The description and frequency comment columns, in bytes. */
   private static final int TEXT_MAX = 2000;
+  private static final String STATUS = "statusCode";
   private static final int MAX_PAGE_SIZE = 100;
 
   private final CrossingStructureRepository structures;
@@ -249,12 +250,12 @@ public class StructureMonitorsService {
   private void validate(String status, String frequency, String comment, String description) {
     Map<String, String> errors = new LinkedHashMap<>();
     if (status == null) {
-      errors.put("statusCode", "Monitoring Status is required.");
+      errors.put(STATUS, "Monitoring Status is required.");
     } else if (!statuses.existsById(status)) {
-      errors.put("statusCode", "Monitoring Status is not one of the listed statuses.");
+      errors.put(STATUS, "Monitoring Status is not one of the listed statuses.");
     } else if (REVIEWER_STATUSES.contains(status) && !loggedUser.isInspectionReviewer()) {
       // Legacy's reviewer row; the role now (cbr-inspection-reviewer.local.md §10).
-      errors.put("statusCode",
+      errors.put(STATUS,
           "Only an inspection reviewer can set Monitoring Status to Required or Not Required.");
     }
     if (frequency != null && !frequencies.existsById(frequency)) {
