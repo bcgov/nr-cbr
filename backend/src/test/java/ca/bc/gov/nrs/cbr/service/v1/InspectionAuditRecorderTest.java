@@ -15,9 +15,7 @@ import static org.mockito.Mockito.when;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
-import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionReviewerRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -40,15 +38,13 @@ class InspectionAuditRecorderTest {
   private static final byte[] PDF = "%PDF".getBytes(StandardCharsets.US_ASCII);
 
   private final StructureInspectionRepository inspections = mock(StructureInspectionRepository.class);
-  private final StructureInspectionReviewerRepository reviewers =
-      mock(StructureInspectionReviewerRepository.class);
   private final InspectionsConductedDetailService report =
       mock(InspectionsConductedDetailService.class);
   private final StructureDocumentsService documents = mock(StructureDocumentsService.class);
   private final LoggedUserHelper loggedUser = mock(LoggedUserHelper.class);
 
   private final InspectionAuditRecorder recorder = new InspectionAuditRecorder(inspections,
-      reviewers, report, documents, loggedUser, mock(PlatformTransactionManager.class));
+      report, documents, loggedUser, mock(PlatformTransactionManager.class));
 
   @BeforeEach
   void setUp() {
@@ -65,10 +61,7 @@ class InspectionAuditRecorderTest {
 
   private void given(String status, boolean reviewer) {
     when(inspections.findById(INSPECTION)).thenReturn(Optional.of(inspection(status, "B1")));
-    when(reviewers.findFirstByUseridIgnoreCaseAndActiveInd("IDIR\\JSMITH", "Y"))
-        .thenReturn(reviewer
-            ? Optional.of(StructureInspectionReviewerEntity.builder().build())
-            : Optional.empty());
+    when(loggedUser.isInspectionReviewer()).thenReturn(reviewer);
   }
 
   private static StructureInspectionEntity inspection(String status, String structureName) {

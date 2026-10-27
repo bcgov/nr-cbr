@@ -126,6 +126,16 @@ public class JwtPrincipalUtil {
     return getClaimValue(claims, "display_name");
   }
 
+  /** The user's first name ({@code given_name}), or an empty string. */
+  public static String getGivenName(Map<String, Object> claims) {
+    return getClaimValue(claims, "given_name");
+  }
+
+  /** The user's last name ({@code family_name}), or an empty string. */
+  public static String getFamilyName(Map<String, Object> claims) {
+    return getClaimValue(claims, "family_name");
+  }
+
   /**
    * Pulls the GUID out of {@code preferred_username}, which the standard realm shapes as
    * {@code <guid>@<idp-alias>}. Returns an empty string if the claim is absent or has no

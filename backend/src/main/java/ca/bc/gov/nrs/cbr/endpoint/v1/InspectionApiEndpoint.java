@@ -291,14 +291,13 @@ public interface InspectionApiEndpoint {
    * it, records its load rating, and sets the structure's routine frequency, Load Rating Review
    * Required and, for a routine inspection, the next planned one.
    *
-   * <p>Gated on {@link CbrAuthorities#APPROVE} — a P.Eng, legacy's {@code /approveInspection}; the
-   * service also needs the caller's active inspection reviewer row. <b>204</b>; <b>404</b> when
-   * there is no such inspection; <b>403</b> when the caller is not an active reviewer; <b>409</b>
-   * once it is Reviewed or Accepted; <b>400</b> with {@code fieldErrors} keyed {@code loadRating},
+   * <p>Gated on {@link CbrAuthorities#REVIEW} — a P.Eng, legacy's {@code /approveInspection}, who is
+   * also an inspection reviewer, legacy's reviewer row. <b>204</b>; <b>404</b> when there is no
+   * such inspection; <b>409</b> once it is Reviewed or Accepted; <b>400</b> with {@code fieldErrors} keyed {@code loadRating},
    * {@code reasonCode}, {@code reasonComment}, {@code nextRoutineDate},
    * {@code routineFrequencyYears}, or the Inspection card's required fields.
    */
-  @PreAuthorize(CbrAuthorities.APPROVE)
+  @PreAuthorize(CbrAuthorities.REVIEW)
   @PostMapping("/{inspectionId}/review")
   ResponseEntity<Void> reviewInspection(@PathVariable("inspectionId") long inspectionId,
       @RequestBody InspectionReviewRequest request);

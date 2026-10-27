@@ -3,7 +3,6 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionReviewerRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -25,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>Applied to every save from the inspection's page: a record when, saved, it is Submitted, by
  * anyone — legacy skipped an active reviewer's save, nr-cbr does not — or Reviewed or Accepted by an
- * active inspection reviewer. None In Progress or Rejected. Every record is kept.
+ * inspection reviewer ({@code CBR_INSPECTION_REVIEWER}, legacy's active reviewer row). None In Progress or Rejected. Every record is kept.
  *
  * <p>Made once the save has committed, in a transaction of its own, so it shows the inspection as
  * saved. As legacy, a record that cannot be made is logged and the save stands.
@@ -35,7 +34,6 @@ public class InspectionAuditRecorder {
 
   private static final Logger log = LoggerFactory.getLogger(InspectionAuditRecorder.class);
 
-  private static final String YES = "Y";
   /** The statuses a record is made at, with how they read. */
   private static final Map<String, String> RECORDED = Map.of(
       "SUB", "Submitted", "RVD", "Reviewed", "ACC", "Accepted");
@@ -48,18 +46,16 @@ public class InspectionAuditRecorder {
   private static final int NAME_MAX = 255;
 
   private final StructureInspectionRepository inspections;
-  private final StructureInspectionReviewerRepository reviewers;
   private final InspectionsConductedDetailService report;
   private final StructureDocumentsService documents;
   private final LoggedUserHelper loggedUser;
   private final TransactionTemplate ownTransaction;
 
   public InspectionAuditRecorder(StructureInspectionRepository inspections,
-      StructureInspectionReviewerRepository reviewers, InspectionsConductedDetailService report,
-      StructureDocumentsService documents, LoggedUserHelper loggedUser,
+      InspectionsConductedDetailService report, StructureDocumentsService documents,
+      LoggedUserHelper loggedUser,
       PlatformTransactionManager transactions) {
     this.inspections = inspections;
-    this.reviewers = reviewers;
     this.report = report;
     this.documents = documents;
     this.loggedUser = loggedUser;
@@ -119,7 +115,7 @@ public class InspectionAuditRecorder {
       return;
     }
     // Submitted by anyone; Reviewed or Accepted by a reviewer alone, as legacy.
-    if (!SUBMITTED.equals(code) && !isReviewer(user)) {
+    if (!SUBMITTED.equals(code) && !loggedUser.isInspectionReviewer()) {
       return;
     }
     String status = RECORDED.get(code);
@@ -132,10 +128,6 @@ public class InspectionAuditRecorder {
     long fileId = documents.addAuditRecord(inspection.getCrossingStructureId(), inspectionId,
         filename(inspection, status, now), line, pdf);
     log.info("Made audit record {} of inspection {} ({})", fileId, inspectionId, status);
-  }
-
-  private boolean isReviewer(String user) {
-    return reviewers.findFirstByUseridIgnoreCaseAndActiveInd(user, YES).isPresent();
   }
 
   /**

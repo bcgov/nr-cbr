@@ -21,19 +21,19 @@ import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionReviewRequest;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * A P.Eng's part of an inspection: the review — legacy's Accept dialog, which marks it Reviewed —
@@ -54,8 +54,10 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>Where legacy checked only in the browser — a rating, a reason that fits, Other's words — it is
  * checked here too. Legacy's report to TRIM on review is not sent.
  *
- * <p>The reviewer is the P.Eng saving it: their active {@code STRUCTURE_INSPECTION_REVIEWER} row,
- * without which the review is refused ({@code cbr-inspection-reviewer.local.md} §4).
+ * <p>Who may review is the endpoint's: a P.Eng holding {@code CBR_INSPECTION_REVIEWER}. The
+ * reviewer is the P.Eng saving it: their {@code STRUCTURE_INSPECTION_REVIEWER} row, active or not as
+ * legacy binds one, or one added from their login with their first review ({@code
+ * cbr-inspection-reviewer.local.md} §10).
  */
 @Service
 public class InspectionReviewService {
@@ -75,6 +77,10 @@ public class InspectionReviewService {
   private static final long RATING_MAX = 999_999L;
   private static final int TEXT_MAX = 4000;
   private static final String YES = "Y";
+  /** {@code FIRST_NAME}, {@code LAST_NAME VARCHAR2(50 BYTE)}. */
+  private static final int NAME_MAX = 50;
+  /** The organization IDIR's display name ends with, e.g. {@code WLRS:EX}. */
+  private static final Pattern ORGANIZATION = Pattern.compile("\\s+\\S+:\\S+$");
 
   private static final String RATING = "loadRating";
   private static final String REASON = "reasonCode";
@@ -126,22 +132,18 @@ public class InspectionReviewService {
    *
    * @throws InspectionNotFoundException if there is no such inspection
    * @throws InspectionLockedException   once it is Reviewed or Accepted
-   * @throws ResponseStatusException     403 when the user is not an active inspection reviewer
    * @throws FieldValidationException    with a message for each field at fault
    */
   @Transactional
   public void review(long inspectionId, InspectionReviewRequest request) {
     StructureInspectionEntity inspection = open(inspectionId);
     String user = loggedUser.getLoggedUserId();
-    StructureInspectionReviewerEntity reviewer = reviewers
-        .findFirstByUseridIgnoreCaseAndActiveInd(user, YES)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-            "You are not listed as an inspection reviewer, so you cannot review inspections."));
     Long structureId = inspection.getCrossingStructureId();
     boolean routine = ROUTINE.equals(inspection.getStrctreInspectionTypeCode());
     validate(inspection, request, routine);
 
     LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    StructureInspectionReviewerEntity reviewer = reviewer(user, now);
     String reason = trimmed(request.reasonCode());
     String reasonComment = OTHER_REASON.equals(reason) ? trimmed(request.reasonComment()) : null;
     StructureLoadRatingEntity rating = loadRatings
@@ -191,6 +193,67 @@ public class InspectionReviewService {
     log.info("Inspection {} reviewed by reviewer {}", inspectionId,
         reviewer.getInspectionReviewerId());
     audit.afterCommit(inspectionId);
+  }
+
+  /**
+   * The user's reviewer row, active or not — set active, as a review shows they are — or one added
+   * with the names their login gives.
+   */
+  private StructureInspectionReviewerEntity reviewer(String user, LocalDateTime now) {
+    StructureInspectionReviewerEntity found = reviewers
+        .findFirstByUseridIgnoreCaseOrderByActiveIndDescInspectionReviewerIdAsc(user)
+        .orElse(null);
+    if (found != null && YES.equals(found.getActiveInd())) {
+      return found;
+    }
+    if (found != null) {
+      log.info("Reviewer {} active again", found.getInspectionReviewerId());
+      return reviewers.save(found.toBuilder().activeInd(YES).updateUserid(user)
+          .updateTimestamp(now).build());
+    }
+    String[] names = names(loggedUser.getLoggedUserFirstName(), loggedUser.getLoggedUserLastName(),
+        loggedUser.getLoggedUserDisplayName(), user);
+    StructureInspectionReviewerEntity added = reviewers.save(StructureInspectionReviewerEntity
+        .builder()
+        .userid(user)
+        .firstName(names[0])
+        .lastName(names[1])
+        .activeInd(YES)
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build());
+    log.info("Reviewer {} added", added.getInspectionReviewerId());
+    return added;
+  }
+
+  /**
+   * First and last name, both required: the login's, else read from IDIR's display name
+   * ({@code Last, First ORG:XX}), else the display name or the user ID itself — each within its
+   * column.
+   */
+  static String[] names(String given, String family, String display, String user) {
+    String first = given == null ? "" : given.strip();
+    String last = family == null ? "" : family.strip();
+    String shown = display == null ? "" : display.strip();
+    int comma = shown.indexOf(',');
+    if (comma > 0) {
+      last = last.isEmpty() ? shown.substring(0, comma).strip() : last;
+      first = first.isEmpty()
+          ? ORGANIZATION.matcher(shown.substring(comma + 1).strip()).replaceFirst("") : first;
+    }
+    String fallback = shown.isEmpty() ? user.substring(user.indexOf('\\') + 1) : shown;
+    return new String[] {
+        fitted(first.isEmpty() ? fallback : first), fitted(last.isEmpty() ? fallback : last)};
+  }
+
+  private static String fitted(String name) {
+    String fitted = name;
+    while (fitted.getBytes(StandardCharsets.UTF_8).length > NAME_MAX) {
+      fitted = fitted.substring(0, fitted.length() - 1);
+    }
+    return fitted;
   }
 
   /**

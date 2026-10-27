@@ -46,6 +46,21 @@ class CbrAuthoritiesTest {
   }
 
   @Test
+  @DisplayName("REVIEW is a P.Eng who is also an inspection reviewer — both, not either")
+  void reviewNeedsBothRoles() {
+    assertThat(CbrAuthorities.REVIEW)
+        .isEqualTo("hasAuthority('CBR_PENG') and hasAuthority('CBR_INSPECTION_REVIEWER')");
+    // Off the ladder, like ADMIN: it ranks nowhere, reads nothing, and FAM may issue it.
+    assertThat(CbrRoles.LADDER).doesNotContain(CbrRoles.INSPECTION_REVIEWER);
+    assertThat(CbrRoles.READERS).doesNotContain(CbrRoles.INSPECTION_REVIEWER);
+    assertThat(CbrRoles.effectiveRole(Set.of(CbrRoles.INSPECTION_REVIEWER, CbrRoles.PENG)))
+        .isEqualTo(CbrRoles.PENG);
+    assertThat(CbrRoles.isKnown(CbrRoles.INSPECTION_REVIEWER)).isTrue();
+    assertThat(CbrRoles.isInspectionReviewer(Set.of(CbrRoles.INSPECTION_REVIEWER))).isTrue();
+    assertThat(CbrRoles.isInspectionReviewer(Set.of(CbrRoles.PENG))).isFalse();
+  }
+
+  @Test
   @DisplayName("READ admits every ladder role plus CBR_ADMIN")
   void readAdmitsAdministrators() {
     // A deliberate divergence from legacy, decided 2026-09-15: in WebADE the ADMINISTRATOR role held
@@ -66,7 +81,8 @@ class CbrAuthoritiesTest {
         CbrAuthorities.INSPECTION_WRITE,
         CbrAuthorities.CONTENT_EDIT,
         CbrAuthorities.DESTRUCTIVE,
-        CbrAuthorities.APPROVE);
+        CbrAuthorities.APPROVE,
+        CbrAuthorities.REVIEW);
 
     String admin = CbrAuthorities.ADMIN;
 

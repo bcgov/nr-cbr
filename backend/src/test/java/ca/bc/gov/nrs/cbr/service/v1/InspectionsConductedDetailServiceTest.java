@@ -259,10 +259,12 @@ class InspectionsConductedDetailServiceTest {
   @Test
   @DisplayName("names the reviewer and the review date once the inspection has one")
   void reviewedStatus() {
-    entityManager.persist(StructureInspectionReviewerEntity.builder().inspectionReviewerId(7L)
-        .userid("IDIR\\PENG").firstName("Pat").lastName("Engineer").activeInd("Y").build());
+    StructureInspectionReviewerEntity reviewer = StructureInspectionReviewerEntity.builder()
+        .userid("IDIR\\PENG").firstName("Pat").lastName("Engineer").activeInd("Y").build();
+    entityManager.persist(reviewer);
     long id = structure("B1", s -> s);
-    long inspection = inspection(id, LocalDate.of(2025, 6, 12), i -> i.inspectionReviewerId(7L)
+    long inspection = inspection(id, LocalDate.of(2025, 6, 12), i -> i
+        .inspectionReviewerId(reviewer.getInspectionReviewerId())
         .pengReviewerDate(LocalDateTime.of(2025, 7, 2, 0, 0)), "ACC");
     entityManager.persist(StructureLoadRatingEntity.builder()
         .crossingStructureId(id).inspectionId(inspection).loadRating(new BigDecimal("45.4"))

@@ -58,13 +58,16 @@ class InspectionDetailServiceTest {
     }
   }
 
+  /** The reviewer the inspections are bound to: none of the table's, unless a test adds one. */
+  private long reviewerId = 3L;
+
   private void inspection(long id, String... statuses) {
     entityManager.persist(StructureInspectionEntity.builder().inspectionId(id)
         .crossingStructureId(7L).strctreInspectionTypeCode("ROUT")
         .inspectionDate(LocalDate.of(2024, 5, 1)).inspectorName("Jo Smith")
         .inspectorCompanyName("Bridges Ltd").inspectionCost(1200L).pengInspectionReqInd("Y")
         .inspectionComment("Fine").pengComment("Agreed").siteAtTimeOfInspection("62-001")
-        .inspectionReviewerId(3L).pengReviewerDate(LocalDateTime.of(2024, 6, 2, 9, 0))
+        .inspectionReviewerId(reviewerId).pengReviewerDate(LocalDateTime.of(2024, 6, 2, 9, 0))
         .channelPwlDepth(new BigDecimal("1.5")).scourHazardInd("Y").debrisHazardInd("N")
         .hazardComment("Some scour").entryUserid("IDIR\\JO")
         .entryTimestamp(LocalDateTime.of(2024, 5, 1, 8, 0)).build());
@@ -112,9 +115,11 @@ class InspectionDetailServiceTest {
   @Test
   @DisplayName("carries the review: who and when, the load rating and its reason, the comments")
   void readsTheReview() {
+    StructureInspectionReviewerEntity reviewer = StructureInspectionReviewerEntity.builder()
+        .userid("IDIR\\PAT").firstName("Pat").lastName("Engineer").build();
+    entityManager.persist(reviewer);
+    reviewerId = reviewer.getInspectionReviewerId();
     inspection(41L, "RVD");
-    entityManager.persist(StructureInspectionReviewerEntity.builder().inspectionReviewerId(3L)
-        .userid("IDIR\\PAT").firstName("Pat").lastName("Engineer").build());
     entityManager.persist(StrctreLoadRatingRsnCodeEntity.builder().strctreLoadRatingRsnCode("SD")
         .description("Structural deterioration").effectiveDate(PAST).expiryDate(FUTURE).build());
     entityManager.persist(StructureLoadRatingEntity.builder().crossingStructureId(7L)

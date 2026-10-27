@@ -11,6 +11,7 @@ import type { MonitorUpdateRequest, StructureMonitor } from './monitorsResponse'
 import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
+import { useAuthorization } from '@/hooks/useAuthorization';
 import { useMonitorFrequencyCodes, useMonitoringStatusCodes } from '@/hooks/useConfiguration';
 import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useCreateStructureMonitor, useUpdateStructureMonitor } from '@/hooks/useStructureSearch';
@@ -35,6 +36,8 @@ const OTHER_FREQUENCY = 'OTH';
 const DEFAULT_FREQUENCY = 'INS';
 /** The status every new item starts in — legacy locks it on Add. */
 const SUGGESTED = 'SUG';
+/** Required and Not Required: an inspection reviewer's, as legacy's list; the server agrees. */
+const REVIEWER_STATUSES: ReadonlySet<string> = new Set(['REQ', 'NRQ']);
 /** The description and frequency comment columns, in bytes. */
 const TEXT_MAX = 2000;
 
@@ -69,6 +72,7 @@ const validate = (values: MonitorUpdateRequest): Errors => {
  */
 const MonitorDialog: FC<Props> = ({ structureId, inspectionId, monitor, onClose }) => {
   const adding = monitor === null;
+  const { isInspectionReviewer } = useAuthorization();
   const statuses = useMonitoringStatusCodes();
   const frequencies = useMonitorFrequencyCodes();
   const create = useCreateStructureMonitor(structureId, inspectionId);
@@ -76,8 +80,14 @@ const MonitorDialog: FC<Props> = ({ structureId, inspectionId, monitor, onClose 
   const saving = create.isPending || update.isPending;
   const { display } = useNotification();
 
+  const offeredStatuses = (statuses.data ?? []).filter(
+    (option) => isInspectionReviewer || !REVIEWER_STATUSES.has(option.code),
+  );
+  const storedStatus = monitor?.status.code ?? SUGGESTED;
+
   const [values, setValues] = useState<MonitorUpdateRequest>({
-    statusCode: monitor?.status.code ?? SUGGESTED,
+    // A status this user may not set opens blank, as legacy's list opens without it.
+    statusCode: !isInspectionReviewer && REVIEWER_STATUSES.has(storedStatus) ? '' : storedStatus,
     frequencyCode: monitor?.frequency.code ?? '',
     frequencyComment: monitor?.frequencyComment ?? '',
     description: monitor?.description ?? '',
@@ -199,7 +209,8 @@ const MonitorDialog: FC<Props> = ({ structureId, inspectionId, monitor, onClose 
             onChange={(event) => change('statusCode', event.target.value)}
             onBlur={() => form.leave('statusCode')}
           >
-            {(statuses.data ?? []).map((option) => (
+            <SelectItem value="" text="Choose a status" />
+            {offeredStatuses.map((option) => (
               <SelectItem key={option.code} value={option.code} text={option.description} />
             ))}
           </Select>

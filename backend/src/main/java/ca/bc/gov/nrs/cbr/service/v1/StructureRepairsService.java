@@ -69,8 +69,8 @@ public class StructureRepairsService {
   private static final String NOT_CARRIED_FORWARD = "N";
   /** The status field's name in a refusal — the request's, which is the form's. */
   private static final String STATUS_FIELD = "statusCode";
-  /** Required and Not Required: the statuses legacy offers only a P.Eng. */
-  private static final Set<String> ENGINEER_STATUSES = Set.of(REQUIRED, "NRQ");
+  /** Required and Not Required: an inspection reviewer's to set, as legacy. */
+  private static final Set<String> REVIEWER_STATUSES = Set.of(REQUIRED, "NRQ");
   /** The type whose repair must be described — legacy's {@code Repair.validate}. */
   private static final String DESCRIBED_TYPE = "800A";
   /** The description column, in bytes. */
@@ -348,9 +348,10 @@ public class StructureRepairsService {
       errors.put(STATUS_FIELD, "Repair Status is required.");
     } else if (!statuses.existsById(status)) {
       errors.put(STATUS_FIELD, "Repair Status is not one of the listed statuses.");
-    } else if (ENGINEER_STATUSES.contains(status) && !loggedUser.isPeng()) {
+    } else if (REVIEWER_STATUSES.contains(status) && !loggedUser.isInspectionReviewer()) {
+      // Legacy's reviewer row; the role now (cbr-inspection-reviewer.local.md §10).
       errors.put(STATUS_FIELD,
-          "Only a professional engineer can set Repair Status to Required or Not Required.");
+          "Only an inspection reviewer can set Repair Status to Required or Not Required.");
     }
   }
 

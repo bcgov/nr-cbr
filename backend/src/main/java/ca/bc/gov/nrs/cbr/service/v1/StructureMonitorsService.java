@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -55,6 +56,8 @@ public class StructureMonitorsService {
   private static final String SUGGESTED = "SUG";
   private static final String REQUIRED = "REQ";
   private static final String COMPLETED = "COM";
+  /** Required and Not Required: an inspection reviewer's to set, as legacy. */
+  private static final Set<String> REVIEWER_STATUSES = Set.of(REQUIRED, "NRQ");
   /** A frequency that needs words: "Other". */
   private static final String OTHER_FREQUENCY = "OTH";
   /** The description and frequency comment columns, in bytes. */
@@ -199,7 +202,8 @@ public class StructureMonitorsService {
    * ({@code StructureAction.monitor}, {@code CBR.UPDATE_MONITOR}).
    *
    * <p>As legacy: the description is required and at most 2000 characters; a frequency of Other
-   * needs its comment. The status and frequency must be codes that exist. The number is not
+   * needs its comment. The status and frequency must be codes that exist; Required and Not Required
+   * an inspection reviewer's. The number is not
    * changed.
    *
    * <p>As legacy's procedure, the audit for the status the item now has — Suggested, Required or
@@ -248,6 +252,10 @@ public class StructureMonitorsService {
       errors.put("statusCode", "Monitoring Status is required.");
     } else if (!statuses.existsById(status)) {
       errors.put("statusCode", "Monitoring Status is not one of the listed statuses.");
+    } else if (REVIEWER_STATUSES.contains(status) && !loggedUser.isInspectionReviewer()) {
+      // Legacy's reviewer row; the role now (cbr-inspection-reviewer.local.md §10).
+      errors.put("statusCode",
+          "Only an inspection reviewer can set Monitoring Status to Required or Not Required.");
     }
     if (frequency != null && !frequencies.existsById(frequency)) {
       errors.put("frequencyCode", "Monitoring Frequency is not one of the listed frequencies.");

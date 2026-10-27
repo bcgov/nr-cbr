@@ -32,9 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.web.server.ResponseStatusException;
 
 /** A P.Eng's review of an inspection — legacy's Accept dialog — and the PEng Comments. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
@@ -58,6 +56,9 @@ class InspectionReviewServiceTest {
   @MockitoBean
   private InspectionAuditRecorder audit;
 
+  /** {@link #PENG}'s row. */
+  private long reviewerId;
+
   @BeforeEach
   void setUp() {
     when(loggedUser.getLoggedUserId()).thenReturn("idir\\peng");
@@ -79,8 +80,10 @@ class InspectionReviewServiceTest {
     entityManager.persist(new LoadRatingReasonXrefEntity("DOWN", "DEC"));
     entityManager.persist(new LoadRatingReasonXrefEntity("OTHR", "UNDEF"));
     entityManager.persist(new LoadRatingReasonXrefEntity("HIST", "UNDEF"));
-    entityManager.persist(StructureInspectionReviewerEntity.builder().inspectionReviewerId(5L)
-        .userid(PENG).firstName("Pat").lastName("Eng").activeInd("Y").build());
+    StructureInspectionReviewerEntity reviewer = StructureInspectionReviewerEntity.builder()
+        .userid(PENG).firstName("Pat").lastName("Eng").activeInd("Y").build();
+    entityManager.persist(reviewer);
+    reviewerId = reviewer.getInspectionReviewerId();
     entityManager.persist(StructureRepairEntity.builder().crossingStructureId(7L)
         .repairNumber(1L).repairStatusCode("SUG").description("Deck").build());
     entityManager.persist(StructureMonitorItemEntity.builder().crossingStructureId(7L)
@@ -128,7 +131,7 @@ class InspectionReviewServiceTest {
 
     StructureInspectionEntity inspection = found(StructureInspectionEntity.class, 41L);
     assertThat(inspection.getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("RVD");
-    assertThat(inspection.getInspectionReviewerId()).isEqualTo(5L);
+    assertThat(inspection.getInspectionReviewerId()).isEqualTo(reviewerId);
     assertThat(inspection.getPengReviewerDate()).isNotNull();
     StructureLoadRatingEntity rating = entityManager.createQuery(
         "SELECT r FROM StructureLoadRatingEntity r WHERE r.inspectionId = 41",
@@ -204,19 +207,70 @@ class InspectionReviewServiceTest {
   }
 
   @Test
-  @DisplayName("is refused to a P.Eng with no active reviewer row, and once Reviewed")
-  void refusals() {
-    inspection(41L, "SUB", "ROUT");
+  @DisplayName("is refused once Reviewed")
+  void refusedOnceReviewed() {
     inspection(42L, "RVD", "ROUT");
     InspectionReviewRequest request = review(40L, "INSP", null);
 
-    when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\SOMEONE");
-    assertThatThrownBy(() -> service.review(41L, request))
-        .isInstanceOfSatisfying(ResponseStatusException.class,
-            refusal -> assertThat(refusal.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
-    when(loggedUser.getLoggedUserId()).thenReturn(PENG);
     assertThatThrownBy(() -> service.review(42L, request))
         .isInstanceOf(InspectionLockedException.class);
+  }
+
+  @Test
+  @DisplayName("adds a reviewer's row with their first review, named from their login")
+  void addsTheReviewer() {
+    inspection(41L, "SUB", "ROUT");
+    when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\NEWPENG");
+    when(loggedUser.getLoggedUserFirstName()).thenReturn("Nia");
+    when(loggedUser.getLoggedUserLastName()).thenReturn("Engineer");
+
+    service.review(41L, review(40L, "INSP", null));
+
+    long bound = found(StructureInspectionEntity.class, 41L).getInspectionReviewerId();
+    assertThat(bound).isNotEqualTo(reviewerId);
+    assertThat(entityManager.find(StructureInspectionReviewerEntity.class, bound))
+        .satisfies(row -> {
+          assertThat(row.getUserid()).isEqualTo("IDIR\\NEWPENG");
+          assertThat(row.getFirstName()).isEqualTo("Nia");
+          assertThat(row.getLastName()).isEqualTo("Engineer");
+          assertThat(row.getActiveInd()).isEqualTo("Y");
+          assertThat(row.getEntryUserid()).isEqualTo("IDIR\\NEWPENG");
+          assertThat(row.getEntryTimestamp()).isNotNull();
+        });
+  }
+
+  @Test
+  @DisplayName("binds a reviewer's inactive row, active again — no second row")
+  void reactivatesTheReviewer() {
+    StructureInspectionReviewerEntity inactive = StructureInspectionReviewerEntity.builder()
+        .userid("IDIR\\OLDPENG").firstName("Old").lastName("Eng").activeInd("N").build();
+    entityManager.persist(inactive);
+    inspection(41L, "SUB", "ROUT");
+    when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\OLDPENG");
+
+    service.review(41L, review(40L, "INSP", null));
+
+    assertThat(found(StructureInspectionEntity.class, 41L).getInspectionReviewerId())
+        .isEqualTo(inactive.getInspectionReviewerId());
+    assertThat(entityManager.find(StructureInspectionReviewerEntity.class,
+        inactive.getInspectionReviewerId()).getActiveInd()).isEqualTo("Y");
+    assertThat(entityManager.createQuery("SELECT COUNT(r) FROM StructureInspectionReviewerEntity r",
+        Long.class).getSingleResult()).isEqualTo(2L);
+  }
+
+  @Test
+  @DisplayName("names a new reviewer from the login, IDIR's display name, or the user ID")
+  void names() {
+    assertThat(InspectionReviewService.names("Nia", "Engineer", "Engineer, Nia WLRS:EX",
+        "IDIR\\NIA")).containsExactly("Nia", "Engineer");
+    assertThat(InspectionReviewService.names("", null, "Engineer, Nia WLRS:EX", "IDIR\\NIA"))
+        .containsExactly("Nia", "Engineer");
+    assertThat(InspectionReviewService.names(null, null, "Nia Engineer", "BCEID\\NIA"))
+        .containsExactly("Nia Engineer", "Nia Engineer");
+    assertThat(InspectionReviewService.names(null, null, null, "IDIR\\NIA"))
+        .containsExactly("NIA", "NIA");
+    assertThat(InspectionReviewService.names("é".repeat(40), "Eng", null, "IDIR\\NIA")[0])
+        .hasSize(25);
   }
 
   @Test

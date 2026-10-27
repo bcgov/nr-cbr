@@ -48,6 +48,16 @@ public class LoggedUserHelper {
     return JwtPrincipalUtil.getDisplayName(getPrincipal().getClaims());
   }
 
+  /** The user's first name from the token's {@code given_name} claim, or an empty string. */
+  public String getLoggedUserFirstName() {
+    return JwtPrincipalUtil.getGivenName(getPrincipal().getClaims());
+  }
+
+  /** The user's last name from the token's {@code family_name} claim, or an empty string. */
+  public String getLoggedUserLastName() {
+    return JwtPrincipalUtil.getFamilyName(getPrincipal().getClaims());
+  }
+
   // ─── Role / authority helpers (roles ride the access token — see Oauth2SecurityCustomizer) ──
 
   /**
@@ -137,11 +147,19 @@ public class LoggedUserHelper {
    * held by {@code PROFESSIONAL_ENGINEER} alone.
    *
    * <p>That separation is the point: sealing an inspection is a professional engineering act tied to
-   * a named P.Eng, not an administrative one. Holding the role is still only half of it — the
-   * workflow also binds to a {@code STRUCTURE_INSPECTION_REVIEWER} row keyed by userid.
+   * a named P.Eng, not an administrative one. Marking one Reviewed also needs
+   * {@link #isInspectionReviewer()}.
    */
   public boolean isPeng() {
     return getAuthorities().contains(CbrRoles.PENG);
+  }
+
+  /**
+   * True if the user holds {@link CbrRoles#INSPECTION_REVIEWER}: with {@link #isPeng()}, may mark an
+   * inspection Reviewed; may set repair and monitoring items Required or Not Required.
+   */
+  public boolean isInspectionReviewer() {
+    return CbrRoles.isInspectionReviewer(getAuthorities());
   }
 
   // ─── Internal helpers ─────────────────────────────────────────────

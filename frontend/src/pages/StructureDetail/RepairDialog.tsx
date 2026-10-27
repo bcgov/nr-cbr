@@ -53,8 +53,8 @@ type Props = {
 const SUGGESTED = 'SUG';
 /** The status that has a completed date and an actual cost. */
 const COMPLETED = 'COM';
-/** Required and Not Required: legacy offers them to a P.Eng only, and the server agrees. */
-const ENGINEER_STATUSES: ReadonlySet<string> = new Set(['REQ', 'NRQ']);
+/** Required and Not Required: an inspection reviewer's, as legacy's list; the server agrees. */
+const REVIEWER_STATUSES: ReadonlySet<string> = new Set(['REQ', 'NRQ']);
 /** The type whose repair must be described — legacy's `Repair.validate`. */
 const DESCRIBED_TYPE = '800A';
 /** The description column, in bytes. */
@@ -143,7 +143,7 @@ const typesFor = (options: RepairTypeOption[], groups: ReadonlySet<string>) => {
  * A save that fails for no field's sake is a toast, as the app's other actions report one.
  */
 const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose }) => {
-  const { isPeng } = useAuthorization();
+  const { isInspectionReviewer } = useAuthorization();
   const statuses = useRepairStatusCodes();
   const priorities = useRepairPriorityCodes();
   const groups = useRepairGroupCodes();
@@ -155,13 +155,13 @@ const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose })
   const { display } = useNotification();
 
   const offeredStatuses = (statuses.data ?? []).filter(
-    (option) => isPeng || !ENGINEER_STATUSES.has(option.code),
+    (option) => isInspectionReviewer || !REVIEWER_STATUSES.has(option.code),
   );
   const storedStatus = repair?.status.code ?? SUGGESTED;
 
   const [values, setValues] = useState<Values>({
     // A status this user may not set opens blank, as legacy's list opens without it.
-    statusCode: !isPeng && ENGINEER_STATUSES.has(storedStatus) ? '' : storedStatus,
+    statusCode: !isInspectionReviewer && REVIEWER_STATUSES.has(storedStatus) ? '' : storedStatus,
     priorityCode: repair?.priority.code ?? '',
     completedDate: toBox(repair?.completedDate ?? null),
     estimate: number(repair?.estimate),
