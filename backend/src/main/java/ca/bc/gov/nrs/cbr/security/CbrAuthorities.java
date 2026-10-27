@@ -19,14 +19,14 @@ package ca.bc.gov.nrs.cbr.security;
  *
  * <table>
  *   <caption>Who can do what</caption>
- *   <tr><th>Capability</th><th>Floor</th><th>GENERAL</th><th>LEVEL_0</th><th>LEVEL_1</th><th>LEVEL_2</th><th>PENG</th><th>ADMIN</th></tr>
- *   <tr><td>{@link #READ}</td><td>GENERAL</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><b>✓</b></td></tr>
- *   <tr><td>{@link #INSPECTION_WRITE}</td><td>LEVEL_0</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #CONTENT_EDIT}</td><td>LEVEL_1</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #DESTRUCTIVE}</td><td>LEVEL_2</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #APPROVE}</td><td>PENG</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #REVIEW}</td><td>PENG + {@code CBR_INSPECTION_REVIEWER}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>with the role</td><td>—</td></tr>
- *   <tr><td>{@link #ADMIN}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+ *   <tr><th>Capability</th><th>Floor</th><th>GENERAL</th><th>LEVEL_0</th><th>LEVEL_1</th><th>LEVEL_2</th><th>PENG</th><th>INSPECTION_REVIEWER</th><th>ADMIN</th></tr>
+ *   <tr><td>{@link #READ}</td><td>GENERAL</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><b>✓</b></td></tr>
+ *   <tr><td>{@link #INSPECTION_WRITE}</td><td>LEVEL_0</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #CONTENT_EDIT}</td><td>LEVEL_1</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #DESTRUCTIVE}</td><td>LEVEL_2</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #APPROVE}</td><td>PENG</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #REVIEW}</td><td>INSPECTION_REVIEWER</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #ADMIN}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
  * </table>
  *
  * <p><b>{@link #READ} is the only capability {@link CbrRoles#ADMIN} shares.</b> Administrators can
@@ -54,7 +54,7 @@ public final class CbrAuthorities {
    */
   public static final String READ =
       "hasAnyAuthority('CBR_GENERAL','CBR_LEVEL_0','CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG',"
-          + "'CBR_ADMIN')";
+          + "'CBR_INSPECTION_REVIEWER','CBR_ADMIN')";
 
   /**
    * Record or amend an inspection ({@code /saveInspection}), and the offline capture path.
@@ -64,7 +64,8 @@ public final class CbrAuthorities {
    * off.
    */
   public static final String INSPECTION_WRITE =
-      "hasAnyAuthority('CBR_LEVEL_0','CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG')";
+      "hasAnyAuthority('CBR_LEVEL_0','CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG',"
+          + "'CBR_INSPECTION_REVIEWER')";
 
   /**
    * The general create/edit surface: {@code /saveSite}, {@code /saveStructure},
@@ -74,7 +75,7 @@ public final class CbrAuthorities {
    * / Level 2 line.
    */
   public static final String CONTENT_EDIT =
-      "hasAnyAuthority('CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG')";
+      "hasAnyAuthority('CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG','CBR_INSPECTION_REVIEWER')";
 
   /**
    * Destructive operations: the nine deletes (site, structure, inspection, and the
@@ -86,29 +87,26 @@ public final class CbrAuthorities {
    * {@link #CONTENT_EDIT}: the legacy export puts it on LEVEL_2, alongside the deletes.
    */
   public static final String DESTRUCTIVE =
-      "hasAnyAuthority('CBR_LEVEL_2','CBR_PENG')";
+      "hasAnyAuthority('CBR_LEVEL_2','CBR_PENG','CBR_INSPECTION_REVIEWER')";
 
   /**
    * Sign off an inspection — {@code /approveInspection} and {@code /pEngAccess}: moving one into
    * {@code RVD}/{@code REJ}/{@code ACC}, and editing one already there.
    *
    * <p>Floor: {@link CbrRoles#PENG}, which in the export holds {@code /approveInspection}
-   * <b>alone</b>. {@link CbrRoles#ADMIN} is excluded: sealing an inspection is a professional
+   * <b>alone</b> — and the reviewer rung above it. {@link CbrRoles#ADMIN} is excluded: sealing an inspection is a professional
    * engineering act tied to a named P.Eng, not an administrative one.
    *
    * <p>Marking one Reviewed needs {@link #REVIEW} as well.
    */
-  public static final String APPROVE = "hasAuthority('CBR_PENG')";
+  public static final String APPROVE = "hasAnyAuthority('CBR_PENG','CBR_INSPECTION_REVIEWER')";
 
   /**
-   * Mark an inspection Reviewed: a P.Eng who is also an inspection reviewer — legacy's
+   * Mark an inspection Reviewed: the top rung, {@link CbrRoles#INSPECTION_REVIEWER} — legacy's
    * {@code /approveInspection} and a reviewer row. Moving one into Rejected, or changing one already
    * Reviewed, needs {@link #APPROVE} alone, as legacy ({@code cbr-inspection-reviewer.local.md} §10).
-   *
-   * <p>Both roles, not either: {@link CbrRoles#INSPECTION_REVIEWER} is off the ladder.
    */
-  public static final String REVIEW =
-      "hasAuthority('CBR_PENG') and hasAuthority('CBR_INSPECTION_REVIEWER')";
+  public static final String REVIEW = "hasAuthority('CBR_INSPECTION_REVIEWER')";
 
   /**
    * Administration: the landing-page bulletin and inspection-reviewer maintenance.

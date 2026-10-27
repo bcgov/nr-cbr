@@ -44,11 +44,12 @@ export const AVAILABLE_ROLES = [
  * | `CBR_LEVEL_2` | destructive: all nine deletes, archive, add site, status override, bulk upload |
  * | `CBR_PENG` | `/approveInspection` (**held by this role alone**), `/pEngAccess` |
  * | `CBR_ADMIN` | the two admin screens, **plus read** |
- * | `CBR_INSPECTION_REVIEWER` | with `CBR_PENG`, mark an inspection Reviewed; repair and monitoring items Required or Not Required — legacy's reviewer row |
+ * | `CBR_INSPECTION_REVIEWER` | everything `CBR_PENG` has, plus mark an inspection Reviewed and set repair and monitoring items Required or Not Required — legacy's reviewer row |
  *
- * Profiles nest: READ_ONLY ⊂ TECHNICIAN_0 ⊂ TECHNICIAN_1 ⊂ TECHNICIAN_2 ⊂ MINISTRY_PENG.
- * `CBR_ADMIN` and `CBR_INSPECTION_REVIEWER` stand apart — neither is on that ladder, and the reviewer
- * role is held alongside a ladder role (not every P.Eng is a reviewer; cbr-inspection-reviewer.local.md §10).
+ * Profiles nest: READ_ONLY ⊂ TECHNICIAN_0 ⊂ TECHNICIAN_1 ⊂ TECHNICIAN_2 ⊂ MINISTRY_PENG ⊂
+ * INSPECTION_REVIEWER. The top rung is legacy's reviewer row, which only a P.Eng was given: FAM grants
+ * a reviewing P.Eng `CBR_INSPECTION_REVIEWER` in place of `CBR_PENG` (cbr-inspection-reviewer.local.md §10).
+ * `CBR_ADMIN` stands apart — it is not on that ladder.
  *
  * **`CBR_ADMIN` gets read, diverging from legacy** (decided 2026-09-15): WebADE's `ADMINISTRATOR`
  * held three privileges and its profile bundled no `GENERAL`, so an administrator could not open a
@@ -56,11 +57,25 @@ export const AVAILABLE_ROLES = [
  * capability below excludes `CBR_ADMIN`, so do not treat it as a superuser in the UI.
  */
 export const ROLE_CAPABILITIES = {
-  read: ['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'],
+  read: [
+    'CBR_GENERAL',
+    'CBR_LEVEL_0',
+    'CBR_LEVEL_1',
+    'CBR_LEVEL_2',
+    'CBR_PENG',
+    'CBR_INSPECTION_REVIEWER',
+    'CBR_ADMIN',
+  ],
   /** Record or amend an inspection — narrower than `write`, which also covers sites and structures. */
-  inspectionWrite: ['CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'],
+  inspectionWrite: [
+    'CBR_LEVEL_0',
+    'CBR_LEVEL_1',
+    'CBR_LEVEL_2',
+    'CBR_PENG',
+    'CBR_INSPECTION_REVIEWER',
+  ],
   /** The general create/edit surface. `CBR_GENERAL` is read-only; `CBR_LEVEL_0` writes inspections only. */
-  write: ['CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'],
+  write: ['CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_INSPECTION_REVIEWER'],
   /**
    * Delete / archive / add site / status override / bulk upload.
    *
@@ -68,9 +83,11 @@ export const ROLE_CAPABILITIES = {
    * bundles `LEVEL_2` — and because the backend's `CbrAuthorities.DESTRUCTIVE` admits it. Omitting
    * it here would hide delete controls from a P.Eng the API would happily let through.
    */
-  destructive: ['CBR_LEVEL_2', 'CBR_PENG'],
+  destructive: ['CBR_LEVEL_2', 'CBR_PENG', 'CBR_INSPECTION_REVIEWER'],
   /** Inspection sign-off. Not `CBR_ADMIN` — see the note above. */
-  approve: ['CBR_PENG'],
+  approve: ['CBR_PENG', 'CBR_INSPECTION_REVIEWER'],
+  /** Mark an inspection Reviewed; repair and monitoring items Required or Not Required. */
+  review: ['CBR_INSPECTION_REVIEWER'],
   /** Administration: the bulletin and the inspection reviewers. `CBR_ADMIN` alone. */
   admin: ['CBR_ADMIN'],
 } as const satisfies Record<string, readonly ROLE_TYPE[]>;

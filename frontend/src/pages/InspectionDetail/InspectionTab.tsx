@@ -118,8 +118,8 @@ const REVIEW_FIELDS = new Set<string>([
 ]);
 
 /**
- * The Inspection card's form: status, date, inspector, company, cost, professional. A P.Eng who is
- * an inspection reviewer may pick Reviewed: Save then opens the Review dialog — legacy's Accept —
+ * The Inspection card's form: status, date, inspector, company, cost, professional. An inspection
+ * reviewer may pick Reviewed: Save then opens the Review dialog — legacy's Accept —
  * which saves the card as it stands, then the review.
  */
 const InspectionEditor: FC<{
@@ -207,12 +207,12 @@ const InspectionEditor: FC<{
   };
 
   // In Progress and Submitted, and the status it has if neither (Rejected), so it reads right;
-  // Reviewed for a P.Eng who is an inspection reviewer, through the Review dialog.
+  // Reviewed for an inspection reviewer, through the Review dialog.
   const offered = (statuses.data ?? []).filter(
     (status) =>
       CARD_STATUSES.has(status.code) ||
       status.code === current ||
-      (isPeng && isInspectionReviewer && status.code === REVIEWED),
+      (isInspectionReviewer && status.code === REVIEWED),
   );
 
   return (

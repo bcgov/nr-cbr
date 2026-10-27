@@ -147,16 +147,16 @@ public class LoggedUserHelper {
    * held by {@code PROFESSIONAL_ENGINEER} alone.
    *
    * <p>That separation is the point: sealing an inspection is a professional engineering act tied to
-   * a named P.Eng, not an administrative one. Marking one Reviewed also needs
-   * {@link #isInspectionReviewer()}.
+   * a named P.Eng, not an administrative one. An inspection reviewer, the rung above, is one too;
+   * marking an inspection Reviewed needs {@link #isInspectionReviewer()}.
    */
   public boolean isPeng() {
-    return getAuthorities().contains(CbrRoles.PENG);
+    return CbrRoles.isAtLeast(getAuthorities(), CbrRoles.PENG);
   }
 
   /**
-   * True if the user holds {@link CbrRoles#INSPECTION_REVIEWER}: with {@link #isPeng()}, may mark an
-   * inspection Reviewed; may set repair and monitoring items Required or Not Required.
+   * True if the user holds {@link CbrRoles#INSPECTION_REVIEWER}, the top rung: may mark an
+   * inspection Reviewed, and set repair and monitoring items Required or Not Required.
    */
   public boolean isInspectionReviewer() {
     return CbrRoles.isInspectionReviewer(getAuthorities());

@@ -22,6 +22,7 @@ const LADDER: ROLE_TYPE[] = [
   'CBR_LEVEL_1',
   'CBR_LEVEL_2',
   'CBR_PENG',
+  'CBR_INSPECTION_REVIEWER',
 ];
 
 /** Every rung at or above `floor` — what a capability with that floor must admit. */
@@ -33,6 +34,7 @@ describe('ROLE_CAPABILITIES mirrors the backend ladder', () => {
     ['write', 'CBR_LEVEL_1'],
     ['destructive', 'CBR_LEVEL_2'],
     ['approve', 'CBR_PENG'],
+    ['review', 'CBR_INSPECTION_REVIEWER'],
   ] as const)('%s admits exactly its floor (%s) and above', (capability, floor) => {
     expect([...ROLE_CAPABILITIES[capability]].sort()).toEqual([...atLeast(floor)].sort());
   });
@@ -50,6 +52,7 @@ describe('ROLE_CAPABILITIES mirrors the backend ladder', () => {
       ROLE_CAPABILITIES.write,
       ROLE_CAPABILITIES.destructive,
       ROLE_CAPABILITIES.approve,
+      ROLE_CAPABILITIES.review,
     ];
 
     for (const capability of writeCapabilities) {
@@ -65,9 +68,7 @@ describe('ROLE_CAPABILITIES mirrors the backend ladder', () => {
     }
   });
 
-  it('AVAILABLE_ROLES is exactly the ladder plus CBR_ADMIN and CBR_INSPECTION_REVIEWER', () => {
-    expect([...AVAILABLE_ROLES].sort()).toEqual(
-      [...LADDER, 'CBR_ADMIN', 'CBR_INSPECTION_REVIEWER'].sort(),
-    );
+  it('AVAILABLE_ROLES is exactly the ladder plus CBR_ADMIN', () => {
+    expect([...AVAILABLE_ROLES].sort()).toEqual([...LADDER, 'CBR_ADMIN'].sort());
   });
 });

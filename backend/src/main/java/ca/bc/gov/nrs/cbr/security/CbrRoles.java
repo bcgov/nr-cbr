@@ -12,30 +12,27 @@ import java.util.List;
  * capabilities each role grants there.
  *
  * <h2>Two axes, not one</h2>
- * Five roles form a <b>cumulative ladder</b> — each rung carries everything below it:
+ * Six roles form a <b>cumulative ladder</b> — each rung carries everything below it:
  *
  * <pre>
- *   CBR_GENERAL  &lt;  CBR_LEVEL_0  &lt;  CBR_LEVEL_1  &lt;  CBR_LEVEL_2  &lt;  CBR_PENG
- *   read-only       + record an     + create/edit   + delete,        + sign off
- *                     inspection      sites,          archive,         inspections
- *                     (offline)       structures      add site,
- *                                                     status override
+ *   CBR_GENERAL  &lt;  CBR_LEVEL_0  &lt;  CBR_LEVEL_1  &lt;  CBR_LEVEL_2  &lt;  CBR_PENG  &lt;  CBR_INSPECTION_REVIEWER
+ *   read-only       + record an     + create/edit   + delete,        + sign off   + mark Reviewed;
+ *                     inspection      sites,          archive,         inspections  repairs and
+ *                     (offline)       structures      add site,                     monitors Required
+ *                                                     status override               or Not Required
  * </pre>
  *
- * That ladder is not invented: it is exactly how the legacy WebADE profiles nest
- * ({@code CBR_READ_ONLY} &sub; {@code CBR_INSPECTOR_TECHNICIAN_0/1/2} &sub;
- * {@code CBR_MINISTRY_PENG}), each bundling every role beneath it. See
- * {@code cbr-auth-and-roles.local.md} §3.
+ * The first five are exactly how the legacy WebADE profiles nest ({@code CBR_READ_ONLY} &sub;
+ * {@code CBR_INSPECTOR_TECHNICIAN_0/1/2} &sub; {@code CBR_MINISTRY_PENG}), each bundling every role
+ * beneath it. See {@code cbr-auth-and-roles.local.md} §3. The top rung is legacy's reviewer row,
+ * which only a P.Eng was given: FAM grants a reviewing P.Eng {@link #INSPECTION_REVIEWER} in place
+ * of {@link #PENG} ({@code cbr-inspection-reviewer.local.md} §10).
  *
  * <p><b>{@link #ADMIN} is not on the ladder.</b> It is a separate axis: it carries the two admin
  * screens plus read ({@link #READERS}), and no write capability at any level. It is therefore
  * excluded from {@link #LADDER} and from {@link #effectiveRole} — ask {@link #isAdministrator} or
  * {@link #canRead} instead. Giving it a rung would either hand administrators the whole application
  * or place them below a read-only user, and neither is intended.
- *
- * <p><b>Nor is {@link #INSPECTION_REVIEWER}.</b> It is held alongside a ladder role, as legacy's
- * reviewer row was kept alongside the P.Eng profile: not every P.Eng is a reviewer. It grants no
- * read of its own.
  *
  * <h2>No role stacking</h2>
  * A user resolves to a single <b>effective</b> ladder role — capabilities are never the union of
@@ -62,20 +59,19 @@ public final class CbrRoles {
   public static final String PENG = "CBR_PENG";
 
   /**
+   * A P.Eng who marks inspections Reviewed and sets repair and monitoring items Required or Not
+   * Required. Legacy's active {@code STRUCTURE_INSPECTION_REVIEWER} row, which an administrator kept
+   * for a P.Eng; FAM grants it now, as the top rung ({@code cbr-inspection-reviewer.local.md} §10).
+   */
+  public static final String INSPECTION_REVIEWER = "CBR_INSPECTION_REVIEWER";
+
+  /**
    * Bulletin and inspection-reviewer administration. Legacy {@code ADMINISTRATOR}.
    *
    * <p>Off the ladder — see the class javadoc. Carries no read access.
    */
   public static final String ADMIN = "CBR_ADMIN";
 
-  /**
-   * Inspection reviewer: with {@link #PENG}, marks an inspection Reviewed; sets repair and monitoring
-   * items Required or Not Required. Legacy's active {@code STRUCTURE_INSPECTION_REVIEWER} row, which
-   * an administrator kept; FAM grants it now ({@code cbr-inspection-reviewer.local.md} §10).
-   *
-   * <p>Off the ladder — see the class javadoc. Carries no read access.
-   */
-  public static final String INSPECTION_REVIEWER = "CBR_INSPECTION_REVIEWER";
 
   /**
    * The cumulative ladder, <b>lowest rung first</b>. Index is the rank; a role at index <i>n</i>
@@ -84,11 +80,12 @@ public final class CbrRoles {
    * <p>Order is authorization. Reordering this list silently changes who can do what, which is why
    * {@link CbrAuthorities} is pinned against it by a test rather than kept in step by hand.
    */
-  public static final List<String> LADDER = List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG);
+  public static final List<String> LADDER =
+      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER);
 
-  /** Every role FAM issues — the ladder plus {@link #ADMIN} and {@link #INSPECTION_REVIEWER}. */
+  /** Every role FAM issues — the ladder plus {@link #ADMIN}. */
   public static final List<String> ALL =
-      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, ADMIN, INSPECTION_REVIEWER);
+      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER, ADMIN);
 
   /**
    * Roles that carry read access: the whole ladder, <b>plus {@link #ADMIN}</b>.
@@ -104,7 +101,7 @@ public final class CbrRoles {
    * {@link #ADMIN}, which is what keeps the separation of duties the legacy design was expressing.
    */
   public static final List<String> READERS =
-      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, ADMIN);
+      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER, ADMIN);
 
   /**
    * The role's rung, or {@code -1} if it is not on the ladder — which covers {@link #ADMIN}, any
@@ -156,7 +153,7 @@ public final class CbrRoles {
     return roles != null && roles.contains(ADMIN);
   }
 
-  /** True when the caller holds {@link #INSPECTION_REVIEWER}. Independent of the ladder. */
+  /** True when the caller holds {@link #INSPECTION_REVIEWER}, the top rung. */
   public static boolean isInspectionReviewer(Collection<String> roles) {
     return roles != null && roles.contains(INSPECTION_REVIEWER);
   }
