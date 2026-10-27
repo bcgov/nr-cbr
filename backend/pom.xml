@@ -44,12 +44,23 @@
     <ojdbc.version>21.3.0.0</ojdbc.version>
     <commons-lang3.version>3.18.0</commons-lang3.version>
     <resilience4j.version>2.3.0</resilience4j.version>
+
+    <!--
+      Overrides of Boot-managed versions, for CVEs that Boot 3.5.16's own picks don't yet cover.
+      Drop each once the parent manages a version at or above it.
+      - netty: 4.1.137+ fixes the SNI-bypass and TLS/HTTP/2/SPDY DoS advisories (Boot manages
+        4.1.135). Netty is only here through the AWS SDK's netty-nio-client.
+      - jackson: 2.21.7+ fixes the jackson-core ReDoS / invalid-token and jackson-databind
+        forward-reference / type-ID cache advisories (Boot manages 2.21.4).
+    -->
+    <netty.version>4.1.139.Final</netty.version>
+    <jackson-bom.version>2.21.8</jackson-bom.version>
   </properties>
 
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.5.14</version>
+    <version>3.5.16</version>
     <relativePath/>
   </parent>
 
