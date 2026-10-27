@@ -19,6 +19,11 @@ export type AuthorizationInfo = {
   isGeneral: boolean;
   /** `true` when the user may review and seal inspection reports (`CBR_PENG`). Not implied by admin. */
   isPeng: boolean;
+  /**
+   * `true` when the user holds `CBR_INSPECTION_REVIEWER`: with {@link isPeng}, may mark an inspection
+   * Reviewed; may set repair and monitoring items Required or Not Required. Off the ladder.
+   */
+  isInspectionReviewer: boolean;
   /** `true` when the user holds any recognized CBR role. */
   hasAnyRole: boolean;
   /** `true` when the user may search, view and run reports. */
@@ -71,6 +76,8 @@ export const useAuthorization = (): AuthorizationInfo => {
     // Not `isSysAdmin || …`: /approveInspection belongs to CBR_PENG alone. Sealing an inspection is
     // a professional engineering act tied to a named P.Eng, not an administrative one.
     const isPeng = roles.includes('CBR_PENG');
+    // Legacy's reviewer row, granted by FAM: not every P.Eng holds it.
+    const isInspectionReviewer = roles.includes('CBR_INSPECTION_REVIEWER');
 
     const canRead = holds(ROLE_CAPABILITIES.read);
     const canWriteInspection = holds(ROLE_CAPABILITIES.inspectionWrite);
@@ -87,6 +94,7 @@ export const useAuthorization = (): AuthorizationInfo => {
       isSysAdmin,
       isGeneral,
       isPeng,
+      isInspectionReviewer,
       hasAnyRole,
       canRead,
       canWriteInspection,

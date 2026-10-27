@@ -6,6 +6,8 @@ import ReadOnlyField from '@/components/core/ReadOnlyField';
 import { requiredLabel } from '@/utils/requiredLabel';
 
 import { number } from './format';
+import { useReviewerStatuses } from './reviewerStatuses';
+import StatusSelect from './StatusSelect';
 
 import type { MonitorUpdateRequest, StructureMonitor } from './monitorsResponse';
 import type { FC } from 'react';
@@ -76,8 +78,13 @@ const MonitorDialog: FC<Props> = ({ structureId, inspectionId, monitor, onClose 
   const saving = create.isPending || update.isPending;
   const { display } = useNotification();
 
+  const { offered: offeredStatuses, initial: initialStatus } = useReviewerStatuses(
+    statuses.data,
+    monitor?.status.code ?? SUGGESTED,
+  );
+
   const [values, setValues] = useState<MonitorUpdateRequest>({
-    statusCode: monitor?.status.code ?? SUGGESTED,
+    statusCode: initialStatus,
     frequencyCode: monitor?.frequency.code ?? '',
     frequencyComment: monitor?.frequencyComment ?? '',
     description: monitor?.description ?? '',
@@ -188,21 +195,16 @@ const MonitorDialog: FC<Props> = ({ structureId, inspectionId, monitor, onClose 
           // Locked on Add, as legacy locks it: a new item is a suggestion until someone requires it.
           <ReadOnlyField label="Monitoring Status" value="Suggested" />
         ) : (
-          <Select
+          <StatusSelect
             id="monitor-status"
-            data-testid="monitor-status"
-            labelText={requiredLabel('Monitoring Status', true)}
+            label="Monitoring Status"
             value={values.statusCode}
-            disabled={statuses.isLoading}
-            invalid={Boolean(shown.statusCode)}
-            invalidText={shown.statusCode}
-            onChange={(event) => change('statusCode', event.target.value)}
+            options={offeredStatuses}
+            loading={statuses.isLoading}
+            error={shown.statusCode}
+            onChange={(code) => change('statusCode', code)}
             onBlur={() => form.leave('statusCode')}
-          >
-            {(statuses.data ?? []).map((option) => (
-              <SelectItem key={option.code} value={option.code} text={option.description} />
-            ))}
-          </Select>
+          />
         )}
         <Select
           id="monitor-frequency"

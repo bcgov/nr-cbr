@@ -94,6 +94,30 @@ describe('useAuthorization — the capability ladder', () => {
   });
 });
 
+describe('useAuthorization — CBR_INSPECTION_REVIEWER is off the ladder', () => {
+  it('is not implied by CBR_PENG — not every P.Eng is a reviewer', () => {
+    withRoles(['CBR_PENG']);
+
+    expect(renderHook(() => useAuthorization()).result.current.isInspectionReviewer).toBe(false);
+  });
+
+  it('rides alongside a ladder role, adding nothing else', () => {
+    withRoles(['CBR_PENG', 'CBR_INSPECTION_REVIEWER']);
+    expect(renderHook(() => useAuthorization()).result.current).toMatchObject({
+      isPeng: true,
+      isInspectionReviewer: true,
+    });
+
+    withRoles(['CBR_INSPECTION_REVIEWER']);
+    expect(renderHook(() => useAuthorization()).result.current).toMatchObject({
+      isInspectionReviewer: true,
+      isPeng: false,
+      canRead: false,
+      hasAnyRole: false,
+    });
+  });
+});
+
 describe('useAuthorization — CBR_ADMIN is off the ladder', () => {
   it('reads, but writes nothing at any level', () => {
     // Legacy gave ADMINISTRATOR three privileges and no read at all; the rebuild grants read

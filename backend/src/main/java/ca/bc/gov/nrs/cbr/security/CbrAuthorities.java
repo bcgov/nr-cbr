@@ -25,6 +25,7 @@ package ca.bc.gov.nrs.cbr.security;
  *   <tr><td>{@link #CONTENT_EDIT}</td><td>LEVEL_1</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
  *   <tr><td>{@link #DESTRUCTIVE}</td><td>LEVEL_2</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>—</td></tr>
  *   <tr><td>{@link #APPROVE}</td><td>PENG</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #REVIEW}</td><td>PENG + {@code CBR_INSPECTION_REVIEWER}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>with the role</td><td>—</td></tr>
  *   <tr><td>{@link #ADMIN}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
  * </table>
  *
@@ -35,8 +36,7 @@ package ca.bc.gov.nrs.cbr.security;
  *
  * <p>These are coarse, role-level gates: they decide whether a kind of user may ever perform an
  * operation. They do <b>not</b> decide whether this caller may do it to <em>this</em> record in
- * <em>this</em> state — that fence is separate, and for CBR it is the
- * {@code STRUCTURE_INSPECTION_REVIEWER} row that binds a sign-off to a named P.Eng (§6).
+ * <em>this</em> state — that fence is in the services.
  *
  * <p>Every expression below is pinned against {@link CbrRoles#LADDER} by {@code CbrAuthoritiesTest},
  * so a reordered ladder fails the build instead of silently re-granting.
@@ -96,10 +96,19 @@ public final class CbrAuthorities {
    * <b>alone</b>. {@link CbrRoles#ADMIN} is excluded: sealing an inspection is a professional
    * engineering act tied to a named P.Eng, not an administrative one.
    *
-   * <p>Necessary but not sufficient — the service layer must also find an active
-   * {@code STRUCTURE_INSPECTION_REVIEWER} row for the caller's userid.
+   * <p>Marking one Reviewed needs {@link #REVIEW} as well.
    */
   public static final String APPROVE = "hasAuthority('CBR_PENG')";
+
+  /**
+   * Mark an inspection Reviewed: a P.Eng who is also an inspection reviewer — legacy's
+   * {@code /approveInspection} and a reviewer row. Moving one into Rejected, or changing one already
+   * Reviewed, needs {@link #APPROVE} alone, as legacy ({@code cbr-inspection-reviewer.local.md} §10).
+   *
+   * <p>Both roles, not either: {@link CbrRoles#INSPECTION_REVIEWER} is off the ladder.
+   */
+  public static final String REVIEW =
+      "hasAuthority('CBR_PENG') and hasAuthority('CBR_INSPECTION_REVIEWER')";
 
   /**
    * Administration: the landing-page bulletin and inspection-reviewer maintenance.

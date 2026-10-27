@@ -14,6 +14,7 @@ const authorization = vi.hoisted(() => ({
   canEdit: true,
   canDelete: true,
   isPeng: true,
+  isInspectionReviewer: true,
 }));
 vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
 vi.mock('@/context/notification/useNotification', () => ({
@@ -741,6 +742,25 @@ describe('InspectionDetailPage', () => {
         ).toEqual(['In Progress', 'Submitted']),
       );
       authorization.isPeng = true;
+    });
+
+    it('offers Reviewed to a P.Eng who is an inspection reviewer, the PEng Comments to any', async () => {
+      inspectionApi.getInspection.mockResolvedValue(inProgress());
+      authorization.isInspectionReviewer = false;
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      expect(screen.getByTestId('peng-comments-edit')).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      const status = screen.getByTestId('inspection-edit-statusCode');
+      await waitFor(() =>
+        expect(
+          within(status)
+            .getAllByRole('option')
+            .map((option) => option.textContent),
+        ).toEqual(['In Progress', 'Submitted']),
+      );
+      authorization.isInspectionReviewer = true;
     });
 
     it('saves the PEng Comments', async () => {

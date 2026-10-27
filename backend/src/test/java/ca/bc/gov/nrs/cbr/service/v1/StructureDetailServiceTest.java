@@ -138,6 +138,13 @@ class StructureDetailServiceTest {
     }
   }
 
+  private long givenReviewer() {
+    StructureInspectionReviewerEntity reviewer = StructureInspectionReviewerEntity.builder()
+        .userid("IDIR\\PENG").build();
+    entityManager.persist(reviewer);
+    return reviewer.getInspectionReviewerId();
+  }
+
   private void givenInspection(long inspectionId, long structureId, LocalDate date,
       String status, Long reviewerId) {
     givenStatusCode(status);
@@ -384,18 +391,17 @@ class StructureDetailServiceTest {
     @Test
     @DisplayName("merges manual ratings with reviewed inspections, newest first, current marked")
     void mergesTheHistory() {
-      entityManager.persist(StructureInspectionReviewerEntity.builder()
-          .inspectionReviewerId(5L).userid("IDIR\\PENG").build());
+      long reviewer = givenReviewer();
       givenSite("SITE-1", site -> { });
       givenStructure(7L, "B100", "SITE-1", s -> s.designLoadRating(new BigDecimal("63")));
       givenBridge(70L, 7L);
       givenRating(7L, null, "63", LocalDateTime.of(2000, 10, 1, 9, 0));
-      givenInspection(100L, 7L, LocalDate.of(2024, 5, 1), "RVD", 5L);
+      givenInspection(100L, 7L, LocalDate.of(2024, 5, 1), "RVD", reviewer);
       givenRating(7L, 100L, "60", LocalDateTime.of(2024, 5, 20, 9, 0));
       // Reviewed, but recorded no rating — legacy's "UNK".
-      givenInspection(101L, 7L, LocalDate.of(2010, 6, 1), "ACC", 5L);
+      givenInspection(101L, 7L, LocalDate.of(2010, 6, 1), "ACC", reviewer);
       // Not reviewed, so not a load rating at all.
-      givenInspection(102L, 7L, LocalDate.of(2025, 1, 1), "SUB", 5L);
+      givenInspection(102L, 7L, LocalDate.of(2025, 1, 1), "SUB", reviewer);
 
       StructureDetailResponse.LoadRating loadRating = read(7L).loadRating();
 
@@ -476,12 +482,11 @@ class StructureDetailServiceTest {
     @Test
     @DisplayName("counts a reviewed inspection as a load rating")
     void countsReviewedInspections() {
-      entityManager.persist(StructureInspectionReviewerEntity.builder()
-          .inspectionReviewerId(5L).userid("IDIR\\PENG").build());
+      long reviewer = givenReviewer();
       givenSite("SITE-1", site -> { });
       givenStructure(7L, "B100", "SITE-1", s -> s.loadRatingUnknownIndicator("N"));
       givenBridge(70L, 7L);
-      givenInspection(100L, 7L, LocalDate.of(2024, 5, 1), "RVD", 5L);
+      givenInspection(100L, 7L, LocalDate.of(2024, 5, 1), "RVD", reviewer);
 
       assertThat(read(7L).outstanding()).isEmpty();
     }

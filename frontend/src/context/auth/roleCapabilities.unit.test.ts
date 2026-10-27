@@ -65,7 +65,9 @@ describe('ROLE_CAPABILITIES mirrors the backend ladder', () => {
     }
   });
 
-  it('AVAILABLE_ROLES is exactly the ladder plus CBR_ADMIN — no obsolete entries', () => {
-    expect([...AVAILABLE_ROLES].sort()).toEqual([...LADDER, 'CBR_ADMIN'].sort());
+  it('AVAILABLE_ROLES is exactly the ladder plus CBR_ADMIN and CBR_INSPECTION_REVIEWER', () => {
+    expect([...AVAILABLE_ROLES].sort()).toEqual(
+      [...LADDER, 'CBR_ADMIN', 'CBR_INSPECTION_REVIEWER'].sort(),
+    );
   });
 });

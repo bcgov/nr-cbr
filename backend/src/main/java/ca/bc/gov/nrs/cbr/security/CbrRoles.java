@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Canonical CBR role names, and the ladder they form.
  *
- * <p>FAM holds nothing but these six flat strings — no nesting, no scoping, no permissions. The
+ * <p>FAM holds nothing but these seven flat strings — no nesting, no scoping, no permissions. The
  * role&rarr;capability matrix lives here and in {@link CbrAuthorities}: roles here, the
  * capabilities each role grants there.
  *
@@ -32,6 +32,10 @@ import java.util.List;
  * excluded from {@link #LADDER} and from {@link #effectiveRole} — ask {@link #isAdministrator} or
  * {@link #canRead} instead. Giving it a rung would either hand administrators the whole application
  * or place them below a read-only user, and neither is intended.
+ *
+ * <p><b>Nor is {@link #INSPECTION_REVIEWER}.</b> It is held alongside a ladder role, as legacy's
+ * reviewer row was kept alongside the P.Eng profile: not every P.Eng is a reviewer. It grants no
+ * read of its own.
  *
  * <h2>No role stacking</h2>
  * A user resolves to a single <b>effective</b> ladder role — capabilities are never the union of
@@ -65,6 +69,15 @@ public final class CbrRoles {
   public static final String ADMIN = "CBR_ADMIN";
 
   /**
+   * Inspection reviewer: with {@link #PENG}, marks an inspection Reviewed; sets repair and monitoring
+   * items Required or Not Required. Legacy's active {@code STRUCTURE_INSPECTION_REVIEWER} row, which
+   * an administrator kept; FAM grants it now ({@code cbr-inspection-reviewer.local.md} §10).
+   *
+   * <p>Off the ladder — see the class javadoc. Carries no read access.
+   */
+  public static final String INSPECTION_REVIEWER = "CBR_INSPECTION_REVIEWER";
+
+  /**
    * The cumulative ladder, <b>lowest rung first</b>. Index is the rank; a role at index <i>n</i>
    * carries every capability of the roles below it.
    *
@@ -73,9 +86,9 @@ public final class CbrRoles {
    */
   public static final List<String> LADDER = List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG);
 
-  /** Every role FAM issues — the ladder plus {@link #ADMIN}. */
+  /** Every role FAM issues — the ladder plus {@link #ADMIN} and {@link #INSPECTION_REVIEWER}. */
   public static final List<String> ALL =
-      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, ADMIN);
+      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, ADMIN, INSPECTION_REVIEWER);
 
   /**
    * Roles that carry read access: the whole ladder, <b>plus {@link #ADMIN}</b>.
@@ -141,6 +154,11 @@ public final class CbrRoles {
   /** True when the caller holds {@link #ADMIN}. Independent of the ladder. */
   public static boolean isAdministrator(Collection<String> roles) {
     return roles != null && roles.contains(ADMIN);
+  }
+
+  /** True when the caller holds {@link #INSPECTION_REVIEWER}. Independent of the ladder. */
+  public static boolean isInspectionReviewer(Collection<String> roles) {
+    return roles != null && roles.contains(INSPECTION_REVIEWER);
   }
 
   /**

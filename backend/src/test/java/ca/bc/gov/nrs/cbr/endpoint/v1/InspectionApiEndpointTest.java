@@ -151,7 +151,8 @@ class InspectionApiEndpointTest {
   }
 
   @Test
-  @DisplayName("its review is POST …/review, its PEng comments PUT …/peng-comment, a P.Eng's")
+  @DisplayName("its review is POST …/review, a reviewing P.Eng's; its PEng comments PUT "
+      + "…/peng-comment, a P.Eng's")
   void reviewIsMappedAndGated() {
     Method review = method("reviewInspection");
     Method comment = method("updatePengComment");
@@ -161,7 +162,7 @@ class InspectionApiEndpointTest {
     assertThat(comment.getAnnotation(PutMapping.class).value())
         .containsExactly("/{inspectionId}/peng-comment");
     assertThat(review.getAnnotation(PreAuthorize.class).value())
-        .isEqualTo(CbrAuthorities.APPROVE);
+        .isEqualTo(CbrAuthorities.REVIEW);
     assertThat(comment.getAnnotation(PreAuthorize.class).value())
         .isEqualTo(CbrAuthorities.APPROVE);
   }

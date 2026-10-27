@@ -12,6 +12,7 @@ const authorization = vi.hoisted(() => ({
   canEdit: false,
   canDelete: false,
   isPeng: false,
+  isInspectionReviewer: false,
   canWriteInspection: false,
 }));
 vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
@@ -455,6 +456,7 @@ beforeEach(() => {
   api.deleteStructureMonitor.mockResolvedValue(undefined);
   authorization.canDelete = false;
   authorization.isPeng = false;
+  authorization.isInspectionReviewer = false;
   authorization.canWriteInspection = false;
   api.getStructureRepairTypes.mockReset();
   api.getStructureRepairTypes.mockResolvedValue([
@@ -3538,7 +3540,7 @@ describe('StructureDetailPage — Repairs', () => {
     });
 
     it('opens the repair with its number shown and not edited, and saves the edit', async () => {
-      authorization.isPeng = true;
+      authorization.isInspectionReviewer = true;
       const dialog = await openEdit();
 
       expect(dialog).toMatchTextContent('Edit repair 3');
@@ -3570,7 +3572,9 @@ describe('StructureDetailPage — Repairs', () => {
       );
     });
 
-    it('offers Required and Not Required to a P.Eng only, as legacy does', async () => {
+    it('offers Required and Not Required to an inspection reviewer only, as legacy does', async () => {
+      // A P.Eng is not, by that alone.
+      authorization.isPeng = true;
       const dialog = await openEdit();
       const offered = () =>
         Array.from(
@@ -3665,7 +3669,7 @@ describe('StructureDetailPage — Repairs', () => {
     });
 
     it('shows what the server refused beside the field', async () => {
-      authorization.isPeng = true;
+      authorization.isInspectionReviewer = true;
       api.updateStructureRepair.mockRejectedValue({
         body: { fieldErrors: { typeCode: 'Repair Type is not one of the listed types.' } },
       });
@@ -3844,9 +3848,10 @@ describe('StructureDetailPage — Monitoring', () => {
     );
   });
 
-  /** Opens the edit dialog for item 2, as a Level 1 user. */
+  /** Opens the edit dialog for item 2, as a Level 1 user who is an inspection reviewer. */
   const openEdit = async (overrides: object = {}) => {
     authorization.canEdit = true;
+    authorization.isInspectionReviewer = true;
     api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2', overrides)]));
     await showing(bridge());
     await openMonitoring();
@@ -3869,6 +3874,25 @@ describe('StructureDetailPage — Monitoring', () => {
       screen.getByTestId('structure-monitor-edit-2'),
     );
     expect(screen.queryByTestId('structure-monitor-delete-2')).not.toBeInTheDocument();
+  });
+
+  it('offers Required and Not Required to an inspection reviewer only, as legacy does', async () => {
+    authorization.canEdit = true;
+    authorization.isPeng = true;
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+    await openMonitoring();
+    await userEvent.click(await screen.findByTestId('structure-monitor-edit-2'));
+    const dialog = await screen.findByTestId('monitor-dialog');
+    const status = within(dialog).getByTestId('monitor-status') as HTMLSelectElement;
+    await vi.waitFor(() => expect(status.options).toHaveLength(3));
+
+    // The stored Required is not this user's to keep: the status opens unchosen.
+    expect(status).toHaveValue('');
+    expect(Array.from(status.options, (option) => option.value)).toEqual(['', 'COM', 'SUG']);
+    await userEvent.click(within(dialog).getByTestId('monitor-save'));
+    expect(dialog).toMatchTextContent('Monitoring Status is required.');
+    expect(api.updateStructureMonitor).not.toHaveBeenCalled();
   });
 
   it('opens the item in a dialog, its number shown and not edited, and saves the edit', async () => {

@@ -25,6 +25,7 @@ import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -258,6 +259,7 @@ class StructureMonitorsServiceTest {
         .suggestedByUserid("IDIR\\A").suggestedByTimestamp(LocalDateTime.of(2023, 6, 2, 9, 0)));
     entityManager.flush();
     entityManager.clear();
+    when(loggedUser.isInspectionReviewer()).thenReturn(true);
 
     service.update(7L, id, new MonitorUpdateRequest("REQ", "ANN", "ignored", "  Scour, south.  "));
 
@@ -281,12 +283,29 @@ class StructureMonitorsServiceTest {
         .requiredByUserid("IDIR\\B").requiredByTimestamp(LocalDateTime.of(2020, 1, 1, 9, 0)));
     entityManager.flush();
     entityManager.clear();
+    when(loggedUser.isInspectionReviewer()).thenReturn(true);
 
     service.update(7L, id, new MonitorUpdateRequest("REQ", null, null, "Typo fixed."));
 
     StructureMonitorItemEntity monitor = stored(id);
     assertThat(monitor.getRequiredByUserid()).isEqualTo("IDIR\\EDITOR");
     assertThat(monitor.getRequiredByTimestamp()).isAfter(LocalDateTime.of(2020, 1, 1, 9, 0));
+  }
+
+  @Test
+  @DisplayName("lets only an inspection reviewer set Required or Not Required, as legacy's list does")
+  void reviewerStatuses() {
+    givenCodes();
+    long id = givenMonitor(1L, null, "SUG");
+    entityManager.flush();
+    entityManager.clear();
+
+    MonitorUpdateRequest required = new MonitorUpdateRequest("REQ", null, null, "Scour.");
+    assertThatThrownBy(() -> service.update(7L, id, required))
+        .isInstanceOfSatisfying(FieldValidationException.class, failure ->
+            assertThat(failure.getFieldErrors()).containsExactly(Map.entry("statusCode",
+                "Only an inspection reviewer can set Monitoring Status to Required or Not "
+                    + "Required.")));
   }
 
   @Test

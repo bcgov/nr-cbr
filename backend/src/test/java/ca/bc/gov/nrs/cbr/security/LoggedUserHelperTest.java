@@ -85,6 +85,18 @@ class LoggedUserHelperTest {
   }
 
   @Test
+  @DisplayName("the inspection reviewer role is its own — P.Eng does not imply it")
+  void inspectionReviewerAuthority() {
+    authenticateWith(CbrRoles.PENG);
+    assertThat(helper.isInspectionReviewer()).isFalse();
+
+    SecurityContextHolder.clearContext();
+    authenticateWith(CbrRoles.INSPECTION_REVIEWER);
+    assertThat(helper.isInspectionReviewer()).isTrue();
+    assertThat(helper.isPeng()).isFalse();
+  }
+
+  @Test
   @DisplayName("an unauthenticated context yields no authorities rather than throwing")
   void unauthenticatedYieldsNoAuthorities() {
     assertThat(helper.getAuthorities()).isEqualTo(Set.of());

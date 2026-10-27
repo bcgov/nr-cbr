@@ -413,8 +413,9 @@ class StructureRepairsServiceTest {
   }
 
   @Test
-  @DisplayName("lets only a P.Eng set Required or Not Required, as legacy's list does")
-  void engineerStatuses() {
+  @DisplayName("lets only an inspection reviewer set Required or Not Required, as legacy's list "
+      + "does")
+  void reviewerStatuses() {
     givenCodes();
     long id = givenRepair(1L, null, "SUG", "H");
 
@@ -422,6 +423,9 @@ class StructureRepairsServiceTest {
     assertThat(refused(id, edit("NRQ", null, null))).containsOnlyKeys("statusCode");
 
     when(loggedUser.isPeng()).thenReturn(true);
+    assertThat(refused(id, edit("REQ", null, null))).as("a P.Eng alone").containsOnlyKeys(
+        "statusCode");
+    when(loggedUser.isInspectionReviewer()).thenReturn(true);
     service.update(7L, id, edit("REQ", null, null));
     StructureRepairEntity repair = stored(id);
     assertThat(repair.getRepairStatusCode()).isEqualTo("REQ");

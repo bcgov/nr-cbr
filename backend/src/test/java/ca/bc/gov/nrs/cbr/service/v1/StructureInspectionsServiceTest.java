@@ -261,13 +261,14 @@ class StructureInspectionsServiceTest {
       entityManager.persist(StrctreInspectionTypeCodeEntity.builder()
           .strctreInspectionTypeCode("ROUT").description("Routine")
           .effectiveDate(EARLY).expiryDate(LATE).build());
-      entityManager.persist(StructureInspectionReviewerEntity.builder()
-          .inspectionReviewerId(5L).userid("IDIR\\PENG").firstName("Pat").lastName("Engineer")
-          .build());
+      StructureInspectionReviewerEntity reviewer = StructureInspectionReviewerEntity.builder()
+          .userid("IDIR\\PENG").firstName("Pat").lastName("Engineer").build();
+      entityManager.persist(reviewer);
       givenStructure(7L, structure -> { });
       givenInspection(1L, 7L, LocalDate.of(2023, 6, 1), "RVD", inspection -> inspection
           .strctreInspectionTypeCode("ROUT").siteAtTimeOfInspection("62-001")
-          .inspectionReviewerId(5L).pengReviewerDate(LocalDateTime.of(2023, 7, 2, 10, 0))
+          .inspectionReviewerId(reviewer.getInspectionReviewerId())
+          .pengReviewerDate(LocalDateTime.of(2023, 7, 2, 10, 0))
           .inspectorName("Sam Inspector"));
       settle();
 

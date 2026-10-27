@@ -17,12 +17,13 @@ import { requiredLabel } from '@/utils/requiredLabel';
 import { toBox, toIso } from './dateBox';
 import DateField from './DateField';
 import { number } from './format';
+import { useReviewerStatuses } from './reviewerStatuses';
+import StatusSelect from './StatusSelect';
 
 import type { RepairTypeOption, RepairUpdateRequest, StructureRepair } from './repairsResponse';
 import type { ChangeEvent, FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
-import { useAuthorization } from '@/hooks/useAuthorization';
 import {
   useRepairGroupCodes,
   useRepairPriorityCodes,
@@ -53,8 +54,6 @@ type Props = {
 const SUGGESTED = 'SUG';
 /** The status that has a completed date and an actual cost. */
 const COMPLETED = 'COM';
-/** Required and Not Required: legacy offers them to a P.Eng only, and the server agrees. */
-const ENGINEER_STATUSES: ReadonlySet<string> = new Set(['REQ', 'NRQ']);
 /** The type whose repair must be described — legacy's `Repair.validate`. */
 const DESCRIBED_TYPE = '800A';
 /** The description column, in bytes. */
@@ -143,7 +142,6 @@ const typesFor = (options: RepairTypeOption[], groups: ReadonlySet<string>) => {
  * A save that fails for no field's sake is a toast, as the app's other actions report one.
  */
 const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose }) => {
-  const { isPeng } = useAuthorization();
   const statuses = useRepairStatusCodes();
   const priorities = useRepairPriorityCodes();
   const groups = useRepairGroupCodes();
@@ -154,14 +152,13 @@ const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose })
   const saving = create.isPending || update.isPending;
   const { display } = useNotification();
 
-  const offeredStatuses = (statuses.data ?? []).filter(
-    (option) => isPeng || !ENGINEER_STATUSES.has(option.code),
+  const { offered: offeredStatuses, initial: initialStatus } = useReviewerStatuses(
+    statuses.data,
+    repair?.status.code ?? SUGGESTED,
   );
-  const storedStatus = repair?.status.code ?? SUGGESTED;
 
   const [values, setValues] = useState<Values>({
-    // A status this user may not set opens blank, as legacy's list opens without it.
-    statusCode: !isPeng && ENGINEER_STATUSES.has(storedStatus) ? '' : storedStatus,
+    statusCode: initialStatus,
     priorityCode: repair?.priority.code ?? '',
     completedDate: toBox(repair?.completedDate ?? null),
     estimate: number(repair?.estimate),
@@ -321,22 +318,16 @@ const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose })
           // Locked on Add, as legacy locks it: a new repair is a suggestion until someone requires it.
           <ReadOnlyField label="Repair Status" value="Suggested" />
         ) : (
-          <Select
+          <StatusSelect
             id="repair-status"
-            data-testid="repair-status"
-            labelText={requiredLabel('Repair Status', true)}
+            label="Repair Status"
             value={values.statusCode}
-            disabled={statuses.isLoading}
-            invalid={Boolean(shown.statusCode)}
-            invalidText={shown.statusCode}
-            onChange={(event) => change('statusCode', event.target.value)}
+            options={offeredStatuses}
+            loading={statuses.isLoading}
+            error={shown.statusCode}
+            onChange={(code) => change('statusCode', code)}
             onBlur={() => form.leave('statusCode')}
-          >
-            <SelectItem value="" text="Choose a status" />
-            {offeredStatuses.map((option) => (
-              <SelectItem key={option.code} value={option.code} text={option.description} />
-            ))}
-          </Select>
+          />
         )}
         <Select
           id="repair-priority"
