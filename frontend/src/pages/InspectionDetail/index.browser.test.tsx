@@ -727,7 +727,9 @@ describe('InspectionDetailPage', () => {
 
     it('offers Reviewed and the PEng Comments to a P.Eng only', async () => {
       inspectionApi.getInspection.mockResolvedValue(inProgress());
+      // An inspection reviewer is a P.Eng too: below the P.Eng, neither.
       authorization.isPeng = false;
+      authorization.isInspectionReviewer = false;
       renderPage();
       await screen.findByTestId('inspection-inspection');
 
@@ -742,9 +744,10 @@ describe('InspectionDetailPage', () => {
         ).toEqual(['In Progress', 'Submitted']),
       );
       authorization.isPeng = true;
+      authorization.isInspectionReviewer = true;
     });
 
-    it('offers Reviewed to a P.Eng who is an inspection reviewer, the PEng Comments to any', async () => {
+    it('offers Reviewed to an inspection reviewer, the PEng Comments to any P.Eng', async () => {
       inspectionApi.getInspection.mockResolvedValue(inProgress());
       authorization.isInspectionReviewer = false;
       renderPage();

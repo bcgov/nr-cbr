@@ -17,11 +17,14 @@ export type AuthorizationInfo = {
   isSysAdmin: boolean;
   /** `true` when the user holds `CBR_GENERAL`, the read-only role. */
   isGeneral: boolean;
-  /** `true` when the user may review and seal inspection reports (`CBR_PENG`). Not implied by admin. */
+  /**
+   * `true` when the user may review and seal inspection reports (`CBR_PENG`, or the inspection
+   * reviewer above it). Not implied by admin.
+   */
   isPeng: boolean;
   /**
-   * `true` when the user holds `CBR_INSPECTION_REVIEWER`: with {@link isPeng}, may mark an inspection
-   * Reviewed; may set repair and monitoring items Required or Not Required. Off the ladder.
+   * `true` when the user holds `CBR_INSPECTION_REVIEWER`, the top rung: may mark an inspection
+   * Reviewed, and set repair and monitoring items Required or Not Required.
    */
   isInspectionReviewer: boolean;
   /** `true` when the user holds any recognized CBR role. */
@@ -73,11 +76,12 @@ export const useAuthorization = (): AuthorizationInfo => {
 
     const isSysAdmin = roles.includes('CBR_ADMIN');
     const isGeneral = roles.includes('CBR_GENERAL');
-    // Not `isSysAdmin || …`: /approveInspection belongs to CBR_PENG alone. Sealing an inspection is
-    // a professional engineering act tied to a named P.Eng, not an administrative one.
-    const isPeng = roles.includes('CBR_PENG');
-    // Legacy's reviewer row, granted by FAM: not every P.Eng holds it.
-    const isInspectionReviewer = roles.includes('CBR_INSPECTION_REVIEWER');
+    // Not `isSysAdmin || …`: /approveInspection belongs to CBR_PENG and the reviewer above it.
+    // Sealing an inspection is a professional engineering act tied to a named P.Eng, not an
+    // administrative one.
+    const isPeng = holds(ROLE_CAPABILITIES.approve);
+    // Legacy's reviewer row, granted by FAM in place of CBR_PENG: not every P.Eng holds it.
+    const isInspectionReviewer = holds(ROLE_CAPABILITIES.review);
 
     const canRead = holds(ROLE_CAPABILITIES.read);
     const canWriteInspection = holds(ROLE_CAPABILITIES.inspectionWrite);

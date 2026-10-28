@@ -94,26 +94,24 @@ describe('useAuthorization — the capability ladder', () => {
   });
 });
 
-describe('useAuthorization — CBR_INSPECTION_REVIEWER is off the ladder', () => {
+describe('useAuthorization — CBR_INSPECTION_REVIEWER is the top rung', () => {
   it('is not implied by CBR_PENG — not every P.Eng is a reviewer', () => {
     withRoles(['CBR_PENG']);
 
     expect(renderHook(() => useAuthorization()).result.current.isInspectionReviewer).toBe(false);
   });
 
-  it('rides alongside a ladder role, adding nothing else', () => {
-    withRoles(['CBR_PENG', 'CBR_INSPECTION_REVIEWER']);
-    expect(renderHook(() => useAuthorization()).result.current).toMatchObject({
-      isPeng: true,
-      isInspectionReviewer: true,
-    });
-
+  it('carries everything a P.Eng has, on its own', () => {
     withRoles(['CBR_INSPECTION_REVIEWER']);
     expect(renderHook(() => useAuthorization()).result.current).toMatchObject({
       isInspectionReviewer: true,
-      isPeng: false,
-      canRead: false,
-      hasAnyRole: false,
+      isPeng: true,
+      canRead: true,
+      canWriteInspection: true,
+      canEdit: true,
+      canDelete: true,
+      hasAnyRole: true,
+      isSysAdmin: false,
     });
   });
 });

@@ -85,7 +85,7 @@ class LoggedUserHelperTest {
   }
 
   @Test
-  @DisplayName("the inspection reviewer role is its own — P.Eng does not imply it")
+  @DisplayName("the inspection reviewer is the rung above P.Eng — a P.Eng, but not every P.Eng one")
   void inspectionReviewerAuthority() {
     authenticateWith(CbrRoles.PENG);
     assertThat(helper.isInspectionReviewer()).isFalse();
@@ -93,7 +93,9 @@ class LoggedUserHelperTest {
     SecurityContextHolder.clearContext();
     authenticateWith(CbrRoles.INSPECTION_REVIEWER);
     assertThat(helper.isInspectionReviewer()).isTrue();
-    assertThat(helper.isPeng()).isFalse();
+    assertThat(helper.isPeng()).isTrue();
+    assertThat(helper.canRead()).isTrue();
+    assertThat(helper.canEdit()).isTrue();
   }
 
   @Test
