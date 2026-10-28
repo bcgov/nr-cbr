@@ -3,6 +3,7 @@ import type {
   BridgeCodes,
   CodeOption,
   CulvertCodes,
+  InspectionReviewerOption,
   LoadRatingCodes,
   OrgUnitOption,
 } from '@/types/configuration';
@@ -254,6 +255,17 @@ export class ConfigurationService extends HttpClient {
     return this.doRequest<CodeOption[]>(this.config, {
       method: 'GET',
       url: '/v1/configuration/inspection-type-codes',
+    });
+  }
+
+  /**
+   * Inspection Search's Reviewed By list: everyone holding `CBR_INSPECTION_REVIEWER`, read from CSS,
+   * by last name. Empty when the backend cannot reach CSS.
+   */
+  getInspectionReviewers(): CancelablePromise<InspectionReviewerOption[]> {
+    return this.doRequest<InspectionReviewerOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/inspection-reviewers',
     });
   }
 

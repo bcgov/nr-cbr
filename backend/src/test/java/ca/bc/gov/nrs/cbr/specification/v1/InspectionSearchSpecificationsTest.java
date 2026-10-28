@@ -9,6 +9,7 @@ import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
@@ -337,6 +338,54 @@ class InspectionSearchSpecificationsTest {
 
       assertThat(search(criteria().inspectionTypeCode("ROUT").build())).containsExactly(1L);
       assertThat(search(criteria().inspectionTypeCode("ROU").build())).isEmpty();
+    }
+  }
+
+  @Nested
+  @DisplayName("Reviewed By finds the inspections reviewed under a user ID")
+  class ReviewedBy {
+
+    private long reviewer(String userid) {
+      StructureInspectionReviewerEntity row = StructureInspectionReviewerEntity.builder()
+          .userid(userid)
+          .firstName("Jane")
+          .lastName("Smith")
+          .activeInd("Y")
+          .entryUserid("IDIR\\TESTER")
+          .entryTimestamp(LocalDateTime.now())
+          .updateUserid("IDIR\\TESTER")
+          .updateTimestamp(LocalDateTime.now())
+          .build();
+      entityManager.persist(row);
+      return row.getInspectionReviewerId();
+    }
+
+    @Test
+    @DisplayName("on any of the user's rows, in any case")
+    void byUserId() {
+      givenSite("site-1");
+      givenStructure(100L, "BR000001", "site-1");
+      long smith = reviewer("IDIR\\JSMITH");
+      // A second row for the same person, as direct SQL has made.
+      long smithAgain = reviewer("idir\\jsmith");
+      long jones = reviewer("IDIR\\BJONES");
+      LocalDate date = LocalDate.of(2026, 6, 15);
+      givenInspection(1L, 100L, date, "site-1", "J. Smith", smith, "RVD");
+      givenInspection(2L, 100L, date, "site-1", "J. Smith", smithAgain, "RVD");
+      givenInspection(3L, 100L, date, "site-1", "J. Smith", jones, "RVD");
+      givenInspection(4L, 100L, date, "site-1", "J. Smith", null, "SUB");
+
+      assertThat(search(criteria().reviewerUserId("IDIR\\JSmith").build()))
+          .containsExactlyInAnyOrder(1L, 2L);
+      assertThat(search(criteria().reviewerUserId("IDIR\\BJONES").build())).containsExactly(3L);
+    }
+
+    @Test
+    @DisplayName("a reviewer with no row yet finds nothing")
+    void noRowYet() {
+      givenCompleteInspection(1L, "SUB");
+
+      assertThat(search(criteria().reviewerUserId("IDIR\\NEWPENG").build())).isEmpty();
     }
   }
 

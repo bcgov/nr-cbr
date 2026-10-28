@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
+  getInspectionReviewers: vi.fn(),
 }));
 const searchApi = vi.hoisted(() => ({
   searchInspections: vi.fn(),
@@ -145,7 +146,7 @@ describe('InspectionSearchPage — criteria form', () => {
       'managementOrgUnitNo',
       'businessAreaOrgUnitNo',
       'inspectorName',
-      'inspectionReviewerId',
+      'reviewerUserId',
       'closeProximity',
       'mostRecentInspections',
       'findChangedReviewed',
@@ -155,22 +156,45 @@ describe('InspectionSearchPage — criteria form', () => {
     }
   });
 
-  it('disables Reviewed By, which has nothing behind it yet', async () => {
-    // The one filter on this form with no source: decision D4 has not settled whether reviewers
-    // come from STRUCTURE_INSPECTION_REVIEWER or from FAM. Left enabled it would offer a filter
-    // whose only option is "Anyone" — the same as not filtering — so a user could believe they had
-    // narrowed a search when they had not.
+  it('offers the inspection reviewers by name, and searches on the chosen one', async () => {
+    api.getInspectionReviewers.mockResolvedValue([
+      { userId: 'IDIR\\AADAMS', displayName: 'Adams, Al' },
+      { userId: 'IDIR\\JSMITH', displayName: 'Smith, Jane' },
+    ]);
+    renderPage();
+
+    const reviewedBy = screen.getByTestId('inspection-search-reviewerUserId');
+    await waitFor(() =>
+      expect(
+        within(reviewedBy)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual(['Anyone', 'Adams, Al', 'Smith, Jane']),
+    );
+    expect(reviewedBy).toBeEnabled();
+
+    type('reviewerUserId', 'IDIR\\JSMITH');
+    search();
+
+    expect(searchApi.searchInspections).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewerUserId: 'IDIR\\JSMITH' }),
+      0,
+      20,
+      null,
+    );
+  });
+
+  it('leaves Reviewed By usable when there are no reviewers to list', async () => {
+    // The backend answers an empty list when CSS cannot be reached; the search still works.
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-inspectionReviewerId')).toBeDisabled();
+      expect(screen.getByTestId('inspection-search-inspectionTypeCode')).toBeEnabled();
     });
-    expect(screen.getByText('Not available yet')).toBeInTheDocument();
+    expect(screen.getByTestId('inspection-search-reviewerUserId')).toBeEnabled();
   });
 
-  it('leaves every other filter usable', async () => {
-    // The reviewer is disabled on its own account, not because the form is still loading — so the
-    // rest of the form must not be disabled with it.
+  it('leaves every filter usable once loaded', async () => {
     renderPage();
 
     await waitFor(() => {
@@ -182,7 +206,7 @@ describe('InspectionSearchPage — criteria form', () => {
   it('is not badged as under construction, because it works', async () => {
     // The badge tells users not to trust what they are seeing. Searching, paging, sorting and
     // deleting all run against real endpoints now, so it would be saying something untrue about
-    // results that are correct. The one unfinished control says so on itself instead.
+    // results that are correct.
     renderPage();
 
     await waitFor(() => {

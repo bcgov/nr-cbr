@@ -6,9 +6,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.service.v1.ConfigurationService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionReviewersService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureCulvertService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureLoadRatingsService;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionReviewerResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -27,9 +29,10 @@ import org.springframework.http.ResponseEntity;
 class ConfigurationApiControllerTest {
 
   private final ConfigurationService service = mock(ConfigurationService.class);
+  private final InspectionReviewersService reviewers = mock(InspectionReviewersService.class);
   private final ConfigurationApiController controller =
       new ConfigurationApiController(service, mock(StructureLoadRatingsService.class),
-          mock(StructureCulvertService.class));
+          mock(StructureCulvertService.class), reviewers);
 
   private static List<CodeOptionResponse> codes(String marker) {
     return List.of(new CodeOptionResponse(marker, marker));
@@ -37,6 +40,16 @@ class ConfigurationApiControllerTest {
 
   private static List<OrgUnitResponse> orgUnits(String marker) {
     return List.of(new OrgUnitResponse(marker, marker, marker));
+  }
+
+  @Test
+  @DisplayName("the inspection reviewers come from the reviewers service")
+  void inspectionReviewersDelegate() {
+    List<InspectionReviewerResponse> listed =
+        List.of(new InspectionReviewerResponse("IDIR\\JSMITH", "Smith, Jane"));
+    when(reviewers.getInspectionReviewers()).thenReturn(listed);
+
+    assertThat(controller.getInspectionReviewers().getBody()).isEqualTo(listed);
   }
 
   @Test

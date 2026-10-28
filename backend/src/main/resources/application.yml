@@ -204,8 +204,8 @@ ca:
         # Calls authenticate with CBR's OWN client_credentials service account, not the caller's
         # token, because that is what nr-user-lookup-api validates.
         #
-        # CBR's first consumer will be inspection-reviewer administration (Phase 6), which today
-        # resolves reviewers from STRUCTURE_INSPECTION_REVIEWER rows keyed by userid.
+        # Nothing in CBR calls it yet: inspection-reviewer administration, its intended first
+        # consumer, was replaced by a FAM role, read from CSS (css-api below).
         #
         # Set all of token-url / client-id / client-secret, or none — a partial trio fails fast at
         # startup. Unset means an unauthenticated client and an empty directory, which is how PR
@@ -220,6 +220,23 @@ ca:
           scope: ${USER_LOOKUP_SCOPE:}
           connect-timeout: 15s
           read-timeout: 30s
+        # The CSS API over CBR's own integration (Common Hosted Single Sign-On). FAM grants CBR's roles
+        # as client roles there, so this is where Inspection Search's Reviewed By list comes from:
+        # everyone holding CBR_INSPECTION_REVIEWER. Calls authenticate as CBR's CSS API account
+        # (created in the CSS app), not the caller.
+        #
+        # ENVIRONMENT is the CSS environment this deployment signs in against: dev, test or prod.
+        # Set all of token-url / client-id / client-secret, or none — a partial trio fails fast at
+        # startup. Unset, the Reviewed By list is empty and the search works without it.
+        css-api:
+          base-url: ${CSS_API_BASE_URL:https://api.loginproxy.gov.bc.ca/api/v1}
+          token-url: ${CSS_API_TOKEN_URL:}
+          client-id: ${CSS_API_CLIENT_ID:}
+          client-secret: ${CSS_API_CLIENT_SECRET:}
+          integration-id: ${CSS_API_INTEGRATION_ID:}
+          environment: ${CSS_API_ENVIRONMENT:}
+          connect-timeout: 5s
+          read-timeout: 15s
         user-directory:
           default-page-size: 25
         frontend:

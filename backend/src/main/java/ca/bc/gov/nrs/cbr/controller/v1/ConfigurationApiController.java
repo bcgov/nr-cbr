@@ -2,11 +2,13 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.ConfigurationApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.ConfigurationService;
+import ca.bc.gov.nrs.cbr.service.v1.InspectionReviewersService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureCulvertService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureLoadRatingsService;
 import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CulvertCodesResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionReviewerResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
@@ -25,14 +27,17 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   private final ConfigurationService configurationService;
   private final StructureLoadRatingsService loadRatingsService;
   private final StructureCulvertService culvertService;
+  private final InspectionReviewersService reviewersService;
 
   public ConfigurationApiController(
       ConfigurationService configurationService,
       StructureLoadRatingsService loadRatingsService,
-      StructureCulvertService culvertService) {
+      StructureCulvertService culvertService,
+      InspectionReviewersService reviewersService) {
     this.configurationService = configurationService;
     this.loadRatingsService = loadRatingsService;
     this.culvertService = culvertService;
+    this.reviewersService = reviewersService;
   }
 
   @Override
@@ -73,6 +78,11 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   @Override
   public ResponseEntity<List<OrgUnitResponse>> getBusinessAreas() {
     return ResponseEntity.ok(configurationService.getBusinessAreas());
+  }
+
+  @Override
+  public ResponseEntity<List<InspectionReviewerResponse>> getInspectionReviewers() {
+    return ResponseEntity.ok(reviewersService.getInspectionReviewers());
   }
 
   @Override

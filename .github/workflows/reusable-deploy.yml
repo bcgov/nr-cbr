@@ -92,6 +92,16 @@ on:
           The shared clamd's host for CLAMAV_HOST
           (<service>.bd657f-<env>.svc.cluster.local).
         required: true
+      css_api_client_id:
+        description: |
+          CBR's CSS API account client ID (CSS_API_CLIENT_ID), for the Reviewed By list. Optional:
+          unset, the list is empty.
+        required: false
+      css_api_client_secret:
+        description: |
+          CBR's CSS API account secret (CSS_API_CLIENT_SECRET), for the Reviewed By list. Optional:
+          unset, the list is empty.
+        required: false
       vanity_tls_certificate:
         description: |
           PEM leaf/server certificate for the PROD vanity Route hostname
@@ -140,6 +150,7 @@ jobs:
       KEYSTORE_SECRET: ${{ secrets.keystore_secret }}
       OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.object_storage_access_key }}
       OBJECT_STORAGE_SECRET_KEY: ${{ secrets.object_storage_secret_key }}
+      CSS_API_CLIENT_SECRET: ${{ secrets.css_api_client_secret }}
     steps:
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         id: deploy
@@ -174,6 +185,11 @@ jobs:
             -p OBJECT_STORAGE_ACCESS_KEY="$OBJECT_STORAGE_ACCESS_KEY"
             -p OBJECT_STORAGE_SECRET_KEY="$OBJECT_STORAGE_SECRET_KEY"
             -p CLAMAV_HOST="${{ secrets.clamav_host }}"
+            -p CSS_API_TOKEN_URL="${{ vars.CSS_API_TOKEN_URL }}"
+            -p CSS_API_CLIENT_ID="${{ secrets.css_api_client_id }}"
+            -p CSS_API_CLIENT_SECRET="$CSS_API_CLIENT_SECRET"
+            -p CSS_API_INTEGRATION_ID="${{ vars.CSS_API_INTEGRATION_ID }}"
+            -p CSS_API_ENVIRONMENT="${{ vars.CSS_API_ENVIRONMENT }}"
           triggers: ${{ inputs.triggers }}
 
   frontend:

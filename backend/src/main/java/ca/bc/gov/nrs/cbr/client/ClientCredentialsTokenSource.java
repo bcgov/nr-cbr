@@ -18,7 +18,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Encapsulates the OAuth2 {@code client_credentials} exchange used to
- * authenticate outbound calls to nr-user-lookup-api. Owns its own
+ * authenticate outbound calls — to nr-user-lookup-api and to the CSS API. Owns its own
  * {@link RestClient} (pointed at the Keycloak token endpoint), the
  * Basic-auth header derived from client_id/client_secret, and the form
  * body. Returned tokens are short-lived JWTs; this source caches them
@@ -30,6 +30,8 @@ public final class ClientCredentialsTokenSource {
   private static final Logger LOG = LoggerFactory.getLogger(ClientCredentialsTokenSource.class);
 
   private final RestClient http;
+  /** Which client this authenticates, for the logs: {@code user-lookup}, {@code css-api}. */
+  private final String name;
   private final String tokenUrl;
   private final String clientId;
   private final String scope;
@@ -41,9 +43,10 @@ public final class ClientCredentialsTokenSource {
   private volatile String cachedAccessToken = "";
   private volatile Instant cachedAccessTokenExpiresAt = Instant.EPOCH;
 
-  private ClientCredentialsTokenSource(
-      RestClient http, String tokenUrl, String clientId, String scope, String basicAuthHeader) {
+  private ClientCredentialsTokenSource(RestClient http, String name, String tokenUrl,
+      String clientId, String scope, String basicAuthHeader) {
     this.http = http;
+    this.name = name;
     this.tokenUrl = tokenUrl;
     this.clientId = clientId;
     this.scope = scope;
@@ -58,6 +61,17 @@ public final class ClientCredentialsTokenSource {
   public static ClientCredentialsTokenSource fromProps(
       String tokenUrl, String clientId, String clientSecret, String scope,
       Duration connectTimeout, Duration readTimeout) {
+    return fromProps("user-lookup", "USER_LOOKUP", tokenUrl, clientId, clientSecret, scope,
+        connectTimeout, readTimeout);
+  }
+
+  /**
+   * As {@link #fromProps(String, String, String, String, Duration, Duration)}, for the client
+   * {@code name} whose settings are the environment variables starting {@code envPrefix}.
+   */
+  public static ClientCredentialsTokenSource fromProps(
+      String name, String envPrefix, String tokenUrl, String clientId, String clientSecret,
+      String scope, Duration connectTimeout, Duration readTimeout) {
     String url = tokenUrl == null ? "" : tokenUrl.trim();
     String id = clientId == null ? "" : clientId.trim();
     String secret = clientSecret == null ? "" : clientSecret.trim();
@@ -68,9 +82,9 @@ public final class ClientCredentialsTokenSource {
     }
     if (url.isBlank() || id.isBlank() || secret.isBlank()) {
       throw new IllegalStateException(
-          "user-lookup client_credentials misconfigured — set ALL of "
-              + "USER_LOOKUP_TOKEN_URL, USER_LOOKUP_CLIENT_ID, USER_LOOKUP_CLIENT_SECRET "
-              + "(or none).");
+          name + " client_credentials misconfigured — set ALL of "
+              + envPrefix + "_TOKEN_URL, " + envPrefix + "_CLIENT_ID, " + envPrefix
+              + "_CLIENT_SECRET (or none).");
     }
 
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -83,7 +97,7 @@ public final class ClientCredentialsTokenSource {
 
     String basic = "Basic " + Base64.getEncoder().encodeToString(
         (id + ":" + secret).getBytes(StandardCharsets.UTF_8));
-    return new ClientCredentialsTokenSource(http, url, id, requestedScope, basic);
+    return new ClientCredentialsTokenSource(http, name, url, id, requestedScope, basic);
   }
 
   public String tokenUrl() {
@@ -116,8 +130,8 @@ public final class ClientCredentialsTokenSource {
       cachedAccessTokenExpiresAt = now.plusSeconds(fresh.expiresInSeconds());
       return cachedAccessToken;
     } catch (RuntimeException ex) {
-      LOG.warn("user-lookup client_credentials token fetch failed ({}); next call will retry",
-          ex.getMessage());
+      LOG.warn("{} client_credentials token fetch failed ({}); next call will retry",
+          name, ex.getMessage());
       cachedAccessToken = "";
       cachedAccessTokenExpiresAt = Instant.EPOCH;
       return "";

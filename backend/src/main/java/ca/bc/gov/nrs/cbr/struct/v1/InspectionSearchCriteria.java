@@ -51,7 +51,8 @@ public record InspectionSearchCriteria(
     /** BCTS Business Area — a third, separate org-unit filter, not a child of the district. */
     String businessAreaOrgUnitNo,
     String inspectorName,
-    String inspectionReviewerId
+    /** Reviewed By: a reviewer's user ID, {@code IDIR\JSMITH}. */
+    String reviewerUserId
 ) {
 
   /**
@@ -102,7 +103,7 @@ public record InspectionSearchCriteria(
         && isBlank(managementOrgUnitNo)
         && isBlank(businessAreaOrgUnitNo)
         && isBlank(inspectorName)
-        && isBlank(inspectionReviewerId)
+        && isBlank(reviewerUserId)
         && !Boolean.TRUE.equals(closeProximity)
         && !Boolean.TRUE.equals(mostRecentInspections)
         && !Boolean.TRUE.equals(findChangedReviewed);

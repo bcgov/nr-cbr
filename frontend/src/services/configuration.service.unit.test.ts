@@ -43,6 +43,7 @@ describe('ConfigurationService', () => {
     ['getStructureTypeClassCodes', 'structure-type-class-codes'],
     ['getInspectionTypeCodes', 'inspection-type-codes'],
     ['getInspectionReportStatusCodes', 'inspection-report-status-codes'],
+    ['getInspectionReviewers', 'inspection-reviewers'],
     ['getForestDistricts', 'forest-districts'],
     ['getBusinessAreas', 'business-areas'],
     ['getSuperstructureTypeCodes', 'superstructure-type-codes'],
