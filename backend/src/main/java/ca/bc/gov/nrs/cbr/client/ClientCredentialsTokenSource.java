@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -61,17 +62,19 @@ public final class ClientCredentialsTokenSource {
   public static ClientCredentialsTokenSource fromProps(
       String tokenUrl, String clientId, String clientSecret, String scope,
       Duration connectTimeout, Duration readTimeout) {
-    return fromProps("user-lookup", "USER_LOOKUP", tokenUrl, clientId, clientSecret, scope,
+    return fromProps("user-lookup", tokenUrl, clientId, clientSecret, scope,
         connectTimeout, readTimeout);
   }
 
   /**
    * As {@link #fromProps(String, String, String, String, Duration, Duration)}, for the client
-   * {@code name} whose settings are the environment variables starting {@code envPrefix}.
+   * {@code name}, whose settings are the environment variables named after it: {@code css-api},
+   * {@code CSS_API_*}.
    */
   public static ClientCredentialsTokenSource fromProps(
-      String name, String envPrefix, String tokenUrl, String clientId, String clientSecret,
+      String name, String tokenUrl, String clientId, String clientSecret,
       String scope, Duration connectTimeout, Duration readTimeout) {
+    String envPrefix = name.toUpperCase(Locale.ROOT).replace('-', '_');
     String url = tokenUrl == null ? "" : tokenUrl.trim();
     String id = clientId == null ? "" : clientId.trim();
     String secret = clientSecret == null ? "" : clientSecret.trim();

@@ -42,8 +42,6 @@ public class CssApiClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(CssApiClient.class);
 
-  private static final String ROLE_USERS_PATH =
-      "/integrations/{integrationId}/{environment}/roles/{roleName}/users";
   /** Users asked for per page — CSS's most, 1 to 50. A shorter page is the last. */
   static final int PAGE_SIZE = 50;
   /** A stop for a server that never returns a short page. */
@@ -65,8 +63,8 @@ public class CssApiClient {
       @Value("${ca.bc.gov.nrs.css-api.environment:}") String environment,
       @Value("${ca.bc.gov.nrs.css-api.connect-timeout:5s}") Duration connectTimeout,
       @Value("${ca.bc.gov.nrs.css-api.read-timeout:10s}") Duration readTimeout) {
-    this.clientCredentials = ClientCredentialsTokenSource.fromProps("css-api", "CSS_API",
-        tokenUrl, clientId, clientSecret, "", connectTimeout, readTimeout);
+    this.clientCredentials = ClientCredentialsTokenSource.fromProps(
+        "css-api", tokenUrl, clientId, clientSecret, "", connectTimeout, readTimeout);
     this.integrationId = integrationId == null ? "" : integrationId.trim();
     this.environment = environment == null ? "" : environment.trim();
     this.configured = clientCredentials != null && !this.integrationId.isEmpty()
@@ -113,10 +111,12 @@ public class CssApiClient {
       int current = page;
       RoleUsersResponse response = http.get()
           .uri(uriBuilder -> {
-            URI uri = uriBuilder.path(ROLE_USERS_PATH)
+            // integrations/{id}/{environment}/roles/{role}/users, each part encoded on its own.
+            URI uri = uriBuilder
+                .pathSegment("integrations", integrationId, environment, "roles", roleName, "users")
                 .queryParam("page", current)
                 .queryParam("max", PAGE_SIZE)
-                .build(integrationId, environment, roleName);
+                .build();
             LOG.debug("css-api role users: {}", uri);
             return uri;
           })

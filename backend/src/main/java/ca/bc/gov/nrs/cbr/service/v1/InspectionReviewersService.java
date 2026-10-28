@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,8 +43,8 @@ public class InspectionReviewersService {
   private final CssApiClient css;
   private final Clock clock;
 
-  private volatile List<InspectionReviewerResponse> reviewers = List.of();
-  private volatile Instant expires = Instant.MIN;
+  /** The list and when it goes stale, swapped as one so a reader never sees half an update. */
+  private final AtomicReference<Held> held = new AtomicReference<>(new Held(List.of(), Instant.MIN));
 
   @Autowired
   public InspectionReviewersService(CssApiClient css) {
@@ -61,23 +62,29 @@ public class InspectionReviewersService {
       return List.of();
     }
     Instant now = clock.instant();
-    if (now.isBefore(expires)) {
-      return reviewers;
+    Held current = held.get();
+    if (now.isBefore(current.expires())) {
+      return current.reviewers();
     }
     try {
-      reviewers = options(css.usersWithRole(CbrRoles.INSPECTION_REVIEWER));
-      expires = now.plus(FRESH);
-      log.info("Read {} inspection reviewers from CSS", reviewers.size());
+      List<InspectionReviewerResponse> read =
+          options(css.usersWithRole(CbrRoles.INSPECTION_REVIEWER));
+      held.set(new Held(read, now.plus(FRESH)));
+      log.info("Read {} inspection reviewers from CSS", read.size());
+      return read;
     } catch (RestClientResponseException ex) {
       // CSS's error says what it refused — a parameter, the role. One line, cut short.
       log.warn("Could not read the inspection reviewers from CSS ({} {}); keeping the {} held",
-          ex.getStatusCode().value(), oneLine(ex.getResponseBodyAsString()), reviewers.size());
+          ex.getStatusCode().value(), oneLine(ex.getResponseBodyAsString()),
+          current.reviewers().size());
     } catch (RestClientException ex) {
       log.warn("Could not read the inspection reviewers from CSS ({}); keeping the {} held",
-          ex.getClass().getSimpleName(), reviewers.size());
+          ex.getClass().getSimpleName(), current.reviewers().size());
     }
-    return reviewers;
+    return current.reviewers();
   }
+
+  private record Held(List<InspectionReviewerResponse> reviewers, Instant expires) {}
 
   private static List<InspectionReviewerResponse> options(List<CssUser> users) {
     Map<String, CssUser> byUserId = new LinkedHashMap<>();
