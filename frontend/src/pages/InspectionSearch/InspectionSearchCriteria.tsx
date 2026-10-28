@@ -381,35 +381,20 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
         )}
         {text('inspectorName', 'Inspector Name', 255)}
 
-        {/* Disabled, not hidden.
-            The reviewer list is the one filter on this form with nothing behind it, and it will stay
-            that way until decision D4 settles where reviewers come from — the
-            `STRUCTURE_INSPECTION_REVIEWER` table, or FAM through `UserLookupClient`
-            (cbr-inspection-reviewer.local.md §7).
-
-            Left enabled it offers a filter that silently does nothing: the only option is "Anyone",
-            which is the same as not filtering, so a user could believe they had narrowed a search
-            when they had not. Removed entirely, the form would quietly lose a criterion the legacy
-            screen has, and the gap would be invisible to anyone comparing the two. Greyed out with a
-            reason says what is true — the filter exists and is not available yet. */}
+        {/* Everyone FAM has granted CBR_INSPECTION_REVIEWER, from CSS, as legacy listed its active
+            reviewers (cbr-inspection-reviewer.local.md §10). One who has not reviewed yet finds
+            nothing. */}
         <Select
-          id="inspection-search-inspectionReviewerId"
-          data-testid="inspection-search-inspectionReviewerId"
+          id="inspection-search-reviewerUserId"
+          data-testid="inspection-search-reviewerUserId"
           labelText="Reviewed By"
-          disabled
-          helperText="Not available yet"
-          value={criteria.inspectionReviewerId}
-          onChange={(event) => onChange('inspectionReviewerId', event.target.value)}
+          value={criteria.reviewerUserId}
+          onChange={(event) => onChange('reviewerUserId', event.target.value)}
         >
           <SelectItem value="" text="Anyone" />
           {codeTables.inspectionReviewers.map((reviewer) => (
-            // The name alone, not "id - name": the value is a sequence number, which means nothing
-            // to a user and appears nowhere they would recognise it.
-            <SelectItem
-              key={reviewer.inspectionReviewerId}
-              value={reviewer.inspectionReviewerId}
-              text={reviewer.displayName}
-            />
+            // The name alone: the value is a user ID, which the list's readers know by name.
+            <SelectItem key={reviewer.userId} value={reviewer.userId} text={reviewer.displayName} />
           ))}
         </Select>
 

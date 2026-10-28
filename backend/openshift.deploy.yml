@@ -70,7 +70,7 @@ parameters:
   # ensure-keycloak-service-account.sh step, KEYCLOAK_SA_* and USER_LOOKUP_BASE_URL) was removed
   # until the directory is actually needed, so these fall through to "" and the backend's
   # UserLookupClient stays inert. The parameters stay declared so restoring it is a workflow change
-  # only. CBR's first consumer is inspection-reviewer administration (Phase 6).
+  # only. Nothing calls it yet: reviewer administration, its intended first consumer, became a FAM role.
   - name: USER_LOOKUP_BASE_URL
     required: false
     value: ""
@@ -81,6 +81,24 @@ parameters:
     required: false
     value: ""
   - name: USER_LOOKUP_CLIENT_SECRET
+    required: false
+    value: ""
+  # The CSS API account that reads who holds CBR_INSPECTION_REVIEWER, for Inspection Search's
+  # Reviewed By list. Optional: unset, the list is empty and nothing else changes. ENVIRONMENT is the
+  # CSS environment the deployment signs in against (dev, test, prod).
+  - name: CSS_API_TOKEN_URL
+    required: false
+    value: ""
+  - name: CSS_API_CLIENT_ID
+    required: false
+    value: ""
+  - name: CSS_API_CLIENT_SECRET
+    required: false
+    value: ""
+  - name: CSS_API_INTEGRATION_ID
+    required: false
+    value: ""
+  - name: CSS_API_ENVIRONMENT
     required: false
     value: ""
   - name: DATABASE_HOST
@@ -210,6 +228,19 @@ objects:
                     secretKeyRef:
                       name: ${NAME}-backend-secret-${ZONE}
                       key: USER_LOOKUP_CLIENT_SECRET
+                - name: CSS_API_TOKEN_URL
+                  value: ${CSS_API_TOKEN_URL}
+                - name: CSS_API_CLIENT_ID
+                  value: ${CSS_API_CLIENT_ID}
+                - name: CSS_API_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NAME}-backend-secret-${ZONE}
+                      key: CSS_API_CLIENT_SECRET
+                - name: CSS_API_INTEGRATION_ID
+                  value: ${CSS_API_INTEGRATION_ID}
+                - name: CSS_API_ENVIRONMENT
+                  value: ${CSS_API_ENVIRONMENT}
                 - name: DATABASE_HOST
                   value: ${DATABASE_HOST}
                 - name: DATABASE_SERVICE_NAME
@@ -401,6 +432,7 @@ objects:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       KEYSTORE_SECRET: ${KEYSTORE_SECRET}
       USER_LOOKUP_CLIENT_SECRET: ${USER_LOOKUP_CLIENT_SECRET}
+      CSS_API_CLIENT_SECRET: ${CSS_API_CLIENT_SECRET}
       OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY}
       OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY}
 

@@ -38,6 +38,17 @@ export type StatusTagType =
   | 'cool-gray'
   | 'warm-gray';
 
+/**
+ * One option of Inspection Search's Reviewed By select: a user holding `CBR_INSPECTION_REVIEWER`,
+ * from CSS — the backend's `InspectionReviewerResponse`.
+ */
+export type InspectionReviewerOption = {
+  /** The submitted value, as CBR stores user IDs: `IDIR\JSMITH`. */
+  userId: string;
+  /** "Last, First", as legacy labels a reviewer. */
+  displayName: string;
+};
+
 /** The Details tab's Bridge card lists — the backend's `BridgeCodesResponse`, current codes only. */
 export type BridgeCodes = {
   superstructureTypes: CodeOption[];

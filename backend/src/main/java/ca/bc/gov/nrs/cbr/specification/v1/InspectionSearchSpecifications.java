@@ -8,6 +8,7 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntitie
 
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -22,6 +23,7 @@ import jakarta.persistence.criteria.Subquery;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -51,7 +53,7 @@ import org.springframework.util.StringUtils;
  *                                   AND S.ROAD_SECTION_ID = SEC.ROAD_SECTION_ID
  * INNER JOIN INSPECTION_REPORT_STATUS_CODE CD ON IRS...CODE = CD...CODE
  * INNER JOIN CBR_ORG_UNIT O  ON O.ORG_UNIT_NO = S.ORG_UNIT_NO
- * LEFT  JOIN STRUCTURE_INSPECTION_REVIEWER  IR   (displayed, never filtered here)
+ * LEFT  JOIN STRUCTURE_INSPECTION_REVIEWER  IR   (displayed; Reviewed By filters it in a subquery)
  * LEFT  JOIN STRCTRE_INSPECTION_TYPE_CODE   SITC (displayed, never filtered here)
  * </pre>
  *
@@ -92,6 +94,7 @@ public final class InspectionSearchSpecifications {
   private static final String INSPECTOR_NAME = "inspectorName";
   private static final String SITE_AT_TIME_OF_INSPECTION = "siteAtTimeOfInspection";
   private static final String INSPECTION_REVIEWER_ID = "inspectionReviewerId";
+  private static final String REVIEWER_USERID = "userid";
   private static final String INSPECTION_TYPE_CODE = "strctreInspectionTypeCode";
   private static final String CROSSING_STRUCTURE_ID = "crossingStructureId";
   private static final String INSPECTION_ID = "inspectionId";
@@ -185,8 +188,9 @@ public final class InspectionSearchSpecifications {
           .ifPresent(predicates::add);
       equalsText(builder, root.get(INSPECTION_TYPE_CODE), criteria.inspectionTypeCode())
           .ifPresent(predicates::add);
-      equalsNumber(builder, root.get(INSPECTION_REVIEWER_ID), criteria.inspectionReviewerId())
-          .ifPresent(predicates::add);
+      if (StringUtils.hasText(criteria.reviewerUserId())) {
+        predicates.add(reviewedBy(builder, query, root, criteria.reviewerUserId()));
+      }
       inspectionDateRange(builder, root.get(INSPECTION_DATE), criteria)
           .ifPresent(predicates::add);
 
@@ -357,6 +361,26 @@ public final class InspectionSearchSpecifications {
     return builder.and(
         builder.notEqual(currentStatus.get(STATUS_CODE_VALUE), REVIEWED),
         builder.exists(everReviewed));
+  }
+
+  /**
+   * Reviewed By: the inspection's reviewer row has this user ID, in any case — legacy's
+   * {@code I.INSPECTION_REVIEWER_ID = :id}, keyed on the person rather than the row, because the list
+   * comes from FAM and a reviewer may not have a row yet. Then nothing matches.
+   */
+  private static Predicate reviewedBy(
+      CriteriaBuilder builder,
+      CriteriaQuery<?> query,
+      Root<StructureInspectionEntity> root,
+      String userId) {
+    Subquery<Long> rows = query.subquery(Long.class);
+    Root<StructureInspectionReviewerEntity> reviewer =
+        rows.from(StructureInspectionReviewerEntity.class);
+    rows.select(reviewer.get(INSPECTION_REVIEWER_ID))
+        .where(builder.equal(
+            builder.upper(reviewer.get(REVIEWER_USERID)),
+            userId.trim().toUpperCase(Locale.ROOT)));
+    return root.get(INSPECTION_REVIEWER_ID).in(rows);
   }
 
   /**

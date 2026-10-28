@@ -8,12 +8,13 @@ import type {
   BridgeCodes,
   CodeOption,
   CulvertCodes,
+  InspectionReviewerOption,
   LoadRatingCodes,
   OrgUnitOption,
 } from '@/types/configuration';
 import type { UseQueryResult } from '@tanstack/react-query';
 
-import { THREE_HOURS } from '@/config/react-query/TimeUnits';
+import { ONE_MINUTE, THREE_HOURS } from '@/config/react-query/TimeUnits';
 import API from '@/services/APIs';
 
 /** Query key prefix for every `/api/v1/configuration/*` lookup. */
@@ -348,6 +349,23 @@ export const managementAreasQuery = (forestDistrictOrgUnitNo: string) =>
     staleTime: REFERENCE_DATA_STALE_TIME,
     enabled: forestDistrictOrgUnitNo !== '',
   });
+
+/**
+ * Inspection Search's Reviewed By list, from CSS through the backend.
+ *
+ * <p>Not a code table: FAM grants the role at any time, and the backend holds the list for five
+ * minutes, so this is fresh for five as well rather than three hours. Kept out of
+ * `INSPECTION_SEARCH_LOOKUPS` because an empty list is an answer here, not a failure — the backend
+ * returns one when CSS cannot be reached, and the search works without the filter.
+ */
+export const inspectionReviewersQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'inspection-reviewers'],
+  queryFn: () => API.configuration.getInspectionReviewers(),
+  staleTime: 5 * ONE_MINUTE,
+});
+
+export const useInspectionReviewers = (): UseQueryResult<InspectionReviewerOption[]> =>
+  useQuery(inspectionReviewersQuery);
 
 export const useSiteStatusCodes = (): UseQueryResult<CodeOption[]> =>
   useQuery(siteStatusCodesQuery);

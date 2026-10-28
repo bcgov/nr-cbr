@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CulvertCodesResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.InspectionReviewerResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
@@ -78,6 +79,14 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/business-areas")
   ResponseEntity<List<OrgUnitResponse>> getBusinessAreas();
+
+  /**
+   * Inspection reviewers, from CSS — the Reviewed By select. Empty when CSS is not configured or
+   * cannot be reached.
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/inspection-reviewers")
+  ResponseEntity<List<InspectionReviewerResponse>> getInspectionReviewers();
 
   /**
    * The name of the recreation project a file id names — "Project Name" on the site form.

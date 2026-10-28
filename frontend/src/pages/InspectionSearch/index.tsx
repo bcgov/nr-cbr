@@ -25,6 +25,7 @@ import {
   useInspectionReferenceDataState,
   useInspectionReportStatusCodes,
   useInspectionTypeCodes,
+  useInspectionReviewers,
   useManagementAreas,
   useStructureTypeClassCodes,
 } from '@/hooks/useConfiguration';
@@ -42,12 +43,9 @@ import { apiErrorMessage } from '@/utils/apiError';
  * four places the query diverges from the legacy stored procedure, are documented on the backend's
  * `InspectionSearchSpecifications` rather than repeated here.
  *
- * <p>Six of the seven dropdowns are live off `/api/v1/configuration`. The seventh, Reviewed By, is
- * empty on purpose rather than for want of an endpoint: it is the one list that is not a code table,
- * and `cbr-auth-and-roles.local.md` §6 recommends moving the reviewer permission into FAM and
- * deleting the admin screen that maintains it — which would re-source the list from
- * `UserLookupClient` rather than from `STRUCTURE_INSPECTION_REVIEWER` (decision D4). Building it
- * against the table first would be building it twice.
+ * <p>All seven dropdowns are live off `/api/v1/configuration`. Six are code tables; Reviewed By is
+ * everyone FAM has granted `CBR_INSPECTION_REVIEWER`, which the backend reads from CSS
+ * (cbr-inspection-reviewer.local.md §10).
  *
  * <p><b>Delete is real and irreversible.</b> It is offered on an `OFL` row only and to a role
  * holding the destructive capability, and it removes the inspection's attachments, repairs, monitor
@@ -85,6 +83,7 @@ const InspectionSearchPage: FC = () => {
   // its own cache key — whenever Forest District changes, and does not run at all until one is
   // picked. Legacy does the same by posting the whole form back on change.
   const managementAreas = useManagementAreas(criteria.orgUnitNo);
+  const inspectionReviewers = useInspectionReviewers();
   const referenceData = useInspectionReferenceDataState();
 
   // `page` is 1-based because Carbon's Pagination is; the backend is 0-based, so the conversion
@@ -99,12 +98,7 @@ const InspectionSearchPage: FC = () => {
    */
   const codeTables = useMemo<CodeTables>(
     () => ({
-      // The one list the configuration endpoint does not serve yet. Listed rather than omitted so
-      // the form's shape is the finished one and wiring it is a one-line change here. It is held
-      // back on purpose: `cbr-auth-and-roles.local.md` §6 recommends moving the reviewer permission
-      // into FAM and deleting the admin screen that maintains it, which would re-source this list
-      // from `UserLookupClient` rather than from STRUCTURE_INSPECTION_REVIEWER (decision D4).
-      inspectionReviewers: [],
+      inspectionReviewers: inspectionReviewers.data ?? [],
       structureTypeClassCodes: structureTypeClassCodes.data ?? [],
       inspectionTypeCodes: inspectionTypeCodes.data ?? [],
       inspectionReportStatusCodes: inspectionReportStatusCodes.data ?? [],
@@ -119,6 +113,7 @@ const InspectionSearchPage: FC = () => {
       businessAreas.data,
       forestDistricts.data,
       managementAreas.data,
+      inspectionReviewers.data,
     ],
   );
 

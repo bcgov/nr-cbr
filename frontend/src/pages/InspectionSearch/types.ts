@@ -20,21 +20,8 @@ export type { CodeOption, OrgUnitOption } from '@/types/configuration';
 /** The paging envelope every search endpoint answers with. */
 export type { PagedResponse } from '@/types/api';
 
-/**
- * One reviewer, as the "Reviewed By" select needs them — `STRUCTURE_INSPECTION_REVIEWER` joined to
- * the user who may sign off an inspection.
- *
- * <p>Its own shape rather than a `CodeOption`, because the value is a numeric id rather than a code
- * anyone says out loud, so the select must not render it beside the name the way a code list does.
- *
- * <p>Whether this list survives at all is open: `cbr-auth-and-roles.local.md` §6 recommends moving
- * the reviewer permission into FAM and deleting the admin screen that maintains it, in which case
- * this re-sources to `UserLookupClient` (decision D4).
- */
-export type InspectionReviewerOption = {
-  inspectionReviewerId: string;
-  displayName: string;
-};
+/** One reviewer, as the "Reviewed By" select needs them. */
+export type { InspectionReviewerOption } from '@/types/configuration';
 
 /**
  * The results columns a user can sort by, one per header, by the server's names for them.
@@ -103,7 +90,8 @@ export type InspectionSearchCriteria = {
   /** BCTS Business Area — a third, separate org-unit filter, not a child of the district. */
   businessAreaOrgUnitNo: string;
   inspectorName: string;
-  inspectionReviewerId: string;
+  /** Reviewed By: a reviewer's user ID, `IDIR\JSMITH`. */
+  reviewerUserId: string;
 };
 
 /**
@@ -167,5 +155,5 @@ export const EMPTY_CRITERIA: InspectionSearchCriteria = {
   managementOrgUnitNo: '',
   businessAreaOrgUnitNo: '',
   inspectorName: '',
-  inspectionReviewerId: '',
+  reviewerUserId: '',
 };
