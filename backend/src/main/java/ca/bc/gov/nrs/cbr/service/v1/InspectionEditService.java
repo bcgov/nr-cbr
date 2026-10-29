@@ -5,6 +5,7 @@ import ca.bc.gov.nrs.cbr.exception.InspectionLockedException;
 import ca.bc.gov.nrs.cbr.exception.InspectionNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
@@ -43,9 +44,13 @@ import org.springframework.transaction.annotation.Transactional;
  *       Progress, or once given — legacy's {@code FRM.validate}: "X is required.";
  *   <li>the date is not in the future, and no other inspection of the structure is on it (offline
  *       ones aside);
- *   <li>the status moves between In Progress and Submitted here; Reviewed is a P.Eng's, through
- *       the review ({@link InspectionReviewService}); out of Rejected only a P.Eng moves it, as
- *       legacy;
+ *   <li>the status moves between In Progress and Submitted here; Reviewed is an inspection
+ *       reviewer's, through the review ({@link InspectionReviewService}); Rejected is an inspection
+ *       reviewer's too, from In Progress or Submitted, here; out of Rejected only a P.Eng moves
+ *       it, as legacy;
+ *   <li>rejecting sets the structure's next planned routine inspection a year from today and its
+ *       routine frequency to one year, as legacy's save at Rejected — once, on the change to
+ *       Rejected, where legacy did it again at every save;
  *   <li>Professional Inspection Required is a Level 2 user's to change;
  *   <li>refused once Reviewed or Accepted, as legacy disables its page then — here on the server
  *       too.
@@ -73,20 +78,25 @@ public class InspectionEditService {
   private static final int HAZARD_COMMENT_MAX = 2000;
   private static final long COST_MAX = 999_999L;
   private static final String YES = "Y";
+  /** Legacy's Rejected schedule: the next routine inspection a year out, then yearly. */
+  private static final int REJECTED_FREQUENCY_YEARS = 1;
 
   private final StructureInspectionRepository inspections;
   private final InspectionReportStatusRepository statuses;
   private final StructureInspectionItemRepository items;
+  private final CrossingStructureRepository structures;
   private final InspectionFormService forms;
   private final LoggedUserHelper loggedUser;
   private final InspectionAuditRecorder audit;
 
   public InspectionEditService(StructureInspectionRepository inspections,
       InspectionReportStatusRepository statuses, StructureInspectionItemRepository items,
-      InspectionFormService forms, LoggedUserHelper loggedUser, InspectionAuditRecorder audit) {
+      CrossingStructureRepository structures, InspectionFormService forms,
+      LoggedUserHelper loggedUser, InspectionAuditRecorder audit) {
     this.inspections = inspections;
     this.statuses = statuses;
     this.items = items;
+    this.structures = structures;
     this.forms = forms;
     this.loggedUser = loggedUser;
     this.audit = audit;
@@ -130,6 +140,11 @@ public class InspectionEditService {
           .entryUserid(user)
           .entryTimestamp(now)
           .build());
+      if (REJECTED.equals(status)) {
+        structures.updateFromRejection(inspection.getCrossingStructureId(),
+            now.toLocalDate().plusYears(REJECTED_FREQUENCY_YEARS),
+            String.valueOf(REJECTED_FREQUENCY_YEARS), user);
+      }
     }
     log.info("Updated inspection {}, status {}", inspectionId, status);
     audit.afterCommit(inspectionId);
@@ -342,15 +357,23 @@ public class InspectionEditService {
   }
 
   /**
-   * In Progress or Submitted, or the status it has; out of Rejected a P.Eng's only — legacy's
-   * "You do not have permission to change this status."
+   * In Progress or Submitted, or the status it has; into Rejected an inspection reviewer's, from
+   * In Progress or Submitted; out of Rejected a P.Eng's only — legacy's "You do not have
+   * permission to change this status."
    */
   private void checkStatus(Map<String, String> errors, String current, String status) {
     if (status == null) {
       errors.put(STATUS_FIELD, "Inspection Report Status is required.");
     } else if (!status.equals(current)) {
-      if (!EDITABLE_STATUSES.contains(status)) {
-        errors.put(STATUS_FIELD, "Reviewed is set by a P.Eng through the review, not saved here.");
+      if (REJECTED.equals(status)) {
+        if (!loggedUser.isInspectionReviewer()) {
+          errors.put(STATUS_FIELD, "Only an inspection reviewer can reject an inspection.");
+        } else if (!EDITABLE_STATUSES.contains(current)) {
+          errors.put(STATUS_FIELD, "Only an In Progress or Submitted inspection can be rejected.");
+        }
+      } else if (!EDITABLE_STATUSES.contains(status)) {
+        errors.put(STATUS_FIELD,
+            "Reviewed is set by an inspection reviewer through the review, not saved here.");
       } else if (REJECTED.equals(current) && !loggedUser.isPeng()) {
         errors.put(STATUS_FIELD, "You do not have permission to change this status.");
       }

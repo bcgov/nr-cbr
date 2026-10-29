@@ -640,7 +640,7 @@ describe('InspectionDetailPage', () => {
           within(status)
             .getAllByRole('option')
             .map((option) => option.textContent),
-        ).toEqual(['In Progress', 'Reviewed', 'Submitted']),
+        ).toEqual(['In Progress', 'Rejected', 'Reviewed', 'Submitted']),
       );
       // One card at a time.
       expect(screen.queryByTestId('comments-edit')).not.toBeInTheDocument();
@@ -766,6 +766,60 @@ describe('InspectionDetailPage', () => {
       authorization.isInspectionReviewer = true;
     });
 
+    it('lets an inspection reviewer reject it with the card, saying what it reschedules', async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'SUB', description: 'Submitted' } }),
+      );
+      inspectionApi.updateInspection.mockResolvedValue(undefined);
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      const status = screen.getByTestId('inspection-edit-statusCode');
+      await waitFor(() => expect(within(status).getByText('Rejected')).toBeInTheDocument());
+      expect(screen.getByTestId('inspection-section-inspection')).not.toMatchTextContent(
+        /reschedules/,
+      );
+
+      fireEvent.change(status, { target: { value: 'REJ' } });
+      const next = new Date();
+      const yearOut = `${next.getFullYear() + 1}/`;
+      expect(screen.getByTestId('inspection-section-inspection')).toMatchTextContent(
+        new RegExp(`next routine inspection to ${yearOut}`),
+      );
+      await userEvent.click(screen.getByTestId('inspection-save'));
+
+      await waitFor(() =>
+        expect(inspectionApi.updateInspection).toHaveBeenCalledWith(
+          '41',
+          expect.objectContaining({ statusCode: 'REJ' }),
+        ),
+      );
+      // Not a review: no Accept dialog.
+      expect(inspectionApi.reviewInspection).not.toHaveBeenCalled();
+    });
+
+    it('offers Rejected to an inspection reviewer only', async () => {
+      inspectionApi.getInspection.mockResolvedValue(
+        inspection({ status: { code: 'SUB', description: 'Submitted' } }),
+      );
+      // A P.Eng below the reviewer may move a Rejected one on, but not reject.
+      authorization.isInspectionReviewer = false;
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      const status = screen.getByTestId('inspection-edit-statusCode');
+      await waitFor(() =>
+        expect(
+          within(status)
+            .getAllByRole('option')
+            .map((option) => option.textContent),
+        ).toEqual(['In Progress', 'Submitted']),
+      );
+      authorization.isInspectionReviewer = true;
+    });
+
     it('saves the PEng Comments', async () => {
       inspectionApi.getInspection.mockResolvedValue(inProgress());
       inspectionApi.updatePengComment.mockResolvedValue(undefined);
@@ -794,7 +848,7 @@ describe('InspectionDetailPage', () => {
 
       await userEvent.click(screen.getByTestId('inspection-edit'));
       const status = screen.getByTestId('inspection-edit-statusCode');
-      await waitFor(() => expect(within(status).getAllByRole('option')).toHaveLength(3));
+      await waitFor(() => expect(within(status).getAllByRole('option')).toHaveLength(4));
       fireEvent.change(status, { target: { value: 'RVD' } });
       await userEvent.click(screen.getByTestId('inspection-save'));
 

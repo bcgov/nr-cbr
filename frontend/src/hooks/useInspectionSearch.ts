@@ -113,12 +113,15 @@ export const useUpdateInspection = (inspectionId: string) => {
   const mutation = useMutation({
     mutationFn: (request: InspectionUpdateRequest) =>
       API.inspectionSearch.updateInspection(inspectionId, request),
-    // A save of the inspection may have stored its audit record among the documents.
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
-        invalidateDocuments(queryClient),
-      ]),
+    // A save of the inspection may have stored its audit record among the documents; a rejection
+    // also reschedules the structure's inspections, so everything is read again, as a review is.
+    onSuccess: (_, request) =>
+      request.statusCode === 'REJ'
+        ? queryClient.invalidateQueries()
+        : Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['inspection', inspectionId] }),
+            invalidateDocuments(queryClient),
+          ]),
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };
 };

@@ -96,14 +96,13 @@
       as soon as the app reads parameters. Advisory range is `< 2.4.0.Beta1`, and Boot 3.5.14 manages
       2.3.24.Final, so the managed version is affected.
 
-      Pinned on undertow-core alone, deliberately: the 2.4.0.Beta1 release published *only* the core
-      module — undertow-servlet and undertow-websockets-jsr do not exist at that version on Maven
-      Central. Overriding Boot's `undertow.version` property therefore cannot resolve, since the BOM
-      drives all three artifacts from it. Servlet and websockets stay on 2.3.24.Final; the form
-      parser the CVE concerns lives in core.
+      Pinned on undertow-core alone, deliberately: the 2.4.x releases publish *only* the core
+      module — undertow-servlet and undertow-websockets-jsr do not exist on the 2.4 line on Maven
+      Central (checked at 2.4.4.Final). Overriding Boot's `undertow.version` property therefore
+      cannot resolve, since the BOM drives all three artifacts from it. Servlet and websockets stay
+      on Boot's 2.3.x; the form parser the CVE concerns lives in core.
 
-      2.4.0.Beta1 is a development build. Revisit when 2.4.0.Final ships or Boot's managed version
-      moves to a non-vulnerable release, and drop this block then.
+      Drop this block once Boot's managed version moves to a non-vulnerable release.
     -->
     <dependency>
       <groupId>io.undertow</groupId>

@@ -280,6 +280,25 @@ public interface CrossingStructureRepository
       @Param("user") String user);
 
   /**
+   * Writes what rejecting an inspection sets on the structure — legacy's save at Rejected: the
+   * next planned routine inspection and the routine frequency — with who changed it and when.
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("""
+      UPDATE CrossingStructureEntity structure
+         SET structure.nextPlannedInspectionDate = :nextRoutineDate,
+             structure.routineInspectionFrequency = :routineFrequency,
+             structure.updateUserid = :user,
+             structure.updateTimestamp = LOCAL DATETIME
+       WHERE structure.crossingStructureId = :id
+      """)
+  int updateFromRejection(
+      @Param("id") Long id,
+      @Param("nextRoutineDate") LocalDate nextRoutineDate,
+      @Param("routineFrequency") String routineFrequency,
+      @Param("user") String user);
+
+  /**
    * Marks structures updated by a repair-responsibility change, as legacy's {@code structure.save}
    * did: stamped with who and when, and {@code ACTIVE_IND = 'Y'} — legacy's save sets every
    * structure it touches active, so an archived structure ticked for this comes back. Kept on
