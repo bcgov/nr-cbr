@@ -5,7 +5,6 @@ import react from '@vitejs/plugin-react';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig, loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import tsconfigPaths from 'vite-tsconfig-paths';
 import { configDefaults } from 'vitest/config';
 
 export default defineConfig(({ mode }) => {
@@ -41,7 +40,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      tsconfigPaths(),
       // CBR has no offline mode, so no service worker. selfDestroying ships a sw.js that unregisters
       // the one this app used to install and clears its caches, so browsers that already have it
       // stop serving a stale build. Drop the plugin once that has had time to reach every browser
@@ -116,7 +114,7 @@ export default defineConfig(({ mode }) => {
             },
           },
           css,
-          plugins: [react(), tsconfigPaths()],
+          plugins: [react()],
           test: {
             name: 'node',
             setupFiles: [
@@ -134,7 +132,7 @@ export default defineConfig(({ mode }) => {
             },
           },
           css,
-          plugins: [react(), tsconfigPaths()],
+          plugins: [react()],
           test: {
             name: 'browser',
             setupFiles: [

@@ -18,6 +18,7 @@ import { requiredLabel } from '@/utils/requiredLabel';
 import {
   CARD_STATUSES,
   LOCKING_STATUSES,
+  REJECTED,
   canChangeStatus,
   cardErrorsOf,
   requiredOf,
@@ -54,6 +55,7 @@ import {
   IN_PROGRESS,
   type InspectionValues,
 } from '@/pages/NewInspection/inspectionRules';
+import { addYears, fromCalendar, toIso } from '@/pages/StructureDetail/dateBox';
 import { describe } from '@/pages/StructureDetail/format';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { byteLength } from '@/utils/textLimits';
@@ -120,7 +122,8 @@ const REVIEW_FIELDS = new Set<string>([
 /**
  * The Inspection card's form: status, date, inspector, company, cost, professional. An inspection
  * reviewer may pick Reviewed: Save then opens the Review dialog — legacy's Accept —
- * which saves the card as it stands, then the review.
+ * which saves the card as it stands, then the review. They may also pick Rejected, saved with the
+ * card, which reschedules the structure's next routine inspection a year out.
  */
 const InspectionEditor: FC<{
   inspection: InspectionDetailResponse;
@@ -207,13 +210,18 @@ const InspectionEditor: FC<{
   };
 
   // In Progress and Submitted, and the status it has if neither (Rejected), so it reads right;
-  // Reviewed for an inspection reviewer, through the Review dialog.
+  // for an inspection reviewer, Reviewed through the Review dialog and, from In Progress or
+  // Submitted, Rejected.
+  const reviewable = isInspectionReviewer && CARD_STATUSES.has(current ?? '');
   const offered = (statuses.data ?? []).filter(
     (status) =>
       CARD_STATUSES.has(status.code) ||
       status.code === current ||
-      (isInspectionReviewer && status.code === REVIEWED),
+      (isInspectionReviewer && status.code === REVIEWED) ||
+      (reviewable && status.code === REJECTED),
   );
+  const rejecting = values.statusCode === REJECTED && current !== REJECTED;
+  const today = toIso(fromCalendar(new Date())) ?? '';
 
   return (
     <div className="structure-detail__edit">
@@ -227,6 +235,11 @@ const InspectionEditor: FC<{
             value={values.statusCode}
             invalid={Boolean(shown.statusCode)}
             invalidText={shown.statusCode}
+            helperText={
+              rejecting
+                ? `Saving reschedules the structure's next routine inspection to ${addYears(today, 1)}, then yearly.`
+                : undefined
+            }
             onChange={(event) => change('statusCode', event.target.value)}
             onBlur={() => form.leave('statusCode')}
           >

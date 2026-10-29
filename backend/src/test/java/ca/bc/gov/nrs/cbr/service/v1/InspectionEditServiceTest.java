@@ -152,14 +152,71 @@ class InspectionEditServiceTest {
     inspection(41L, "PRO", null, null);
     inspection(42L, "REJ", DAY, "Jo");
 
-    assertThat(refused(41L, card("RVD", null, null, null))).containsEntry(
-        "statusCode", "Reviewed is set by a P.Eng through the review, not saved here.");
+    assertThat(refused(41L, card("RVD", null, null, null))).containsEntry("statusCode",
+        "Reviewed is set by an inspection reviewer through the review, not saved here.");
     assertThat(refused(42L, card("SUB", DAY, "Jo", "Co"))).containsOnly(
         Map.entry("statusCode", "You do not have permission to change this status."));
     service.update(42L, card("REJ", DAY, "Jo", "Co"));
     when(loggedUser.isPeng()).thenReturn(true);
     service.update(42L, card("SUB", DAY, "Jo", "Co"));
     assertThat(stored(42L).getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("SUB");
+  }
+
+  @Test
+  @DisplayName("rejects only for an inspection reviewer, from In Progress or Submitted")
+  void whoRejects() {
+    inspection(41L, "SUB", DAY, "Jo");
+    inspection(42L, "OFL", DAY.minusDays(1), "Jo");
+
+    // A P.Eng below the reviewer may move a Rejected inspection on, but not reject one.
+    when(loggedUser.isPeng()).thenReturn(true);
+    assertThat(refused(41L, card("REJ", DAY, "Jo", "Co"))).containsOnly(
+        Map.entry("statusCode", "Only an inspection reviewer can reject an inspection."));
+    when(loggedUser.isInspectionReviewer()).thenReturn(true);
+    assertThat(refused(42L, card("REJ", DAY.minusDays(1), "Jo", "Co"))).containsOnly(
+        Map.entry("statusCode", "Only an In Progress or Submitted inspection can be rejected."));
+
+    service.update(41L, card("REJ", DAY, "Jo", "Co"));
+    assertThat(stored(41L).getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("REJ");
+  }
+
+  @Test
+  @DisplayName("rejecting schedules the structure's next routine inspection a year out, yearly")
+  void rejectingReschedules() {
+    inspection(41L, "PRO", DAY, "Jo");
+    when(loggedUser.isInspectionReviewer()).thenReturn(true);
+    LocalDate yearOut = LocalDate.now().plusYears(1);
+
+    service.update(41L, card("REJ", DAY, "Jo", "Co"));
+
+    CrossingStructureEntity structure = structure();
+    assertThat(structure.getNextPlannedInspectionDate()).isEqualTo(yearOut);
+    assertThat(structure.getRoutineInspectionFrequency()).isEqualTo("1");
+    assertThat(structure.getUpdateUserid()).isEqualTo("IDIR\\INSPECTOR");
+    // Once, on the change to Rejected: saving it again Rejected leaves the schedule alone.
+    entityManager.createQuery("UPDATE CrossingStructureEntity s SET s.nextPlannedInspectionDate"
+        + " = :day, s.routineInspectionFrequency = '3' WHERE s.crossingStructureId = 7")
+        .setParameter("day", DAY).executeUpdate();
+    service.update(41L, card("REJ", DAY, "Jo", "Co"));
+    assertThat(structure().getNextPlannedInspectionDate()).isEqualTo(DAY);
+    assertThat(structure().getRoutineInspectionFrequency()).isEqualTo("3");
+  }
+
+  @Test
+  @DisplayName("another status change leaves the structure's schedule alone")
+  void submittingKeepsSchedule() {
+    inspection(41L, "PRO", DAY, "Jo");
+
+    service.update(41L, card("SUB", DAY, "Jo", "Co"));
+
+    assertThat(structure().getNextPlannedInspectionDate()).isNull();
+    assertThat(structure().getRoutineInspectionFrequency()).isNull();
+  }
+
+  private CrossingStructureEntity structure() {
+    entityManager.flush();
+    entityManager.clear();
+    return entityManager.find(CrossingStructureEntity.class, 7L);
   }
 
   @Test

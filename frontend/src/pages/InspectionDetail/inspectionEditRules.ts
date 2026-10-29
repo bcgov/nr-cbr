@@ -5,8 +5,12 @@ import { inspectionErrorsOf } from '@/pages/NewInspection/inspectionRules';
 import { toBox, toIso } from '@/pages/StructureDetail/dateBox';
 
 export const IN_PROGRESS = 'PRO';
-const REJECTED = 'REJ';
-/** The statuses this card moves between; Reviewed and Rejected are the Review tab's. */
+/** Rejected — an inspection reviewer's, from In Progress or Submitted, picked on this card. */
+export const REJECTED = 'REJ';
+/**
+ * The statuses this card moves between; an inspection reviewer may also pick Rejected here, and
+ * Reviewed through the Review dialog.
+ */
 export const CARD_STATUSES = new Set([IN_PROGRESS, 'SUB']);
 /** The statuses after which legacy's page is disabled — Reviewed and Accepted, not Rejected. */
 export const LOCKING_STATUSES = new Set(['RVD', 'ACC']);
