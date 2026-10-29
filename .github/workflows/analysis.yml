@@ -19,7 +19,7 @@ jobs:
   backend-tests:
     name: Backend Tests
     if: (! github.event.pull_request.draft)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -31,13 +31,13 @@ jobs:
       SONAR_TOKEN: ${{ secrets.sonar_token_backend }}
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY_BACKEND }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Sonar uses git blame for new-code detection; shallow clones break it.
           fetch-depth: 0
 
       - name: Set up Java 21 (Temurin) + Maven cache
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -72,7 +72,7 @@ jobs:
   frontend-tests:
     name: Frontend Tests
     if: (! github.event.pull_request.draft)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - uses: bcgov/action-test-and-analyse@8f699e3fd3fadd9a6adf6f4b1f2638ef7ecfefb9 # v2.0.0
@@ -123,10 +123,10 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Cache Trivy DB
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .trivycache
           key: ${{ runner.os }}-trivy-v0.36.0-cache-v1
