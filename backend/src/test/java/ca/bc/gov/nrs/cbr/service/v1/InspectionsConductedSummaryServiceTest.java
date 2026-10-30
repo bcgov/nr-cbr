@@ -204,7 +204,7 @@ class InspectionsConductedSummaryServiceTest {
   }
 
   @Test
-  @DisplayName("leaves out archived structures and portable superstructures in service")
+  @DisplayName("leaves out archived structures and portable superstructures in storage")
   void exclusions() {
     long id = structure("B1", s -> s);
     inspection(id, "ROUT", LocalDate.of(2025, 1, 1), i -> i, "ACC");

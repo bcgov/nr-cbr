@@ -37,14 +37,14 @@ import org.springframework.util.StringUtils;
  * <p>Replaces the {@code WHERE} clause legacy's {@code RepairSummaryReportForm.createSearch} and
  * {@code OracleReportQueryDAO.generateReportQuery} assemble as a string for
  * {@code CBR_REPORTING.REPAIR_SUMMARY}. Its rules are legacy's: an active structure; never a repair
- * carried forward to a later inspection; never a portable superstructure in service; text an
+ * carried forward to a later inspection; never a portable superstructure in storage; text an
  * unanchored, case-insensitive contains; codes exact, a group of them any one.
  *
  * <p>Two of legacy's joins are left out, as they only repeated rows. Legacy joined the structure's
  * culvert records, which the report never prints, so a structure with two listed every repair
  * twice; and it joined the repair type's classes, of which a type can have several, to filter on
  * Structural Safety — here an {@code EXISTS}. The bridge, read only to leave out a portable
- * superstructure in service, is a {@code NOT EXISTS} for the same reason.
+ * superstructure in storage, is a {@code NOT EXISTS} for the same reason.
  */
 public final class RepairsSummaryReportSpecifications {
 
@@ -105,8 +105,8 @@ public final class RepairsSummaryReportSpecifications {
   private static final String YES = "Y";
   private static final String NO = "N";
   private static final String ROUTINE = "ROUT";
-  /** A portable superstructure in service: legacy leaves its structure out of the report. */
-  private static final String IN_SERVICE = "S";
+  /** A portable superstructure in storage: legacy leaves its structure out of the report. */
+  private static final String IN_STORAGE = "S";
   private static final List<String> OUTSTANDING = List.of("SUG", "REQ", "CF");
   private static final List<String> SUGGESTED_OR_REQUIRED = List.of("SUG", "REQ");
   /** The site statuses and type/classes legacy's reports count as downrated: live crossings. */
@@ -138,7 +138,7 @@ public final class RepairsSummaryReportSpecifications {
     predicates.add(builder.equal(repair.get(STRUCTURE_ID), structure.get(STRUCTURE_ID)));
     predicates.add(builder.equal(structure.get(ACTIVE_IND), YES));
     predicates.add(builder.equal(repair.get(CARRIED_FORWARD), NO));
-    predicates.add(builder.not(builder.exists(portableInService(query, builder, structure))));
+    predicates.add(builder.not(builder.exists(portableInStorage(query, builder, structure))));
     structureCriteria(builder, structure, site, criteria, predicates);
     siteCriteria(builder, site, roadSection, criteria, predicates);
     repairCriteria(builder, query, repair, structure, criteria, predicates);
@@ -291,14 +291,14 @@ public final class RepairsSummaryReportSpecifications {
         builder.equal(inspection.get(INSPECTION_DATE), latest));
   }
 
-  /** The structure's bridge, if it is a portable superstructure in service. */
-  private static Subquery<Long> portableInService(
+  /** The structure's bridge, if it is a portable superstructure in storage. */
+  private static Subquery<Long> portableInStorage(
       CriteriaQuery<?> query, CriteriaBuilder builder, Root<CrossingStructureEntity> structure) {
     Subquery<Long> rows = query.subquery(Long.class);
     Root<ForestServiceBridgeEntity> bridge = rows.from(ForestServiceBridgeEntity.class);
     return rows.select(bridge.get(STRUCTURE_ID)).where(
         builder.equal(bridge.get(STRUCTURE_ID), structure.get(STRUCTURE_ID)),
-        builder.equal(bridge.get(PORTABLE_STATUS), IN_SERVICE));
+        builder.equal(bridge.get(PORTABLE_STATUS), IN_STORAGE));
   }
 
   /**

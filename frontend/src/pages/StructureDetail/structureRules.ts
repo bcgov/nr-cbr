@@ -116,10 +116,8 @@ export const structureWarningsOf = (values: StructureValues): Messages<Structure
       `the year built + 50 years (${built + 50})`,
     );
   }
-  const installation = toCost(values.installationCost);
-  if (installation !== null && installation > 500_000) {
-    warnings.installationCost = 'Installation Cost is not in the range $0 through $500,000.';
-  }
+  // Legacy also warned of an Installation Cost over $500,000. Dropped on request: users asked for
+  // $1,000,000, past the column's $999,999, whose error already covers it.
   return warnings;
 };
 

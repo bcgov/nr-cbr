@@ -59,7 +59,7 @@ public class ForestServiceBridgeEntity {
   @Column(name = "DECK_TYPE_CODE", length = 10)
   private String deckTypeCode;
 
-  /** {@code 'S'} when a portable superstructure is in service — the abutments then matter. */
+  /** {@code 'S'} when a portable superstructure is in storage — it then has no abutments. */
   @Column(name = "PRTBLE_SUPERSTRUCTURE_STS_CODE", length = 10)
   private String portableSuperstructureStatusCode;
 

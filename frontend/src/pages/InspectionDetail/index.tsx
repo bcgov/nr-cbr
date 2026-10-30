@@ -74,7 +74,7 @@ const isOutstandingTab = (key: TabKey): key is OutstandingTab =>
  * <p>Inspection (the structure and its site, the inspection, its comments), Condition (every
  * question asked, answered or not), Hydraulic Hazards, then as legacy: Documents & Photos (every
  * document on the structure, by inspection), Repairs and Monitoring (outstanding by default, with
- * Current Inspection Items for this one's). As legacy, there is no Review tab: the status history,
+ * Current Inspection Items for this one's — the default once it is reviewed). As legacy, there is no Review tab: the status history,
  * the review's load rating and the PEng Comments are on the Inspection tab, and a P.Eng reviews the
  * inspection by saving it as Reviewed, which opens the Review dialog — legacy's Accept.
  *
@@ -101,6 +101,8 @@ const InspectionDetailPage: FC = () => {
   const notFound = (loaded.error as { status?: number } | null)?.status === 404;
   /** Reviewed, Accepted or Rejected: its repairs and monitoring items are no longer changed here. */
   const locked = LOCKING_STATUSES.has(inspection?.status.code ?? '');
+  /** Reviewed or Accepted: its repairs and monitoring items open on its own, not the outstanding. */
+  const reviewed = DOCUMENT_LOCKING_STATUSES.has(inspection?.status.code ?? '');
   /** Reviewed or Accepted: no document added any more — legacy disables its Add then, not on Rejected. */
   const documentsLocked = DOCUMENT_LOCKING_STATUSES.has(inspection?.status.code ?? '');
   /** Legacy's page: Level 0 and up edit it, until it is Reviewed or Accepted. */
@@ -236,22 +238,27 @@ const InspectionDetailPage: FC = () => {
                   )}
                 </TabPanel>
                 <TabPanel>
+                  {/* Keyed on reviewed: reviewing it here starts the tab again on its own items. */}
                   {structureId && (
                     <RepairsTab
+                      key={String(reviewed)}
                       structureId={structureId}
                       opened={openedTabs.has('repairs')}
                       inspectionId={inspection.id}
                       locked={locked}
+                      reviewed={reviewed}
                     />
                   )}
                 </TabPanel>
                 <TabPanel>
                   {structureId && (
                     <MonitoringTab
+                      key={String(reviewed)}
                       structureId={structureId}
                       opened={openedTabs.has('monitoring')}
                       inspectionId={inspection.id}
                       locked={locked}
+                      reviewed={reviewed}
                     />
                   )}
                 </TabPanel>
