@@ -269,7 +269,7 @@ class RepairsSummaryServiceTest {
   }
 
   @Test
-  @DisplayName("leaves out carried-forward repairs, archived structures and portables in service")
+  @DisplayName("leaves out carried-forward repairs, archived structures and portables in storage")
   void exclusions() {
     long id = structure("B1", s -> s);
     repair(id, null, r -> r.description("listed"));

@@ -198,7 +198,7 @@ class ReplacementStructuresSummaryServiceTest {
   }
 
   @Test
-  @DisplayName("prints a row per bridge and culvert record, less a portable bridge in service")
+  @DisplayName("prints a row per bridge and culvert record, less a portable bridge in storage")
   void bridgesAndCulverts() {
     site("62-001", s -> s);
     long twoBridges = structure("B1", "62-001", s -> s.fullLogHaulReplacementYear(2030));

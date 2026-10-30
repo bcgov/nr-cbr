@@ -47,6 +47,8 @@ type Props = {
    * any more — no Add, Edit or Delete.
    */
   locked?: boolean;
+  /** On an inspection's page: the inspection is Reviewed, so the tab opens on its own items. */
+  reviewed?: boolean;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -179,7 +181,13 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, 
  * all of them, a page at a time from the server. Edit (Level 1 and up) and Delete (Level 2 and
  * up) from each row's Actions; Add (Level 1 and up) over the table.
  */
-const RepairsTab: FC<Props> = ({ structureId, opened, inspectionId, locked = false }) => {
+const RepairsTab: FC<Props> = ({
+  structureId,
+  opened,
+  inspectionId,
+  locked = false,
+  reviewed = false,
+}) => {
   const authorization = useAuthorization();
   // On an inspection's page, legacy's: Level 0 adds and edits, as an inspector records them while
   // inspecting; on the structure page, Level 1. Delete is Level 2's on either.
@@ -193,7 +201,8 @@ const RepairsTab: FC<Props> = ({ structureId, opened, inspectionId, locked = fal
   const [pendingDelete, setPendingDelete] = useState<StructureRepair | null>(null);
   /** The repair being edited, `'new'` while one is being added, or null. */
   const [editing, setEditing] = useState<StructureRepair | 'new' | null>(null);
-  const [view, setView] = useState<RepairView>('OUTSTANDING');
+  // Once its inspection is reviewed, what it raised is what is looked at, not what is outstanding.
+  const [view, setView] = useState<RepairView>(reviewed ? 'CURRENT' : 'OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   /** Legacy's "Show Inspections before the Superstructure Install Date". */
