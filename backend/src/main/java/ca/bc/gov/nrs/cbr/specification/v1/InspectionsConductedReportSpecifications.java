@@ -29,7 +29,7 @@ import java.util.List;
  * <p>Replaces the {@code WHERE} clause legacy's {@code InspectionsConductedReportForm.createSearch}
  * and {@code OracleReportQueryDAO.generateReportQuery} assemble as a string for
  * {@code CBR_REPORTING.INSPCTNS_CONDUCTED_RPT}. Its rules are legacy's: an active structure; never a
- * portable superstructure in service; an inspection with a report status, listed once under its
+ * portable superstructure in storage; an inspection with a report status, listed once under its
  * current one — the status a Report Status filter matches; text an unanchored, case-insensitive
  * contains; codes exact. The inspection date is a range of whole months, as on Inspection Search;
  * legacy's day-precise bounds left out a one-sided range's own end.
@@ -69,8 +69,8 @@ public final class InspectionsConductedReportSpecifications {
 
   private static final String YES = "Y";
   private static final String ROUTINE = "ROUT";
-  /** A portable superstructure in service: legacy leaves its structure out of the report. */
-  private static final String IN_SERVICE = "S";
+  /** A portable superstructure in storage: legacy leaves its structure out of the report. */
+  private static final String IN_STORAGE = "S";
 
   private InspectionsConductedReportSpecifications() {}
 
@@ -92,7 +92,7 @@ public final class InspectionsConductedReportSpecifications {
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(builder.equal(inspection.get(STRUCTURE_ID), structure.get(STRUCTURE_ID)));
     predicates.add(builder.equal(structure.get(ACTIVE_IND), YES));
-    predicates.add(builder.not(builder.exists(portableInService(query, builder, structure))));
+    predicates.add(builder.not(builder.exists(portableInStorage(query, builder, structure))));
     inspectionCriteria(builder, query, inspection, status, criteria, predicates);
     structureCriteria(builder, structure, site, criteria, predicates);
 
@@ -180,14 +180,14 @@ public final class InspectionsConductedReportSpecifications {
         builder.equal(inspection.get(INSPECTION_DATE), latest));
   }
 
-  /** The structure's bridge, if it is a portable superstructure in service. */
-  private static Subquery<Long> portableInService(
+  /** The structure's bridge, if it is a portable superstructure in storage. */
+  private static Subquery<Long> portableInStorage(
       CriteriaQuery<?> query, CriteriaBuilder builder, Root<CrossingStructureEntity> structure) {
     Subquery<Long> rows = query.subquery(Long.class);
     Root<ForestServiceBridgeEntity> bridge = rows.from(ForestServiceBridgeEntity.class);
     return rows.select(bridge.get(STRUCTURE_ID)).where(
         builder.equal(bridge.get(STRUCTURE_ID), structure.get(STRUCTURE_ID)),
-        builder.equal(bridge.get(PORTABLE_STATUS), IN_SERVICE));
+        builder.equal(bridge.get(PORTABLE_STATUS), IN_STORAGE));
   }
 
   /**
@@ -238,7 +238,7 @@ public final class InspectionsConductedReportSpecifications {
    * whatever was chosen.
    *
    * <p>Its rules differ from the Summary's where legacy's {@code INSPCTN_RPT} differs from
-   * {@code INSPCTNS_CONDUCTED_RPT}: a portable superstructure in service is listed; an inspection
+   * {@code INSPCTNS_CONDUCTED_RPT}: a portable superstructure in storage is listed; an inspection
    * without a report status is listed too, unless a status is asked for; the site, its district
    * and the inspection's type are required, as legacy's inner joins had them.
    */

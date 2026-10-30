@@ -47,6 +47,8 @@ type Props = {
    * any more — no Add, Edit or Delete.
    */
   locked?: boolean;
+  /** On an inspection's page: the inspection is Reviewed, so the tab opens on its own items. */
+  reviewed?: boolean;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -170,7 +172,13 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit,
  * <p>Legacy's one viewing option drove both this tab and Repairs; each tab has its own here, so
  * choosing All on one does not change what the other lists.
  */
-const MonitoringTab: FC<Props> = ({ structureId, opened, inspectionId, locked = false }) => {
+const MonitoringTab: FC<Props> = ({
+  structureId,
+  opened,
+  inspectionId,
+  locked = false,
+  reviewed = false,
+}) => {
   const authorization = useAuthorization();
   // On an inspection's page, legacy's: Level 0 adds and edits, as an inspector records them while
   // inspecting; on the structure page, Level 1. Delete is Level 2's on either.
@@ -187,7 +195,8 @@ const MonitoringTab: FC<Props> = ({ structureId, opened, inspectionId, locked = 
   const deleteMonitor = useDeleteStructureMonitor(structureId, inspectionId);
   /** The item whose delete is being confirmed, if any. */
   const [pendingDelete, setPendingDelete] = useState<StructureMonitor | null>(null);
-  const [view, setView] = useState<MonitorView>('OUTSTANDING');
+  // Once its inspection is reviewed, what it raised is what is looked at, not what is outstanding.
+  const [view, setView] = useState<MonitorView>(reviewed ? 'CURRENT' : 'OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   /** Legacy's "Show Inspections before the Superstructure Install Date". */

@@ -377,28 +377,13 @@ describe('InspectionDetailPage', () => {
     expect(within(history).getByTestId('status-history-1')).toMatchTextContent(/Submitted/);
   });
 
-  it("lists the structure's outstanding repairs, read only, and this inspection's on request", async () => {
+  it("lists a reviewed inspection's own repairs, read only, and the outstanding on request", async () => {
     renderPage();
     await screen.findByTestId('inspection-inspection');
     await openTab('repairs');
 
     await waitFor(() =>
       expect(structureApi.getStructureRepairs).toHaveBeenCalledWith(
-        '7',
-        'OUTSTANDING',
-        0,
-        10,
-        false,
-        '41',
-      ),
-    );
-    expect(screen.queryByTestId('structure-repair-add')).not.toBeInTheDocument();
-
-    await userEvent.click(
-      within(screen.getByTestId('structure-repairs-tab')).getByText('Current Inspection Items'),
-    );
-    await waitFor(() =>
-      expect(structureApi.getStructureRepairs).toHaveBeenLastCalledWith(
         '7',
         'CURRENT',
         0,
@@ -407,19 +392,104 @@ describe('InspectionDetailPage', () => {
         '41',
       ),
     );
+    expect(structureApi.getStructureRepairs).not.toHaveBeenCalledWith(
+      '7',
+      'OUTSTANDING',
+      0,
+      10,
+      false,
+      '41',
+    );
     expect(
       await screen.findByText('No outstanding repairs for this inspection.'),
     ).toBeInTheDocument();
+    expect(screen.queryByTestId('structure-repair-add')).not.toBeInTheDocument();
+
+    await userEvent.click(
+      within(screen.getByTestId('structure-repairs-tab')).getByText('Show Outstanding'),
+    );
+    await waitFor(() =>
+      expect(structureApi.getStructureRepairs).toHaveBeenLastCalledWith(
+        '7',
+        'OUTSTANDING',
+        0,
+        10,
+        false,
+        '41',
+      ),
+    );
   });
+
+  it('lists the repairs and monitoring items of one Accepted — the expired Reviewed — as Reviewed', async () => {
+    inspectionApi.getInspection.mockResolvedValue(
+      inspection({ status: { code: 'ACC', description: 'Accepted' } }),
+    );
+    renderPage();
+    await screen.findByTestId('inspection-inspection');
+    await openTab('repairs');
+    await waitFor(() =>
+      expect(structureApi.getStructureRepairs).toHaveBeenCalledWith(
+        '7',
+        'CURRENT',
+        0,
+        10,
+        false,
+        '41',
+      ),
+    );
+    await openTab('monitoring');
+    await waitFor(() =>
+      expect(structureApi.getStructureMonitors).toHaveBeenCalledWith(
+        '7',
+        'CURRENT',
+        0,
+        10,
+        false,
+        '41',
+      ),
+    );
+  });
+
+  it.each([
+    ['In Progress', 'PRO'],
+    // Locked, as Reviewed, but only Reviewed and Accepted open on its own items.
+    ['Rejected', 'REJ'],
+  ])(
+    'lists the outstanding repairs and monitoring items of one %s by default',
+    async (description, code) => {
+      inspectionApi.getInspection.mockResolvedValue(inspection({ status: { code, description } }));
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+      await openTab('repairs');
+      await waitFor(() =>
+        expect(structureApi.getStructureRepairs).toHaveBeenCalledWith(
+          '7',
+          'OUTSTANDING',
+          0,
+          10,
+          false,
+          '41',
+        ),
+      );
+      await openTab('monitoring');
+      await waitFor(() =>
+        expect(structureApi.getStructureMonitors).toHaveBeenCalledWith(
+          '7',
+          'OUTSTANDING',
+          0,
+          10,
+          false,
+          '41',
+        ),
+      );
+    },
+  );
 
   it('lists the monitoring items and documents read only', async () => {
     renderPage();
     await screen.findByTestId('inspection-inspection');
     await openTab('monitoring');
-    await waitFor(() => expect(structureApi.getStructureMonitors).toHaveBeenCalled());
-    await userEvent.click(
-      within(screen.getByTestId('structure-monitoring-tab')).getByText('Current Inspection Items'),
-    );
+    // Reviewed: this inspection's own, from the start.
     expect(await screen.findByText('No monitoring items for this inspection.')).toBeInTheDocument();
 
     await openTab('documents');

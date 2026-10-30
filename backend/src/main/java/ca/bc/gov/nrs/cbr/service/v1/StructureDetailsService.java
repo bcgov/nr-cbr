@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Replacement History have services of their own.
  *
  * <p>Legacy's blocking rules ({@code StructureForm.validate}), each beside its field, plus values
- * that fit their columns and years of four digits. Legacy's range warnings — a year before 1900, a cost over $500,000 — never
+ * that fit their columns and years of four digits. Legacy's range warnings — a year before 1900 — never
  * blocked its save and do not block this one; the page shows them as the user types. Only these
  * columns and the update audit are written, so nothing else is blanked and an archived structure
  * stays archived.

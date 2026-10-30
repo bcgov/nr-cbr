@@ -44,7 +44,7 @@ import org.springframework.util.StringUtils;
  *
  * <p>A structure is a row per bridge record and culvert record it has, as legacy's left joins made
  * it — its Total Length the bridge's, else the culvert's — less any bridge whose portable
- * superstructure is in service ({@code S}). Each year's total counts and costs those rows, as
+ * superstructure is in storage ({@code S}). Each year's total counts and costs those rows, as
  * legacy's did.
  *
  * <p>The CSV is the PDF's rows, in its order, each carrying the headings the PDF prints above it —
@@ -56,8 +56,8 @@ import org.springframework.util.StringUtils;
 @Transactional(readOnly = true)
 public class ReplacementStructuresRows {
 
-  /** A portable superstructure in service: legacy left its bridge record out. */
-  private static final String IN_SERVICE = "S";
+  /** A portable superstructure in storage: legacy left its bridge record out. */
+  private static final String IN_STORAGE = "S";
   /** Closures are listed for active sites only. */
   private static final String ACTIVE = "ACT";
 
@@ -194,14 +194,14 @@ public class ReplacementStructuresRows {
   /**
    * The Total Length of each row a structure is listed as: one per bridge record and culvert record,
    * as legacy's left joins made it — the bridge's length, else the culvert's — less the bridges
-   * whose portable superstructure is in service. A structure with only such bridges is not listed.
+   * whose portable superstructure is in storage. A structure with only such bridges is not listed.
    */
   private static List<BigDecimal> lengths(
       List<ForestServiceBridgeEntity> bridgeRecords,
       List<StructureValue<BigDecimal>> culvertLengths) {
     List<BigDecimal> lengths = new ArrayList<>();
     for (ForestServiceBridgeEntity bridge : orNone(bridgeRecords)) {
-      if (bridge == null || !IN_SERVICE.equals(bridge.getPortableSuperstructureStatusCode())) {
+      if (bridge == null || !IN_STORAGE.equals(bridge.getPortableSuperstructureStatusCode())) {
         for (StructureValue<BigDecimal> culvert : orNone(culvertLengths)) {
           lengths.add(length(bridge, culvert));
         }
