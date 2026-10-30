@@ -191,6 +191,11 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   }
 
   @Override
+  public ResponseEntity<List<CodeOptionResponse>> getAllBuiltByCodes() {
+    return ResponseEntity.ok(configurationService.getAllBuiltByCodes());
+  }
+
+  @Override
   public ResponseEntity<List<CodeOptionResponse>> getStructureSourceCodes() {
     return ResponseEntity.ok(configurationService.getStructureSourceCodes());
   }

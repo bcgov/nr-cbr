@@ -15,7 +15,9 @@ const api = vi.hoisted(() => ({
   getSiteTypeCodes: vi.fn(),
   getSpecialAccessCodes: vi.fn(),
   getSpecialEquipmentCodes: vi.fn(),
+  getAllBuiltByCodes: vi.fn(),
   getForestDistricts: vi.fn(),
+  getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
 }));
 
@@ -148,6 +150,8 @@ describe('StructureSearchPage — criteria form', () => {
       'orgUnit',
       'includeArchived',
       'managementOrgUnit',
+      // Not on legacy's form: added on request, as on the reports.
+      'businessAreaOrgUnit',
       'maintainer',
       'clientLocationCode',
       'loadRestrictionYearStart',
@@ -160,6 +164,8 @@ describe('StructureSearchPage — criteria form', () => {
       'yearBuiltEnd',
       'specialAccessCode',
       'specialEquipmentCode',
+      // Not on legacy's form: added on request.
+      'builtByCode',
     ]) {
       expect(screen.getByTestId(`structure-search-${field}`)).toBeInTheDocument();
     }
@@ -466,6 +472,45 @@ describe('StructureSearchPage — the dropdowns come from the server', () => {
     );
     expect(screen.getByTestId('structure-search-specialEquipmentCode')).toMatchTextContent(
       'CRN - Crane',
+    );
+  });
+
+  it('offers Built For from its lookup, set to Any until chosen, and searches on it', async () => {
+    // Expired codes too: a structure saved with one can still be found.
+    api.getAllBuiltByCodes.mockResolvedValue([
+      { code: 'LIC', description: 'Licensee' },
+      { code: 'OLD', description: 'Expired owner' },
+    ]);
+    renderPage();
+    const builtFor = screen.getByTestId('structure-search-builtByCode');
+    await waitFor(() =>
+      expect(builtFor).toMatchTextContent(/Any\s*LIC - Licensee\s*OLD - Expired owner/),
+    );
+    expect(builtFor).toHaveValue('');
+
+    await searchAndWait();
+    expect(sentCriteria()).toEqual(expect.objectContaining({ builtByCode: '' }));
+
+    fireEvent.change(builtFor, { target: { value: 'LIC' } });
+    search();
+    await waitFor(() =>
+      expect(sentCriteria()).toEqual(expect.objectContaining({ builtByCode: 'LIC' })),
+    );
+  });
+
+  it('offers BCTS Business Area from its lookup, Any until chosen, and searches on it', async () => {
+    api.getBusinessAreas.mockResolvedValue([
+      { orgUnitNo: '1773', orgUnitCode: 'TCH', orgUnitName: 'Chinook' },
+    ]);
+    renderPage();
+    const area = screen.getByTestId('structure-search-businessAreaOrgUnit');
+    await waitFor(() => expect(area).toMatchTextContent(/Any business area\s*TCH - Chinook/));
+    expect(area).toHaveValue('');
+
+    fireEvent.change(area, { target: { value: '1773' } });
+    search();
+    await waitFor(() =>
+      expect(sentCriteria()).toEqual(expect.objectContaining({ businessAreaOrgUnit: '1773' })),
     );
   });
 

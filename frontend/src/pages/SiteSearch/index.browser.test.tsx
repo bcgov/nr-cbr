@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   getSiteTypeCodes: vi.fn(),
   getForestDistricts: vi.fn(),
   getManagementAreas: vi.fn(),
+  getBusinessAreas: vi.fn(),
 }));
 
 vi.mock('@/hooks/useAuthorization', () => ({
@@ -136,6 +137,8 @@ describe('SiteSearchPage — criteria form', () => {
       'kiloStart',
       'kiloEnd',
       'managementOrgUnit',
+      // Not on legacy's form: added on request, as on the reports.
+      'businessAreaOrgUnit',
       'specialAccessCode',
       'siteTypeCode',
       'incomplete',
@@ -512,6 +515,26 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     });
     expect(screen.getByTestId('site-search-siteTypeCode')).toMatchTextContent('Any site type');
     expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Any district');
+  });
+
+  it('offers BCTS Business Area from its lookup, Any until chosen, and searches on it', async () => {
+    api.getBusinessAreas.mockResolvedValue([
+      { orgUnitNo: '1773', orgUnitCode: 'TCH', orgUnitName: 'Chinook' },
+    ]);
+    renderPage();
+    const area = screen.getByTestId('site-search-businessAreaOrgUnit');
+    await waitFor(() => expect(area).toMatchTextContent(/Any business area\s*TCH - Chinook/));
+    expect(area).toHaveValue('');
+
+    fireEvent.change(area, { target: { value: '1773' } });
+    await searchAndWait();
+
+    expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(
+      expect.objectContaining({ businessAreaOrgUnit: '1773' }),
+      0,
+      20,
+      null,
+    );
   });
 
   it('keeps the unfiltered option valueless, so choosing it clears the filter', async () => {

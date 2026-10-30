@@ -15,7 +15,7 @@ class SiteSearchCriteriaTest {
   private static SiteSearchCriteria empty() {
     return new SiteSearchCriteria(
         null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null);
+        null, null, null, null, null, null);
   }
 
   @Test
@@ -23,7 +23,7 @@ class SiteSearchCriteriaTest {
   void hasAllSeventeenCriteria() {
     // Field-for-field with site_search.jsp and the frontend's SiteSearchCriteria. A dropped field is
     // a search someone can no longer run, with nothing to notice.
-    assertThat(SiteSearchCriteria.class.getRecordComponents()).hasSize(20);
+    assertThat(SiteSearchCriteria.class.getRecordComponents()).hasSize(21);
   }
 
   @Test
@@ -39,7 +39,8 @@ class SiteSearchCriteriaTest {
     // treating "" as a filter would turn every unfilled box into a predicate.
     SiteSearchCriteria blanks =
         new SiteSearchCriteria(
-            "", "  ", "", "", "", "", "", "", "", "", "", "", "", "", "", "", false, "", false, "");
+            "", "  ", "", "", "", "", "", "", "", "", "", "", "", "", "", "", false, "", false, "",
+            "");
 
     assertThat(blanks.isEmpty()).isTrue();
   }
@@ -50,9 +51,16 @@ class SiteSearchCriteriaTest {
     SiteSearchCriteria withSiteId =
         new SiteSearchCriteria(
             "12345", null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null);
+            null, null, null, null, null, null, null);
 
     assertThat(withSiteId.isEmpty()).isFalse();
+  }
+
+  @Test
+  @DisplayName("a BCTS Business Area alone makes the request non-empty")
+  void businessAreaIsACriterion() {
+    assertThat(SiteSearchCriteria.builder().businessAreaOrgUnit("1773").build().isEmpty())
+        .isFalse();
   }
 
   @Test
@@ -61,11 +69,11 @@ class SiteSearchCriteriaTest {
     SiteSearchCriteria incompleteOn =
         new SiteSearchCriteria(
             null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, true, null, null, null);
+            null, null, true, null, null, null, null);
     SiteSearchCriteria incompleteOff =
         new SiteSearchCriteria(
             null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, false, null, null, null);
+            null, null, false, null, null, null, null);
 
     assertThat(incompleteOn.isEmpty()).isFalse();
     assertThat(incompleteOff.isEmpty()).isTrue();
@@ -80,7 +88,7 @@ class SiteSearchCriteriaTest {
 
     private static SiteSearchCriteria withKilometres(String value) {
       return new SiteSearchCriteria(null, null, null, null, null, null, null, null, null, null,
-          value, value, null, value, value, null, null, null, null, null);
+          value, value, null, value, value, null, null, null, null, null, null);
     }
 
     @ParameterizedTest(name = "accepts \"{0}\"")
@@ -107,7 +115,7 @@ class SiteSearchCriteriaTest {
       // Legacy raises one page-level message per pair; the point of validating here is that the
       // response says which of the four boxes to fix.
       SiteSearchCriteria criteria = new SiteSearchCriteria(null, null, null, null, null, null, null,
-          null, null, null, "oops", null, null, null, null, null, null, null, null, null);
+          null, null, null, "oops", null, null, null, null, null, null, null, null, null, null);
 
       assertThat(VALIDATOR.validate(criteria))
           .singleElement()
@@ -123,7 +131,7 @@ class SiteSearchCriteriaTest {
       // Legacy guards the User Km upper bound with a test on kiloEnd, so "User Kilometres To" on
       // its own is silently dropped. Validation is the first place that asymmetry could creep back.
       SiteSearchCriteria onlyUserKmEnd = new SiteSearchCriteria(null, null, null, null, null, null,
-          null, null, null, null, null, null, null, null, "bad", null, null, null, null, null);
+          null, null, null, null, null, null, null, null, "bad", null, null, null, null, null, null);
 
       assertThat(VALIDATOR.validate(onlyUserKmEnd))
           .singleElement()

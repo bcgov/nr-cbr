@@ -218,6 +218,14 @@ export class ConfigurationService extends HttpClient {
     });
   }
 
+  /** Built For, expired values included, by description — the Built For filter on Structure Search. */
+  getAllBuiltByCodes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/built-by-codes/all',
+    });
+  }
+
   /** Structure sources, current ones by description — the Details tab's Structure card. */
   getStructureSourceCodes(): CancelablePromise<CodeOption[]> {
     return this.doRequest<CodeOption[]>(this.config, {

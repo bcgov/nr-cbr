@@ -66,6 +66,12 @@
   row-gap: $spacing-05;
 }
 
+// Every toggle on one full-width row of their own, wrapping only when the screen is too narrow.
+.structure-search__toggles--row {
+  grid-column: 1 / -1;
+  column-gap: $spacing-09;
+}
+
 .structure-search__actions {
   grid-column: 1 / -1;
   display: flex;

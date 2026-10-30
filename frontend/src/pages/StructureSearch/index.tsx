@@ -25,6 +25,8 @@ import type { FC } from 'react';
 import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
 import {
+  useAllBuiltByCodes,
+  useBusinessAreas,
   useCulvertTypeCodes,
   useForestDistricts,
   useManagementAreas,
@@ -175,8 +177,10 @@ const StructureSearchPage: FC = () => {
   const siteTypeCodes = useSiteTypeCodes();
   const specialAccessCodes = useSpecialAccessCodes();
   const specialEquipmentCodes = useSpecialEquipmentCodes();
+  const builtByCodes = useAllBuiltByCodes();
   const forestDistricts = useForestDistricts();
   const managementAreas = useManagementAreas(criteria.orgUnit);
+  const businessAreas = useBusinessAreas();
 
   const referenceData = useStructureReferenceDataState();
 
@@ -192,8 +196,10 @@ const StructureSearchPage: FC = () => {
       siteTypeCodes: siteTypeCodes.data ?? [],
       specialAccessCodes: specialAccessCodes.data ?? [],
       specialEquipmentCodes: specialEquipmentCodes.data ?? [],
+      builtByCodes: builtByCodes.data ?? [],
       forestDistricts: forestDistricts.data ?? [],
       managementAreas: managementAreas.data ?? [],
+      businessAreas: businessAreas.data ?? [],
     }),
     [
       structureTypeClassCodes.data,
@@ -204,8 +210,10 @@ const StructureSearchPage: FC = () => {
       siteTypeCodes.data,
       specialAccessCodes.data,
       specialEquipmentCodes.data,
+      builtByCodes.data,
       forestDistricts.data,
       managementAreas.data,
+      businessAreas.data,
     ],
   );
 

@@ -95,6 +95,22 @@ class SiteSearchServiceTest {
   }
 
   @Test
+  @DisplayName("filters on the BCTS Business Area, and not at all when none is chosen")
+  void filtersOnTheBusinessArea() {
+    entityManager.persist(CrossingSiteEntity.builder().crossingSiteId("IN-BCTS")
+        .businessAreaOrgUnitNo(1773L).capitalRoadInd("N").build());
+    entityManager.persist(CrossingSiteEntity.builder().crossingSiteId("OTHER-BCTS")
+        .businessAreaOrgUnitNo(1774L).capitalRoadInd("N").build());
+    entityManager.persist(CrossingSiteEntity.builder().crossingSiteId("NO-BCTS")
+        .capitalRoadInd("N").build());
+    flushAndClear();
+
+    assertThat(service.search(SiteSearchCriteria.builder().businessAreaOrgUnit("1773").build(),
+        0, 20, null, null).content()).extracting(SiteSearchResult::id).containsExactly("IN-BCTS");
+    assertThat(searchAll(0, 20).content()).hasSize(3);
+  }
+
+  @Test
   @DisplayName("sorts by the column whose header was clicked, either way")
   void sortsByAColumn() {
     givenNamedSite("SITE-A", "Riske Cr", "3.0");

@@ -484,6 +484,18 @@ class ConfigurationServiceTest {
   }
 
   @Test
+  @DisplayName("lists every Built For value, expired ones too, for the Structure Search filter")
+  void allBuiltByCodes() {
+    when(builtBy.findAllByOrderByDescriptionAsc()).thenReturn(List.of(
+        BuiltByCodeEntity.builder().builtByCode("OLD").description("Expired owner").build(),
+        BuiltByCodeEntity.builder().builtByCode("MOF").description("Ministry of Forests").build()));
+
+    assertThat(service.getAllBuiltByCodes()).containsExactly(
+        new CodeOptionResponse("OLD", "Expired owner"),
+        new CodeOptionResponse("MOF", "Ministry of Forests"));
+  }
+
+  @Test
   @DisplayName("lists the Bridge card's five code lists together, current codes only")
   void bridgeCodes() {
     when(superstructureTypes.findAllCurrent()).thenReturn(List.of(

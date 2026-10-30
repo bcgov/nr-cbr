@@ -80,11 +80,13 @@ class ConfigurationApiControllerTest {
     when(service.getDeckTypeCodes()).thenReturn(codes("deck"));
     when(service.getCulvertMaterialCodes()).thenReturn(codes("material"));
     when(service.getPortableSuperstructureStatusCodes()).thenReturn(codes("portable"));
+    when(service.getAllBuiltByCodes()).thenReturn(codes("built"));
 
     assertThat(controller.getDeckTypeCodes().getBody()).isEqualTo(codes("deck"));
     assertThat(controller.getCulvertMaterialCodes().getBody()).isEqualTo(codes("material"));
     assertThat(controller.getPortableSuperstructureStatusCodes().getBody())
         .isEqualTo(codes("portable"));
+    assertThat(controller.getAllBuiltByCodes().getBody()).isEqualTo(codes("built"));
   }
 
   @Test

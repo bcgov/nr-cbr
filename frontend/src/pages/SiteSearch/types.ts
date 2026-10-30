@@ -38,6 +38,8 @@ export type SiteSearchCriteria = {
   kiloStart: string;
   kiloEnd: string;
   managementOrgUnit: string;
+  /** BCTS Business Area, as on the reports. Not on legacy's form: added on request. */
+  businessAreaOrgUnit: string;
   specialAccessCode: string;
   incomplete: boolean;
   siteTypeCode: string;
@@ -106,6 +108,7 @@ export const EMPTY_CRITERIA: SiteSearchCriteria = {
   kiloStart: '',
   kiloEnd: '',
   managementOrgUnit: '',
+  businessAreaOrgUnit: '',
   specialAccessCode: '',
   incomplete: false,
   siteTypeCode: '',

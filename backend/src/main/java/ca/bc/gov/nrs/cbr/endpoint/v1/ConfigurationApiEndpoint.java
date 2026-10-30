@@ -223,6 +223,11 @@ public interface ConfigurationApiEndpoint {
   @GetMapping("/built-by-codes")
   ResponseEntity<List<CodeOptionResponse>> getBuiltByCodes();
 
+  /** Built For, expired ones included — the Built For filter on Structure Search. */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/built-by-codes/all")
+  ResponseEntity<List<CodeOptionResponse>> getAllBuiltByCodes();
+
   /** Structure sources — the Source select on the Details tab's Structure card. */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/structure-source-codes")

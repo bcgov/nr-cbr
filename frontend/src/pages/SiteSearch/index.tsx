@@ -20,6 +20,7 @@ import type { FC } from 'react';
 import { useNotification } from '@/context/notification/useNotification';
 import { useAuthorization } from '@/hooks/useAuthorization';
 import {
+  useBusinessAreas,
   useForestDistricts,
   useManagementAreas,
   useSiteReferenceDataState,
@@ -136,6 +137,7 @@ const SiteSearchPage: FC = () => {
   // its own cache key — whenever Forest District changes, and does not run at all until one is
   // picked. Legacy does the same by posting the form back on change.
   const managementAreas = useManagementAreas(criteria.orgUnit);
+  const businessAreas = useBusinessAreas();
 
   const referenceData = useSiteReferenceDataState();
 
@@ -152,6 +154,7 @@ const SiteSearchPage: FC = () => {
       siteTypeCodes: siteTypeCodes.data ?? [],
       forestDistricts: forestDistricts.data ?? [],
       managementAreas: managementAreas.data ?? [],
+      businessAreas: businessAreas.data ?? [],
     }),
     [
       siteStatusCodes.data,
@@ -160,6 +163,7 @@ const SiteSearchPage: FC = () => {
       siteTypeCodes.data,
       forestDistricts.data,
       managementAreas.data,
+      businessAreas.data,
     ],
   );
 

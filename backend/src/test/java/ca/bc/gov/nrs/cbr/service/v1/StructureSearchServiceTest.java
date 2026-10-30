@@ -233,6 +233,34 @@ class StructureSearchServiceTest {
     }
 
     @Test
+    @DisplayName("filters on the site's BCTS Business Area, and not at all when none is chosen")
+    void filtersOnTheBusinessArea() {
+      givenSite("SITE-1", site -> site.businessAreaOrgUnitNo(1773L));
+      givenSite("SITE-2", site -> site.businessAreaOrgUnitNo(1774L));
+      givenSite("SITE-3");
+      givenStructure(1L, "IN-BCTS", "SITE-1");
+      givenStructure(2L, "OTHER-BCTS", "SITE-2");
+      givenStructure(3L, "NO-BCTS", "SITE-3");
+
+      assertThat(names(criteria().businessAreaOrgUnit("1773"))).containsExactly("IN-BCTS");
+      assertThat(names(criteria().businessAreaOrgUnit("")))
+          .containsExactlyInAnyOrder("IN-BCTS", "OTHER-BCTS", "NO-BCTS");
+    }
+
+    @Test
+    @DisplayName("filters on who the structure was built for, and not at all when none is chosen")
+    void filtersOnBuiltFor() {
+      givenSite("SITE-1");
+      givenStructure(1L, "FOR-MOF", "SITE-1", s -> s.builtByCode("MOF"));
+      givenStructure(2L, "FOR-LIC", "SITE-1", s -> s.builtByCode("LIC"));
+      givenStructure(3L, "UNKNOWN", "SITE-1", s -> s.builtByCode(null));
+
+      assertThat(names(criteria().builtByCode("LIC"))).containsExactly("FOR-LIC");
+      assertThat(names(criteria().builtByCode("")))
+          .containsExactlyInAnyOrder("FOR-MOF", "FOR-LIC", "UNKNOWN");
+    }
+
+    @Test
     @DisplayName("filters on the bridge's superstructure and curb, and the culvert's type")
     void filtersOnBridgeAndCulvert() {
       givenSite("SITE-1");
