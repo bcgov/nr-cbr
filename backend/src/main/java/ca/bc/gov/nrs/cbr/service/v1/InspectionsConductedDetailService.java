@@ -52,6 +52,11 @@ public class InspectionsConductedDetailService {
     this.criteriaLine = criteriaLine;
   }
 
+  /** The structures the report lists, an inspection's each, in its order — for its KMZ. */
+  List<Long> structureIds(InspectionsConductedCriteria criteria) {
+    return rows.structureIds(criteria, criteria.sortOr(DEFAULT_SORT));
+  }
+
   /** The report, as a PDF or a CSV. */
   public ReportFile generate(InspectionsConductedCriteria criteria, ReportFormat format) {
     long started = System.nanoTime();

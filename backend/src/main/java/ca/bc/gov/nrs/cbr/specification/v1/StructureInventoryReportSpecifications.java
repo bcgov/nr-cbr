@@ -25,6 +25,7 @@ import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -162,52 +163,79 @@ public final class StructureInventoryReportSpecifications {
     CriteriaQuery<StructureInventoryDetailLine> query =
         builder.createQuery(StructureInventoryDetailLine.class);
     Root<CrossingStructureEntity> root = query.from(CrossingStructureEntity.class);
+    DetailJoins joins = selectDetail(builder, query, root);
+
+    List<Predicate> predicates = sharedCriteria(builder, query, root, joins.site(), criteria);
+
+    return query
+        .where(predicates.toArray(new Predicate[0]))
+        .orderBy(order(criteria.sortOrDefault(), root, joins.site(), joins.roadSection(), builder));
+  }
+
+  /**
+   * The same lines for these structures, whichever report chose them — the Detailed KMZ's pop-up
+   * for another report's structures. In no order: the caller puts them in its own. Nothing else is
+   * filtered, as the report that chose them already has; the type/class is still an inner join.
+   */
+  public static CriteriaQuery<StructureInventoryDetailLine> detailedOf(
+      CriteriaBuilder builder, Collection<Long> structureIds) {
+    CriteriaQuery<StructureInventoryDetailLine> query =
+        builder.createQuery(StructureInventoryDetailLine.class);
+    Root<CrossingStructureEntity> root = query.from(CrossingStructureEntity.class);
+    selectDetail(builder, query, root);
+    return query.where(root.get(STRUCTURE_ID).in(structureIds));
+  }
+
+  /** The site and road a Detailed line is joined to, which its order reads. */
+  private record DetailJoins(From<?, ?> site, From<?, ?> roadSection) {}
+
+  /** The Detailed line's joins and its selection. */
+  private static DetailJoins selectDetail(
+      CriteriaBuilder builder,
+      CriteriaQuery<StructureInventoryDetailLine> query,
+      Root<CrossingStructureEntity> root) {
     From<?, ?> typeClass = root.join(TYPE_CLASS, JoinType.INNER);
     From<?, ?> site = root.join(SITE, JoinType.LEFT);
     From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
     From<?, ?> status = site.join(SITE_STATUS_CODE, JoinType.LEFT);
     From<?, ?> district = site.join(ORG_UNIT, JoinType.LEFT);
 
-    List<Predicate> predicates = sharedCriteria(builder, query, root, site, criteria);
-
-    return query
-        .select(builder.construct(StructureInventoryDetailLine.class,
-            root.get(STRUCTURE_ID),
-            root.get(STRUCTURE_NAME),
-            typeClass.get(DESCRIPTION),
-            root.get(PORTABLE_IND),
-            root.get(DESIGN_LOAD_RATING),
-            root.get(CURRENT_LOAD_RATING),
-            root.get(YEAR_BUILT),
-            root.get(LOAD_RATING_UNKNOWN),
-            site.get(SITE_ID),
-            status.get(DESCRIPTION),
-            site.get(KILOMETRES),
-            site.get(USER_KM),
-            site.get(FOREST_FILE_ID),
-            site.get(ROAD_SECTION_ID),
-            district.get(ORG_UNIT_NAME),
-            roadSection.get(ROAD_SECTION_NAME),
-            site.get(CROSSING_NAME),
-            site.get(CAPITAL_ROAD),
-            root.get(DESIGN_VEHICLE),
-            root.get(BUILT_BY),
-            root.get(NEXT_PLANNED_INSPECTION),
-            root.get(REPLACEMENT_YEAR),
-            root.get(REPLACEMENT_COST),
-            root.get(CLOSURE_YEAR),
-            root.get(LOAD_RESTRICTION_YEAR),
-            root.get(STRUCTURE_SOURCE),
-            site.get(CLIENT_NUMBER),
-            site.get(SITE_TYPE),
-            site.get(LONGITUDE),
-            site.get(LATITUDE),
-            site.get(MANAGEMENT_ORG_UNIT_NO),
-            site.get(BUSINESS_AREA_ORG_UNIT_NO),
-            district.get(ROLLUP_REGION_NO),
-            site.get(STRUCTURE_INSPECTION_STATUS)))
-        .where(predicates.toArray(new Predicate[0]))
-        .orderBy(order(criteria.sortOrDefault(), root, site, roadSection, builder));
+    query.select(builder.construct(StructureInventoryDetailLine.class,
+        root.get(STRUCTURE_ID),
+        root.get(STRUCTURE_NAME),
+        typeClass.get(DESCRIPTION),
+        root.get(PORTABLE_IND),
+        root.get(DESIGN_LOAD_RATING),
+        root.get(CURRENT_LOAD_RATING),
+        root.get(YEAR_BUILT),
+        root.get(LOAD_RATING_UNKNOWN),
+        site.get(SITE_ID),
+        status.get(DESCRIPTION),
+        site.get(KILOMETRES),
+        site.get(USER_KM),
+        site.get(FOREST_FILE_ID),
+        site.get(ROAD_SECTION_ID),
+        district.get(ORG_UNIT_NAME),
+        roadSection.get(ROAD_SECTION_NAME),
+        site.get(CROSSING_NAME),
+        site.get(CAPITAL_ROAD),
+        root.get(DESIGN_VEHICLE),
+        root.get(BUILT_BY),
+        root.get(NEXT_PLANNED_INSPECTION),
+        root.get(REPLACEMENT_YEAR),
+        root.get(REPLACEMENT_COST),
+        root.get(CLOSURE_YEAR),
+        root.get(LOAD_RESTRICTION_YEAR),
+        root.get(STRUCTURE_SOURCE),
+        site.get(CLIENT_NUMBER),
+        site.get(SITE_TYPE),
+        site.get(LONGITUDE),
+        site.get(LATITUDE),
+        site.get(MANAGEMENT_ORG_UNIT_NO),
+        site.get(BUSINESS_AREA_ORG_UNIT_NO),
+        district.get(ROLLUP_REGION_NO),
+        site.get(STRUCTURE_INSPECTION_STATUS)));
+    return new DetailJoins(site, roadSection);
   }
 
   /** The criteria every Structure Inventory report has — always {@code ACTIVE_IND = 'Y'}. */

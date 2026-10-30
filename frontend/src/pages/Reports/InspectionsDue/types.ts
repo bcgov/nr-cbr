@@ -74,8 +74,14 @@ export type InspectionsDueCriteria = MaintainerCriteria & {
   sortBy: InspectionsDueSort;
 };
 
-/** PDF to print, CSV to work with — a button each. Legacy offered PDF, Word and Excel. */
-export const FORMATS = ['CSV', 'PDF'] as const;
+/**
+ * PDF to print, CSV to work with, KMZ to see on a map — a button each. Legacy offered PDF, Word
+ * and Excel; the KMZ is the Structure Inventory – Detailed one, for the structures listed.
+ */
+export const FORMATS = ['CSV', 'KMZ', 'PDF'] as const;
+
+/** The Blank's: its forms are for printing, not for a map. */
+export const BLANK_FORMATS = ['CSV', 'PDF'] as const;
 
 /** Legacy's defaults, for all three: nothing set, sorted by Forest Service Road. */
 export const EMPTY_CRITERIA: InspectionsDueCriteria = {

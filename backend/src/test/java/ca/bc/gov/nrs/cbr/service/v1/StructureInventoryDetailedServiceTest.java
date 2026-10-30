@@ -365,6 +365,29 @@ class StructureInventoryDetailedServiceTest {
         .endsWith("ylw-pushpin.png");
   }
 
+  @Test
+  @DisplayName("maps another report's structures in its order, each once, under its name")
+  void kmzOf() throws Exception {
+    givenCsvNames();
+    long first = structure("B1", s -> s);
+    structure("B2", s -> s);
+    long third = structure("B3", s -> s);
+    entityManager.flush();
+    entityManager.clear();
+
+    ReportFile file = service.kmzOf(List.of(third, first, third, 999L), "Inspections Due - Summary",
+        "InspectionsDueSummaryReport");
+
+    assertThat(file.filename()).matches("InspectionsDueSummaryReport_\\d{4}-\\d{2}-\\d{2}\\.kmz");
+    org.w3c.dom.NodeList placemarks = kml(file.content()).getElementsByTagName("Placemark");
+    List<String> names = new java.util.ArrayList<>();
+    for (int index = 0; index < placemarks.getLength(); index++) {
+      names.add(text((org.w3c.dom.Element) placemarks.item(index), "name"));
+    }
+    // Not B2, which the report did not list; B3 once; the unknown id skipped.
+    assertThat(names).containsExactly("B3", "B1");
+  }
+
   /** The KML inside a KMZ, parsed. */
   private static org.w3c.dom.Document kml(byte[] kmz) throws Exception {
     try (java.util.zip.ZipInputStream zip =

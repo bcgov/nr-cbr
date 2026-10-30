@@ -24,9 +24,11 @@ import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -136,13 +138,39 @@ public class StructureInventoryDetailedService {
    * its pop-up legacy's fields, written from the CSV's rows ({@link StructureInventoryKmz}).
    */
   public ReportFile kmz(StructureInventoryDetailedCriteria criteria) {
+    return kmz(facts(criteria), "Structure Inventory - Detailed", FILENAME);
+  }
+
+  /**
+   * Another report's structures as this report's KMZ — the same placemarks and pop-up, for the
+   * structures that report lists, in its order. Each structure once, however often the report
+   * lists it.
+   *
+   * @param structureIds the report's structures, in its order
+   * @param report       the report's name, for the log
+   * @param filename     the report's file name before the date
+   */
+  public ReportFile kmzOf(List<Long> structureIds, String report, String filename) {
+    List<Long> ids = structureIds.stream().distinct().toList();
+    Map<Long, StructureInventoryDetailLine> lines = new HashMap<>();
+    for (int from = 0; from < ids.size(); from += StructureInventoryReportSupport.BATCH) {
+      entityManager.createQuery(StructureInventoryReportSpecifications.detailedOf(
+              entityManager.getCriteriaBuilder(),
+              ids.subList(from, Math.min(ids.size(), from + StructureInventoryReportSupport.BATCH))))
+          .getResultList()
+          .forEach(line -> lines.put(line.crossingStructureId(), line));
+    }
+    return kmz(facts(ids.stream().map(lines::get).filter(Objects::nonNull).toList()), report,
+        filename);
+  }
+
+  private ReportFile kmz(List<Facts> facts, String report, String filename) {
     long started = System.nanoTime();
-    List<Facts> facts = facts(criteria);
     String printed = support.today();
     byte[] content = StructureInventoryKmz.kmz(CSV_COLUMNS, csvRows(facts));
-    log.info("Structure Inventory - Detailed: {} structures as KMZ ({} bytes) in {} ms",
-        facts.size(), content.length, millisSince(started));
-    return new ReportFile(content, FILENAME + "_" + printed.replace('/', '-') + ".kmz", KMZ);
+    log.info("{}: {} structures as KMZ ({} bytes) in {} ms",
+        report, facts.size(), content.length, millisSince(started));
+    return new ReportFile(content, filename + "_" + printed.replace('/', '-') + ".kmz", KMZ);
   }
 
   /** The PDF's blocks, in order, every value as legacy's template printed it. */
@@ -161,9 +189,13 @@ public class StructureInventoryDetailedService {
    * so they cover the same structures and agree on every value they share.
    */
   private List<Facts> facts(StructureInventoryDetailedCriteria criteria) {
-    List<StructureInventoryDetailLine> lines = entityManager.createQuery(
+    return facts(entityManager.createQuery(
         StructureInventoryReportSpecifications.detailed(
-            entityManager.getCriteriaBuilder(), criteria)).getResultList();
+            entityManager.getCriteriaBuilder(), criteria)).getResultList());
+  }
+
+  /** The same, for these lines, in their order. */
+  private List<Facts> facts(List<StructureInventoryDetailLine> lines) {
     List<Long> ids = lines.stream().map(StructureInventoryDetailLine::crossingStructureId).toList();
     Map<Long, StructureBridgeDetail> bridgeDetails = firstOf(ids, bridges::findDetails,
         StructureBridgeDetail::crossingStructureId, Function.identity());

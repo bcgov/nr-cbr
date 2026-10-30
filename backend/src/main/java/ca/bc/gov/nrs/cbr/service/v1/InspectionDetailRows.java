@@ -139,6 +139,14 @@ public class InspectionDetailRows {
     return InspectionDetailCsv.rows(loaded, items.answers(loaded.ids()));
   }
 
+  /** The structures of the report's inspections, an inspection's each, in its order — for its KMZ. */
+  public List<Long> structureIds(
+      InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
+    List<Long> ids = ids(criteria, sort);
+    Map<Long, StructureInspectionEntity> found = inspections(ids);
+    return ids.stream().map(id -> found.get(id).getCrossingStructureId()).toList();
+  }
+
   /** The inspections for these criteria, in order. */
   private List<Long> ids(InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
     return entityManager.createQuery(InspectionsConductedReportSpecifications.detailIds(

@@ -4,6 +4,8 @@ import { ReportService } from './report.service';
 
 import type { APIConfig } from '@/config/api/types';
 
+import { EMPTY_DETAIL_CRITERIA as CONDUCTED_EMPTY } from '@/pages/Reports/InspectionsConducted/types';
+import { EMPTY_CRITERIA as DUE_EMPTY } from '@/pages/Reports/InspectionsDue/types';
 import { EMPTY_CRITERIA as DETAILED_EMPTY } from '@/pages/Reports/StructureInventoryDetailed/types';
 import { EMPTY_CRITERIA } from '@/pages/Reports/StructureInventorySummary/types';
 
@@ -102,5 +104,42 @@ describe('ReportService', () => {
     expect(url).toContain('/api/v1/reports/structure-inventory-detailed/kmz?');
     expect(url).toContain('yearBuiltStart=1990');
     expect(url).not.toContain('format=');
+  });
+
+  it.each([
+    ['inspectionsConductedSummary', 'inspections-conducted-summary'],
+    ['inspectionsConductedDetail', 'inspections-conducted-detail'],
+  ] as const)('asks for %s as a KMZ at its own address, without a format', async (method, path) => {
+    const { service, request } = withMockedRequest();
+
+    await service[method](CONDUCTED_EMPTY, 'KMZ');
+
+    const url = urlOf(request);
+    expect(url).toContain(`/api/v1/reports/${path}/kmz`);
+    expect(url).not.toContain('format=');
+  });
+
+  it.each([
+    ['inspectionsDueSummary', 'inspections-due-summary'],
+    ['inspectionsDueDetailed', 'inspections-due-detailed'],
+  ] as const)('asks for %s as a KMZ at its own address, without a format', async (method, path) => {
+    const { service, request } = withMockedRequest();
+
+    await service[method]({ ...DUE_EMPTY, nextPlannedInspectionDateStart: '2027/01/01' }, 'KMZ');
+
+    const url = urlOf(request);
+    expect(url).toContain(`/api/v1/reports/${path}/kmz?`);
+    expect(url).toContain('nextPlannedInspectionDateStart=2027%2F01%2F01');
+    expect(url).not.toContain('format=');
+  });
+
+  it('still asks for an inspection report PDF at its usual address', async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.inspectionsDueSummary(DUE_EMPTY, 'PDF');
+
+    const url = urlOf(request);
+    expect(url).toContain('/api/v1/reports/inspections-due-summary?');
+    expect(url).toContain('format=PDF');
   });
 });

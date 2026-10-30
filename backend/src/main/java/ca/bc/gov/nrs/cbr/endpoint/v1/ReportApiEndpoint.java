@@ -44,7 +44,7 @@ public interface ReportApiEndpoint {
   /**
    * Structure Inventory – Detailed (legacy CBR007), as a PDF in legacy's layout — a block of
    * labelled fields per structure — or a CSV of legacy's fuller export, downloaded as an
-   * attachment. Its KMZ is {@link StructureInventoryMapApiEndpoint}'s.
+   * attachment. Its KMZ is {@link ReportMapApiEndpoint}'s.
    *
    * <p>{@code @Valid} turns a kilometre or a year that is not one into a 400 naming the field.
    *

@@ -120,7 +120,7 @@ export class ReportService extends HttpClient {
 
   /**
    * Inspections Conducted – Summary (legacy CBR002): a line per inspection, as a PDF in legacy's
-   * landscape layout or a CSV of its columns. A GET, the criteria as query parameters; 400 with `fieldErrors` for an
+   * landscape layout, a CSV of its columns, or a KMZ of its structures. A GET, the criteria as query parameters; 400 with `fieldErrors` for an
    * Inspection Date that is not a month.
    */
   inspectionsConductedSummary(
@@ -129,15 +129,19 @@ export class ReportService extends HttpClient {
   ): CancelablePromise<Blob> {
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
-      url: '/v1/reports/inspections-conducted-summary',
-      query: { ...populated(criteria), format },
+      // The KMZ — the Detailed report's, for these structures — has a mapping of its own.
+      url:
+        format === 'KMZ'
+          ? '/v1/reports/inspections-conducted-summary/kmz'
+          : '/v1/reports/inspections-conducted-summary',
+      query: format === 'KMZ' ? populated(criteria) : { ...populated(criteria), format },
       responseType: 'blob',
     });
   }
 
   /**
    * Inspections Conducted – Detail (legacy CBR001): each inspection in full, a page of its own, as
-   * a PDF in legacy's layout; or a CSV, a row per inspection item. A GET, the criteria as query parameters; 400 with `fieldErrors` for
+   * a PDF in legacy's layout; a CSV, a row per inspection item; or a KMZ of its structures. A GET, the criteria as query parameters; 400 with `fieldErrors` for
    * an Inspection Date that is not a month.
    */
   inspectionsConductedDetail(
@@ -146,16 +150,21 @@ export class ReportService extends HttpClient {
   ): CancelablePromise<Blob> {
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
-      url: '/v1/reports/inspections-conducted-detail',
-      query: { ...populated(criteria), format },
+      // The KMZ — the Detailed report's, for these structures — has a mapping of its own.
+      url:
+        format === 'KMZ'
+          ? '/v1/reports/inspections-conducted-detail/kmz'
+          : '/v1/reports/inspections-conducted-detail',
+      query: format === 'KMZ' ? populated(criteria) : { ...populated(criteria), format },
       responseType: 'blob',
     });
   }
 
   /**
    * Inspections Due – Summary (legacy CBR004): a line per structure under its forest district, as
-   * a PDF in legacy's landscape layout. A GET, the criteria as query parameters; 400 with
-   * `fieldErrors` for a Next Planned Inspection Date that is not yyyy/mm/dd.
+   * a PDF in legacy's landscape layout, a CSV, or a KMZ of its structures. A GET, the criteria as
+   * query parameters; 400 with `fieldErrors` for a Next Planned Inspection Date that is not
+   * yyyy/mm/dd.
    */
   inspectionsDueSummary(
     criteria: InspectionsDueCriteria,
@@ -163,16 +172,21 @@ export class ReportService extends HttpClient {
   ): CancelablePromise<Blob> {
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
-      url: '/v1/reports/inspections-due-summary',
-      query: { ...populated(criteria), format },
+      // The KMZ — the Detailed report's, for these structures — has a mapping of its own.
+      url:
+        format === 'KMZ'
+          ? '/v1/reports/inspections-due-summary/kmz'
+          : '/v1/reports/inspections-due-summary',
+      query: format === 'KMZ' ? populated(criteria) : { ...populated(criteria), format },
       responseType: 'blob',
     });
   }
 
   /**
    * Inspections Due – Detailed (legacy CBR003): a box per structure under its forest district, as
-   * a PDF on legacy's portrait page. A GET, the criteria as query parameters; 400 with
-   * `fieldErrors` for a Next Planned Inspection Date that is not yyyy/mm/dd.
+   * a PDF on legacy's portrait page, a CSV, or a KMZ of its structures. A GET, the criteria as
+   * query parameters; 400 with `fieldErrors` for a Next Planned Inspection Date that is not
+   * yyyy/mm/dd.
    */
   inspectionsDueDetailed(
     criteria: InspectionsDueCriteria,
@@ -180,8 +194,12 @@ export class ReportService extends HttpClient {
   ): CancelablePromise<Blob> {
     return this.doRequest<Blob>(this.config, {
       method: 'GET',
-      url: '/v1/reports/inspections-due-detailed',
-      query: { ...populated(criteria), format },
+      // The KMZ — the Detailed report's, for these structures — has a mapping of its own.
+      url:
+        format === 'KMZ'
+          ? '/v1/reports/inspections-due-detailed/kmz'
+          : '/v1/reports/inspections-due-detailed',
+      query: format === 'KMZ' ? populated(criteria) : { ...populated(criteria), format },
       responseType: 'blob',
     });
   }

@@ -257,6 +257,24 @@ class InspectionsConductedDetailServiceTest {
   }
 
   @Test
+  @DisplayName("gives the structure of each inspection, in the report's order, for its KMZ")
+  void structureIds() {
+    long first = structure("B1", s -> s);
+    long second = structure("B2", s -> s);
+    inspection(first, LocalDate.of(2025, 6, 12), i -> i, "ACC");
+    inspection(second, LocalDate.of(2025, 5, 1), i -> i, "ACC");
+    inspection(first, LocalDate.of(2024, 6, 12), i -> i, "ACC");
+    Map<String, Long> ids = Map.of("B1", first, "B2", second);
+
+    List<Long> expected = rows(c -> c).stream()
+        .map(row -> ids.get((String) row.get("CROSSING_STRUCTURE_NAME"))).toList();
+
+    assertThat(rows.structureIds(InspectionsConductedCriteria.builder().build(),
+        InspectionsConductedSort.PROJECT_BRANCH_USER_KM))
+        .hasSize(3).containsExactlyElementsOf(expected);
+  }
+
+  @Test
   @DisplayName("names the reviewer and the review date once the inspection has one")
   void reviewedStatus() {
     StructureInspectionReviewerEntity reviewer = StructureInspectionReviewerEntity.builder()
