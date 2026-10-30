@@ -11,8 +11,6 @@ import { useReportDownload } from '../useReportDownload';
 import {
   CLOSE_PROXIMITY_CHOICES,
   EMPTY_CRITERIA,
-  BLANK_FORMATS,
-  FORMATS,
   INSPECTIONS_DUE_STATE_KEYS,
   NO_SPECIAL_EQUIPMENT,
   SORT_OPTIONS,
@@ -37,6 +35,15 @@ import {
   useInspectionsDueDetailedReport,
   useInspectionsDueSummaryReport,
 } from '@/hooks/useReports';
+
+/**
+ * PDF to print, CSV to work with, KMZ to see on a map — a button each. Legacy offered PDF, Word
+ * and Excel; the KMZ is the Structure Inventory – Detailed one, for the structures listed.
+ */
+const FORMATS = ['CSV', 'KMZ', 'PDF'] as const;
+
+/** The Blank's: its forms are for printing, not for a map. */
+const BLANK_FORMATS = ['CSV', 'PDF'] as const;
 
 /** What sets the three reports apart. */
 type Variant = {

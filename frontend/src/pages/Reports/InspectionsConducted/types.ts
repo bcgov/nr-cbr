@@ -72,12 +72,6 @@ export type InspectionsConductedCriteria = MaintainerCriteria & {
   sortBy: InspectionsConductedSort;
 };
 
-/**
- * PDF to print, CSV to work with, KMZ to see on a map — a button each. Legacy offered PDF, Word
- * and Excel; the KMZ is the Structure Inventory – Detailed one, for the structures listed.
- */
-export const FORMATS = ['CSV', 'KMZ', 'PDF'] as const;
-
 const EMPTY: Omit<InspectionsConductedCriteria, 'inspectionTypeCode' | 'sortBy'> = {
   structureName: '',
   siteTypeCode: '',

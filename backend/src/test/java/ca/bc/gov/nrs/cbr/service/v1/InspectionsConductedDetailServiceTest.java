@@ -269,8 +269,7 @@ class InspectionsConductedDetailServiceTest {
     List<Long> expected = rows(c -> c).stream()
         .map(row -> ids.get((String) row.get("CROSSING_STRUCTURE_NAME"))).toList();
 
-    assertThat(rows.structureIds(InspectionsConductedCriteria.builder().build(),
-        InspectionsConductedSort.PROJECT_BRANCH_USER_KM))
+    assertThat(service.structureIds(InspectionsConductedCriteria.builder().build()))
         .hasSize(3).containsExactlyElementsOf(expected);
   }
 
