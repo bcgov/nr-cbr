@@ -74,9 +74,6 @@ export type InspectionsDueCriteria = MaintainerCriteria & {
   sortBy: InspectionsDueSort;
 };
 
-/** PDF to print, CSV to work with — a button each. Legacy offered PDF, Word and Excel. */
-export const FORMATS = ['CSV', 'PDF'] as const;
-
 /** Legacy's defaults, for all three: nothing set, sorted by Forest Service Road. */
 export const EMPTY_CRITERIA: InspectionsDueCriteria = {
   structureName: '',

@@ -263,6 +263,25 @@ class InspectionsDueSummaryServiceTest {
   }
 
   @Test
+  @DisplayName("gives each report's structures, once each, in its order, for its KMZ")
+  void structureIds() {
+    long plain = structure("A0", s -> s);
+    long both = structure("A1", s -> s);
+    bridge(both, "30", 1);
+    culvert(both, "9");
+    Map<String, Long> ids = Map.of("A0", plain, "A1", both);
+
+    List<Long> summary = names(c -> c).stream().distinct().map(ids::get).toList();
+    List<Long> detailedOrder = detailed(c -> c).stream()
+        .map(row -> ids.get(row.get("CROSSING_STRUCTURE_NAME"))).distinct().toList();
+    InspectionsDueCriteria criteria = InspectionsDueCriteria.builder().build();
+
+    assertThat(service.structureIds(criteria)).hasSize(2).containsExactlyElementsOf(summary);
+    assertThat(detailedService.structureIds(criteria)).hasSize(2)
+        .containsExactlyElementsOf(detailedOrder);
+  }
+
+  @Test
   @DisplayName("takes the last routine inspection ever reviewed or accepted")
   void lastInspection() {
     long id = structure("B1", s -> s);

@@ -202,6 +202,21 @@ describe('InspectionsConductedPage', () => {
     );
   });
 
+  it("fetches the Summary's KMZ and saves it under the report's name", async () => {
+    renderPage('summary');
+
+    expect(
+      screen.getAllByRole('button', { name: /^Download / }).map((button) => button.textContent),
+    ).toEqual(['Download CSV', 'Download KMZ', 'Download PDF']);
+    fireEvent.click(byId('summary', 'run-KMZ'));
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalled());
+    expect(reportApi.inspectionsConductedSummary).toHaveBeenCalledWith(expect.any(Object), 'KMZ');
+    expect(saveFile.mock.calls[0][1]).toMatch(
+      /^InspectionsConductedSummaryReport_\d{4}-\d{2}-\d{2}\.kmz$/,
+    );
+  });
+
   it("fetches the Detail's PDF, not the Summary's, and saves it under its name", async () => {
     renderPage('detail');
     type('detail', 'structureName', 'B10');

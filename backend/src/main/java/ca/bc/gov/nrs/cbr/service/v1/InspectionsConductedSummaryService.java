@@ -115,16 +115,25 @@ public class InspectionsConductedSummaryService {
     return inspections(criteria).stream().map(InspectionsConductedSummaryService::csvRow).toList();
   }
 
+  /** The structures the report lists, an inspection's each, in its order — for its KMZ. */
+  List<Long> structureIds(InspectionsConductedCriteria criteria) {
+    return lines(criteria).stream().map(InspectionsConductedLine::structureId).toList();
+  }
+
   /** The inspections for these criteria, in order, with their type and status named. */
   private List<Inspection> inspections(InspectionsConductedCriteria criteria) {
-    List<InspectionsConductedLine> lines = entityManager
-        .createQuery(InspectionsConductedReportSpecifications.lines(
-            entityManager.getCriteriaBuilder(), criteria, criteria.sortOr(DEFAULT_SORT)))
-        .getResultList();
+    List<InspectionsConductedLine> lines = lines(criteria);
     Map<String, String> types = byCode(codes.getInspectionTypeCodes());
     Map<String, String> statuses = byCode(codes.getInspectionReportStatusCodes());
     return lines.stream().map(line -> new Inspection(line,
         types.get(line.inspectionTypeCode()), statuses.get(line.reportStatusCode()))).toList();
+  }
+
+  private List<InspectionsConductedLine> lines(InspectionsConductedCriteria criteria) {
+    return entityManager
+        .createQuery(InspectionsConductedReportSpecifications.lines(
+            entityManager.getCriteriaBuilder(), criteria, criteria.sortOr(DEFAULT_SORT)))
+        .getResultList();
   }
 
   private static Map<String, String> pdfRow(Inspection inspection) {

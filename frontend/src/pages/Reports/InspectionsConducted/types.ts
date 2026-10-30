@@ -72,9 +72,6 @@ export type InspectionsConductedCriteria = MaintainerCriteria & {
   sortBy: InspectionsConductedSort;
 };
 
-/** PDF to print, CSV to work with — a button each. Legacy offered PDF, Word and Excel. */
-export const FORMATS = ['CSV', 'PDF'] as const;
-
 const EMPTY: Omit<InspectionsConductedCriteria, 'inspectionTypeCode' | 'sortBy'> = {
   structureName: '',
   siteTypeCode: '',

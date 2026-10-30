@@ -11,7 +11,6 @@ import { useReportDownload } from '../useReportDownload';
 import {
   CLOSE_PROXIMITY_CHOICES,
   EMPTY_CRITERIA,
-  FORMATS,
   INSPECTIONS_DUE_STATE_KEYS,
   NO_SPECIAL_EQUIPMENT,
   SORT_OPTIONS,
@@ -22,6 +21,7 @@ import {
 import { criteriaErrors } from './validation';
 
 import type { SortOption } from '../ReportOutput';
+import type { ReportFormat } from '../types';
 import type { FC } from 'react';
 
 import {
@@ -36,6 +36,15 @@ import {
   useInspectionsDueSummaryReport,
 } from '@/hooks/useReports';
 
+/**
+ * PDF to print, CSV to work with, KMZ to see on a map — a button each. Legacy offered PDF, Word
+ * and Excel; the KMZ is the Structure Inventory – Detailed one, for the structures listed.
+ */
+const FORMATS = ['CSV', 'KMZ', 'PDF'] as const;
+
+/** The Blank's: its forms are for printing, not for a map. */
+const BLANK_FORMATS = ['CSV', 'PDF'] as const;
+
 /** What sets the three reports apart. */
 type Variant = {
   id: string;
@@ -48,6 +57,7 @@ type Variant = {
   blank: boolean;
   /** The file's name before the date. */
   filename: string;
+  formats: readonly ReportFormat[];
 };
 
 const VARIANTS: Record<InspectionsDueVariant, Variant> = {
@@ -59,6 +69,7 @@ const VARIANTS: Record<InspectionsDueVariant, Variant> = {
     sortOptions: SORT_OPTIONS,
     blank: false,
     filename: 'InspectionsDueSummaryReport',
+    formats: FORMATS,
   },
   detailed: {
     id: 'inspections-due-detailed',
@@ -68,6 +79,7 @@ const VARIANTS: Record<InspectionsDueVariant, Variant> = {
     sortOptions: SORT_OPTIONS,
     blank: false,
     filename: 'InspectionsDueDetailedReport',
+    formats: FORMATS,
   },
   blank: {
     id: 'inspections-blank',
@@ -77,6 +89,7 @@ const VARIANTS: Record<InspectionsDueVariant, Variant> = {
     sortOptions: [],
     blank: true,
     filename: 'InspectionsBlankReport',
+    formats: BLANK_FORMATS,
   },
 };
 
@@ -151,7 +164,7 @@ const InspectionsDuePage: FC<{ variant: InspectionsDueVariant }> = ({ variant })
         criteria={criteria}
         sortOptions={config.sortOptions}
         errors={errors}
-        formats={FORMATS}
+        formats={config.formats}
         codeTablesLoading={referenceData.isLoading}
         onChange={onChange}
         onRun={run}

@@ -34,7 +34,8 @@ const ID = 'structure-inventory-detailed';
  * <p>Legacy equivalent: `showStructureInventoryDetailedReport.do` →
  * `structure_inventory_detailed.jsp`, gated on `/showStructureInventoryDetailedReport`, which every
  * role that can read holds. Where the Summary is a line per structure, this is a block of labelled
- * fields per structure, and it alone of the reports also comes as a KMZ for a map.
+ * fields per structure, and it also comes as a KMZ for a map — the KMZ the inspection reports
+ * offer too, for the structures they list.
  *
  * <p>The Summary's form without its construction filters, in the same grid: the site first, then
  * the structure, then who holds it, then legacy's "Replacement Date" pair. Labels are legacy's —

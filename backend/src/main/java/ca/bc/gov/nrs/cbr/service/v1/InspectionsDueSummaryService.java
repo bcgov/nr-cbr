@@ -46,6 +46,11 @@ public class InspectionsDueSummaryService {
     this.criteriaLine = criteriaLine;
   }
 
+  /** The structures the report lists, in its order — for its KMZ. */
+  List<Long> structureIds(InspectionsDueCriteria criteria) {
+    return rows.summaryStructureIds(criteria);
+  }
+
   /** The report, as a PDF or a CSV. */
   public ReportFile generate(InspectionsDueCriteria criteria, ReportFormat format) {
     long started = System.nanoTime();

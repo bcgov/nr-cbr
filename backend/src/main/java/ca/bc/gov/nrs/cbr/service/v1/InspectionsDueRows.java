@@ -219,6 +219,22 @@ public class InspectionsDueRows {
     }).toList();
   }
 
+  /** The structures the Summary lists, in its order — for its KMZ. */
+  public List<Long> summaryStructureIds(InspectionsDueCriteria criteria) {
+    return entityManager
+        .createQuery(InspectionsDueReportSpecifications.lines(
+            entityManager.getCriteriaBuilder(), criteria))
+        .getResultList().stream().map(InspectionsDueLine::structureId).toList();
+  }
+
+  /** The structures the Detailed lists, in its order — for its KMZ. */
+  public List<Long> detailedStructureIds(InspectionsDueCriteria criteria) {
+    return entityManager
+        .createQuery(InspectionsDueReportSpecifications.detailedLines(
+            entityManager.getCriteriaBuilder(), criteria))
+        .getResultList().stream().map(InspectionsDueLine::structureId).toList();
+  }
+
   private Loaded<StructureBridgeLength> loadSummary(InspectionsDueCriteria criteria) {
     List<InspectionsDueLine> lines = entityManager
         .createQuery(InspectionsDueReportSpecifications.lines(

@@ -12,7 +12,6 @@ import {
   DETAIL_SORT_OPTIONS,
   EMPTY_DETAIL_CRITERIA,
   EMPTY_SUMMARY_CRITERIA,
-  FORMATS,
   INSPECTIONS_CONDUCTED_STATE_KEYS,
   SUMMARY_SORT_OPTIONS,
   type InspectionsConductedCriteria,
@@ -33,6 +32,12 @@ import {
   useInspectionsConductedDetailReport,
   useInspectionsConductedSummaryReport,
 } from '@/hooks/useReports';
+
+/**
+ * PDF to print, CSV to work with, KMZ to see on a map — a button each. Legacy offered PDF, Word
+ * and Excel; the KMZ is the Structure Inventory – Detailed one, for the structures listed.
+ */
+const FORMATS = ['CSV', 'KMZ', 'PDF'] as const;
 
 /** What sets the two reports apart. */
 type Variant = {

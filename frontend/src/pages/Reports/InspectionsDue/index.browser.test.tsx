@@ -243,6 +243,30 @@ describe('InspectionsDuePage', () => {
     );
   });
 
+  it.each([
+    ['summary', ['Download CSV', 'Download KMZ', 'Download PDF']],
+    ['detailed', ['Download CSV', 'Download KMZ', 'Download PDF']],
+    ['blank', ['Download CSV', 'Download PDF']],
+  ] as const)('offers the %s report a KMZ only when it is a Due report', (variant, buttons) => {
+    renderPage(variant);
+
+    expect(
+      screen.getAllByRole('button', { name: /^Download / }).map((button) => button.textContent),
+    ).toEqual(buttons);
+  });
+
+  it("fetches the Detailed's KMZ and saves it under the report's name", async () => {
+    renderPage('detailed');
+
+    fireEvent.click(byId('detailed', 'run-KMZ'));
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalled());
+    expect(reportApi.inspectionsDueDetailed).toHaveBeenCalledWith(expect.any(Object), 'KMZ');
+    expect(saveFile.mock.calls[0][1]).toMatch(
+      /^InspectionsDueDetailedReport_\d{4}-\d{2}-\d{2}\.kmz$/,
+    );
+  });
+
   it("fetches the Blank's PDF and saves it under its name", async () => {
     renderPage('blank');
     type('blank', 'structureName', 'B10');
