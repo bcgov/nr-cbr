@@ -565,6 +565,18 @@ public class ConfigurationService {
         .toList();
   }
 
+  /**
+   * Built For — {@code THE.BUILT_BY_CODE}, every code by description. The Built For filter on
+   * Structure Search, so a structure saved with a since-expired code can still be found; the
+   * Structure card's select reads the current ones only ({@link #getBuiltByCodes}).
+   */
+  @Cacheable("allBuiltByCodes")
+  public List<CodeOptionResponse> getAllBuiltByCodes() {
+    return builtByCodeRepository.findAllByOrderByDescriptionAsc().stream()
+        .map(entity -> new CodeOptionResponse(entity.getBuiltByCode(), entity.getDescription()))
+        .toList();
+  }
+
   /** Built For — {@code THE.BUILT_BY_CODE}, current ones by description. */
   @Cacheable("builtByCodes")
   public List<CodeOptionResponse> getBuiltByCodes() {

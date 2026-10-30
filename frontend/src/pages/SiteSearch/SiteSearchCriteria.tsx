@@ -10,7 +10,7 @@ import type { ClientSuggestion } from '@/types/client';
 import type { FC, SubmitEventHandler } from 'react';
 
 import { useClientLocations } from '@/hooks/useClientSearch';
-import { clientLabel, locationLabel } from '@/utils/clientSearch';
+import { MIN_CLIENT_TERM_LENGTH, clientLabel, locationLabel } from '@/utils/clientSearch';
 
 export type CodeTables = {
   siteStatusCodes: CodeOption[];
@@ -19,6 +19,7 @@ export type CodeTables = {
   siteTypeCodes: CodeOption[];
   forestDistricts: OrgUnitOption[];
   managementAreas: OrgUnitOption[];
+  businessAreas: OrgUnitOption[];
 };
 
 type Props = {
@@ -285,6 +286,8 @@ const SiteSearchCriteriaForm: FC<Props> = ({
           key={resetToken}
           id="site-search-maintainer"
           titleText="Designated Maintainer"
+          // One line, so this row is no taller than the others.
+          helperText={`Name, city or client # (min. ${MIN_CLIENT_TERM_LENGTH})`}
           selectedLabel={criteria.maintainerLabel}
           onSelect={selectMaintainer}
           onTermChange={typeMaintainer}
@@ -327,6 +330,12 @@ const SiteSearchCriteriaForm: FC<Props> = ({
           criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
           codeTables.managementAreas,
           codeTablesLoading || managementAreasLoading,
+        )}
+        {orgUnitSelect(
+          'businessAreaOrgUnit',
+          'BCTS Business Area',
+          'Any business area',
+          codeTables.businessAreas,
         )}
         {range('kiloStart', 'kiloEnd', 'Kilometres')}
 

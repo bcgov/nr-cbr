@@ -178,6 +178,13 @@ export const bridgeCodesQuery = queryOptions({
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
+/** Built For, expired codes included — the Structure Search filter, so old values still match. */
+export const allBuiltByCodesQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'all-built-by-codes'],
+  queryFn: () => API.configuration.getAllBuiltByCodes(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
 export const builtByCodesQuery = queryOptions({
   queryKey: [CONFIGURATION_QUERY_KEY, 'built-by-codes'],
   queryFn: () => API.configuration.getBuiltByCodes(),
@@ -241,6 +248,7 @@ const SITE_SEARCH_LOOKUPS = [
   specialAccessCodesQuery,
   siteTypeCodesQuery,
   forestDistrictsQuery,
+  businessAreasQuery,
 ] as const;
 
 const INSPECTION_SEARCH_LOOKUPS = [
@@ -261,6 +269,8 @@ const STRUCTURE_SEARCH_LOOKUPS = [
   forestDistrictsQuery,
   specialAccessCodesQuery,
   specialEquipmentCodesQuery,
+  allBuiltByCodesQuery,
+  businessAreasQuery,
 ] as const;
 
 const STRUCTURE_INVENTORY_SUMMARY_LOOKUPS = [
@@ -582,6 +592,7 @@ export const usePrefetchConfiguration = (enabled: boolean): void => {
     void queryClient.query(structureCurbTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(culvertTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(specialEquipmentCodesQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(allBuiltByCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(deckTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(culvertMaterialCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(portableSuperstructureStatusCodesQuery).catch(ignoreWarmUpFailure);
@@ -616,6 +627,10 @@ export const usePierTypeCodes = (): UseQueryResult<CodeOption[]> => useQuery(pie
 
 /** The Built For select on the Details tab's Structure card. */
 export const useBuiltByCodes = (): UseQueryResult<CodeOption[]> => useQuery(builtByCodesQuery);
+
+/** The Built For filter on Structure Search: every code, expired ones too. */
+export const useAllBuiltByCodes = (): UseQueryResult<CodeOption[]> =>
+  useQuery(allBuiltByCodesQuery);
 
 /** The Source select on the Details tab's Structure card. */
 export const useStructureSourceCodes = (): UseQueryResult<CodeOption[]> =>

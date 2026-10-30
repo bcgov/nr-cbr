@@ -68,6 +68,7 @@ public final class StructureSearchSpecifications {
   private static final String ACTIVE_IND = "activeInd";
   private static final String PORTABLE_IND = "portableStructureInd";
   private static final String SPECIAL_EQUIPMENT_CODE = "specialEquipmentRqmtCode";
+  private static final String BUILT_BY_CODE = "builtByCode";
   private static final String DESIGN_LOAD_RATING = "designLoadRating";
   private static final String CURRENT_LOAD_RATING = "currentLoadRating";
   private static final String LOAD_RATING_UNKNOWN = "loadRatingUnknownIndicator";
@@ -87,6 +88,7 @@ public final class StructureSearchSpecifications {
   private static final String CROSSING_NAME = "crossingName";
   private static final String ORG_UNIT_NO = "orgUnitNo";
   private static final String MANAGEMENT_ORG_UNIT_NO = "managementOrgUnitNo";
+  private static final String BUSINESS_AREA_ORG_UNIT_NO = "businessAreaOrgUnitNo";
   private static final String CLIENT_NUMBER = "clientNumber";
   private static final String CLIENT_LOCATION = "clientLocnCode";
   private static final String SITE_STATUS = "crossingSiteStatusCode";
@@ -169,6 +171,8 @@ public final class StructureSearchSpecifications {
         .ifPresent(predicates::add);
     equalsText(builder, root.get(SPECIAL_EQUIPMENT_CODE), criteria.specialEquipmentCode())
         .ifPresent(predicates::add);
+    equalsText(builder, root.get(BUILT_BY_CODE), criteria.builtByCode())
+        .ifPresent(predicates::add);
     integerRange(builder, root.get(YEAR_BUILT),
         criteria.yearBuiltStart(), criteria.yearBuiltEnd()).ifPresent(predicates::add);
     integerRange(builder, root.get(LOAD_RESTRICTION_YEAR),
@@ -217,6 +221,8 @@ public final class StructureSearchSpecifications {
         .ifPresent(predicates::add);
     equalsNumber(builder, site.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
     equalsNumber(builder, site.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
+        .ifPresent(predicates::add);
+    equalsNumber(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnit())
         .ifPresent(predicates::add);
     decimalRange(builder, site.get(KILOMETRES), criteria.kiloStart(), criteria.kiloEnd())
         .ifPresent(predicates::add);

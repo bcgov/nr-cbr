@@ -24,7 +24,7 @@ import lombok.Builder;
  * {@code CBR_VARCHAR2_ARRAY} of binds regardless — parsing here would reject input the legacy screen
  * accepts.
  *
- * <p><b>{@code @Builder} because there are twenty components and seventeen of them are
+ * <p><b>{@code @Builder} because there are twenty-one components and eighteen of them are
  * {@link String}.</b> Spring binds instances from the query string and never calls the constructor
  * positionally, but tests and any future caller do, and at this width a transposed pair of
  * same-typed neighbours — {@code kiloStart}/{@code kiloEnd},
@@ -71,7 +71,12 @@ public record SiteSearchCriteria(
     String siteTypeCode,
     Boolean capitalRoad,
     /** Designated Maintainer, by name rather than client number. */
-    String primaryUserName
+    String primaryUserName,
+    /**
+     * BCTS Business Area — {@code BUSINESS_AREA_ORG_UNIT_NO}, as on the reports. Not on legacy's
+     * form: added on request.
+     */
+    String businessAreaOrgUnit
 ) {
 
   /**
@@ -115,6 +120,7 @@ public record SiteSearchCriteria(
         && isBlank(specialAccessCode)
         && isBlank(siteTypeCode)
         && isBlank(primaryUserName)
+        && isBlank(businessAreaOrgUnit)
         && !Boolean.TRUE.equals(incomplete)
         && !Boolean.TRUE.equals(capitalRoad);
   }

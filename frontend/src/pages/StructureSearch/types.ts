@@ -47,6 +47,8 @@ export type StructureSearchCriteria = {
   /** Off, the default, leaves archived structures out — legacy's rule. */
   includeArchived: boolean;
   managementOrgUnit: string;
+  /** BCTS Business Area, as on the reports. Not on legacy's form: added on request. */
+  businessAreaOrgUnit: string;
   clientNumber: string;
   clientLocationCode: string;
   /** Designated Maintainer by name, for a term that is not a pick from the lookup. */
@@ -66,6 +68,8 @@ export type StructureSearchCriteria = {
   yearBuiltEnd: string;
   specialAccessCode: string;
   specialEquipmentCode: string;
+  /** Built For — `BUILT_BY_CODE`. Not on legacy's form: added on request. */
+  builtByCode: string;
 
   /**
    * The label of the maintainer picked from the lookup. <b>Display state, not a criterion</b> —
@@ -150,6 +154,7 @@ export const EMPTY_CRITERIA: StructureSearchCriteria = {
   orgUnit: '',
   includeArchived: false,
   managementOrgUnit: '',
+  businessAreaOrgUnit: '',
   clientNumber: '',
   clientLocationCode: '',
   primaryUserName: '',
@@ -163,6 +168,7 @@ export const EMPTY_CRITERIA: StructureSearchCriteria = {
   yearBuiltEnd: '',
   specialAccessCode: '',
   specialEquipmentCode: '',
+  builtByCode: '',
   maintainerLabel: '',
 };
 

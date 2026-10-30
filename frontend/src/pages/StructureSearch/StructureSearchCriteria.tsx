@@ -10,7 +10,7 @@ import type { ClientSuggestion } from '@/types/client';
 import type { FC, SubmitEventHandler } from 'react';
 
 import { useClientLocations } from '@/hooks/useClientSearch';
-import { clientLabel, locationLabel } from '@/utils/clientSearch';
+import { MIN_CLIENT_TERM_LENGTH, clientLabel, locationLabel } from '@/utils/clientSearch';
 
 export type CodeTables = {
   structureTypeClassCodes: CodeOption[];
@@ -21,8 +21,10 @@ export type CodeTables = {
   siteTypeCodes: CodeOption[];
   specialAccessCodes: CodeOption[];
   specialEquipmentCodes: CodeOption[];
+  builtByCodes: CodeOption[];
   forestDistricts: OrgUnitOption[];
   managementAreas: OrgUnitOption[];
+  businessAreas: OrgUnitOption[];
 };
 
 type Props = {
@@ -50,7 +52,7 @@ const label = (code: string | null, description: string | null): string =>
  * Kilometres (see `StructureSearchCriteria`) and the three maintainer boxes, which are one lookup
  * plus a location here, as on Site Search. Laid out in the same four-column grid as Site Search:
  * the structure's own criteria first, then the site's, then the replacement dates — the groups
- * legacy's form has, in its order.
+ * legacy's form has, in its order — and last its yes/no filters, side by side on a row of their own.
  */
 const StructureSearchCriteriaForm: FC<Props> = ({
   criteria,
@@ -246,10 +248,7 @@ const StructureSearchCriteriaForm: FC<Props> = ({
           'Any requirement',
           codeTables.specialEquipmentCodes,
         )}
-        <div className="structure-search__toggles">
-          {toggle('downrated', 'Downrated Structure?')}
-          {toggle('portableStructure', 'Portable Structure?')}
-        </div>
+        {codeSelect('builtByCode', 'Built For', 'Any', codeTables.builtByCodes)}
 
         {/* The site it stands on */}
         {text('siteId', 'Site #', 14)}
@@ -278,10 +277,18 @@ const StructureSearchCriteriaForm: FC<Props> = ({
           codeTables.managementAreas,
           codeTablesLoading || managementAreasLoading,
         )}
+        {orgUnitSelect(
+          'businessAreaOrgUnit',
+          'BCTS Business Area',
+          'Any business area',
+          codeTables.businessAreas,
+        )}
         <ClientCombo
           key={resetToken}
           id="structure-search-maintainer"
           titleText="Designated Maintainer"
+          // One line, so this row is no taller than the others.
+          helperText={`Name, city or client # (min. ${MIN_CLIENT_TERM_LENGTH})`}
           selectedLabel={criteria.maintainerLabel}
           onSelect={selectMaintainer}
           onTermChange={typeMaintainer}
@@ -316,7 +323,11 @@ const StructureSearchCriteriaForm: FC<Props> = ({
         )}
         {range('replacementYearStart', 'replacementYearEnd', 'Estimated Replacement', 'year')}
         {range('closureYearStart', 'closureYearEnd', 'Estimated Closure', 'year')}
-        <div className="structure-search__toggles">
+
+        {/* The yes/no filters, together on the last row, side by side. */}
+        <div className="structure-search__toggles structure-search__toggles--row">
+          {toggle('downrated', 'Downrated Structure?')}
+          {toggle('portableStructure', 'Portable Structure?')}
           {toggle('incomplete', 'Incomplete Data?')}
           {/* Off by default, which leaves archived structures out — legacy's rule. */}
           {toggle('includeArchived', 'Include Archived Structure?')}

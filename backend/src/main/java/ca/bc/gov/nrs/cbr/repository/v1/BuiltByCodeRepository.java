@@ -10,6 +10,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface BuiltByCodeRepository extends JpaRepository<BuiltByCodeEntity, String> {
 
+  /** Every code, expired ones too, by description — the Built For filter on Structure Search. */
+  List<BuiltByCodeEntity> findAllByOrderByDescriptionAsc();
+
   /** The current codes, by description; expired ones are left out, as legacy's select left them. */
   @Query("""
       SELECT code

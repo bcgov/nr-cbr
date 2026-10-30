@@ -72,6 +72,7 @@ public final class SiteSearchSpecifications {
   private static final String CLIENT_LOCATION_CODE = "clientLocnCode";
   private static final String ORG_UNIT_NO = "orgUnitNo";
   private static final String MANAGEMENT_ORG_UNIT_NO = "managementOrgUnitNo";
+  private static final String BUSINESS_AREA_ORG_UNIT_NO = "businessAreaOrgUnitNo";
   private static final String CAPITAL_ROAD_IND = "capitalRoadInd";
   private static final String KILOMETRES = "pointOfCommencementDistance";
   private static final String USER_KM = "userKm";
@@ -154,6 +155,8 @@ public final class SiteSearchSpecifications {
 
     equalsNumber(builder, root.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
     equalsNumber(builder, root.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
+        .ifPresent(predicates::add);
+    equalsNumber(builder, root.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnit())
         .ifPresent(predicates::add);
 
     decimalRange(builder, root.get(KILOMETRES), criteria.kiloStart(), criteria.kiloEnd())

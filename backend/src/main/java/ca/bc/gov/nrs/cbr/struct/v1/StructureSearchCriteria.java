@@ -54,6 +54,11 @@ public record StructureSearchCriteria(
      */
     Boolean includeArchived,
     String managementOrgUnit,
+    /**
+     * BCTS Business Area — the site's {@code BUSINESS_AREA_ORG_UNIT_NO}, as on the reports. Not on
+     * legacy's form: added on request.
+     */
+    String businessAreaOrgUnit,
     String clientNumber,
     String clientLocationCode,
     /** Designated Maintainer, by name rather than client number. */
@@ -79,7 +84,9 @@ public record StructureSearchCriteria(
     @Pattern(regexp = YEAR, message = INVALID_YEAR)
     String yearBuiltEnd,
     String specialAccessCode,
-    String specialEquipmentCode
+    String specialEquipmentCode,
+    /** "Built For" — {@code BUILT_BY_CODE}. Not on legacy's form: added on request. */
+    String builtByCode
 ) {
 
   /** An unset value, or a four-digit year — the columns are {@code NUMBER(4)}. */
