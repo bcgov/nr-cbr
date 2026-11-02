@@ -9,6 +9,7 @@ import ca.bc.gov.nrs.cbr.exception.RepairNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeOrderEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
@@ -58,7 +59,8 @@ class StructureRepairsServiceTest {
   void setUp() {
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\EDITOR");
     for (String entity : List.of("StructureRepairEntity", "StructureInspectionEntity",
-        "RepairPriorityCodeEntity", "RepairStatusCodeEntity", "StructureRepairTypeCodeEntity",
+        "RepairPriorityCodeEntity", "RepairPriorityCodeOrderEntity", "RepairStatusCodeEntity",
+        "StructureRepairTypeCodeEntity",
         "StructureRepairTypeOrderEntity", "StructureRepairTypeXrefEntity",
         "CrossingStructureEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
@@ -78,6 +80,13 @@ class StructureRepairsServiceTest {
   private void givenInspection(long id, LocalDate date) {
     entityManager.persist(StructureInspectionEntity.builder()
         .inspectionId(id).crossingStructureId(7L).inspectionDate(date).build());
+  }
+
+  /** A priority's rank in {@code REPAIR_PRIORITY_CODE_ORDER}, keyed by the rank itself. */
+  private void givenPriorityRank(String priority, int rank) {
+    entityManager.persist(RepairPriorityCodeOrderEntity.builder()
+        .repairPriorityCodeOrderId(rank).repairPriorityCode(priority).repairPriorityCodeOrder(rank)
+        .build());
   }
 
   /** A repair numbered {@code number}; its id, from the sequence, is returned. */
@@ -139,8 +148,12 @@ class StructureRepairsServiceTest {
 
   @Test
   @DisplayName("orders as legacy does: no inspection first, then newest inspection, then "
-      + "priority, status descending, number")
+      + "priority rank, status descending, number")
   void legacyOrder() {
+    // Ranked against their codes' order, so a sort by code would fail.
+    givenPriorityRank("P2", 1);
+    givenPriorityRank("P1", 2);
+    givenPriorityRank("P3", 3);
     givenInspection(10L, LocalDate.of(2020, 6, 1));
     givenInspection(11L, LocalDate.of(2023, 6, 1));
     givenRepair(1L, 10L, "REQ", "P1");
@@ -148,9 +161,11 @@ class StructureRepairsServiceTest {
     givenRepair(3L, 11L, "REQ", "P1");
     givenRepair(4L, 11L, "SUG", "P1");
     givenRepair(5L, null, "REQ", "P3");
+    // No rank: after the ranked ones, where legacy's inner join dropped it.
+    givenRepair(6L, 11L, "REQ", "P9");
 
     assertThat(repairs(View.ALL).content()).extracting(Repair::number)
-        .containsExactly(5L, 4L, 3L, 2L, 1L);
+        .containsExactly(5L, 2L, 4L, 3L, 6L, 1L);
   }
 
   @Test
