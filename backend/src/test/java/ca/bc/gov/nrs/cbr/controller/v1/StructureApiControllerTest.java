@@ -22,7 +22,6 @@ import ca.bc.gov.nrs.cbr.service.v1.StructureSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSpansAndPiersService;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
-import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse;
 import org.junit.jupiter.api.DisplayName;
@@ -58,13 +57,11 @@ class StructureApiControllerTest {
   }
 
   @Test
-  @DisplayName("adds a repair, a monitoring item and a document as the structure's own: 201")
+  @DisplayName("adds a monitoring item and a document as the structure's own: 201")
   void addsAsTheStructures() {
-    when(repairs.create(7L, null, null)).thenReturn(new RepairCreatedResponse("5", 1L));
     when(monitors.create(7L, null, null)).thenReturn(new MonitorCreatedResponse("6", 1L));
     when(documents.upload(7L, null, null, null)).thenReturn("9");
 
-    assertThat(controller.createRepair(7L, null).getStatusCode()).isEqualTo(HttpStatus.CREATED);
     assertThat(controller.createMonitor(7L, null).getStatusCode()).isEqualTo(HttpStatus.CREATED);
     var added = controller.addDocument(7L, null, null);
 

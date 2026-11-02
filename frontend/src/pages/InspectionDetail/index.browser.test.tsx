@@ -17,8 +17,9 @@ const authorization = vi.hoisted(() => ({
   isInspectionReviewer: true,
 }));
 vi.mock('@/hooks/useAuthorization', () => ({ useAuthorization: () => authorization }));
+const display = vi.hoisted(() => vi.fn());
 vi.mock('@/context/notification/useNotification', () => ({
-  useNotification: () => ({ display: vi.fn() }),
+  useNotification: () => ({ display }),
 }));
 vi.mock('@/context/pageTitle/usePageTitle', () => ({
   usePageTitle: () => ({ setPageTitle: vi.fn(), pageTitle: '' }),
@@ -27,6 +28,7 @@ vi.mock('@/context/pageTitle/usePageTitle', () => ({
 const inspectionApi = vi.hoisted(() => ({
   getInspection: vi.fn(),
   getInspectionForm: vi.fn(),
+  addInspectionRepair: vi.fn(),
   deleteInspectionRepair: vi.fn(),
   deleteInspectionMonitor: vi.fn(),
   deleteInspectionDocument: vi.fn(),
@@ -43,10 +45,14 @@ const structureApi = vi.hoisted(() => ({
   getStructureRepairs: vi.fn(),
   getStructureMonitors: vi.fn(),
   getInspectionSchedule: vi.fn(),
+  getStructureRepairTypes: vi.fn(),
 }));
 const configurationApi = vi.hoisted(() => ({
   getInspectionReportStatusCodes: vi.fn(),
   getLoadRatingCodes: vi.fn(),
+  getRepairStatusCodes: vi.fn(),
+  getRepairPriorityCodes: vi.fn(),
+  getRepairGroupCodes: vi.fn(),
 }));
 vi.mock('@/services/APIs', () => ({
   default: {
@@ -177,6 +183,26 @@ const page = (content: object[]) => ({
 });
 
 beforeEach(() => {
+  display.mockClear();
+  // The Repair Item dialog's lists.
+  structureApi.getStructureRepairTypes.mockResolvedValue([
+    { code: 'DECK', description: 'Deck planks', unit: 'm²', groupCode: 'STRU' },
+    { code: '800A', description: 'Other', unit: null, groupCode: 'MISC' },
+  ]);
+  configurationApi.getRepairStatusCodes.mockResolvedValue([
+    { code: 'REQ', description: 'Required' },
+    { code: 'SUG', description: 'Suggested' },
+  ]);
+  configurationApi.getRepairPriorityCodes.mockResolvedValue([
+    { code: 'P1', description: 'Urgent' },
+    { code: 'H', description: 'High' },
+  ]);
+  configurationApi.getRepairGroupCodes.mockResolvedValue([
+    { code: 'MISC', description: 'Miscellaneous' },
+    { code: 'STRU', description: 'Superstructure' },
+  ]);
+  inspectionApi.addInspectionRepair.mockReset();
+  inspectionApi.addInspectionRepair.mockResolvedValue({ id: '40', number: 4 });
   configurationApi.getInspectionReportStatusCodes.mockResolvedValue([
     { code: 'PRO', description: 'In Progress' },
     { code: 'REJ', description: 'Rejected' },
@@ -541,6 +567,86 @@ describe('InspectionDetailPage', () => {
         within(screen.getByTestId('structure-monitoring-tab')).getByTestId('structure-monitor-add'),
       ).toBeInTheDocument();
       authorization.canEdit = true;
+    });
+
+    describe('Add, the one place a repair is added (CBR-858)', () => {
+      const openAdd = async () => {
+        inspectionApi.getInspection.mockResolvedValue(inProgress());
+        renderPage();
+        await screen.findByTestId('inspection-inspection');
+        await openTab('repairs');
+        await userEvent.click(await screen.findByTestId('structure-repair-add'));
+        const dialog = await screen.findByTestId('repair-dialog');
+        await vi.waitFor(() =>
+          expect(within(dialog).getByTestId('repair-type').querySelectorAll('option')).toHaveLength(
+            3,
+          ),
+        );
+        return dialog;
+      };
+
+      it('adds a repair as Suggested through the inspection, and says which number it took', async () => {
+        const dialog = await openAdd();
+        expect(dialog).toMatchTextContent('Add repair');
+        // No number before saving, a locked status, and nothing only a completed repair has.
+        expect(within(dialog).queryByText('Repair Number')).not.toBeInTheDocument();
+        expect(dialog).toMatchTextContent('Suggested');
+        expect(within(dialog).queryByTestId('repair-status')).not.toBeInTheDocument();
+        expect(within(dialog).queryByTestId('repair-completed-date')).not.toBeInTheDocument();
+        expect(within(dialog).queryByTestId('repair-actualCost')).not.toBeInTheDocument();
+
+        await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
+        await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), 'DECK');
+        await userEvent.type(within(dialog).getByTestId('repair-estimate'), '2500');
+        await userEvent.type(within(dialog).getByTestId('repair-quantity'), '8');
+        await userEvent.type(within(dialog).getByTestId('repair-description'), 'New planks.');
+        await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+        await vi.waitFor(() =>
+          expect(inspectionApi.addInspectionRepair).toHaveBeenCalledWith('41', {
+            priorityCode: 'H',
+            estimate: 2500,
+            typeCode: 'DECK',
+            quantity: 8,
+            description: 'New planks.',
+          }),
+        );
+        await vi.waitFor(() =>
+          expect(display).toHaveBeenCalledWith(
+            expect.objectContaining({ kind: 'success', title: 'Repair 4 added' }),
+          ),
+        );
+        expect(screen.queryByTestId('repair-dialog')).not.toBeInTheDocument();
+      });
+
+      it('adds nothing without a priority and a type, and says so beside each', async () => {
+        const dialog = await openAdd();
+        await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+        expect(dialog).toMatchTextContent('Repair Priority is required.');
+        expect(dialog).toMatchTextContent('Repair Type is required.');
+        expect(inspectionApi.addInspectionRepair).not.toHaveBeenCalled();
+      });
+
+      it('says so when the add fails for no field', async () => {
+        inspectionApi.addInspectionRepair.mockRejectedValue(new Error('boom'));
+        const dialog = await openAdd();
+        await vi.waitFor(() =>
+          expect(
+            within(dialog).getByTestId('repair-priority').querySelectorAll('option'),
+          ).toHaveLength(3),
+        );
+        await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
+        await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), 'DECK');
+        await userEvent.click(within(dialog).getByTestId('repair-save'));
+
+        await vi.waitFor(() =>
+          expect(display).toHaveBeenCalledWith(
+            expect.objectContaining({ kind: 'error', title: 'The repair was not added' }),
+          ),
+        );
+        expect(screen.getByTestId('repair-dialog')).toBeInTheDocument();
+      });
     });
 
     it('offers no Delete below Level 2', async () => {
