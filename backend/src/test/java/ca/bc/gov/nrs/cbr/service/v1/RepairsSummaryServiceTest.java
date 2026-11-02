@@ -13,6 +13,7 @@ import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeOrderEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RepairStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairClassCodeEntity;
@@ -93,7 +94,8 @@ class RepairsSummaryServiceTest {
         "ForestServiceBridgeEntity", "CrossingStructureEntity", "CrossingSiteEntity",
         "CbrRoadSectionEntity", "OrgUnitEntity", "CrossingSiteStatusCodeEntity",
         "RepairStatusCodeEntity",
-        "RepairPriorityCodeEntity", "StructureRepairTypeCodeEntity",
+        "RepairPriorityCodeEntity", "RepairPriorityCodeOrderEntity",
+        "StructureRepairTypeCodeEntity",
         "StructureRepairTypeOrderEntity", "StructureRepairTypeXrefEntity",
         "StructureRepairGroupCodeEntity", "StructureRepairClassCodeEntity", "ClientPublicEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
@@ -318,6 +320,24 @@ class RepairsSummaryServiceTest {
         .containsExactly("A", "B newer 1", "B newer 2", "B older");
     assertThat(descriptions(c -> c.sortBy(RepairsSummarySort.SITE_ID)))
         .containsExactly("A", "B newer 1", "B newer 2", "B older");
+  }
+
+  @Test
+  @DisplayName("sorts an inspection's repairs by priority rank, not code, an unranked one last")
+  void priorityRank() {
+    // Ranked against their codes' order, so a sort by code would fail.
+    for (String[] rank : new String[][] {{"U", "1"}, {"H", "2"}}) {
+      entityManager.persist(RepairPriorityCodeOrderEntity.builder()
+          .repairPriorityCodeOrderId(Integer.valueOf(rank[1])).repairPriorityCode(rank[0])
+          .repairPriorityCodeOrder(Integer.valueOf(rank[1])).build());
+    }
+    long b = structure("B", s -> s);
+    long inspected = inspection(b, "ROUT", LocalDate.of(2025, 5, 1));
+    repair(b, inspected, r -> r.description("High").repairPriorityCode("H").repairNumber(1L));
+    repair(b, inspected, r -> r.description("No rank").repairPriorityCode("Z").repairNumber(2L));
+    repair(b, inspected, r -> r.description("Urgent").repairPriorityCode("U").repairNumber(3L));
+
+    assertThat(descriptions(c -> c)).containsExactly("Urgent", "High", "No rank");
   }
 
   @Test
