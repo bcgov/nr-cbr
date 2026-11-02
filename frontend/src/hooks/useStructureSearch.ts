@@ -634,23 +634,24 @@ export const useStructureRepairTypes = (structureId: string) =>
   });
 
 /**
- * Adds a repair, then refreshes the structure's repairs table. The fields the server refused come
- * back as `fieldErrors`, keyed as the request is.
+ * Adds a repair through the inspection that raised it, then refreshes the structure's repairs
+ * table. The fields the server refused come back as `fieldErrors`, keyed as the request is.
+ *
+ * <p>A repair is always raised by an inspection (CBR-858); without one there is nothing to add to.
  */
 export const useCreateStructureRepair = (structureId: string, inspectionId?: string) => {
   const queryClient = useQueryClient();
   const mutation = useMutation({
-    // From an inspection's page, raised by the inspection — its own endpoint.
     mutationFn: (request: RepairCreateRequest) =>
       inspectionId === undefined
-        ? API.structureSearch.createStructureRepair(structureId, request)
+        ? Promise.reject(new Error('A repair is added through an inspection.'))
         : API.inspectionSearch.addInspectionRepair(inspectionId, request),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: [STRUCTURE_QUERY_KEY, structureId, 'repairs'],
       });
-      // From an inspection's page, a save of the inspection: it may have made an audit record.
-      if (inspectionId !== undefined) await invalidateDocuments(queryClient, structureId);
+      // A save of the inspection: it may have made an audit record.
+      await invalidateDocuments(queryClient, structureId);
     },
   });
   return { ...mutation, fieldErrors: apiFieldErrors(mutation.error) };

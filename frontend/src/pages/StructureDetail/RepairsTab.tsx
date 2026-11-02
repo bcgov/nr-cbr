@@ -195,6 +195,9 @@ const RepairsTab: FC<Props> = ({
     !locked &&
     (inspectionId === undefined ? authorization.canEdit : authorization.canWriteInspection);
   const canDelete = !locked && authorization.canDelete;
+  // A repair is always raised by an inspection (CBR-858): added from an inspection's page only,
+  // never from the structure's, where legacy's unattached repairs were never carried forward.
+  const canAdd = canEdit && inspectionId !== undefined;
   const { display } = useNotification();
   const deleteRepair = useDeleteStructureRepair(structureId, inspectionId);
   /** The repair whose delete is being confirmed, if any. */
@@ -272,8 +275,8 @@ const RepairsTab: FC<Props> = ({
         )}
 
         {/* Over the table, at its right, after the options that decide what it lists — as the
-            Monitoring tab's Add. Only for a user who may add, as legacy's Level 1 button. */}
-        {canEdit && (
+            Monitoring tab's Add. Only on an inspection's page, for a user who may add. */}
+        {canAdd && (
           <div className="structure-detail__table-actions">
             <Button
               kind="tertiary"

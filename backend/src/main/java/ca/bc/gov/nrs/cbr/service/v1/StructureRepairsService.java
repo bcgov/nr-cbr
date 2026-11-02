@@ -208,17 +208,19 @@ public class StructureRepairsService {
    * {@code CBR.INSERT_REPAIR}).
    *
    * <p>As legacy: the repair is Suggested, stamped Suggested by the user, not carried forward, and
-   * belongs to the inspection it was added from — legacy's Repairs & Monitoring tab — or, from the
-   * structure page, to none; it takes the structure's next number (over every repair, those an
-   * inspection raised included) and its id from {@code STRUCTURE_REPAIR_SEQ} through the entity's
-   * generator. The priority, type, amounts and description are checked as an edit checks them.
+   * belongs to the inspection it was added from — legacy's Repairs & Monitoring tab. Unlike legacy,
+   * always to an inspection, of any type (CBR-858): the structure page no longer adds repairs, as
+   * legacy's unattached ones were never carried onto a later inspection. It takes the structure's
+   * next number (over every repair, those an inspection raised included) and its id from
+   * {@code STRUCTURE_REPAIR_SEQ} through the entity's generator. The priority, type, amounts and
+   * description are checked as an edit checks them.
    *
-   * @param inspectionId the inspection it was added from, or null from the structure page
+   * @param inspectionId the inspection it was added from
    * @throws StructureNotFoundException if there is no such structure
    * @throws FieldValidationException   with a message for each field at fault
    */
   @Transactional
-  public RepairCreatedResponse create(long structureId, Long inspectionId,
+  public RepairCreatedResponse create(long structureId, long inspectionId,
       RepairCreateRequest request) {
     if (!structures.existsById(structureId)) {
       throw new StructureNotFoundException(structureId);

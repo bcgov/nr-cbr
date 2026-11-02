@@ -542,7 +542,7 @@ class StructureRepairsServiceTest {
 
   @Test
   @DisplayName("adds a repair as legacy does: Suggested by the user, the structure's next number "
-      + "over every repair, not carried forward, of no inspection")
+      + "over every repair, not carried forward, of the inspection it was added from")
   void creates() {
     givenCodes();
     givenInspection(10L, LocalDate.of(2023, 6, 1));
@@ -551,7 +551,7 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    RepairCreatedResponse created = service.create(7L, null,
+    RepairCreatedResponse created = service.create(7L, 10L,
         new RepairCreateRequest(" H ", 4000L, "DECK", 12L, "  Replace planks.  "));
 
     assertThat(created.number()).isEqualTo(5L);
@@ -565,7 +565,7 @@ class StructureRepairsServiceTest {
     assertThat(repair.getRepairQuantity()).isEqualTo(12L);
     assertThat(repair.getDescription()).isEqualTo("Replace planks.");
     assertThat(repair.getCarriedForwardInd()).isEqualTo("N");
-    assertThat(repair.getInspectionId()).isNull();
+    assertThat(repair.getInspectionId()).isEqualTo(10L);
     assertThat(repair.getCompletedDate()).isNull();
     assertThat(repair.getActualCost()).isNull();
     assertThat(repair.getSuggestedByUserid()).isEqualTo("IDIR\\EDITOR");
@@ -579,8 +579,9 @@ class StructureRepairsServiceTest {
   @DisplayName("numbers a structure's first repair 1")
   void firstNumber() {
     givenCodes();
+    givenInspection(10L, LocalDate.of(2023, 6, 1));
 
-    assertThat(service.create(7L, null, new RepairCreateRequest("H", null, "DECK", null, null))
+    assertThat(service.create(7L, 10L, new RepairCreateRequest("H", null, "DECK", null, null))
         .number()).isEqualTo(1L);
   }
 
@@ -590,7 +591,7 @@ class StructureRepairsServiceTest {
     givenCodes();
 
     RepairCreateRequest request = new RepairCreateRequest(null, -5L, "800A", null, null);
-    assertThatThrownBy(() -> service.create(7L, null, request))
+    assertThatThrownBy(() -> service.create(7L, 10L, request))
         .isInstanceOfSatisfying(FieldValidationException.class, refused ->
             assertThat(refused.getFieldErrors())
                 .containsOnlyKeys("priorityCode", "estimate", "description"));
@@ -601,7 +602,7 @@ class StructureRepairsServiceTest {
   @DisplayName("adds nothing to a structure that does not exist")
   void createMissingStructure() {
     RepairCreateRequest request = new RepairCreateRequest("H", null, "DECK", null, null);
-    assertThatThrownBy(() -> service.create(404L, null, request))
+    assertThatThrownBy(() -> service.create(404L, 10L, request))
         .isInstanceOf(StructureNotFoundException.class);
   }
 

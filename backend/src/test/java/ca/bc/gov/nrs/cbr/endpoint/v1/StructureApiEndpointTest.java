@@ -189,8 +189,6 @@ class StructureApiEndpointTest {
         Arguments.of("getRepairs", "GET", "/{structureId}/repairs", CbrAuthorities.READ),
         Arguments.of("getRepairTypes", "GET", "/{structureId}/repair-types",
             CbrAuthorities.READ),
-        Arguments.of("createRepair", "POST", "/{structureId}/repairs",
-            CbrAuthorities.CONTENT_EDIT),
         Arguments.of("updateRepair", "PUT", "/{structureId}/repairs/{repairId}",
             CbrAuthorities.CONTENT_EDIT),
         Arguments.of("deleteRepair", "DELETE", "/{structureId}/repairs/{repairId}",
