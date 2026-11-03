@@ -228,14 +228,17 @@ class SiteUpdateTest {
     }
 
     @Test
-    @DisplayName("refuses Proposed while structures stand on the site")
-    void refusesProposedWithStructures() {
+    @DisplayName("allows Proposed / Under Construction while structures stand on the site")
+    void allowsProposedWithStructures() {
+      // Legacy refused this; the business lifted it when Under Construction joined Proposed.
       givenStructure(1L, "Y");
 
-      assertThat(refusedWith(edit -> {
+      save(edit -> {
         edit.crossingSiteStatusCode = "PP";
         edit.structureInspectionStatusCode = "DNI";
-      })).containsKey("crossingSiteStatusCode");
+      });
+
+      assertThat(stored().getCrossingSiteStatusCode()).isEqualTo("PP");
     }
 
     @Test

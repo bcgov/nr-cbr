@@ -9,6 +9,7 @@ describe('siteStatusTagType', () => {
     ['PP', 'blue'],
     ['DAC', 'cool-gray'],
     ['ARC', 'cool-gray'],
+    ['INAC', 'purple'],
     ['LRM', 'cool-gray'],
   ] as const)('colours %s as %s', (code, expected) => {
     expect(siteStatusTagType(code)).toBe(expected);

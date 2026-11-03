@@ -316,12 +316,15 @@ export const crossFieldErrors = (site: SiteFormValues): SiteErrors => {
   const inspection = site.structureInspectionStatusCode;
 
   const isCrossing = type === SITE_TYPE.CROSSING;
-  const isStanding: boolean = status === SITE_STATUS.ACTIVE || status === SITE_STATUS.BARRICADED;
+  const isStanding: boolean =
+    status === SITE_STATUS.ACTIVE ||
+    status === SITE_STATUS.BARRICADED ||
+    status === SITE_STATUS.INACCESSIBLE;
 
   if (isCrossing && isStanding && inspection === INSPECTION_STATUS.DO_NOT_INSPECT) {
     return {
       structureInspectionStatusCode:
-        'An Active or Barricaded/Closed Crossing site must be set to Inspect.',
+        'An Active, Barricaded/Closed or Inaccessible Crossing site must be set to Inspect.',
     };
   }
 
@@ -332,8 +335,8 @@ export const crossFieldErrors = (site: SiteFormValues): SiteErrors => {
   ) {
     return {
       structureInspectionStatusCode:
-        'A Crossing site that is Transferred, Deactivated, Under Construction, Proposed, ' +
-        'Archived or LRMOPS must be set to Do Not Inspect.',
+        'A Crossing site that is Deactivated, Proposed / Under Construction or Archived must be ' +
+        'set to Do Not Inspect.',
     };
   }
 
@@ -368,22 +371,22 @@ export const crossFieldWarnings = (site: SiteFormValues): SiteErrors => {
 };
 
 /**
- * The two rules that exist only for a site that is already stored.
+ * The rule that exists only for a site that is already stored.
  *
- * <p><b>Both are unreachable from Add Site, in legacy and here.</b> Each turns on whether the site
- * carries structures, and a site being created carries none — so legacy nests them inside
- * `if (actionType.equals(SiteForm.UPDATE))` (`SiteAction.java:539`, the rules at 613 and 621) and
- * guards the save-gate copy on `site != null`, the stored record (`SiteForm.java:311`). Kept out of
+ * <p><b>Unreachable from Add Site, in legacy and here.</b> It turns on whether the site carries
+ * structures, and a site being created carries none — so legacy nests it inside
+ * `if (actionType.equals(SiteForm.UPDATE))` (`SiteAction.java:539`, the rule at 621). Kept out of
  * {@link crossFieldErrors} and {@link crossFieldWarnings} for that reason rather than passed a zero
  * count from Add Site: a rule that cannot apply should be absent, not defaulted into silence.
  *
- * <p>On Status, which is legacy's field for both and the only thing on the form the user can change
- * to resolve either — the structures themselves are elsewhere.
+ * <p>On Status, which is legacy's field and the only thing on the form the user can change to
+ * resolve it — the structures themselves are elsewhere.
  *
- * <p>Two tiers. <b>Proposed is an error</b> — the status contradicts a fact about the site, and
- * legacy refuses the save. <b>Deactivated is a warning</b>, and is warning-only:
- * `SiteForm.validate` has no `errors.site.deactivated` at all, so legacy paints it and saves
- * anyway. A closed crossing legitimately keeps its bridge until someone removes it.
+ * <p><b>Deactivated is a warning</b>, and is warning-only: `SiteForm.validate` has no
+ * `errors.site.deactivated` at all, so legacy paints it and saves anyway. A closed crossing
+ * legitimately keeps its bridge until someone removes it. Legacy's other rule here — a Proposed
+ * site may not carry structures — is gone: the business lifted it when Under Construction joined
+ * Proposed (2026-11).
  */
 export const savedSiteConflicts = (
   site: SiteFormValues,
@@ -392,17 +395,6 @@ export const savedSiteConflicts = (
   const structures = context.activeStructureCount ?? 0;
   if (structures === 0) {
     return { errors: {}, warnings: {} };
-  }
-
-  if (site.crossingSiteStatusCode === SITE_STATUS.PROPOSED) {
-    return {
-      errors: {
-        crossingSiteStatusCode:
-          `A Proposed site cannot have structures, and this one has ${structures}. ` +
-          'Change the status, or archive the structures first.',
-      },
-      warnings: {},
-    };
   }
 
   if (site.crossingSiteStatusCode === SITE_STATUS.DEACTIVATED) {

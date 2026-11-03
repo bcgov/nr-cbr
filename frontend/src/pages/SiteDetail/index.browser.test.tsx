@@ -260,8 +260,15 @@ describe('SiteDetailPage — the structure actions', () => {
     expect(screen.getByTestId('site-detail-structures')).toBeInTheDocument();
   });
 
+  it('offers Add Structure on a Proposed / Under Construction site, which legacy did not', async () => {
+    // The business lifted legacy's rule when Under Construction joined Proposed (2026-11).
+    siteApi.getSite.mockResolvedValue({ ...response, crossingSiteStatusCode: 'PP' });
+    await renderPage({ canEdit: true, canDelete: true });
+
+    expect(screen.getByTestId('site-detail-add-structure')).toBeInTheDocument();
+  });
+
   it.each([
-    ['Proposed', { crossingSiteStatusCode: 'PP' }],
     ['closed (deactivated)', { crossingSiteStatusCode: 'DAC' }],
     ['incomplete', { crossingName: null }],
   ])('hides Add Structure on a %s site, as legacy kept it from one', async (_, change) => {
