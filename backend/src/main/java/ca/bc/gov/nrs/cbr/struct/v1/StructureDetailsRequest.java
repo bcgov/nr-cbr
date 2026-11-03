@@ -11,7 +11,7 @@ package ca.bc.gov.nrs.cbr.struct.v1;
  * @param sourceCode          {@code STRUCTURE_SOURCE_CODE}: required once the structure has one
  * @param endOfDesignLifeYear {@code ORIGINAL_REPLACEMENT_DATE}, a year
  * @param asBuiltInfoOnFile   {@code AS_BUILT_INFO_PRESENT_IND}, required
- * @param installationCost    {@code INSTALLATION_COST}: whole dollars, 0 to 999,999
+ * @param installationCost    {@code INSTALLATION_COST}: whole dollars, 0 to 4,999,999
  * @param materialCost        {@code MATERIAL_COST}: whole dollars, 0 to 999,999
  */
 public record StructureDetailsRequest(
