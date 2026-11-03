@@ -157,19 +157,27 @@ class StructureInformationServiceTest {
   }
 
   @Test
-  @DisplayName("refuses a site that does not exist, is incomplete or is Proposed, or no site")
+  @DisplayName("refuses a site that does not exist or is incomplete, or no site")
   void refusesSites() {
     givenSite("62-200", site -> site.crossingName(null));
-    givenSite("62-300", site -> site.crossingSiteStatusCode("PP"));
 
     assertThat(refused("B100", "62-999"))
         .containsExactly(Map.entry("siteId", "Site 62-999 does not exist."));
     assertThat(refused("B100", "62-200")).containsExactly(Map.entry("siteId",
         "Site 62-200 is incomplete. Complete it on its Site Detail page first."));
-    assertThat(refused("B100", "62-300")).containsExactly(Map.entry("siteId",
-        "Site 62-300 is Proposed. A structure cannot be moved to a Proposed site."));
     assertThat(refused("B100", " "))
         .containsExactly(Map.entry("siteId", "Site # is required."));
+  }
+
+  @Test
+  @DisplayName("moves a structure to a Proposed / Under Construction site")
+  void takesAProposedSite() {
+    // Legacy refused it; the business lifted it when Under Construction joined Proposed.
+    givenSite("62-300", site -> site.crossingSiteStatusCode("PP"));
+
+    service.update(7L, new StructureInformationRequest("B100", "62-300"));
+
+    assertThat(stored().getCrossingSiteId()).isEqualTo("62-300");
   }
 
   @Test
@@ -196,14 +204,14 @@ class StructureInformationServiceTest {
   }
 
   @Test
-  @DisplayName("previews a site with what would stop the move, or nothing")
+  @DisplayName("previews a site with what would stop the move, or nothing — a Proposed site too")
   void previews() {
     givenSite("62-300", site -> site.crossingSiteStatusCode("PP"));
 
     SitePreviewResponse fine = service.preview("62-001");
     assertThat(fine.site().crossingName()).isEqualTo("Riske Cr");
     assertThat(fine.problem()).isNull();
-    assertThat(service.preview("62-300").problem()).contains("is Proposed");
+    assertThat(service.preview("62-300").problem()).isNull();
     assertThat(service.preview("62-999"))
         .isEqualTo(new SitePreviewResponse(null, "Site 62-999 does not exist."));
   }

@@ -143,7 +143,8 @@ public class SiteService {
    * <p><b>What changes depends on who is saving</b>, as it does on {@code site.jsp}:
    * <ul>
    *   <li><b>Level 2 and P.Eng</b> — every field in the request, checked by the same rules as a new
-   *       site, plus one only an edit can meet: a Proposed site may not have structures.</li>
+   *       site. Unlike legacy, a Proposed / Under Construction site may have structures (business,
+   *       2026-11).</li>
    *   <li><b>Level 1</b> — Site Details, and nothing else. Every other control is inside an
    *       {@code isLevel2} branch of the page, so anything else a request carries is ignored and
    *       the stored value kept. Only Site Details is checked: the rest is not the user's to
@@ -217,10 +218,8 @@ public class SiteService {
         request.pointOfAccessDescription());
 
     Long roadSegmentId = resolveRoadSegment(site);
-    long structures = crossingStructureRepository.countByCrossingSiteIdAndActiveInd(
-        stored.getCrossingSiteId(), ACTIVE);
     // Not taken: the number is the one being edited, so there is nothing for it to clash with.
-    validator.validate(site, false, roadSegmentId, structures);
+    validator.validate(site, false, roadSegmentId);
 
     return stored.toBuilder()
         .crossingName(blankToNull(request.crossingName()))

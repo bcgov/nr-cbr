@@ -376,6 +376,21 @@ class SiteCreateTest {
     }
 
     @Test
+    @DisplayName("refuses an Inaccessible Crossing marked Do Not Inspect, and takes it marked Inspect")
+    void inaccessibleCrossingMustBeInspected() {
+      // INAC replaced LRMOPS, which legacy forced to Do Not Inspect; the business now wants it
+      // inspected, as Active and Barricaded are.
+      assertThat(refusedWith(draft -> {
+        draft.crossingSiteStatusCode = "INAC";
+        draft.structureInspectionStatusCode = "DNI";
+      })).containsEntry("structureInspectionStatusCode",
+          "An Active, Barricaded/Closed or Inaccessible Crossing site must be set to Inspect.");
+
+      assertThat(service.create(site(draft -> draft.crossingSiteStatusCode = "INAC")).siteId())
+          .isEqualTo("BOWRON-001");
+    }
+
+    @Test
     @DisplayName("refuses a Storage site marked Inspect")
     void refusesAnInspectedStorageSite() {
       assertThat(refusedWith(draft -> draft.crossingSiteTypeCode = "STRG"))

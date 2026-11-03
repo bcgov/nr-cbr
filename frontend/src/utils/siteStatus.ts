@@ -27,13 +27,15 @@ const SITE_STATUS_TAG_TYPES: Record<string, StatusTagType> = {
   ACT: 'green',
   /** Barricaded. Still a real crossing, but closed to traffic, so it earns the eye-catching colour. */
   BAR: 'red',
-  /** Proposed. Legacy refuses this status once the site has structures, so it means "not yet built". */
+  /** Proposed / Under Construction (2026-11) — not yet built, or being built; may have structures. */
   PP: 'blue',
   /** Deactivated (closed) — legacy's own wording in `errors.site.deactivated`. */
   DAC: 'cool-gray',
   /** Archived. */
   ARC: 'cool-gray',
-  /** Handed to LRM. Grouped with ARC everywhere legacy tests it — out of CBR's hands either way. */
+  /** Inaccessible — replaced LRMOPS (2026-11). Still inspected, unlike the greys, so its own colour. */
+  INAC: 'purple',
+  /** LRMOPS — retired 2026-11 (its sites became INAC); kept for any old reference. */
   LRM: 'cool-gray',
 };
 
