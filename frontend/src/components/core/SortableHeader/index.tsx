@@ -26,6 +26,23 @@ type Props<Column extends string> = {
  * it out when it is sorted already (see `nextSort`). Sorted by more than one, only the arrows show
  * on screen; a screen reader also hears each sorted header's place in the order.
  */
+/**
+ * What the next click on a header does, for a screen reader. Carbon's own wording, but from the
+ * text: Carbon writes the header's children into it, which turns anything beside the text into
+ * "false" or "[object Object]". And a click on an unsorted header adds it once something else is
+ * sorted.
+ */
+const describeClick = <Column extends string>(
+  sort: SortOrder<Column>,
+  label: string,
+  direction: 'ASC' | 'DESC' | 'NONE',
+): string => {
+  if (direction === 'ASC') return `Click to sort rows by ${label} header in descending order`;
+  if (direction === 'DESC') return `Click to unsort rows by ${label} header`;
+  if (sort.length > 0) return `Click to add the ${label} header to the sort, in ascending order`;
+  return `Click to sort rows by ${label} header in ascending order`;
+};
+
 const SortableHeader = <Column extends string>({
   column,
   sort,
@@ -36,24 +53,13 @@ const SortableHeader = <Column extends string>({
 }: Props<Column>) => {
   const position = positionOf(sort, column);
   const direction = directionOf(sort, column);
-  // What the next click does, for a screen reader. Carbon's own wording, but from the text: Carbon
-  // writes the header's children into it, which turns anything beside the text into "false" or
-  // "[object Object]". And a click on an unsorted header adds it once something else is sorted.
-  const description =
-    direction === 'ASC'
-      ? `Click to sort rows by ${children} header in descending order`
-      : direction === 'DESC'
-        ? `Click to unsort rows by ${children} header`
-        : sort.length > 0
-          ? `Click to add the ${children} header to the sort, in ascending order`
-          : `Click to sort rows by ${children} header in ascending order`;
   return (
     <TableHeader
       className={className}
       isSortable={Boolean(onSortChange)}
       isSortHeader={position > 0}
       sortDirection={direction}
-      translateWithId={() => description}
+      translateWithId={() => describeClick(sort, children, direction)}
       onClick={() => onSortChange?.(nextSort(sort, column))}
       data-testid={testId}
     >

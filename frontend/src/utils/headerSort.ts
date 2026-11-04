@@ -67,7 +67,8 @@ export const sortParams = <Column extends string>(
  * single `{ column, direction }`, a list of them, or nothing.
  */
 export const toSortOrder = <Column extends string>(saved: unknown): SortOrder<Column> => {
-  const entries = Array.isArray(saved) ? saved : saved ? [saved] : [];
+  if (!saved) return [];
+  const entries: unknown[] = Array.isArray(saved) ? saved : [saved];
   return entries.filter(
     (entry): entry is HeaderSort<Column> =>
       typeof entry === 'object' &&

@@ -259,8 +259,7 @@ const MonitoringTab: FC<Props> = ({
     page - 1,
     pageSize,
     includeBeforeInstall,
-    inspectionId,
-    sort,
+    { inspectionId, sort },
   );
 
   return (

@@ -248,10 +248,15 @@ export const useStructureRepairs = (
   pageNumber: number,
   pageSize: number,
   includeBeforeInstall: boolean,
-  /** On an inspection's page: the inspection, for the `CURRENT` view. */
-  inspectionId?: string,
-  /** The header sorted by; legacy's order when null. */
-  sort: RepairSort = [],
+  {
+    inspectionId,
+    sort = [],
+  }: {
+    /** On an inspection's page: the inspection, for the `CURRENT` view. */
+    inspectionId?: string;
+    /** The columns sorted by; legacy's order when empty. */
+    sort?: RepairSort;
+  } = {},
 ) =>
   useQuery({
     queryKey: [
@@ -297,10 +302,15 @@ export const useStructureMonitors = (
   pageNumber: number,
   pageSize: number,
   includeBeforeInstall: boolean,
-  /** On an inspection's page: the inspection, for the `CURRENT` view. */
-  inspectionId?: string,
-  /** The header sorted by; legacy's order when null. */
-  sort: MonitorSort = [],
+  {
+    inspectionId,
+    sort = [],
+  }: {
+    /** On an inspection's page: the inspection, for the `CURRENT` view. */
+    inspectionId?: string;
+    /** The columns sorted by; legacy's order when empty. */
+    sort?: MonitorSort;
+  } = {},
 ) =>
   useQuery({
     queryKey: [
