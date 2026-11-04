@@ -9,14 +9,17 @@ import type {
 import type {
   CloseProximityInspectionRequest,
   InspectionScheduleRequest,
+  StructureInspectionSort,
 } from '@/pages/StructureDetail/inspectionsResponse';
 import type {
   MonitorCreateRequest,
+  MonitorSort,
   MonitorUpdateRequest,
   MonitorView,
 } from '@/pages/StructureDetail/monitorsResponse';
 import type {
   RepairCreateRequest,
+  RepairSort,
   RepairUpdateRequest,
   RepairView,
 } from '@/pages/StructureDetail/repairsResponse';
@@ -199,6 +202,8 @@ export const useStructureInspections = (
   pageNumber: number,
   pageSize: number,
   includeBeforeInstall: boolean,
+  /** The header sorted by; newest first when null. */
+  sort: StructureInspectionSort = [],
 ) =>
   useQuery({
     queryKey: [
@@ -208,14 +213,24 @@ export const useStructureInspections = (
       pageNumber,
       pageSize,
       includeBeforeInstall,
+      sort,
     ],
+    // The sort only once a header is clicked.
     queryFn: () =>
-      API.structureSearch.getStructureInspections(
-        structureId as string,
-        pageNumber,
-        pageSize,
-        includeBeforeInstall,
-      ),
+      sort.length === 0
+        ? API.structureSearch.getStructureInspections(
+            structureId as string,
+            pageNumber,
+            pageSize,
+            includeBeforeInstall,
+          )
+        : API.structureSearch.getStructureInspections(
+            structureId as string,
+            pageNumber,
+            pageSize,
+            includeBeforeInstall,
+            sort,
+          ),
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
@@ -235,6 +250,8 @@ export const useStructureRepairs = (
   includeBeforeInstall: boolean,
   /** On an inspection's page: the inspection, for the `CURRENT` view. */
   inspectionId?: string,
+  /** The header sorted by; legacy's order when null. */
+  sort: RepairSort = [],
 ) =>
   useQuery({
     queryKey: [
@@ -246,24 +263,23 @@ export const useStructureRepairs = (
       pageSize,
       includeBeforeInstall,
       inspectionId,
+      sort,
     ],
-    queryFn: () =>
-      inspectionId === undefined
-        ? API.structureSearch.getStructureRepairs(
-            structureId as string,
-            view,
-            pageNumber,
-            pageSize,
-            includeBeforeInstall,
-          )
-        : API.structureSearch.getStructureRepairs(
-            structureId as string,
-            view,
-            pageNumber,
-            pageSize,
-            includeBeforeInstall,
-            inspectionId,
-          ),
+    queryFn: () => {
+      const args = [
+        structureId as string,
+        view,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+      ] as const;
+      // Only what is set: the inspection on its page, the sort once a header is clicked.
+      if (sort.length > 0)
+        return API.structureSearch.getStructureRepairs(...args, inspectionId, sort);
+      return inspectionId === undefined
+        ? API.structureSearch.getStructureRepairs(...args)
+        : API.structureSearch.getStructureRepairs(...args, inspectionId);
+    },
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
@@ -283,6 +299,8 @@ export const useStructureMonitors = (
   includeBeforeInstall: boolean,
   /** On an inspection's page: the inspection, for the `CURRENT` view. */
   inspectionId?: string,
+  /** The header sorted by; legacy's order when null. */
+  sort: MonitorSort = [],
 ) =>
   useQuery({
     queryKey: [
@@ -294,24 +312,23 @@ export const useStructureMonitors = (
       pageSize,
       includeBeforeInstall,
       inspectionId,
+      sort,
     ],
-    queryFn: () =>
-      inspectionId === undefined
-        ? API.structureSearch.getStructureMonitors(
-            structureId as string,
-            view,
-            pageNumber,
-            pageSize,
-            includeBeforeInstall,
-          )
-        : API.structureSearch.getStructureMonitors(
-            structureId as string,
-            view,
-            pageNumber,
-            pageSize,
-            includeBeforeInstall,
-            inspectionId,
-          ),
+    queryFn: () => {
+      const args = [
+        structureId as string,
+        view,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+      ] as const;
+      // Only what is set: the inspection on its page, the sort once a header is clicked.
+      if (sort.length > 0)
+        return API.structureSearch.getStructureMonitors(...args, inspectionId, sort);
+      return inspectionId === undefined
+        ? API.structureSearch.getStructureMonitors(...args)
+        : API.structureSearch.getStructureMonitors(...args, inspectionId);
+    },
     enabled: enabled && Boolean(structureId),
     placeholderData: keepPreviousData,
   });
@@ -834,7 +851,7 @@ export const useStructureSearch = (
   criteria: StructureSearchCriteria | null,
   pageNumber: number,
   pageSize: number,
-  sort: StructureSort | null = null,
+  sort: StructureSort = [],
 ): UseQueryResult<PagedResponse<StructureSearchResult>> =>
   useQuery({
     queryKey: [STRUCTURE_SEARCH_QUERY_KEY, criteria, pageNumber, pageSize, sort],

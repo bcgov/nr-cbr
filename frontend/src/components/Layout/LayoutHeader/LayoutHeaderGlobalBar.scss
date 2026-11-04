@@ -2,7 +2,6 @@
 @use '@carbon/type';
 
 .#{vars.$bcgov-prefix}--header__global {
-
   button.#{vars.$bcgov-prefix}--header__action {
     border-radius: 0;
     // Carbon's default style adds 1px solid transparent inline-start/end borders
@@ -29,21 +28,18 @@
     color: #fff;
     padding: 0.75rem;
     margin: 0 0.5rem;
-        
+
     &:focus {
       outline: 0;
       border: none;
     }
-        
+
     &.#{vars.$bcgov-prefix}--header__action--active {
       color: var(--#{vars.$bcgov-prefix}-layer-selected-inverse);
     }
 
-    path{
+    path {
       fill: currentColor;
     }
-
   }
-  
-
 }

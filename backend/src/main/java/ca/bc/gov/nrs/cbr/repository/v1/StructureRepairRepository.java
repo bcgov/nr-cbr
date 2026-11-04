@@ -34,10 +34,11 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
    * {@code outstandingOnly} its {@code FIND_OUTSTANDING_STRC_REPAIRS}: suggested, required or
    * carried-forward repairs that have not themselves been carried forward.
    *
-   * <p>In legacy's order: newest inspection first (Oracle puts a repair with no inspection first in
-   * a descending sort, and so does this), then priority by its rank in
-   * {@code REPAIR_PRIORITY_CODE_ORDER} (a repair with no ranked priority last, where legacy's
-   * inner join left it out), then status descending, then number.
+   * <p>Unordered here: the order comes on the {@code Pageable}, built by
+   * {@code StructureRepairsService} — the header the user sorted by, then legacy's order. The
+   * aliases it may name are {@code repair}, {@code inspection}, {@code priorityOrder} (the
+   * priority's rank), {@code statusCode} and {@code typeCode} (the descriptions shown); all are
+   * left joins, so a repair with no inspection, rank or decodable code is still listed.
    *
    * <p>Without {@code includeBeforeInstall}, a repair raised by an inspection dated on or before
    * {@code installed} — 1 January of the year the superstructure was installed — is left out, as
@@ -50,6 +51,10 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
         LEFT JOIN FETCH repair.inspection inspection
         LEFT JOIN RepairPriorityCodeOrderEntity priorityOrder
           ON priorityOrder.repairPriorityCode = repair.repairPriorityCode
+        LEFT JOIN RepairStatusCodeEntity statusCode
+          ON statusCode.repairStatusCode = repair.repairStatusCode
+        LEFT JOIN StructureRepairTypeCodeEntity typeCode
+          ON typeCode.structureRepairTypeCode = repair.structureRepairTypeCode
        WHERE repair.crossingStructureId = :structureId
          AND (:inspectionId IS NULL OR repair.inspectionId = :inspectionId)
          AND (:outstandingOnly = FALSE
@@ -59,10 +64,6 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
               OR inspection IS NULL
               OR inspection.inspectionDate IS NULL
               OR inspection.inspectionDate > :installed)
-       ORDER BY inspection.inspectionDate DESC NULLS FIRST,
-                priorityOrder.repairPriorityCodeOrder ASC NULLS LAST,
-                repair.repairStatusCode DESC,
-                repair.repairNumber ASC
       """,
       countQuery = """
       SELECT COUNT(repair)

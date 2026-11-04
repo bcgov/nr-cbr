@@ -1,6 +1,6 @@
-@use "sass:map";
+@use 'sass:map';
 
-@use "./variables" as variables;
+@use './variables' as variables;
 
 /* Carbon ships @font-face blocks for IBM Plex whose URLs are prefixed with `~@ibm/plex`
    (@carbon/styles/scss/_config.scss). The `~` is a webpack convention meaning "resolve from
@@ -18,22 +18,22 @@
    If Plex is ever genuinely wanted, set $font-path to a served location instead of disabling this;
    `/node_modules/@ibm/plex` works in dev and breaks in a build, so it would need the files copied
    into the bundle. */
-@use "@carbon/styles/scss/config" with (
+@use '@carbon/styles/scss/config' with (
   $css--font-face: false
 );
 
-@use "@carbon/react/scss/themes";
-@use "@carbon/react/scss/theme" with (
+@use '@carbon/react/scss/themes';
+@use '@carbon/react/scss/theme' with (
   $fallback: themes.$white,
   $theme: themes.$white
 );
 
-@use "@carbon/react/scss/components/button/tokens" as button-tokens;
-@use "@carbon/react/scss/components/tag/tokens" as tag-tokens;
-@use "@carbon/react/scss/components/notification/tokens" as notification-tokens;
+@use '@carbon/react/scss/components/button/tokens' as button-tokens;
+@use '@carbon/react/scss/components/tag/tokens' as tag-tokens;
+@use '@carbon/react/scss/components/notification/tokens' as notification-tokens;
 
-@use "@carbon/react";
-@use "@carbon/styles/scss/grid";
+@use '@carbon/react';
+@use '@carbon/styles/scss/grid';
 @use '@carbon/react/scss/spacing' as *;
 @use '@carbon/react/scss/breakpoint' as *;
 
@@ -136,7 +136,7 @@
 ------------------------------------------------------- */
 .#{variables.$bcgov-prefix}--number,
 .#{variables.$bcgov-prefix}--number__input-wrapper,
-input[type="number"] {
+input[type='number'] {
   border-top-left-radius: 0.25rem;
   border-top-right-radius: 0.25rem;
 }
@@ -187,13 +187,16 @@ input[type="number"] {
 // the width to take and the calendar icon to stay pinned to the right edge.
 .#{variables.$bcgov-prefix}--date-picker--single,
 .#{variables.$bcgov-prefix}--date-picker--single .#{variables.$bcgov-prefix}--date-picker-container,
-.#{variables.$bcgov-prefix}--date-picker--single .#{variables.$bcgov-prefix}--date-picker-input__wrapper,
+.#{variables.$bcgov-prefix}--date-picker--single
+  .#{variables.$bcgov-prefix}--date-picker-input__wrapper,
 .#{variables.$bcgov-prefix}--date-picker--single .#{variables.$bcgov-prefix}--date-picker__input {
   inline-size: 100%;
   min-inline-size: 0;
 }
 
-.#{variables.$bcgov-prefix}--date-picker--single .#{variables.$bcgov-prefix}--date-picker-input__wrapper > span {
+.#{variables.$bcgov-prefix}--date-picker--single
+  .#{variables.$bcgov-prefix}--date-picker-input__wrapper
+  > span {
   display: block;
   inline-size: 100%;
 }
@@ -271,7 +274,7 @@ div.#{variables.$bcgov-prefix}--inline-notification--low-contrast::before {
   filter: opacity(0.4);
 }
 
-$types: "error", "info", "success", "warning";
+$types: 'error', 'info', 'success', 'warning';
 @each $notificationType in $types {
   div.#{variables.$bcgov-prefix}--inline-notification--#{$notificationType} {
     border-left: 0.25rem
@@ -279,9 +282,7 @@ $types: "error", "info", "success", "warning";
       var(--#{variables.$bcgov-prefix}-support-#{$notificationType}-inverse);
   }
   div.#{variables.$bcgov-prefix}--inline-notification--low-contrast.#{variables.$bcgov-prefix}--inline-notification--#{$notificationType} {
-    border-left: 0.25rem
-      solid
-      var(--#{variables.$bcgov-prefix}-support-#{$notificationType});
+    border-left: 0.25rem solid var(--#{variables.$bcgov-prefix}-support-#{$notificationType});
   }
   div.#{variables.$bcgov-prefix}--inline-notification--low-contrast.#{variables.$bcgov-prefix}--inline-notification--#{$notificationType}::before {
     border-color: var(--#{variables.$bcgov-prefix}-support-#{$notificationType});
@@ -299,18 +300,10 @@ $types: "error", "info", "success", "warning";
       var(--#{variables.$bcgov-prefix}-support-#{$notificationType}-inverse);
   }
   div.#{variables.$bcgov-prefix}--toast-notification--low-contrast.#{variables.$bcgov-prefix}--toast-notification--#{$notificationType} {
-    border-left: 0.25rem
-      solid
-      var(--#{variables.$bcgov-prefix}-support-#{$notificationType});
-    border-top-color: var(
-      --#{variables.$bcgov-prefix}-notification-border-#{$notificationType}
-    );
-    border-bottom-color: var(
-      --#{variables.$bcgov-prefix}-notification-border-#{$notificationType}
-    );
-    border-right-color: var(
-      --#{variables.$bcgov-prefix}-notification-border-#{$notificationType}
-    );
+    border-left: 0.25rem solid var(--#{variables.$bcgov-prefix}-support-#{$notificationType});
+    border-top-color: var(--#{variables.$bcgov-prefix}-notification-border-#{$notificationType});
+    border-bottom-color: var(--#{variables.$bcgov-prefix}-notification-border-#{$notificationType});
+    border-right-color: var(--#{variables.$bcgov-prefix}-notification-border-#{$notificationType});
   }
 }
 
@@ -378,13 +371,17 @@ $types: "error", "info", "success", "warning";
 
 .#{variables.$bcgov-prefix}--data-table
   tbody
-  tr:not(.#{variables.$bcgov-prefix}--parent-row):not(.#{variables.$bcgov-prefix}--data-table--selected):nth-child(even) {
+  tr:not(.#{variables.$bcgov-prefix}--parent-row):not(
+    .#{variables.$bcgov-prefix}--data-table--selected
+  ):nth-child(even) {
   background-color: var(--#{variables.$bcgov-prefix}-layer-01);
 }
 
 .#{variables.$bcgov-prefix}--data-table
   tbody
-  tr:not(.#{variables.$bcgov-prefix}--parent-row):not(.#{variables.$bcgov-prefix}--data-table--selected):hover {
+  tr:not(.#{variables.$bcgov-prefix}--parent-row):not(
+    .#{variables.$bcgov-prefix}--data-table--selected
+  ):hover {
   background-color: var(--#{variables.$bcgov-prefix}-layer-hover);
 }
 
@@ -406,7 +403,9 @@ $types: "error", "info", "success", "warning";
    tab panel. Interactive tiles (dashboard ClickableTile, selectable/expandable)
    keep their own styling.
 ----------------------------------------------------- */
-.#{variables.$bcgov-prefix}--tile:not(.#{variables.$bcgov-prefix}--tile--clickable):not(.#{variables.$bcgov-prefix}--tile--selectable):not(.#{variables.$bcgov-prefix}--tile--expandable) {
+.#{variables.$bcgov-prefix}--tile:not(.#{variables.$bcgov-prefix}--tile--clickable):not(
+    .#{variables.$bcgov-prefix}--tile--selectable
+  ):not(.#{variables.$bcgov-prefix}--tile--expandable) {
   background: var(--cds-background);
 }
 
@@ -593,7 +592,7 @@ button.#{variables.$bcgov-prefix}--side-nav__submenu,
 }
 
 nav.#{variables.$bcgov-prefix}--side-nav--expanded {
-    border-right: 0.063rem solid var(--#{variables.$bcgov-prefix}-border-subtle-01);
+  border-right: 0.063rem solid var(--#{variables.$bcgov-prefix}-border-subtle-01);
 }
 
 /* ------------------ Header ---------------------------
@@ -613,13 +612,12 @@ nav.#{variables.$bcgov-prefix}--side-nav--expanded {
 
 a.#{variables.$bcgov-prefix}--header__name {
   // previously was .#{variables.$bcgov-prefix}--header-site-name
-  font-family: "BCSans", "Noto Sans", Verdana, Arial, sans-serif;
+  font-family: 'BCSans', 'Noto Sans', Verdana, Arial, sans-serif;
   font-size: 0.875rem;
   font-weight: 700;
   color: #f3f3f5;
   padding-left: 2rem;
 }
-
 
 /* ------------------ Other Overrides-------------------
 - Sets the grid gutter
@@ -650,8 +648,9 @@ nav.#{variables.$bcgov-prefix}--side-nav,
   padding: 0;
 }
 
-.#{variables.$bcgov-prefix}--header ~ .#{variables.$bcgov-prefix}--content, div:has(.#{variables.$bcgov-prefix}--header) ~ .#{variables.$bcgov-prefix}--content {
-    margin-block-start: $layout-05;
+.#{variables.$bcgov-prefix}--header ~ .#{variables.$bcgov-prefix}--content,
+div:has(.#{variables.$bcgov-prefix}--header) ~ .#{variables.$bcgov-prefix}--content {
+  margin-block-start: $layout-05;
 }
 
 .#{variables.$bcgov-prefix}--content .#{variables.$bcgov-prefix}--css-grid {

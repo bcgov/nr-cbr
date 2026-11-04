@@ -18,13 +18,14 @@ import { useState } from 'react';
 
 import DestructiveModal from '@/components/core/DestructiveModal';
 import ExternalLink from '@/components/core/ExternalLink';
+import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 
 import Card from './Card';
 import { describe, money, number } from './format';
 import RepairDialog from './RepairDialog';
 import UserAudits from './UserAudits';
 
-import type { RepairView, StructureRepair } from './repairsResponse';
+import type { RepairSort, RepairSortColumn, RepairView, StructureRepair } from './repairsResponse';
 import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
@@ -54,10 +55,28 @@ type Props = {
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZES = [10, 20, 50];
 
+/** Every column but Actions, in legacy's order — each sorts by its header. */
+const COLUMNS: { column: RepairSortColumn; label: string }[] = [
+  { column: 'NUMBER', label: 'Repair Number' },
+  { column: 'STATUS', label: 'Status' },
+  { column: 'TYPE', label: 'Repair Type' },
+  { column: 'USER_AUDITS', label: 'User Audits' },
+  { column: 'INSPECTION_DATE', label: 'Inspection Date' },
+  { column: 'PRIORITY', label: 'Priority' },
+  { column: 'COMPLETED_DATE', label: 'Completed Date' },
+  { column: 'ESTIMATE', label: 'Estimate ($)' },
+  { column: 'ACTUAL_COST', label: 'Actual ($)' },
+  { column: 'QUANTITY', label: 'Quantity' },
+  { column: 'DESCRIPTION', label: 'Description' },
+];
+
 /** The page of repairs, or a line saying there are none in this view. */
 type TableProps = {
   rows: StructureRepair[];
   view: RepairView;
+  /** The header the repairs are sorted by, or `null` for legacy's order. */
+  sort: RepairSort;
+  onSortChange: (next: RepairSort) => void;
   /** Offers Edit — Level 1 and up. */
   canEdit: boolean;
   /** Offers Delete — the destructive privilege. */
@@ -66,7 +85,16 @@ type TableProps = {
   onDelete: (repair: StructureRepair) => void;
 };
 
-const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, onDelete }) => {
+const RepairsTable: FC<TableProps> = ({
+  rows,
+  view,
+  sort,
+  onSortChange,
+  canEdit,
+  canDelete,
+  onEdit,
+  onDelete,
+}) => {
   // The Actions column only when there is an action to offer, as Site Search's.
   const hasActions = canEdit || canDelete;
   if (rows.length === 0) {
@@ -85,94 +113,113 @@ const RepairsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, 
   return (
     // Eleven columns: the headings wrap, and the short values keep one line, so the table and its
     // Actions fit the card; anything wider scrolls inside the card rather than widening the page.
-    <div className="structure-detail__table-scroll structure-detail__repairs-scroll">
-      <Table size="md" useZebraStyles aria-label="Repairs">
-        <TableHead>
-          <TableRow>
-            <TableHeader>Repair Number</TableHeader>
-            <TableHeader>Status</TableHeader>
-            <TableHeader>Repair Type</TableHeader>
-            <TableHeader>User Audits</TableHeader>
-            <TableHeader>Inspection Date</TableHeader>
-            <TableHeader>Priority</TableHeader>
-            <TableHeader>Completed Date</TableHeader>
-            <TableHeader>Estimate ($)</TableHeader>
-            <TableHeader>Actual ($)</TableHeader>
-            <TableHeader>Quantity</TableHeader>
-            <TableHeader>Description</TableHeader>
-            {/* Only for a user who may act, as the other tables' Actions columns: an action that
-                cannot be performed is not shown, and an empty column is noise. */}
-            {hasActions && <TableHeader>Actions</TableHeader>}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((repair) => (
-            <TableRow key={repair.id} data-testid={`structure-repair-${repair.id}`}>
-              <TableCell className="structure-detail__nowrap">{number(repair.number)}</TableCell>
-              <TableCell className="structure-detail__nowrap">{describe(repair.status)}</TableCell>
-              <TableCell>{describe(repair.type)}</TableCell>
-              {/* Wraps, as Repair Type and Priority do: three columns let go of their single line so
-                  the table, Actions included, fits its card. */}
-              <TableCell>
-                <UserAudits item={repair} />
-              </TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {/* Its own tab, as the inspection table opens one. */}
-                {repair.inspectionId ? (
-                  <ExternalLink to={`/inspection/${repair.inspectionId}`}>
-                    {formatShortDate(repair.inspectionDate) || 'No date yet'}
-                  </ExternalLink>
-                ) : null}
-              </TableCell>
-              <TableCell>{describe(repair.priority)}</TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {formatShortDate(repair.completedDate)}
-              </TableCell>
-              <TableCell className="structure-detail__nowrap">{money(repair.estimate)}</TableCell>
-              <TableCell className="structure-detail__nowrap">{money(repair.actualCost)}</TableCell>
-              {/* The number only, as legacy's column: the unit is shown beside Qty in the dialog. */}
-              <TableCell className="structure-detail__nowrap">{number(repair.quantity)}</TableCell>
-              <TableCell className="structure-detail__comment">{repair.description}</TableCell>
-              {hasActions && (
-                <TableCell className="structure-detail__nowrap">
-                  {/* Side by side when the table has room, stacked when it has not — eleven
-                      columns and both buttons in a row need a wide screen. */}
-                  <div className="structure-detail__repair-actions">
-                    {canEdit && (
-                      // Ghost, the link-blue of an action that changes nothing until saved; Delete
-                      // under it is the red one.
-                      <Button
-                        kind="ghost"
-                        size="sm"
-                        renderIcon={Edit}
-                        data-testid={`structure-repair-edit-${repair.id}`}
-                        onClick={() => onEdit(repair)}
-                      >
-                        Edit{' '}
-                        <span className="cds--visually-hidden">repair {number(repair.number)}</span>
-                      </Button>
-                    )}
-                    {/* danger--ghost, as every Delete in the app: red at rest and on hover. */}
-                    {canDelete && (
-                      <Button
-                        kind="danger--ghost"
-                        size="sm"
-                        renderIcon={TrashCan}
-                        data-testid={`structure-repair-delete-${repair.id}`}
-                        onClick={() => onDelete(repair)}
-                      >
-                        Delete{' '}
-                        <span className="cds--visually-hidden">repair {number(repair.number)}</span>
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              )}
+    <>
+      <ClearSort
+        sort={sort}
+        onSortChange={onSortChange}
+        data-testid="structure-repairs-clear-sort"
+      />
+      <div className="structure-detail__table-scroll structure-detail__repairs-scroll">
+        <Table size="md" useZebraStyles aria-label="Repairs">
+          <TableHead>
+            <TableRow>
+              {/* On the server, not the page: the repairs are paged there, so sorting only the rows on
+                  screen would order ten of them and call it sorted. */}
+              {COLUMNS.map(({ column, label }) => (
+                <SortableHeader
+                  key={column}
+                  column={column}
+                  sort={sort}
+                  onSortChange={onSortChange}
+                  data-testid={`structure-repairs-sort-${column}`}
+                >
+                  {label}
+                </SortableHeader>
+              ))}
+              {/* Only for a user who may act, as the other tables' Actions columns: an action that
+                  cannot be performed is not shown, and an empty column is noise. */}
+              {hasActions && <TableHeader>Actions</TableHeader>}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHead>
+          <TableBody>
+            {rows.map((repair) => (
+              <TableRow key={repair.id} data-testid={`structure-repair-${repair.id}`}>
+                <TableCell className="structure-detail__nowrap">{number(repair.number)}</TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {describe(repair.status)}
+                </TableCell>
+                <TableCell>{describe(repair.type)}</TableCell>
+                {/* Wraps, as Repair Type and Priority do: three columns let go of their single line so
+                    the table, Actions included, fits its card. */}
+                <TableCell>
+                  <UserAudits item={repair} />
+                </TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {/* Its own tab, as the inspection table opens one. */}
+                  {repair.inspectionId ? (
+                    <ExternalLink to={`/inspection/${repair.inspectionId}`}>
+                      {formatShortDate(repair.inspectionDate) || 'No date yet'}
+                    </ExternalLink>
+                  ) : null}
+                </TableCell>
+                <TableCell>{describe(repair.priority)}</TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {formatShortDate(repair.completedDate)}
+                </TableCell>
+                <TableCell className="structure-detail__nowrap">{money(repair.estimate)}</TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {money(repair.actualCost)}
+                </TableCell>
+                {/* The number only, as legacy's column: the unit is shown beside Qty in the dialog. */}
+                <TableCell className="structure-detail__nowrap">
+                  {number(repair.quantity)}
+                </TableCell>
+                <TableCell className="structure-detail__comment">{repair.description}</TableCell>
+                {hasActions && (
+                  <TableCell className="structure-detail__nowrap">
+                    {/* Side by side when the table has room, stacked when it has not — eleven
+                        columns and both buttons in a row need a wide screen. */}
+                    <div className="structure-detail__repair-actions">
+                      {canEdit && (
+                        // Ghost, the link-blue of an action that changes nothing until saved; Delete
+                        // under it is the red one.
+                        <Button
+                          kind="ghost"
+                          size="sm"
+                          renderIcon={Edit}
+                          data-testid={`structure-repair-edit-${repair.id}`}
+                          onClick={() => onEdit(repair)}
+                        >
+                          Edit{' '}
+                          <span className="cds--visually-hidden">
+                            repair {number(repair.number)}
+                          </span>
+                        </Button>
+                      )}
+                      {/* danger--ghost, as every Delete in the app: red at rest and on hover. */}
+                      {canDelete && (
+                        <Button
+                          kind="danger--ghost"
+                          size="sm"
+                          renderIcon={TrashCan}
+                          data-testid={`structure-repair-delete-${repair.id}`}
+                          onClick={() => onDelete(repair)}
+                        >
+                          Delete{' '}
+                          <span className="cds--visually-hidden">
+                            repair {number(repair.number)}
+                          </span>
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 };
 
@@ -208,6 +255,8 @@ const RepairsTab: FC<Props> = ({
   const [view, setView] = useState<RepairView>(reviewed ? 'CURRENT' : 'OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  /** The header sorted by — none at first, so legacy's order. */
+  const [sort, setSort] = useState<RepairSort>([]);
   /** Legacy's "Show Inspections before the Superstructure Install Date". */
   const [includeBeforeInstall, setIncludeBeforeInstall] = useState(false);
   // Carbon's Pagination is one-based; the backend is zero-based.
@@ -219,6 +268,7 @@ const RepairsTab: FC<Props> = ({
     pageSize,
     includeBeforeInstall,
     inspectionId,
+    sort,
   );
 
   return (
@@ -310,6 +360,11 @@ const RepairsTab: FC<Props> = ({
             <RepairsTable
               rows={loaded.data.page.content}
               view={view}
+              sort={sort}
+              onSortChange={(next) => {
+                setSort(next);
+                setPage(1);
+              }}
               canEdit={canEdit}
               canDelete={canDelete}
               onEdit={setEditing}

@@ -37,7 +37,7 @@ export class SiteSearchService extends HttpClient {
     criteria: SiteSearchCriteria,
     pageNumber: number,
     pageSize: number,
-    sort: SiteSort | null = null,
+    sort: SiteSort = [],
   ): CancelablePromise<PagedResponse<SiteSearchResult>> {
     return this.doRequest<PagedResponse<SiteSearchResult>>(this.config, {
       method: 'GET',

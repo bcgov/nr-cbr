@@ -22,6 +22,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -82,6 +83,10 @@ public interface InspectionApiEndpoint {
    * ({@link InspectionSortColumn}), {@code sortDirection} {@code ASC} or {@code DESC}; legacy's
    * default order — structure name, then newest first — otherwise. On the server, so it orders
    * every match rather than the page on screen. An unknown value is a 400.
+   *
+   * <p><b>By several columns</b> when {@code sortBy} repeats, each with its {@code sortDirection}
+   * in the same order ({@code HeaderSort}): the first decides, and each next breaks the ties before
+   * it.
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/search")
@@ -89,8 +94,9 @@ public interface InspectionApiEndpoint {
       @Valid @ModelAttribute InspectionSearchCriteria criteria,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
       @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
-      @RequestParam(name = "sortBy", required = false) InspectionSortColumn sortBy,
-      @RequestParam(name = "sortDirection", defaultValue = "ASC") Sort.Direction sortDirection);
+      @RequestParam(name = "sortBy", required = false) List<InspectionSortColumn> sortBy,
+      @RequestParam(name = "sortDirection", required = false)
+      List<Sort.Direction> sortDirection);
 
   /**
    * Deletes an offline inspection.

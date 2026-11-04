@@ -42,7 +42,7 @@ export const useInspectionSearch = (
   criteria: InspectionSearchCriteria | null,
   pageNumber: number,
   pageSize: number,
-  sort: InspectionSort | null = null,
+  sort: InspectionSort = [],
 ): UseQueryResult<PagedResponse<InspectionSearchResult>> =>
   useQuery({
     queryKey: [INSPECTION_SEARCH_QUERY_KEY, criteria, pageNumber, pageSize, sort],

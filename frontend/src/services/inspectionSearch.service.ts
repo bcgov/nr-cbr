@@ -58,7 +58,7 @@ export class InspectionSearchService extends HttpClient {
     criteria: InspectionSearchCriteria,
     pageNumber: number,
     pageSize: number,
-    sort: InspectionSort | null = null,
+    sort: InspectionSort = [],
   ): CancelablePromise<PagedResponse<InspectionSearchResult>> {
     return this.doRequest<PagedResponse<InspectionSearchResult>>(this.config, {
       method: 'GET',

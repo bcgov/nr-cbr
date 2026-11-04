@@ -18,12 +18,14 @@ import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionReviewerRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.CloseProximityInspectionRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.Comment;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse.CloseProximityInspection;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse.Inspection;
 import java.time.LocalDate;
@@ -39,6 +41,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -270,11 +274,12 @@ public class StructureInspectionsService {
    *
    * @param pageNumber zero-based
    * @param pageSize   held to between 1 and 100
+   * @param sort       the columns the user sorted by, first deciding; none for legacy's order
    * @throws StructureNotFoundException if there is no such structure
    */
   @Transactional(readOnly = true)
-  public StructureInspectionsResponse inspections(
-      long structureId, int pageNumber, int pageSize, boolean includeBeforeInstall) {
+  public StructureInspectionsResponse inspections(long structureId, int pageNumber, int pageSize,
+      boolean includeBeforeInstall, List<HeaderSort<StructureInspectionSortColumn>> sort) {
     CrossingStructureEntity structure = structures.findById(structureId)
         .orElseThrow(() -> new StructureNotFoundException(structureId));
     LocalDate installed = LocalDate.of(
@@ -283,7 +288,7 @@ public class StructureInspectionsService {
 
     Page<StructureInspectionEntity> page = inspections.findPageByStructure(
         structureId, installed, includeBeforeInstall,
-        PageRequest.of(Math.max(pageNumber, 0), size));
+        PageRequest.of(Math.max(pageNumber, 0), size, order(sort)));
     Map<String, String> types = typeDescriptions(page.getContent());
     Map<Long, String> reviewerNames = reviewerNames(page.getContent());
 
@@ -294,6 +299,38 @@ public class StructureInspectionsService {
         new PagedResponse<>(rows, page.getTotalElements(), page.getTotalPages(),
             page.getNumber(), page.getSize()),
         inspections.countBeforeInstall(structureId, installed));
+  }
+
+  /**
+   * The page's order: the columns the user sorted by, each breaking the ties of the one before,
+   * then legacy's — an inspection not dated yet first, as the newest work on the structure, then
+   * newest first. The id closes it, so the order is total and no inspection shows on two pages, or
+   * on none. Text sorts without regard to case, as the searches' headers do. Aliases are those of
+   * {@code StructureInspectionRepository.findPageByStructure}.
+   */
+  private static Sort order(List<HeaderSort<StructureInspectionSortColumn>> sort) {
+    // In parentheses: Spring Data prefixes a bare CASE with the entity's alias.
+    Sort legacy = JpaSort.unsafe(Sort.Direction.ASC,
+            "(CASE WHEN inspection.inspectionDate IS NULL THEN 0 ELSE 1 END)")
+        .andUnsafe(Sort.Direction.DESC, "inspection.inspectionDate", "inspection.inspectionId");
+    Sort chosen = Sort.unsorted();
+    for (HeaderSort<StructureInspectionSortColumn> header : sort) {
+      chosen = chosen.and(JpaSort.unsafe(header.direction(), keys(header.column())));
+    }
+    return chosen.and(legacy);
+  }
+
+  /** What a column sorts on — the value it shows. */
+  private static String[] keys(StructureInspectionSortColumn column) {
+    return switch (column) {
+      case INSPECTION_DATE -> new String[] {"inspection.inspectionDate"};
+      case TYPE -> new String[] {"UPPER(typeCode.description)"};
+      case SITE_ID -> new String[] {"UPPER(inspection.siteAtTimeOfInspection)"};
+      case STATUS -> new String[] {"UPPER(statusCode.description)"};
+      case REVIEWED_DATE -> new String[] {"inspection.pengReviewerDate"};
+      case REVIEWED_BY -> new String[] {"UPPER(reviewer.firstName)", "UPPER(reviewer.lastName)"};
+      case INSPECTOR_NAME -> new String[] {"UPPER(inspection.inspectorName)"};
+    };
   }
 
   private static Inspection inspection(StructureInspectionEntity inspection,

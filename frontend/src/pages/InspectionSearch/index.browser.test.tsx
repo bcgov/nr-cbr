@@ -180,7 +180,7 @@ describe('InspectionSearchPage — criteria form', () => {
       expect.objectContaining({ reviewerUserId: 'IDIR\\JSMITH' }),
       0,
       20,
-      null,
+      [],
     );
   });
 
@@ -359,7 +359,7 @@ describe('InspectionSearchPage — validation', () => {
       expect.objectContaining({ inspectionDateStart: '' }),
       0,
       20,
-      null,
+      [],
     );
   });
 
@@ -407,7 +407,7 @@ describe('InspectionSearchPage — searching', () => {
       expect.objectContaining({ siteId: '12345' }),
       0,
       20,
-      null,
+      [],
     );
   });
 
@@ -439,7 +439,7 @@ describe('InspectionSearchPage — searching', () => {
         expect.objectContaining({ siteId: '12345' }),
         1,
         20,
-        null,
+        [],
       );
     });
   });
@@ -743,10 +743,12 @@ describe('InspectionSearchPage — sorting by a header', () => {
     await sortBy('INSPECTION_DATE');
 
     await waitFor(() => {
-      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
-        column: 'INSPECTION_DATE',
-        direction: 'ASC',
-      });
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, [
+        {
+          column: 'INSPECTION_DATE',
+          direction: 'ASC',
+        },
+      ]);
     });
   });
 
@@ -756,15 +758,17 @@ describe('InspectionSearchPage — sorting by a header', () => {
     await sortBy('STRUCTURE_NAME');
     await sortBy('STRUCTURE_NAME');
     await waitFor(() => {
-      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
-        column: 'STRUCTURE_NAME',
-        direction: 'DESC',
-      });
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, [
+        {
+          column: 'STRUCTURE_NAME',
+          direction: 'DESC',
+        },
+      ]);
     });
 
     await sortBy('STRUCTURE_NAME');
     await waitFor(() => {
-      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, []);
     });
   });
 
@@ -772,16 +776,18 @@ describe('InspectionSearchPage — sorting by a header', () => {
     await searchSomething();
     fireEvent.click(screen.getByLabelText('Next page'));
     await waitFor(() => {
-      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 1, 20, null);
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 1, 20, []);
     });
 
     await sortBy('STATUS');
 
     await waitFor(() => {
-      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
-        column: 'STATUS',
-        direction: 'ASC',
-      });
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(expect.anything(), 0, 20, [
+        {
+          column: 'STATUS',
+          direction: 'ASC',
+        },
+      ]);
     });
   });
 

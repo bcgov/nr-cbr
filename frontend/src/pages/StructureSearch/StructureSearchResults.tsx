@@ -16,6 +16,7 @@ import {
 import { Link } from 'react-router-dom';
 
 import ExternalLink from '@/components/core/ExternalLink';
+import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 
 import type {
   SelectedStructure,
@@ -26,8 +27,6 @@ import type {
 import type { StructureLinkState } from '@/pages/StructureDetail';
 import type { FC } from 'react';
 
-import { directionOf, nextSort } from '@/utils/headerSort';
-
 type Props = {
   results: StructureSearchResult[];
   totalItems: number;
@@ -37,8 +36,8 @@ type Props = {
   pageSize: number;
   onPageChange: (next: { page: number; pageSize: number }) => void;
   /** The header the results are sorted by, or `null` for legacy's order. */
-  sort?: StructureSort | null;
-  onSortChange?: (next: StructureSort | null) => void;
+  sort?: StructureSort;
+  onSortChange?: (next: StructureSort) => void;
   /**
    * The ids of the ticked structures, across every page — or `undefined` when the user may not
    * select at all, which leaves the checkbox column off the table.
@@ -98,7 +97,7 @@ const StructureSearchResults: FC<Props> = ({
   page,
   pageSize,
   onPageChange,
-  sort = null,
+  sort = [],
   onSortChange,
   selected,
   onToggle,
@@ -191,6 +190,11 @@ const StructureSearchResults: FC<Props> = ({
             />
           </TableToolbar>
         )}
+        <ClearSort
+          sort={sort}
+          onSortChange={onSortChange}
+          data-testid="structure-search-clear-sort"
+        />
         <Table useZebraStyles size="lg" aria-labelledby="structure-search-results-title">
           <TableHead>
             <TableRow>
@@ -202,16 +206,15 @@ const StructureSearchResults: FC<Props> = ({
                 </TableHeader>
               )}
               {COLUMNS.map(({ column, label }) => (
-                <TableHeader
+                <SortableHeader
                   key={column}
-                  isSortable={Boolean(onSortChange)}
-                  isSortHeader={sort?.column === column}
-                  sortDirection={directionOf(sort, column)}
-                  onClick={() => onSortChange?.(nextSort(sort, column))}
+                  column={column}
+                  sort={sort}
+                  onSortChange={onSortChange}
                   data-testid={`structure-search-sort-${column}`}
                 >
                   {label}
-                </TableHeader>
+                </SortableHeader>
               ))}
             </TableRow>
           </TableHead>

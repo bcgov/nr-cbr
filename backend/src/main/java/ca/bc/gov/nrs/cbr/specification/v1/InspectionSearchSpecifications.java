@@ -9,6 +9,7 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntitie
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -25,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
@@ -151,17 +151,16 @@ public final class InspectionSearchSpecifications {
    * (divergence 3).
    */
   public static Specification<StructureInspectionEntity> matching(InspectionSearchCriteria criteria) {
-    return matching(criteria, null, Sort.Direction.ASC);
+    return matching(criteria, List.of());
   }
 
   /**
    * Builds the predicate, ordered by the header the user chose — or legacy's default when none.
    *
-   * @param sortBy    the results column whose header was clicked, or null for the default order
-   * @param direction which way; ignored when {@code sortBy} is null
+   * @param sort      the columns the user sorted by, first deciding; none for legacy's order
    */
   public static Specification<StructureInspectionEntity> matching(
-      InspectionSearchCriteria criteria, InspectionSortColumn sortBy, Sort.Direction direction) {
+      InspectionSearchCriteria criteria, List<HeaderSort<InspectionSortColumn>> sort) {
     return (root, query, builder) -> {
       List<Predicate> predicates = new ArrayList<>();
 
@@ -245,7 +244,7 @@ public final class InspectionSearchSpecifications {
       }
 
       order(new Joined(root, structure, site, orgUnit, roadSection, statusCode), query, builder,
-          sortBy, direction);
+          sort);
 
       return predicates.isEmpty()
           ? builder.conjunction()
@@ -461,16 +460,15 @@ public final class InspectionSearchSpecifications {
       Joined joined,
       CriteriaQuery<?> query,
       CriteriaBuilder builder,
-      InspectionSortColumn sortBy,
-      Sort.Direction direction) {
+      List<HeaderSort<InspectionSortColumn>> sort) {
     if (!returnsEntities(query)) {
       return;
     }
 
     List<Order> order = new ArrayList<>();
-    if (sortBy != null) {
-      for (Expression<?> key : sortKeys(sortBy, joined, builder)) {
-        order.add(direction == Sort.Direction.DESC ? builder.desc(key) : builder.asc(key));
+    for (HeaderSort<InspectionSortColumn> header : sort) {
+      for (Expression<?> key : sortKeys(header.column(), joined, builder)) {
+        order.add(header.descending() ? builder.desc(key) : builder.asc(key));
       }
     }
     order.add(builder.asc(joined.structure().get(STRUCTURE_NAME)));
