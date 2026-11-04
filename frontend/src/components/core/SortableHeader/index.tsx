@@ -2,7 +2,6 @@ import { Close } from '@carbon/icons-react';
 import { Button, TableHeader } from '@carbon/react';
 
 import type { SortOrder } from '@/utils/headerSort';
-import type { ReactNode } from 'react';
 
 import { directionOf, nextSort, positionOf } from '@/utils/headerSort';
 
@@ -14,7 +13,8 @@ type Props<Column extends string> = {
   'sort': SortOrder<Column>;
   /** Absent where the table is shown without sorting: a plain header then. */
   'onSortChange'?: (next: SortOrder<Column>) => void;
-  'children': ReactNode;
+  /** The header's text — plain, as it also names the column in the sort button's description. */
+  'children': string;
   'className'?: string;
   'data-testid'?: string;
 };
@@ -35,12 +35,25 @@ const SortableHeader = <Column extends string>({
   'data-testid': testId,
 }: Props<Column>) => {
   const position = positionOf(sort, column);
+  const direction = directionOf(sort, column);
+  // What the next click does, for a screen reader. Carbon's own wording, but from the text: Carbon
+  // writes the header's children into it, which turns anything beside the text into "false" or
+  // "[object Object]". And a click on an unsorted header adds it once something else is sorted.
+  const description =
+    direction === 'ASC'
+      ? `Click to sort rows by ${children} header in descending order`
+      : direction === 'DESC'
+        ? `Click to unsort rows by ${children} header`
+        : sort.length > 0
+          ? `Click to add the ${children} header to the sort, in ascending order`
+          : `Click to sort rows by ${children} header in ascending order`;
   return (
     <TableHeader
       className={className}
       isSortable={Boolean(onSortChange)}
       isSortHeader={position > 0}
-      sortDirection={directionOf(sort, column)}
+      sortDirection={direction}
+      translateWithId={() => description}
       onClick={() => onSortChange?.(nextSort(sort, column))}
       data-testid={testId}
     >

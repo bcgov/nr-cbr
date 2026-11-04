@@ -571,9 +571,10 @@ $page-bottom: 2rem;
     padding-inline: $spacing-03;
   }
 
-  // A sortable header pads its button, not the cell — start only; the icon's end margin stands in
-  // for the end — and keeps an icon's room on every header. The same halving there, and the icon
-  // closer to its label.
+  // A sortable header pads its button, not the cell — start only — and keeps an icon's room on
+  // every header, sorted or not: eleven times over. So the icon is Carbon's 16px glyph without its
+  // 20px box, closer to its label, and with nothing after it — the next column's start padding
+  // parts the two headers.
   .cds--data-table th.cds--table-sort__header {
     padding-inline: 0;
   }
@@ -584,7 +585,8 @@ $page-bottom: 2rem;
 
   .cds--table-sort__icon,
   .cds--table-sort__icon-unsorted {
-    margin-inline-start: $spacing-02;
+    inline-size: $spacing-05;
+    margin-inline: $spacing-02 0;
   }
 }
 
