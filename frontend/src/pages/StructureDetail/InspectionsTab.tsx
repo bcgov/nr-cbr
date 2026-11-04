@@ -9,7 +9,6 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
   TableRow,
   Tag,
 } from '@carbon/react';
@@ -17,6 +16,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import ExternalLink from '@/components/core/ExternalLink';
+import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 
 import Card from './Card';
 import OutstandingPanel from './OutstandingPanel';
@@ -26,9 +26,16 @@ import CommentsCard from './CommentsCard';
 import { describe } from './format';
 import ScheduleCard from './ScheduleCard';
 
-import type { InspectionScheduleResponse, StructureInspection } from './inspectionsResponse';
+import type {
+  CompletedCloseProximity,
+  InspectionScheduleResponse,
+  StructureInspection,
+  StructureInspectionSort,
+  StructureInspectionSortColumn,
+} from './inspectionsResponse';
 import type { StructureComment } from './structureResponse';
 import type { OutstandingGroup } from './format';
+import type { SortOrder } from '@/utils/headerSort';
 import type { FC } from 'react';
 
 import { useAuthorization } from '@/hooks/useAuthorization';
@@ -38,6 +45,7 @@ import {
 } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
+import { sortRows } from '@/utils/headerSort';
 import { inspectionStatusLabel, inspectionStatusTagType } from '@/utils/inspectionStatus';
 
 type Props = {
@@ -57,6 +65,13 @@ type Props = {
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZES = [10, 20, 50];
 
+/** The close proximity table's columns, each sorting by its header. */
+type CloseProximityColumn = 'COMPLETED' | 'USER_ID';
+type CloseProximitySort = SortOrder<CloseProximityColumn>;
+
+const closeProximityValue = (done: CompletedCloseProximity, column: CloseProximityColumn) =>
+  column === 'COMPLETED' ? done.completed : done.userId;
+
 /**
  * The close proximity inspections already done, with "Add close proximity inspection" in the header
  * for a P.Eng — legacy's `/pEngAccess` on its add. Rows are neither edited nor deleted, as legacy's.
@@ -67,113 +82,168 @@ const CloseProximityCard: FC<{
   onAdd?: () => void;
   /** Held while another card on the tab is being edited. */
   addDisabled: boolean;
-}> = ({ schedule, onAdd, addDisabled }) => (
-  <Card
-    title="Completed Close Proximity Inspections"
-    icon={CheckmarkOutline}
-    testId="structure-section-close-proximity"
-    action={
-      onAdd && (
-        <Button
-          kind="tertiary"
-          size="sm"
-          renderIcon={Add}
-          disabled={addDisabled}
-          data-testid="close-proximity-add"
-          onClick={onAdd}
-        >
-          Add close proximity inspection
-        </Button>
-      )
-    }
-  >
-    {schedule.completedCloseProximity.length === 0 ? (
-      <p className="structure-detail__empty">No close proximity inspections have been recorded.</p>
-    ) : (
-      <Table size="md" useZebraStyles aria-label="Completed close proximity inspections">
-        <TableHead>
-          <TableRow>
-            <TableHeader className="structure-detail__nowrap">Date</TableHeader>
-            <TableHeader>IDIR ID</TableHeader>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {schedule.completedCloseProximity.map((done) => (
-            <TableRow key={done.id}>
-              <TableCell className="structure-detail__nowrap">
-                {formatShortDate(done.completed)}
-              </TableCell>
-              <TableCell>{done.userId}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    )}
-  </Card>
-);
+}> = ({ schedule, onAdd, addDisabled }) => {
+  // In the browser: every completed inspection is here, so nothing is paged away from the sort.
+  const [sort, setSort] = useState<CloseProximitySort>([]);
+  const rows = sortRows(schedule.completedCloseProximity, sort, closeProximityValue);
+  const header = (column: CloseProximityColumn, label: string, className?: string) => (
+    <SortableHeader
+      className={className}
+      column={column}
+      sort={sort}
+      onSortChange={setSort}
+      data-testid={`close-proximity-sort-${column}`}
+    >
+      {label}
+    </SortableHeader>
+  );
+  return (
+    <Card
+      title="Completed Close Proximity Inspections"
+      icon={CheckmarkOutline}
+      testId="structure-section-close-proximity"
+      action={
+        onAdd && (
+          <Button
+            kind="tertiary"
+            size="sm"
+            renderIcon={Add}
+            disabled={addDisabled}
+            data-testid="close-proximity-add"
+            onClick={onAdd}
+          >
+            Add close proximity inspection
+          </Button>
+        )
+      }
+    >
+      {schedule.completedCloseProximity.length === 0 ? (
+        <p className="structure-detail__empty">
+          No close proximity inspections have been recorded.
+        </p>
+      ) : (
+        <>
+          <ClearSort sort={sort} onSortChange={setSort} data-testid="close-proximity-clear-sort" />
+          <Table size="md" useZebraStyles aria-label="Completed close proximity inspections">
+            <TableHead>
+              <TableRow>
+                {header('COMPLETED', 'Date', 'structure-detail__nowrap')}
+                {header('USER_ID', 'IDIR ID')}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((done) => (
+                <TableRow key={done.id} data-testid={`close-proximity-${done.id}`}>
+                  <TableCell className="structure-detail__nowrap">
+                    {formatShortDate(done.completed)}
+                  </TableCell>
+                  <TableCell>{done.userId}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </>
+      )}
+    </Card>
+  );
+};
+
+/** Every column, in legacy's order — each sorts by its header. */
+const INSPECTION_COLUMNS: {
+  column: StructureInspectionSortColumn;
+  label: string;
+  nowrap?: boolean;
+}[] = [
+  { column: 'INSPECTION_DATE', label: 'Inspection Date', nowrap: true },
+  { column: 'TYPE', label: 'Inspection Type', nowrap: true },
+  { column: 'SITE_ID', label: 'Site #', nowrap: true },
+  { column: 'STATUS', label: 'Inspection Report Status', nowrap: true },
+  { column: 'REVIEWED_DATE', label: 'Reviewed Date', nowrap: true },
+  { column: 'REVIEWED_BY', label: 'Reviewed By' },
+  { column: 'INSPECTOR_NAME', label: 'Inspector Name' },
+];
 
 /** The page of inspections, or legacy's words when there are none. */
-const InspectionsTable: FC<{ rows: StructureInspection[] }> = ({ rows }) => {
+const InspectionsTable: FC<{
+  rows: StructureInspection[];
+  /** The header the inspections are sorted by, or `null` for newest first. */
+  sort: StructureInspectionSort;
+  onSortChange: (next: StructureInspectionSort) => void;
+}> = ({ rows, sort, onSortChange }) => {
   if (rows.length === 0) {
     return (
       <p className="structure-detail__empty">There have been no inspections for this structure.</p>
     );
   }
   return (
-    <Table size="md" useZebraStyles aria-label="Inspections">
-      <TableHead>
-        <TableRow>
-          <TableHeader className="structure-detail__nowrap">Inspection Date</TableHeader>
-          <TableHeader className="structure-detail__nowrap">Inspection Type</TableHeader>
-          <TableHeader className="structure-detail__nowrap">Site #</TableHeader>
-          <TableHeader className="structure-detail__nowrap">Inspection Report Status</TableHeader>
-          <TableHeader className="structure-detail__nowrap">Reviewed Date</TableHeader>
-          <TableHeader>Reviewed By</TableHeader>
-          <TableHeader>Inspector Name</TableHeader>
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {rows.map((inspection) => {
-          // An In Progress inspection may wait for its date; it is listed first, and says so.
-          const date = formatShortDate(inspection.inspectionDate) || 'No date yet';
-          return (
-            <TableRow key={inspection.id} data-testid={`structure-inspection-${inspection.id}`}>
-              <TableCell className="structure-detail__nowrap">
-                {/* Its own tab, as the site and replaced structures open; none while the
-                            inspection is out on the offline client, as legacy offers none. */}
-                {inspection.viewable ? (
-                  <ExternalLink to={`/inspection/${inspection.id}`}>{date}</ExternalLink>
-                ) : (
-                  date
-                )}
-              </TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {describe(inspection.type)}
-              </TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {inspection.siteId && (
-                  <ExternalLink to={`/inventory/site/${inspection.siteId}`}>
-                    {inspection.siteId}
-                  </ExternalLink>
-                )}
-              </TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {(inspection.status.code || inspection.status.description) && (
-                  <Tag type={inspectionStatusTagType(inspection.status.code)} size="sm">
-                    {inspectionStatusLabel(inspection.status.code, inspection.status.description)}
-                  </Tag>
-                )}
-              </TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {formatShortDate(inspection.reviewedDate)}
-              </TableCell>
-              <TableCell>{inspection.reviewedBy}</TableCell>
-              <TableCell>{inspection.inspectorName}</TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+    <>
+      <ClearSort
+        sort={sort}
+        onSortChange={onSortChange}
+        data-testid="structure-inspections-clear-sort"
+      />
+      <Table size="md" useZebraStyles aria-label="Inspections">
+        <TableHead>
+          <TableRow>
+            {/* On the server, not the page: the inspections are paged there, so sorting only the
+                rows on screen would order ten of them and call it sorted. */}
+            {INSPECTION_COLUMNS.map(({ column, label, nowrap }) => (
+              <SortableHeader
+                key={column}
+                className={nowrap ? 'structure-detail__nowrap' : undefined}
+                column={column}
+                sort={sort}
+                onSortChange={onSortChange}
+                data-testid={`structure-inspections-sort-${column}`}
+              >
+                {label}
+              </SortableHeader>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map((inspection) => {
+            // An In Progress inspection may wait for its date; it is listed first, and says so.
+            const date = formatShortDate(inspection.inspectionDate) || 'No date yet';
+            return (
+              <TableRow key={inspection.id} data-testid={`structure-inspection-${inspection.id}`}>
+                <TableCell className="structure-detail__nowrap">
+                  {/* Its own tab, as the site and replaced structures open; none while the
+                              inspection is out on the offline client, as legacy offers none. */}
+                  {inspection.viewable ? (
+                    <ExternalLink to={`/inspection/${inspection.id}`}>{date}</ExternalLink>
+                  ) : (
+                    date
+                  )}
+                </TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {describe(inspection.type)}
+                </TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {inspection.siteId && (
+                    <ExternalLink to={`/inventory/site/${inspection.siteId}`}>
+                      {inspection.siteId}
+                    </ExternalLink>
+                  )}
+                </TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {(inspection.status.code || inspection.status.description) && (
+                    <Tag type={inspectionStatusTagType(inspection.status.code)} size="sm">
+                      {inspectionStatusLabel(inspection.status.code, inspection.status.description)}
+                    </Tag>
+                  )}
+                </TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {formatShortDate(inspection.reviewedDate)}
+                </TableCell>
+                <TableCell>{inspection.reviewedBy}</TableCell>
+                <TableCell>{inspection.inspectorName}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </>
   );
 };
 
@@ -199,6 +269,8 @@ const InspectionsCard: FC<{
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [includeBeforeInstall, setIncludeBeforeInstall] = useState(false);
+  /** The header sorted by — none at first, so newest first. */
+  const [sort, setSort] = useState<StructureInspectionSort>([]);
   // Carbon's Pagination is one-based; the backend is zero-based.
   const loaded = useStructureInspections(
     structureId,
@@ -206,6 +278,7 @@ const InspectionsCard: FC<{
     page - 1,
     pageSize,
     includeBeforeInstall,
+    sort,
   );
 
   if (loaded.isError) {
@@ -295,7 +368,14 @@ const InspectionsCard: FC<{
         </div>
       ) : (
         <>
-          <InspectionsTable rows={rows} />
+          <InspectionsTable
+            rows={rows}
+            sort={sort}
+            onSortChange={(next) => {
+              setSort(next);
+              setPage(1);
+            }}
+          />
           <Pagination
             page={page}
             pageSize={pageSize}

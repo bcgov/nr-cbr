@@ -11,6 +11,7 @@ import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import jakarta.persistence.EntityManager;
@@ -216,7 +217,7 @@ class InspectionSearchSpecificationsTest {
     return repository
         .findAll(
             InspectionSearchSpecifications.matching(
-                criteria().siteId("site-1").build(), column, direction),
+                criteria().siteId("site-1").build(), List.of(new HeaderSort<>(column, direction))),
             PageRequest.of(0, 50))
         .getContent()
         .stream()

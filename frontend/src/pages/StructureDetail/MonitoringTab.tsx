@@ -18,13 +18,19 @@ import { useState } from 'react';
 
 import DestructiveModal from '@/components/core/DestructiveModal';
 import ExternalLink from '@/components/core/ExternalLink';
+import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 
 import Card from './Card';
 import { describe, number } from './format';
 import MonitorDialog from './MonitorDialog';
 import UserAudits from './UserAudits';
 
-import type { MonitorView, StructureMonitor } from './monitorsResponse';
+import type {
+  MonitorSort,
+  MonitorSortColumn,
+  MonitorView,
+  StructureMonitor,
+} from './monitorsResponse';
 import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
@@ -54,9 +60,25 @@ type Props = {
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZES = [10, 20, 50];
 
+/**
+ * Every column but Actions, in legacy's order — each sorts by its header. The short ones keep to
+ * one line.
+ */
+const COLUMNS: { column: MonitorSortColumn; label: string; nowrap?: boolean }[] = [
+  { column: 'NUMBER', label: 'Monitor Number', nowrap: true },
+  { column: 'STATUS', label: 'Status', nowrap: true },
+  { column: 'USER_AUDITS', label: 'User Audits', nowrap: true },
+  { column: 'INSPECTION_DATE', label: 'Inspection Date', nowrap: true },
+  { column: 'DESCRIPTION', label: 'Description' },
+  { column: 'FREQUENCY', label: 'Monitoring Frequency' },
+];
+
 type TableProps = {
   rows: StructureMonitor[];
   view: MonitorView;
+  /** The header the items are sorted by, or `null` for legacy's order. */
+  sort: MonitorSort;
+  onSortChange: (next: MonitorSort) => void;
   /** Offers Edit — Level 1 and up. */
   canEdit: boolean;
   /** Offers Delete — the destructive privilege. */
@@ -66,7 +88,16 @@ type TableProps = {
 };
 
 /** The page of monitoring items, or a line saying there are none in this view. */
-const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit, onDelete }) => {
+const MonitorsTable: FC<TableProps> = ({
+  rows,
+  view,
+  sort,
+  onSortChange,
+  canEdit,
+  canDelete,
+  onEdit,
+  onDelete,
+}) => {
   // The Actions column only when there is an action to offer, as Site Search's.
   const hasActions = canEdit || canDelete;
   if (rows.length === 0) {
@@ -83,84 +114,101 @@ const MonitorsTable: FC<TableProps> = ({ rows, view, canEdit, canDelete, onEdit,
     );
   }
   return (
-    <div className="structure-detail__table-scroll">
-      <Table size="md" useZebraStyles aria-label="Monitoring">
-        <TableHead>
-          <TableRow>
-            <TableHeader className="structure-detail__nowrap">Monitor Number</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Status</TableHeader>
-            <TableHeader className="structure-detail__nowrap">User Audits</TableHeader>
-            <TableHeader className="structure-detail__nowrap">Inspection Date</TableHeader>
-            <TableHeader>Description</TableHeader>
-            <TableHeader>Monitoring Frequency</TableHeader>
-            {/* Only for a user who may act, as Site Search's is: an action that cannot be
-                performed is not shown, and an empty column is noise. */}
-            {hasActions && <TableHeader>Actions</TableHeader>}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((monitor) => (
-            <TableRow key={monitor.id} data-testid={`structure-monitor-${monitor.id}`}>
-              <TableCell className="structure-detail__nowrap">{number(monitor.number)}</TableCell>
-              <TableCell className="structure-detail__nowrap">{describe(monitor.status)}</TableCell>
-              <TableCell className="structure-detail__nowrap">
-                <UserAudits item={monitor} />
-              </TableCell>
-              <TableCell className="structure-detail__nowrap">
-                {/* Its own tab, as the inspection table opens one. */}
-                {monitor.inspectionId ? (
-                  <ExternalLink to={`/inspection/${monitor.inspectionId}`}>
-                    {formatShortDate(monitor.inspectionDate) || 'No date yet'}
-                  </ExternalLink>
-                ) : null}
-              </TableCell>
-              <TableCell className="structure-detail__comment">{monitor.description}</TableCell>
-              <TableCell className="structure-detail__comment">
-                {[describe(monitor.frequency), monitor.frequencyComment]
-                  .filter(Boolean)
-                  .join(' — ')}
-              </TableCell>
-              {hasActions && (
-                <TableCell className="structure-detail__nowrap">
-                  {canEdit && (
-                    // Ghost, the link-blue of an action that changes nothing until saved; Delete
-                    // beside it is the red one.
-                    <Button
-                      kind="ghost"
-                      size="sm"
-                      renderIcon={Edit}
-                      data-testid={`structure-monitor-edit-${monitor.id}`}
-                      onClick={() => onEdit(monitor)}
-                    >
-                      Edit{' '}
-                      <span className="cds--visually-hidden">
-                        monitoring item {number(monitor.number)}
-                      </span>
-                    </Button>
-                  )}
-                  {/* danger--ghost, as Site Search's delete: red at rest and on hover, so it reads
-                      as destructive before it is pressed. */}
-                  {canDelete && (
-                    <Button
-                      kind="danger--ghost"
-                      size="sm"
-                      renderIcon={TrashCan}
-                      data-testid={`structure-monitor-delete-${monitor.id}`}
-                      onClick={() => onDelete(monitor)}
-                    >
-                      Delete{' '}
-                      <span className="cds--visually-hidden">
-                        monitoring item {number(monitor.number)}
-                      </span>
-                    </Button>
-                  )}
-                </TableCell>
-              )}
+    <>
+      <ClearSort
+        sort={sort}
+        onSortChange={onSortChange}
+        data-testid="structure-monitors-clear-sort"
+      />
+      <div className="structure-detail__table-scroll">
+        <Table size="md" useZebraStyles aria-label="Monitoring">
+          <TableHead>
+            <TableRow>
+              {/* On the server, not the page: the items are paged there, so sorting only the rows on
+                  screen would order ten of them and call it sorted. */}
+              {COLUMNS.map(({ column, label, nowrap }) => (
+                <SortableHeader
+                  key={column}
+                  className={nowrap ? 'structure-detail__nowrap' : undefined}
+                  column={column}
+                  sort={sort}
+                  onSortChange={onSortChange}
+                  data-testid={`structure-monitors-sort-${column}`}
+                >
+                  {label}
+                </SortableHeader>
+              ))}
+              {/* Only for a user who may act, as Site Search's is: an action that cannot be
+                  performed is not shown, and an empty column is noise. */}
+              {hasActions && <TableHeader>Actions</TableHeader>}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHead>
+          <TableBody>
+            {rows.map((monitor) => (
+              <TableRow key={monitor.id} data-testid={`structure-monitor-${monitor.id}`}>
+                <TableCell className="structure-detail__nowrap">{number(monitor.number)}</TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {describe(monitor.status)}
+                </TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  <UserAudits item={monitor} />
+                </TableCell>
+                <TableCell className="structure-detail__nowrap">
+                  {/* Its own tab, as the inspection table opens one. */}
+                  {monitor.inspectionId ? (
+                    <ExternalLink to={`/inspection/${monitor.inspectionId}`}>
+                      {formatShortDate(monitor.inspectionDate) || 'No date yet'}
+                    </ExternalLink>
+                  ) : null}
+                </TableCell>
+                <TableCell className="structure-detail__comment">{monitor.description}</TableCell>
+                <TableCell className="structure-detail__comment">
+                  {[describe(monitor.frequency), monitor.frequencyComment]
+                    .filter(Boolean)
+                    .join(' — ')}
+                </TableCell>
+                {hasActions && (
+                  <TableCell className="structure-detail__nowrap">
+                    {canEdit && (
+                      // Ghost, the link-blue of an action that changes nothing until saved; Delete
+                      // beside it is the red one.
+                      <Button
+                        kind="ghost"
+                        size="sm"
+                        renderIcon={Edit}
+                        data-testid={`structure-monitor-edit-${monitor.id}`}
+                        onClick={() => onEdit(monitor)}
+                      >
+                        Edit{' '}
+                        <span className="cds--visually-hidden">
+                          monitoring item {number(monitor.number)}
+                        </span>
+                      </Button>
+                    )}
+                    {/* danger--ghost, as Site Search's delete: red at rest and on hover, so it reads
+                        as destructive before it is pressed. */}
+                    {canDelete && (
+                      <Button
+                        kind="danger--ghost"
+                        size="sm"
+                        renderIcon={TrashCan}
+                        data-testid={`structure-monitor-delete-${monitor.id}`}
+                        onClick={() => onDelete(monitor)}
+                      >
+                        Delete{' '}
+                        <span className="cds--visually-hidden">
+                          monitoring item {number(monitor.number)}
+                        </span>
+                      </Button>
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 };
 
@@ -199,6 +247,8 @@ const MonitoringTab: FC<Props> = ({
   const [view, setView] = useState<MonitorView>(reviewed ? 'CURRENT' : 'OUTSTANDING');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  /** The header sorted by — none at first, so legacy's order. */
+  const [sort, setSort] = useState<MonitorSort>([]);
   /** Legacy's "Show Inspections before the Superstructure Install Date". */
   const [includeBeforeInstall, setIncludeBeforeInstall] = useState(false);
   // Carbon's Pagination is one-based; the backend is zero-based.
@@ -209,7 +259,7 @@ const MonitoringTab: FC<Props> = ({
     page - 1,
     pageSize,
     includeBeforeInstall,
-    inspectionId,
+    { inspectionId, sort },
   );
 
   return (
@@ -303,6 +353,11 @@ const MonitoringTab: FC<Props> = ({
             <MonitorsTable
               rows={loaded.data.page.content}
               view={view}
+              sort={sort}
+              onSortChange={(next) => {
+                setSort(next);
+                setPage(1);
+              }}
               canEdit={canEdit}
               canDelete={canDelete}
               onEdit={setEditing}

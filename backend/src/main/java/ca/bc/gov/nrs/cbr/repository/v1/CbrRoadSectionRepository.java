@@ -39,6 +39,12 @@ public interface CbrRoadSectionRepository
    * the predicate as a string for the same reason. The cost is one plan that knows none of them
    * specifically; paging is what keeps that affordable.
    *
+   * <h2>Ordered by the caller</h2>
+   * The order comes on the {@code Pageable}, built by {@code RoadSectionService}: the header the
+   * user sorted by, then legacy's order — road name, file, branch. It may name {@code road} and
+   * {@code client} columns, and only selected ones: the select is {@code DISTINCT}, so Oracle
+   * refuses to order by anything else.
+   *
    * <h2>Paged, with a count of its own</h2>
    * Legacy caps the dialog at {@code ROWNUM <= 200}; CBR pages it instead, as Site Search and
    * Inspection Search do, so nothing past the two-hundredth road is out of reach and the total is
@@ -67,7 +73,6 @@ public interface CbrRoadSectionRepository
          AND (:tenureType IS NULL OR UPPER(road.fileTypeCode) LIKE :tenureType)
          AND (:clientName IS NULL OR UPPER(client.clientName) LIKE :clientName)
          AND (:clientNumber IS NULL OR UPPER(client.clientNumber) LIKE :clientNumber)
-       ORDER BY road.roadSectName, road.forestFileId, road.roadSectionId
       """,
       countQuery = """
       SELECT COUNT(*)
@@ -105,7 +110,7 @@ public interface CbrRoadSectionRepository
    * <p>Used only when {@code FOREST_FILE_CLIENT} cannot be read — see
    * {@link ca.bc.gov.nrs.cbr.service.v1.RoadSectionService}. Identical but for the two joins and
    * the two columns they supply, so a road still finds itself by name, file, section or tenure
-   * type; only the client is unknown.
+   * type; only the client is unknown. Ordered by the caller too, on {@code road} columns only.
    */
   @Query(value = """
       SELECT new ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult(
@@ -120,7 +125,6 @@ public interface CbrRoadSectionRepository
          AND (:forestFileId IS NULL OR UPPER(road.forestFileId) LIKE :forestFileId)
          AND (:roadSectionId IS NULL OR UPPER(road.roadSectionId) LIKE :roadSectionId)
          AND (:tenureType IS NULL OR UPPER(road.fileTypeCode) LIKE :tenureType)
-       ORDER BY road.roadSectName, road.forestFileId, road.roadSectionId
       """,
       countQuery = """
       SELECT COUNT(road)

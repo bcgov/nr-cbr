@@ -14,8 +14,10 @@ import ca.bc.gov.nrs.cbr.service.v1.InspectionFollowUpService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Sort;
@@ -130,9 +132,14 @@ class InspectionApiControllerTest {
   void searchDelegates() {
     InspectionSearchCriteria criteria = InspectionSearchCriteria.builder().siteId("S").build();
 
-    controller.searchInspections(criteria, 2, 50, InspectionSortColumn.STATUS, Sort.Direction.DESC);
+    // Two columns, one direction: the second's is ascending.
+    controller.searchInspections(criteria, 2, 50,
+        List.of(InspectionSortColumn.STATUS, InspectionSortColumn.SITE_ID),
+        List.of(Sort.Direction.DESC));
 
-    verify(searchService).search(criteria, 2, 50, InspectionSortColumn.STATUS, Sort.Direction.DESC);
+    verify(searchService).search(criteria, 2, 50, List.of(
+        new HeaderSort<>(InspectionSortColumn.STATUS, Sort.Direction.DESC),
+        new HeaderSort<>(InspectionSortColumn.SITE_ID, Sort.Direction.ASC)));
     verifyNoInteractions(inspectionService);
   }
 }

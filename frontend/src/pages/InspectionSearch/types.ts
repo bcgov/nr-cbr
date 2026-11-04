@@ -1,4 +1,4 @@
-import type { HeaderSort } from '@/utils/headerSort';
+import type { SortOrder } from '@/utils/headerSort';
 
 /**
  * Inspection Search criteria and results.
@@ -42,7 +42,7 @@ export type InspectionSortColumn =
   | 'STATUS';
 
 /** A header the user sorted by, and which way. `null` where used means the default order. */
-export type InspectionSort = HeaderSort<InspectionSortColumn>;
+export type InspectionSort = SortOrder<InspectionSortColumn>;
 
 /**
  * The 19 criteria the legacy form offers, in its own order.

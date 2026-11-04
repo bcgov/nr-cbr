@@ -39,13 +39,20 @@ public interface StructureMonitorItemRepository
    * legacy's table leaves it until "Show Inspections before the Superstructure Install Date" is
    * ticked. An item with no inspection, or an undated one, is always listed.
    *
-   * <p>In legacy's order: status descending, then newest inspection (an item with no inspection
-   * first, as Oracle sorts it), then number descending.
+   * <p>Unordered here: the order comes on the {@code Pageable}, built by
+   * {@code StructureMonitorsService} — the header the user sorted by, then legacy's order. The
+   * aliases it may name are {@code monitor}, {@code inspection}, {@code statusCode} and
+   * {@code frequencyCode} (the descriptions shown); all are left joins, so an item with no
+   * inspection or decodable code is still listed.
    */
   @Query(value = """
       SELECT monitor
         FROM StructureMonitorItemEntity monitor
         LEFT JOIN FETCH monitor.inspection inspection
+        LEFT JOIN MonitoringStatusCodeEntity statusCode
+          ON statusCode.monitoringStatusCode = monitor.monitoringStatusCode
+        LEFT JOIN MonitorFrequencyCodeEntity frequencyCode
+          ON frequencyCode.monitorFrequencyCode = monitor.monitorFrequencyCode
        WHERE monitor.crossingStructureId = :structureId
          AND (:inspectionId IS NULL OR monitor.inspectionId = :inspectionId)
          AND (:outstandingOnly = FALSE OR monitor.monitoringStatusCode IN :outstandingStatuses)
@@ -53,9 +60,6 @@ public interface StructureMonitorItemRepository
               OR inspection IS NULL
               OR inspection.inspectionDate IS NULL
               OR inspection.inspectionDate > :installed)
-       ORDER BY monitor.monitoringStatusCode DESC,
-                inspection.inspectionDate DESC NULLS FIRST,
-                monitor.monitorNumber DESC
       """,
       countQuery = """
       SELECT COUNT(monitor)

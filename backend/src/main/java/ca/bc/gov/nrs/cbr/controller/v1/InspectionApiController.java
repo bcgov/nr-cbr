@@ -10,6 +10,7 @@ import ca.bc.gov.nrs.cbr.service.v1.InspectionFormService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.ConditionUpdateRequest;
@@ -29,6 +30,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.multipart.MultipartFile;
@@ -75,9 +77,10 @@ public class InspectionApiController implements InspectionApiEndpoint {
   @Override
   public ResponseEntity<PagedResponse<InspectionSearchResult>> searchInspections(
       InspectionSearchCriteria criteria, int pageNumber, int pageSize,
-      InspectionSortColumn sortBy, Sort.Direction sortDirection) {
+      List<InspectionSortColumn> sortBy, List<Sort.Direction> sortDirection) {
     return ResponseEntity.ok(
-        inspectionSearchService.search(criteria, pageNumber, pageSize, sortBy, sortDirection));
+        inspectionSearchService.search(
+            criteria, pageNumber, pageSize, HeaderSort.of(sortBy, sortDirection)));
   }
 
   @Override

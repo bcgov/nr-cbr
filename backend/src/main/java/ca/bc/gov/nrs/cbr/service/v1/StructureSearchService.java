@@ -10,6 +10,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.ClientLocationRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.specification.v1.StructureSearchSpecifications;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
@@ -26,7 +27,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,16 +75,15 @@ public class StructureSearchService {
    *
    * @param pageNumber zero-based
    * @param pageSize   rows per page, capped at {@value #MAX_PAGE_SIZE}
-   * @param sortBy     the results column the user sorted by, or null for legacy's order
-   * @param direction  which way, when {@code sortBy} is set
+   * @param sort       the columns the user sorted by, first deciding; none for legacy's order
    */
   @Transactional(readOnly = true)
   public PagedResponse<StructureSearchResult> search(
       StructureSearchCriteria criteria, int pageNumber, int pageSize,
-      StructureSortColumn sortBy, Sort.Direction direction) {
+      List<HeaderSort<StructureSortColumn>> sort) {
     Pageable pageable = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
     Page<CrossingStructureEntity> page = structures.findAll(
-        StructureSearchSpecifications.matching(criteria, sortBy, direction), pageable);
+        StructureSearchSpecifications.matching(criteria, sort), pageable);
 
     Map<String, String> names = maintainerNames(page);
     Map<Long, List<String>> blockers = blockersFor(page);

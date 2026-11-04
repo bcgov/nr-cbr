@@ -17,9 +17,11 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeOrderEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeXrefEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
@@ -35,9 +37,12 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -108,7 +113,7 @@ class StructureRepairsServiceTest {
   private PagedResponse<Repair> repairs(View view) {
     entityManager.flush();
     entityManager.clear();
-    return service.repairs(7L, view, null, 0, 10, false).page();
+    return service.repairs(7L, view, null, 0, 10, false, List.of()).page();
   }
 
   @Test
@@ -139,10 +144,11 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var listing = service.repairs(7L, View.CURRENT, 10L, 0, 10, false);
+    var listing = service.repairs(7L, View.CURRENT, 10L, 0, 10, false, List.of());
     assertThat(listing.page().content()).extracting(Repair::number).containsExactly(1L);
     assertThat(listing.beforeInstallCount()).isZero();
-    assertThatThrownBy(() -> service.repairs(7L, View.CURRENT, null, 0, 10, false))
+    assertThatThrownBy(() -> service.repairs(7L, View.CURRENT, null, 0,
+        10, false, List.of()))
         .isInstanceOf(ResponseStatusException.class);
   }
 
@@ -177,11 +183,116 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    PagedResponse<Repair> second = service.repairs(7L, View.ALL, null, 1, 10, false).page();
+    PagedResponse<Repair> second = service.repairs(7L, View.ALL, null, 1,
+        10, false, List.of()).page();
 
     assertThat(second.content()).extracting(Repair::number).containsExactly(11L, 12L);
     assertThat(second.totalElements()).isEqualTo(12);
     assertThat(second.totalPages()).isEqualTo(2);
+  }
+
+  /** The numbers of every repair's first page, sorted by a header. */
+  private List<Long> sortedBy(RepairSortColumn column, Sort.Direction direction) {
+    entityManager.flush();
+    entityManager.clear();
+    return service.repairs(7L, View.ALL, null, 0, 10, false,
+            List.of(new HeaderSort<>(column, direction))).page().content()
+        .stream().map(Repair::number).toList();
+  }
+
+  private void givenStatus(String code, String description) {
+    entityManager.persist(RepairStatusCodeEntity.builder()
+        .repairStatusCode(code).description(description).build());
+  }
+
+  @Test
+  @DisplayName("sorts by a header's shown value, both ways, legacy's order breaking the ties")
+  void sortsByHeader() {
+    // Described against their codes' order, so a sort by code would fail.
+    givenStatus("SUG", "awaiting review");
+    givenStatus("REQ", "Required");
+    givenStatus("COM", "Completed");
+    givenRepair(1L, null, "SUG", "P1");
+    givenRepair(2L, null, "REQ", "P1");
+    givenRepair(3L, null, "COM", "P1");
+    givenRepair(4L, null, "REQ", "P1");
+
+    // Case-blind, so the lower-case one is first. The two Required tie, and legacy's number order
+    // settles them whichever way the header sorts.
+    assertThat(sortedBy(RepairSortColumn.STATUS, Sort.Direction.ASC))
+        .containsExactly(1L, 3L, 2L, 4L);
+    assertThat(sortedBy(RepairSortColumn.STATUS, Sort.Direction.DESC))
+        .containsExactly(2L, 4L, 3L, 1L);
+  }
+
+  @Test
+  @DisplayName("sorts by several headers, each breaking the ties of the one before")
+  void sortsBySeveralHeaders() {
+    givenStatus("SUG", "Suggested");
+    givenStatus("REQ", "Required");
+    givenRepair(1L, null, "SUG", "P1");
+    givenRepair(2L, null, "REQ", "P1");
+    givenRepair(3L, null, "SUG", "P1");
+    givenRepair(4L, null, "REQ", "P1");
+    entityManager.flush();
+    entityManager.clear();
+
+    // Status alone leaves each pair in legacy's number order; Repair Number descending second
+    // reverses each pair.
+    assertThat(service.repairs(7L, View.ALL, null, 0, 10, false, List.of(
+            new HeaderSort<>(RepairSortColumn.STATUS, Sort.Direction.ASC),
+            new HeaderSort<>(RepairSortColumn.NUMBER, Sort.Direction.DESC)))
+        .page().content()).extracting(Repair::number).containsExactly(4L, 2L, 3L, 1L);
+  }
+
+  @Test
+  @DisplayName("sorts Priority by its rank and User Audits by the latest step taken")
+  void sortsByRankAndLatestStep() {
+    givenPriorityRank("P2", 1);
+    givenPriorityRank("P1", 2);
+    givenRepair(1L, null, "SUG", "P1",
+        repair -> repair.suggestedByTimestamp(LocalDateTime.of(2026, 1, 1, 9, 0)));
+    givenRepair(2L, null, "REQ", "P2",
+        repair -> repair.suggestedByTimestamp(LocalDateTime.of(2025, 1, 1, 9, 0))
+            .requiredByTimestamp(LocalDateTime.of(2026, 6, 1, 9, 0)));
+    givenRepair(3L, null, "COM", "P1",
+        repair -> repair.suggestedByTimestamp(LocalDateTime.of(2023, 1, 1, 9, 0))
+            .completedByTimestamp(LocalDateTime.of(2024, 3, 1, 9, 0)));
+
+    assertThat(sortedBy(RepairSortColumn.PRIORITY, Sort.Direction.ASC))
+        .containsExactly(2L, 1L, 3L);
+    assertThat(sortedBy(RepairSortColumn.USER_AUDITS, Sort.Direction.ASC))
+        .containsExactly(3L, 1L, 2L);
+  }
+
+  @Test
+  @DisplayName("sorts every repair on the server, not only the page on screen")
+  void sortsAcrossPages() {
+    for (long id = 1; id <= 12; id++) {
+      givenRepair(id, null, "REQ", "P1");
+    }
+
+    assertThat(sortedBy(RepairSortColumn.NUMBER, Sort.Direction.DESC))
+        .containsExactly(12L, 11L, 10L, 9L, 8L, 7L, 6L, 5L, 4L, 3L);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(RepairSortColumn.class)
+  @DisplayName("every header sorts both ways and still lists every repair")
+  void everyHeaderSorts(RepairSortColumn column) {
+    givenStatus("REQ", "Required");
+    entityManager.persist(StructureRepairTypeCodeEntity.builder()
+        .structureRepairTypeCode("DECK").description("Deck planks").build());
+    givenPriorityRank("P1", 1);
+    givenInspection(10L, LocalDate.of(2023, 6, 1));
+    givenRepair(1L, 10L, "REQ", "P1", repair -> repair.structureRepairTypeCode("DECK")
+        .estimate(500L).actualCost(450L).repairQuantity(2L).description("Bolts")
+        .completedDate(LocalDate.of(2024, 1, 1)));
+    givenRepair(2L, null, "REQ", "P9");
+
+    for (Sort.Direction direction : Sort.Direction.values()) {
+      assertThat(sortedBy(column, direction)).containsExactlyInAnyOrder(1L, 2L);
+    }
   }
 
   @Test
@@ -247,8 +358,8 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var shown = service.repairs(7L, View.ALL, null, 0, 10, false);
-    var all = service.repairs(7L, View.ALL, null, 0, 10, true);
+    var shown = service.repairs(7L, View.ALL, null, 0, 10, false, List.of());
+    var all = service.repairs(7L, View.ALL, null, 0, 10, true, List.of());
 
     // 1 January of the install year is not "after" it; no inspection is always listed.
     assertThat(shown.page().content()).extracting(Repair::number)
@@ -266,7 +377,7 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var listing = service.repairs(7L, View.ALL, null, 0, 10, false);
+    var listing = service.repairs(7L, View.ALL, null, 0, 10, false, List.of());
 
     assertThat(listing.page().content()).hasSize(1);
     assertThat(listing.beforeInstallCount()).isZero();
@@ -285,7 +396,8 @@ class StructureRepairsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThat(service.repairs(7L, View.ALL, null, 0, 10, true).page().content())
+    assertThat(service.repairs(7L, View.ALL, null, 0,
+        10, true, List.of()).page().content())
         .extracting(Repair::number).containsExactly(2L);
   }
 
@@ -595,7 +707,8 @@ class StructureRepairsServiceTest {
         .isInstanceOfSatisfying(FieldValidationException.class, refused ->
             assertThat(refused.getFieldErrors())
                 .containsOnlyKeys("priorityCode", "estimate", "description"));
-    assertThat(service.repairs(7L, View.ALL, null, 0, 10, true).page().content()).isEmpty();
+    assertThat(service.repairs(7L, View.ALL, null, 0,
+        10, true, List.of()).page().content()).isEmpty();
   }
 
   @Test
@@ -609,7 +722,8 @@ class StructureRepairsServiceTest {
   @Test
   @DisplayName("refuses a structure that does not exist")
   void missingStructure() {
-    assertThatThrownBy(() -> service.repairs(404L, View.ALL, null, 0, 10, false))
+    assertThatThrownBy(() -> service.repairs(404L, View.ALL, null, 0,
+        10, false, List.of()))
         .isInstanceOf(StructureNotFoundException.class);
   }
 }

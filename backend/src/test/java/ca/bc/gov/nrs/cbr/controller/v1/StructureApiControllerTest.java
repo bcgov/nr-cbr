@@ -21,11 +21,16 @@ import ca.bc.gov.nrs.cbr.service.v1.StructureReplacementsService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureSpansAndPiersService;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorSortColumn;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairsResponse;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -49,11 +54,17 @@ class StructureApiControllerTest {
   @Test
   @DisplayName("lists repairs and monitoring items for the view and inspection asked")
   void lists() {
-    controller.getRepairs(7L, StructureRepairsResponse.View.CURRENT, 41L, 0, 10, false);
-    controller.getMonitors(7L, StructureMonitorsResponse.View.ALL, null, 1, 20, true);
+    controller.getRepairs(7L, StructureRepairsResponse.View.CURRENT, 41L, 0, 10, false,
+        List.of(RepairSortColumn.PRIORITY, RepairSortColumn.NUMBER),
+        List.of(Sort.Direction.DESC, Sort.Direction.DESC));
+    controller.getMonitors(7L, StructureMonitorsResponse.View.ALL, null, 1, 20, true,
+        List.of(MonitorSortColumn.FREQUENCY), List.of(Sort.Direction.ASC));
 
-    verify(repairs).repairs(7L, StructureRepairsResponse.View.CURRENT, 41L, 0, 10, false);
-    verify(monitors).monitors(7L, StructureMonitorsResponse.View.ALL, null, 1, 20, true);
+    verify(repairs).repairs(7L, StructureRepairsResponse.View.CURRENT, 41L, 0, 10, false,
+        List.of(new HeaderSort<>(RepairSortColumn.PRIORITY, Sort.Direction.DESC),
+            new HeaderSort<>(RepairSortColumn.NUMBER, Sort.Direction.DESC)));
+    verify(monitors).monitors(7L, StructureMonitorsResponse.View.ALL, null, 1, 20, true,
+        List.of(new HeaderSort<>(MonitorSortColumn.FREQUENCY, Sort.Direction.ASC)));
   }
 
   @Test
