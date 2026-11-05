@@ -7,24 +7,27 @@ import java.util.List;
 /**
  * Canonical CBR role names, and the ladder they form.
  *
- * <p>FAM holds nothing but these seven flat strings — no nesting, no scoping, no permissions. The
+ * <p>FAM holds nothing but these six flat strings — no nesting, no scoping, no permissions. The
  * role&rarr;capability matrix lives here and in {@link CbrAuthorities}: roles here, the
  * capabilities each role grants there.
  *
  * <h2>Two axes, not one</h2>
- * Six roles form a <b>cumulative ladder</b> — each rung carries everything below it:
+ * Five roles form a <b>cumulative ladder</b> — each rung carries everything below it:
  *
  * <pre>
- *   CBR_GENERAL  &lt;  CBR_LEVEL_0  &lt;  CBR_LEVEL_1  &lt;  CBR_LEVEL_2  &lt;  CBR_PENG  &lt;  CBR_INSPECTION_REVIEWER
- *   read-only       + record an     + create/edit   + delete,        + sign off   + mark Reviewed;
- *                     inspection      sites,          archive,         inspections  repairs and
- *                     (offline)       structures      add site,                     monitors Required
- *                                                     status override               or Not Required
+ *   CBR_GENERAL  &lt;  CBR_LEVEL_1  &lt;  CBR_LEVEL_2  &lt;  CBR_PENG  &lt;  CBR_INSPECTION_REVIEWER
+ *   read-only       + record         + delete,        + sign off   + mark Reviewed;
+ *                     inspections      archive,         inspections  repairs and
+ *                     (offline too);   add site,                     monitors Required
+ *                     create/edit      status override               or Not Required
+ *                     sites,
+ *                     structures
  * </pre>
  *
- * The first five are exactly how the legacy WebADE profiles nest ({@code CBR_READ_ONLY} &sub;
- * {@code CBR_INSPECTOR_TECHNICIAN_0/1/2} &sub; {@code CBR_MINISTRY_PENG}), each bundling every role
- * beneath it. See {@code cbr-auth-and-roles.local.md} §3. The top rung is legacy's reviewer row,
+ * The first four follow how the legacy WebADE profiles nest ({@code CBR_READ_ONLY} &sub;
+ * {@code CBR_INSPECTOR_TECHNICIAN_1/2} &sub; {@code CBR_MINISTRY_PENG}), each bundling every role
+ * beneath it. Legacy's {@code LEVEL_0} (inspection capture without site or structure edits) is not
+ * issued by FAM, so recording an inspection starts at {@link #LEVEL_1}. See {@code cbr-auth-and-roles.local.md} §3. The top rung is legacy's reviewer row,
  * which only a P.Eng was given: FAM grants a reviewing P.Eng {@link #INSPECTION_REVIEWER} in place
  * of {@link #PENG} ({@code cbr-inspection-reviewer.local.md} §10).
  *
@@ -46,10 +49,10 @@ public final class CbrRoles {
   /** Read-only: search, view, and all twelve reports. Legacy WebADE {@code GENERAL}. */
   public static final String GENERAL = "CBR_GENERAL";
 
-  /** Field capture: record an inspection and use the offline client. Legacy {@code LEVEL_0}. */
-  public static final String LEVEL_0 = "CBR_LEVEL_0";
-
-  /** Create and edit sites, structures and inspections; uploads. Legacy {@code LEVEL_1}. */
+  /**
+   * Record inspections (offline too); create and edit sites and structures; uploads. Legacy
+   * {@code LEVEL_1}, plus the inspection capture legacy's {@code LEVEL_0} held on its own.
+   */
   public static final String LEVEL_1 = "CBR_LEVEL_1";
 
   /** Delete, archive, add site, override inspection status. Legacy {@code LEVEL_2}. */
@@ -81,11 +84,11 @@ public final class CbrRoles {
    * {@link CbrAuthorities} is pinned against it by a test rather than kept in step by hand.
    */
   public static final List<String> LADDER =
-      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER);
+      List.of(GENERAL, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER);
 
   /** Every role FAM issues — the ladder plus {@link #ADMIN}. */
   public static final List<String> ALL =
-      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER, ADMIN);
+      List.of(GENERAL, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER, ADMIN);
 
   /**
    * Roles that carry read access: the whole ladder, <b>plus {@link #ADMIN}</b>.
@@ -101,7 +104,7 @@ public final class CbrRoles {
    * {@link #ADMIN}, which is what keeps the separation of duties the legacy design was expressing.
    */
   public static final List<String> READERS =
-      List.of(GENERAL, LEVEL_0, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER, ADMIN);
+      List.of(GENERAL, LEVEL_1, LEVEL_2, PENG, INSPECTION_REVIEWER, ADMIN);
 
   /**
    * The role's rung, or {@code -1} if it is not on the ladder — which covers {@link #ADMIN}, any

@@ -65,6 +65,23 @@ class LoggedUserHelperTest {
   }
 
   @Test
+  @DisplayName("recording an inspection starts at Level 1 — FAM issues no Level 0")
+  void inspectionWriteStartsAtLevelOne() {
+    for (String role : CbrRoles.atLeast(CbrRoles.LEVEL_1)) {
+      SecurityContextHolder.clearContext();
+      authenticateWith(role);
+      assertThat(helper.canWriteInspection()).as("canWriteInspection for %s", role).isTrue();
+    }
+
+    // Read-only, and the administrator who reads but writes nothing.
+    for (String role : List.of(CbrRoles.GENERAL, CbrRoles.ADMIN)) {
+      SecurityContextHolder.clearContext();
+      authenticateWith(role);
+      assertThat(helper.canWriteInspection()).as("canWriteInspection for %s", role).isFalse();
+    }
+  }
+
+  @Test
   @DisplayName("P.Eng is the only role that signs off — sys-admin does NOT imply it")
   void pengAuthority() {
     authenticateWith(CbrRoles.PENG);

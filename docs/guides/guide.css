@@ -1,0 +1,171 @@
+/*
+  Print styles for the CBR how-to guides. Taken from nr-fam's guides.
+
+  Deliberately plain: this is a document somebody reads on screen or prints, not
+  a page of the app, so it uses the BC Sans stack the rest of the ministry's
+  documents use and leaves Carbon out of it entirely.
+*/
+@page {
+    size: letter;
+}
+
+body {
+    margin: 0;
+    color: #1a1a1a;
+    font-family: "BC Sans", "Noto Sans", system-ui, -apple-system, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+}
+
+h1 {
+    margin: 0 0 0.25rem;
+    color: #013366;
+    font-size: 20pt;
+    line-height: 1.2;
+}
+
+/*
+  Sections run on from one another rather than each starting a page: most are short, and a page
+  break before each left the guides more than half empty. The yellow rule is the page header (see
+  build-guides.mjs), not a divider between sections. What keeps a flow readable instead is
+  below - a heading never ends a page, and a screenshot never leaves its step.
+*/
+h2 {
+    margin: 1.75rem 0 0.75rem;
+    color: #013366;
+    font-size: 15pt;
+}
+
+h1 + h2 {
+    margin-top: 1rem;
+}
+
+h3 {
+    margin: 1.25rem 0 0.5rem;
+    font-size: 12.5pt;
+}
+
+p,
+li {
+    orphans: 3;
+    widows: 3;
+}
+
+ol,
+ul {
+    padding-left: 1.5rem;
+}
+
+li {
+    margin-bottom: 0.35rem;
+}
+
+a {
+    color: #1a5a96;
+}
+
+code {
+    padding: 0 0.2em;
+    border-radius: 3px;
+    background: #f2f2f2;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.9em;
+}
+
+/*
+  A screenshot is evidence for the step beside it, so it must not drift onto the
+  next page away from its text. The border stops a white-backed screenshot from
+  bleeding into the page.
+
+  `break-before: avoid` is what keeps the pair together: rather than let the
+  image fall to the next page on its own, the browser moves the text down with
+  it. A reviewer found three places where the steps sat at the foot of one page
+  and the picture of them opened the next.
+*/
+img {
+    display: block;
+    max-width: 100%;
+    margin: 0.75rem 0 1rem;
+    border: 1px solid #d5d5d5;
+    break-before: avoid;
+    break-inside: avoid;
+}
+
+/* A heading never ends a page. */
+h2,
+h3 {
+    break-after: avoid;
+}
+
+/*
+  And a short list of steps stays whole, so the screenshot it leads to can stay
+  with it. Safe here because the lists are steps - four or five items - rather
+  than long tables of content.
+*/
+ol,
+ul {
+    break-inside: avoid;
+}
+
+/* The lead-in under the title, on the first page only. */
+.subtitle {
+    margin: 0 0 1.5rem;
+    color: #474543;
+    font-size: 13pt;
+}
+
+blockquote {
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    border-left: 4px solid #fcba19;
+    background: #f9f6ed;
+}
+
+blockquote p {
+    margin: 0.25rem 0;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.75rem 0 1rem;
+    font-size: 10pt;
+    break-inside: avoid;
+}
+
+th,
+td {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #d5d5d5;
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    background: #f2f2f2;
+}
+
+/*
+  A tall, narrow screenshot - the side menu - printed at full width would fill a page. Shown at
+  roughly the width it has on screen instead.
+*/
+img.narrow {
+    width: 2.6in;
+}
+
+/*
+  Two narrow screenshots side by side - the menu closed, and the menu with sections opened - so
+  together they take the space of one.
+*/
+.pair {
+    display: flex;
+    gap: 0.4in;
+    align-items: flex-start;
+    margin: 0.75rem 0 1rem;
+    break-inside: avoid;
+}
+
+.pair img {
+    width: 2.6in;
+    margin: 0;
+}

@@ -2681,7 +2681,7 @@ describe('StructureDetailPage — Inspections', () => {
   const openInspections = () => userEvent.click(screen.getByTestId('structure-tab-inspections'));
 
   describe('adding an inspection', () => {
-    it('offers Add unplanned inspection from Level 0, and Add routine inspection from Level 1', async () => {
+    it('offers Add unplanned inspection on inspection-write, and Add routine inspection on edit', async () => {
       authorization.canWriteInspection = true;
       await showing(bridge());
       await openInspections();

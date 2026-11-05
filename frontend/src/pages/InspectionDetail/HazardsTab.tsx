@@ -117,7 +117,7 @@ const HazardsEditor: FC<{ inspection: InspectionDetailResponse; onDone: () => vo
 
 /**
  * The Hydraulic Hazards tab — legacy's: read, with "Edit hydraulic hazards" in the card's header
- * for whoever may write inspections (Level 0 and up, legacy's `/level0Access`), until the
+ * for whoever may write inspections (Level 1 and up), until the
  * inspection is Reviewed or Accepted, as legacy disables its page then.
  */
 const HazardsTab: FC<{ inspection: InspectionDetailResponse }> = ({ inspection }) => {

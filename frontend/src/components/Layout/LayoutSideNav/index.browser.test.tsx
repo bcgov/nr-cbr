@@ -24,9 +24,15 @@ vi.mock('@/context/layout/useLayout', () => ({
   }),
 }));
 
+// Mutable so a case can give the user CBR roles (and so a how-to guide). 'admin' is not a CBR role,
+// so by default there is no guide and the Support block rests on the mailbox alone.
+const { authMock } = vi.hoisted(() => ({ authMock: { roles: ['admin'] as string[] } }));
 vi.mock('@/context/auth/useAuth', () => ({
-  useAuth: () => ({ user: { roles: ['admin'] }, isLoggedIn: true }),
+  useAuth: () => ({ user: { roles: authMock.roles }, isLoggedIn: true }),
 }));
+
+const { onlineMock } = vi.hoisted(() => ({ onlineMock: { online: true } }));
+vi.mock('@/hooks/useOnlineStatus', () => ({ useOnlineStatus: () => onlineMock.online }));
 
 vi.mock('@/routes/routePaths', () => ({
   getOfflineMenuEntries: () => [{ id: 'Offline Inspections', path: '/inspections/offline' }],
@@ -77,6 +83,8 @@ const MOBILE: [number, number] = [390, 844];
 describe('LayoutSideNav', () => {
   afterEach(async () => {
     layoutMock.isSideNavExpanded = true;
+    authMock.roles = ['admin'];
+    onlineMock.online = true;
     openSideNav.mockClear();
     await page.viewport(DESKTOP[0], DESKTOP[1]);
   });
@@ -357,5 +365,52 @@ describe('LayoutSideNav', () => {
     await renderWithProviders();
 
     expect(screen.queryByTestId('side-nav-link-email-support')).toBeNull();
+  });
+
+  describe('the how-to guide', () => {
+    it("links the guide for the user's roles, in a new tab, above Report an issue", async () => {
+      authMock.roles = ['CBR_LEVEL_2', 'CBR_ADMIN'];
+      envMock.VITE_SUPPORT_EMAIL = 'cbr@gov.bc.ca';
+      await renderWithProviders();
+
+      const guide = screen.getByTestId('side-nav-link-how-to-guide');
+      expect(guide.getAttribute('href')).toBe('/cbr-guide-level-2-admin.pdf');
+      expect(guide).toHaveAttribute('target', '_blank');
+      expect(guide.getAttribute('rel')).toContain('noopener');
+
+      const support = screen.getByTestId('side-nav-link-email-support');
+      expect(
+        guide.compareDocumentPosition(support) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('keeps the Support block for the guide alone when no mailbox is configured', async () => {
+      authMock.roles = ['CBR_GENERAL'];
+      delete envMock.VITE_SUPPORT_EMAIL;
+      await renderWithProviders();
+
+      expect(screen.getByTestId('side-nav-link-how-to-guide').getAttribute('href')).toBe(
+        '/cbr-guide-view.pdf',
+      );
+      expect(screen.getByText('Support')).toBeTruthy();
+      expect(screen.queryByTestId('side-nav-link-email-support')).toBeNull();
+    });
+
+    it('offers none to a user with no CBR role', async () => {
+      envMock.VITE_SUPPORT_EMAIL = 'cbr@gov.bc.ca';
+      await renderWithProviders();
+
+      expect(screen.queryByTestId('side-nav-link-how-to-guide')).toBeNull();
+    });
+
+    it('hides it offline, where there is nothing to serve the PDF from', async () => {
+      authMock.roles = ['CBR_LEVEL_1'];
+      onlineMock.online = false;
+      envMock.VITE_SUPPORT_EMAIL = 'cbr@gov.bc.ca';
+      await renderWithProviders();
+
+      expect(screen.queryByTestId('side-nav-link-how-to-guide')).toBeNull();
+      expect(screen.getByTestId('side-nav-link-email-support')).toBeTruthy();
+    });
   });
 });

@@ -40,7 +40,7 @@ type FieldProps<V> = {
   leave: (field: keyof V & string) => void;
 };
 
-/** Routine, which needs Level 1 — Unplanned needs Level 0. */
+/** Routine, which needs the edit capability — Unplanned needs only inspection-write. */
 const ROUTINE = 'ROUT';
 
 /**
@@ -59,7 +59,8 @@ export const InspectionFields: FC<
   }
 > = ({ values, shown, change, leave, types, statuses, typeFixed }) => {
   const { canEdit, canDelete: level2 } = useAuthorization();
-  // Routine is Level 1's: a Level 0 user is offered the types they may add.
+  // Routine needs the edit capability: anyone who can write inspections without it is offered the
+  // types they may add. No role does that since Level 0 went, but the gates stay separate.
   const offered = types.filter((type) => type.code !== ROUTINE || canEdit);
   const addable = statuses.filter((status) => ADDABLE_STATUSES.has(status.code));
   // Past In Progress, the date, inspector and company are required — legacy's rule.
