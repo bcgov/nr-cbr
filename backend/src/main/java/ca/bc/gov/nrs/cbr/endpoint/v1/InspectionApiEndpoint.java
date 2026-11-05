@@ -140,7 +140,7 @@ public interface InspectionApiEndpoint {
   /**
    * Adds an inspection, In Progress or Submitted — Add Inspection.
    *
-   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 1 and up, legacy's
    * {@code /saveInspection}; a Routine inspection needs Level 1, checked by the service. <b>201</b>
    * with the new inspection's id; <b>404</b> when there is no such structure; <b>400</b> with
    * {@code fieldErrors} keyed by field ({@code inspectionDate}, {@code items.DECK.Q1.span-12}, …).
@@ -165,7 +165,7 @@ public interface InspectionApiEndpoint {
    * Adds a repair from the inspection's page — legacy's Add Repair on its Repairs & Monitoring
    * tab. Suggested, the structure's next number, raised by this inspection.
    *
-   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up: an inspector records
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 1 and up: an inspector records
    * repairs while inspecting. <b>201</b>; <b>404</b> when there is no such inspection; <b>409</b>
    * once it is Reviewed or Rejected; <b>400</b> with {@code fieldErrors} when a field is refused.
    */
@@ -176,7 +176,7 @@ public interface InspectionApiEndpoint {
 
   /**
    * Saves an edit to one of the structure's repairs, from the inspection's page — any of them, as
-   * legacy. Level 0 and up; <b>204</b>, <b>404</b>, <b>409</b> or <b>400</b> as adding.
+   * legacy. Level 1 and up; <b>204</b>, <b>404</b>, <b>409</b> or <b>400</b> as adding.
    */
   @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
   @PutMapping("/{inspectionId}/repairs/{repairId}")
@@ -194,7 +194,7 @@ public interface InspectionApiEndpoint {
 
   /**
    * Adds a monitoring item from the inspection's page — legacy's Add Monitor. Suggested, the
-   * structure's next number, raised by this inspection. Level 0 and up; as adding a repair.
+   * structure's next number, raised by this inspection. Level 1 and up; as adding a repair.
    */
   @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
   @PostMapping("/{inspectionId}/monitors")
@@ -243,7 +243,7 @@ public interface InspectionApiEndpoint {
    * Saves the inspection's Hydraulic Hazards — legacy's tab: the three water measurements, the five
    * hazards and their comments.
    *
-   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 1 and up, legacy's
    * {@code /level0Access} on the tab. <b>204</b>; <b>404</b> when there is no such inspection;
    * <b>409</b> once it is Reviewed or Accepted; <b>400</b> with {@code fieldErrors} keyed
    * {@code presentWaterDepth}, {@code presentWaterWidth}, {@code highWaterClearance} or
@@ -258,7 +258,7 @@ public interface InspectionApiEndpoint {
    * Saves the inspection's Inspection card — legacy's Inspection tab: status (In Progress or
    * Submitted), date, inspector, company, cost and Professional Inspection Required.
    *
-   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 1 and up, legacy's
    * {@code /level0Access}; Professional Inspection Required is a Level 2 user's, checked by the
    * service. <b>204</b>; <b>404</b> when there is no such inspection; <b>409</b> once it is
    * Reviewed or Accepted; <b>400</b> with {@code fieldErrors}.
@@ -269,7 +269,7 @@ public interface InspectionApiEndpoint {
       @RequestBody InspectionUpdateRequest request);
 
   /**
-   * Saves the inspector's comments. Level 0 and up; <b>204</b>, <b>404</b>, <b>409</b> or
+   * Saves the inspector's comments. Level 1 and up; <b>204</b>, <b>404</b>, <b>409</b> or
    * <b>400</b> as the Inspection card.
    */
   @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
@@ -281,7 +281,7 @@ public interface InspectionApiEndpoint {
    * Saves one Condition card — a question group's answers, at each span, pier and stringer.
    * Answers the request leaves out are no longer answered.
    *
-   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 0 and up, legacy's
+   * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 1 and up, legacy's
    * {@code /level0Access}. <b>204</b>; <b>404</b> when there is no such inspection, or the
    * structure is not asked the group; <b>409</b> once it is Reviewed or Accepted; <b>400</b> with
    * {@code fieldErrors} keyed {@code items.DECK.Q1.span-12}, ….

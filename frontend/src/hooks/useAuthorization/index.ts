@@ -31,7 +31,7 @@ export type AuthorizationInfo = {
   hasAnyRole: boolean;
   /** `true` when the user may search, view and run reports. */
   canRead: boolean;
-  /** `true` when the user may record or amend an inspection (`CBR_LEVEL_0` and above). */
+  /** `true` when the user may record or amend an inspection (`CBR_LEVEL_1` and above). */
   canWriteInspection: boolean;
   /** `true` when the user may create or edit sites and structures (`CBR_LEVEL_1` and above). */
   canEdit: boolean;

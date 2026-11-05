@@ -398,7 +398,7 @@ const PengCommentsEditor: FC<{ inspection: InspectionDetailResponse; onDone: () 
 /**
  * The Inspection tab: the structure and its site, the inspection and its comments, then the P.Eng's
  * part — the load rating the review recorded and the PEng Comments — each card with its own Edit,
- * one at a time, the structure page's pattern. Level 0 and up edit (legacy's `/level0Access`);
+ * one at a time, the structure page's pattern. Level 1 and up edit;
  * Professional Inspection Required is Level 2's; the PEng Comments and Reviewed a P.Eng's. No Edit
  * once the inspection is Reviewed or Accepted, as legacy disables its page then.
  */

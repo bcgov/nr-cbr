@@ -31,7 +31,7 @@ class CbrAuthoritiesTest {
     String contentEdit = CbrAuthorities.CONTENT_EDIT;
     String destructive = CbrAuthorities.DESTRUCTIVE;
 
-    assertThat(inspectionWrite).isEqualTo(fromLadder(CbrRoles.LEVEL_0));
+    assertThat(inspectionWrite).isEqualTo(fromLadder(CbrRoles.LEVEL_1));
     assertThat(contentEdit).isEqualTo(fromLadder(CbrRoles.LEVEL_1));
     assertThat(destructive).isEqualTo(fromLadder(CbrRoles.LEVEL_2));
   }

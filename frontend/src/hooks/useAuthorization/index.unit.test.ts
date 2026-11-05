@@ -48,18 +48,7 @@ describe('useAuthorization — the capability ladder', () => {
     });
   });
 
-  it('CBR_LEVEL_0 adds inspection capture but not the edit surface', () => {
-    withRoles(['CBR_LEVEL_0']);
-
-    expect(renderHook(() => useAuthorization()).result.current).toMatchObject({
-      canRead: true,
-      canWriteInspection: true,
-      canEdit: false,
-      canDelete: false,
-    });
-  });
-
-  it('CBR_LEVEL_1 adds create/edit but deletes nothing — the Level 1 / Level 2 line', () => {
+  it('CBR_LEVEL_1 adds inspections and create/edit but deletes nothing — the Level 1 / Level 2 line', () => {
     withRoles(['CBR_LEVEL_1']);
 
     expect(renderHook(() => useAuthorization()).result.current).toMatchObject({

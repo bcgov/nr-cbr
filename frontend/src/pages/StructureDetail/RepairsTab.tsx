@@ -236,7 +236,7 @@ const RepairsTab: FC<Props> = ({
   reviewed = false,
 }) => {
   const authorization = useAuthorization();
-  // On an inspection's page, legacy's: Level 0 adds and edits, as an inspector records them while
+  // On an inspection's page, legacy's: Level 1 adds and edits, as an inspector records them while
   // inspecting; on the structure page, Level 1. Delete is Level 2's on either.
   const canEdit =
     !locked &&

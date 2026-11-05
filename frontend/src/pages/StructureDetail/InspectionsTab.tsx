@@ -252,8 +252,8 @@ const InspectionsTable: FC<{
  * the superstructure went in are left out unless asked for, as legacy's table leaves them.
  */
 /**
- * The structure's inspections, with legacy's Add Routine Inspection (Level 1) and Add Unplanned
- * Inspection (Level 0) in the header. As legacy, both wait until the structure is complete — pressed
+ * The structure's inspections, with legacy's Add Routine Inspection (edit capability) and Add
+ * Unplanned Inspection (inspection-write) in the header — both Level 1 and up today. As legacy, both wait until the structure is complete — pressed
  * before then, the page's outstanding items turn red; once complete, they open Add Inspection.
  */
 const InspectionsCard: FC<{

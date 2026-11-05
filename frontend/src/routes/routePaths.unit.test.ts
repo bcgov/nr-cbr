@@ -37,7 +37,7 @@ describe('getMenuEntries', () => {
     expect(child?.path).toBe('site-search');
   });
 
-  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
+  it.each(['CBR_GENERAL', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
     'shows Site Search to %s — every role that can read',
     (role) => {
       // /showSiteSearch sits at the GENERAL floor, and CBR_ADMIN gained read in the 2026-09-15
@@ -46,7 +46,7 @@ describe('getMenuEntries', () => {
     },
   );
 
-  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
+  it.each(['CBR_GENERAL', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
     'shows Structure Search to %s — every role that can read',
     (role) => {
       // /showStructureSearch sits at the GENERAL floor, beside /showSiteSearch.
@@ -61,16 +61,13 @@ describe('getMenuEntries', () => {
     expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).toContain('Add Site');
   });
 
-  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_ADMIN'])(
-    'hides Add Site from %s',
-    (role) => {
-      // CBR_LEVEL_1 is the one worth stating: it holds /saveSite and can edit an existing site,
-      // but /addSite is a LEVEL_2 privilege — legacy groups creating a site with the deletes and
-      // the status override, not with the ordinary edits. CBR_ADMIN can read every site and write
-      // none.
-      expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).not.toContain('Add Site');
-    },
-  );
+  it.each(['CBR_GENERAL', 'CBR_LEVEL_1', 'CBR_ADMIN'])('hides Add Site from %s', (role) => {
+    // CBR_LEVEL_1 is the one worth stating: it holds /saveSite and can edit an existing site,
+    // but /addSite is a LEVEL_2 privilege — legacy groups creating a site with the deletes and
+    // the status override, not with the ordinary edits. CBR_ADMIN can read every site and write
+    // none.
+    expect(entry([role], 'Inventory')?.children?.map((c) => c.id)).not.toContain('Add Site');
+  });
 
   it('orders the Inventory items as the legacy menu did — Site Search, Add Site, Structure Search', () => {
     expect(entry(['CBR_LEVEL_2'], 'Inventory')?.children?.map((c) => c.id)).toEqual([
@@ -95,10 +92,10 @@ describe('getMenuEntries', () => {
     expect(entry([role], 'Inspection')?.children?.map((c) => c.id)).toEqual(['Inspection Search']);
   });
 
-  it.each(['CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'])(
+  it.each(['CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG'])(
     'adds Add Inspection after Inspection Search for %s, as the legacy menu',
     (role) => {
-      // Legacy's entry needs /showInspection and /saveInspection — Level 0 and up.
+      // Legacy's entry needs /showInspection and /saveInspection — Level 1 and up.
       const inspection = entry([role], 'Inspection');
       expect(inspection?.children?.map((c) => c.id)).toEqual([
         'Inspection Search',
@@ -112,7 +109,7 @@ describe('getMenuEntries', () => {
     expect(idsOf(['CBR_GENERAL'])).toEqual(['Dashboard', 'Inventory', 'Inspection', 'Reports']);
   });
 
-  it.each(['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
+  it.each(['CBR_GENERAL', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_ADMIN'])(
     "offers %s Reports with legacy's eleven reports, in legacy's order",
     (role) => {
       const reports = entry([role], 'Reports');
@@ -147,7 +144,7 @@ describe('getMenuEntries', () => {
     expect(admin?.children?.map((child) => [child.id, child.path])).toEqual([
       ['Bulletin Message', 'bulletin-message'],
     ]);
-    for (const role of ['CBR_GENERAL', 'CBR_LEVEL_0', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG']) {
+    for (const role of ['CBR_GENERAL', 'CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG']) {
       expect(idsOf([role])).not.toContain('Administration');
     }
   });

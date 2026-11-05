@@ -131,7 +131,7 @@ public class InspectionCreateValidator {
     return errors;
   }
 
-  /** Required and listed; Routine is Level 1's — Unplanned Level 0's, as the structure's buttons. */
+  /** Required and listed; Routine and Unplanned are both Level 1's, as the structure's buttons. */
   private void checkType(Map<String, String> errors, String type) {
     if (type == null) {
       errors.put(TYPE_CODE, "Inspection Type is required.");

@@ -545,7 +545,7 @@ describe('InspectionDetailPage', () => {
     };
     const inProgress = () => inspection({ status: { code: 'PRO', description: 'In Progress' } });
 
-    it('lets Level 0 add and edit, as legacy, and Level 2 delete — through the inspection', async () => {
+    it('lets inspection-write add and edit, as legacy, and Level 2 delete — through the inspection', async () => {
       authorization.canEdit = false;
       authorization.canDelete = true;
       inspectionApi.getInspection.mockResolvedValue(inProgress());
