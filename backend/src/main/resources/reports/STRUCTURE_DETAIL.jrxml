@@ -1392,14 +1392,14 @@
 				<text><![CDATA[Running Surface:]]></text>
 			</staticText>
 			<staticText>
-				<reportElement uuid="70a15bb8-257c-4759-af2b-76bf5186fc5e" x="289" y="1" width="102" height="11"/>
+				<reportElement uuid="70a15bb8-257c-4759-af2b-76bf5186fc5e" x="289" y="0" width="102" height="10"/>
 				<textElement>
 					<font fontName="Arial" size="8" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
 				</textElement>
 				<text><![CDATA[Abutments (Left/Right):]]></text>
 			</staticText>
 			<staticText>
-				<reportElement uuid="70a15bb8-257c-4759-af2b-76bf5186fc5e" x="289" y="8" width="102" height="10"/>
+				<reportElement uuid="70a15bb8-257c-4759-af2b-76bf5186fc5e" x="289" y="9" width="102" height="10"/>
 				<textElement>
 					<font fontName="Arial" size="8" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
 				</textElement>

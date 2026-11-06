@@ -223,7 +223,7 @@
 					<text><![CDATA[(metres)]]></text>
 				</staticText>
 				<staticText>
-					<reportElement x="498" y="6" width="45" height="24" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
+					<reportElement x="498" y="2" width="45" height="33" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
 					<textElement textAlignment="Center">
 						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
 					</textElement>
@@ -231,14 +231,14 @@
 Rtng GVW]]></text>
 				</staticText>
 				<staticText>
-					<reportElement x="498" y="27" width="45" height="14" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
+					<reportElement x="498" y="33" width="45" height="12" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
 					<textElement textAlignment="Center">
 						<font fontName="Arial" size="9" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
 					</textElement>
 					<text><![CDATA[(tonnes)]]></text>
 				</staticText>
 				<staticText>
-					<reportElement x="545" y="0" width="49" height="36" uuid="cc19002f-2694-46c1-92f7-ed6e06de18aa"/>
+					<reportElement x="545" y="2" width="49" height="33" uuid="cc19002f-2694-46c1-92f7-ed6e06de18aa"/>
 					<textElement textAlignment="Center">
 						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
 					</textElement>
@@ -247,7 +247,7 @@ Rtng GVW
 ]]></text>
 				</staticText>
 				<staticText>
-					<reportElement x="544" y="29" width="49" height="14" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
+					<reportElement x="544" y="33" width="49" height="12" uuid="3d59fc70-f577-4e9e-a6f7-17df8b78eea8"/>
 					<textElement textAlignment="Center">
 						<font fontName="Arial" size="9" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
 					</textElement>
@@ -268,8 +268,8 @@ Rtng GVW
 					<text><![CDATA[Rplcmnt Cost     ]]></text>
 				</staticText>
 				<staticText>
-					<reportElement x="660" y="16" width="22" height="12" uuid="42417ca3-552b-4606-80a9-9993c1a4a6b3"/>
-					<textElement textAlignment="Right">
+					<reportElement x="644" y="28" width="38" height="12" uuid="42417ca3-552b-4606-80a9-9993c1a4a6b3"/>
+					<textElement textAlignment="Center">
 						<font fontName="Arial" size="9" isBold="false" isItalic="true" isUnderline="false" isStrikeThrough="false"/>
 					</textElement>
 					<text><![CDATA[($)]]></text>
@@ -288,9 +288,9 @@ Rtng GVW
 					</graphicElement>
 				</line>
 				<staticText>
-					<reportElement x="724" y="5" width="34" height="36" uuid="337f1470-dc5f-4f68-948e-801f9c484d29"/>
+					<reportElement x="725" y="5" width="31" height="36" uuid="337f1470-dc5f-4f68-948e-801f9c484d29"/>
 					<textElement textAlignment="Center">
-						<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+						<font fontName="Arial" size="8" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
 					</textElement>
 					<text><![CDATA[Capital Road]]></text>
 				</staticText>
