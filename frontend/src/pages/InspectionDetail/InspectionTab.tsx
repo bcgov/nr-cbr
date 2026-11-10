@@ -21,6 +21,8 @@ import {
   REJECTED,
   canChangeStatus,
   cardErrorsOf,
+  isReopening,
+  reopenErrorsOf,
   requiredOf,
   toUpdateRequest,
   valuesOf,
@@ -56,8 +58,9 @@ import {
   type InspectionValues,
 } from '@/pages/NewInspection/inspectionRules';
 import { addYears, fromCalendar, toIso } from '@/pages/StructureDetail/dateBox';
-import { describe } from '@/pages/StructureDetail/format';
+import { describe, money, yesNo } from '@/pages/StructureDetail/format';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
+import { formatShortDate } from '@/utils/date';
 import { byteLength } from '@/utils/textLimits';
 
 /** Cancel and Save, small at the right under the fields — the structure page's cards'. */
@@ -138,10 +141,15 @@ const InspectionEditor: FC<{
   const { display } = useNotification();
   const [reviewing, setReviewing] = useState(false);
   const [values, setValues] = useState<InspectionValues>(() => valuesOf(inspection));
-  const form = useFieldErrors<string>(cardErrorsOf(values, inspection), update.fieldErrors);
+  const current = inspection.status.code;
+  // Reviewed or Accepted: only the status, back to In Progress or Submitted.
+  const reopening = isReopening(current);
+  const form = useFieldErrors<string>(
+    reopening ? reopenErrorsOf(values) : cardErrorsOf(values, inspection),
+    update.fieldErrors,
+  );
   const { shown } = form;
   const required = requiredOf(values, inspection);
-  const current = inspection.status.code;
 
   const change = <K extends keyof InspectionValues>(field: K, value: InspectionValues[K]) => {
     setValues((previous) => ({ ...previous, [field]: value }));
@@ -164,7 +172,7 @@ const InspectionEditor: FC<{
 
   const save = () => {
     if (!form.submit()) return;
-    if (values.statusCode === REVIEWED) {
+    if (values.statusCode === REVIEWED && !reopening) {
       setReviewing(true);
       return;
     }
@@ -209,18 +217,19 @@ const InspectionEditor: FC<{
     });
   };
 
-  // In Progress and Submitted, and the status it has if neither (Rejected), so it reads right;
-  // for an inspection reviewer, Reviewed through the Review dialog and, from In Progress or
-  // Submitted, Rejected.
+  // In Progress and Submitted, and the status it has if neither (Rejected, Reviewed, Accepted), so
+  // it reads right; for an inspection reviewer, Reviewed through the Review dialog and, from In
+  // Progress or Submitted, Rejected. Reopening offers only the first two.
   const reviewable = isInspectionReviewer && CARD_STATUSES.has(current ?? '');
   const offered = (statuses.data ?? []).filter(
     (status) =>
       CARD_STATUSES.has(status.code) ||
       status.code === current ||
-      (isInspectionReviewer && status.code === REVIEWED) ||
+      (!reopening && isInspectionReviewer && status.code === REVIEWED) ||
       (reviewable && status.code === REJECTED),
   );
   const rejecting = values.statusCode === REJECTED && current !== REJECTED;
+  const reopened = reopening && values.statusCode !== current;
   const today = toIso(fromCalendar(new Date())) ?? '';
 
   return (
@@ -238,7 +247,9 @@ const InspectionEditor: FC<{
             helperText={
               rejecting
                 ? `Saving reschedules the structure's next routine inspection to ${addYears(today, 1)}, then yearly.`
-                : undefined
+                : reopened
+                  ? "Saving clears the review — its reviewer and date — and this inspection's load rating stops counting as the structure's current one."
+                  : undefined
             }
             onChange={(event) => change('statusCode', event.target.value)}
             onBlur={() => form.leave('statusCode')}
@@ -254,35 +265,57 @@ const InspectionEditor: FC<{
             value={<StatusTag status={inspection.status} />}
           />
         )}
-        <DateField
-          id="inspection-edit-date"
-          labelText={requiredLabel('Date of Inspection', required.inspectionDate)}
-          value={values.inspectionDate}
-          invalidText={shown.inspectionDate}
-          onChange={(value) => change('inspectionDate', value)}
-          onBlur={() => form.leave('inspectionDate')}
-        />
-        {text('inspectorName', requiredLabel('Inspector Name', required.inspectorName))}
-        {text(
-          'inspectorCompanyName',
-          requiredLabel('Inspection Company Name', required.inspectorCompanyName),
-        )}
-        {text('cost', 'Cost of Inspection ($)')}
-        {level2 ? (
-          <RadioButtonGroup
-            name="inspection-edit-professional"
-            legendText="Professional Inspection Required?"
-            valueSelected={values.professionalInspectionRequired ? 'Y' : 'N'}
-            onChange={(selected) => change('professionalInspectionRequired', selected === 'Y')}
-          >
-            <RadioButton id="inspection-edit-professional-yes" labelText="Yes" value="Y" />
-            <RadioButton id="inspection-edit-professional-no" labelText="No" value="N" />
-          </RadioButtonGroup>
+        {reopening ? (
+          <>
+            <ReadOnlyField
+              label="Date of Inspection"
+              value={formatShortDate(inspection.inspectionDate)}
+              emptyText="No date yet"
+            />
+            <ReadOnlyField label="Inspector Name" value={inspection.inspectorName} />
+            <ReadOnlyField
+              label="Inspection Company Name"
+              value={inspection.inspectorCompanyName}
+            />
+            <ReadOnlyField label="Cost of Inspection" value={money(inspection.cost)} />
+            <ReadOnlyField
+              label="Professional Inspection Required?"
+              value={yesNo(inspection.professionalInspectionRequired)}
+            />
+          </>
         ) : (
-          <ReadOnlyField
-            label="Professional Inspection Required?"
-            value={values.professionalInspectionRequired ? 'Yes' : 'No'}
-          />
+          <>
+            <DateField
+              id="inspection-edit-date"
+              labelText={requiredLabel('Date of Inspection', required.inspectionDate)}
+              value={values.inspectionDate}
+              invalidText={shown.inspectionDate}
+              onChange={(value) => change('inspectionDate', value)}
+              onBlur={() => form.leave('inspectionDate')}
+            />
+            {text('inspectorName', requiredLabel('Inspector Name', required.inspectorName))}
+            {text(
+              'inspectorCompanyName',
+              requiredLabel('Inspection Company Name', required.inspectorCompanyName),
+            )}
+            {text('cost', 'Cost of Inspection ($)')}
+            {level2 ? (
+              <RadioButtonGroup
+                name="inspection-edit-professional"
+                legendText="Professional Inspection Required?"
+                valueSelected={values.professionalInspectionRequired ? 'Y' : 'N'}
+                onChange={(selected) => change('professionalInspectionRequired', selected === 'Y')}
+              >
+                <RadioButton id="inspection-edit-professional-yes" labelText="Yes" value="Y" />
+                <RadioButton id="inspection-edit-professional-no" labelText="No" value="N" />
+              </RadioButtonGroup>
+            ) : (
+              <ReadOnlyField
+                label="Professional Inspection Required?"
+                value={values.professionalInspectionRequired ? 'Yes' : 'No'}
+              />
+            )}
+          </>
         )}
       </div>
       <EditActions
@@ -399,8 +432,9 @@ const PengCommentsEditor: FC<{ inspection: InspectionDetailResponse; onDone: () 
  * The Inspection tab: the structure and its site, the inspection and its comments, then the P.Eng's
  * part — the load rating the review recorded and the PEng Comments — each card with its own Edit,
  * one at a time, the structure page's pattern. Level 1 and up edit;
- * Professional Inspection Required is Level 2's; the PEng Comments and Reviewed a P.Eng's. No Edit
- * once the inspection is Reviewed or Accepted, as legacy disables its page then.
+ * Professional Inspection Required is Level 2's; the PEng Comments and Reviewed a P.Eng's. Once the
+ * inspection is Reviewed or Accepted, only "Change status" on the Inspection card, to move it back
+ * to In Progress or Submitted; every other card stays locked until it has moved.
  */
 const InspectionTab: FC<{
   inspection: InspectionDetailResponse;
@@ -411,7 +445,7 @@ const InspectionTab: FC<{
   const open = !LOCKING_STATUSES.has(inspection.status.code ?? '');
   const edit = (card: Card, label: string, allowed = canWriteInspection) =>
     allowed &&
-    open &&
+    (open || card === 'inspection') &&
     editing === null && (
       <Button
         kind="tertiary"
@@ -429,7 +463,10 @@ const InspectionTab: FC<{
     <>
       <StructureCard inspection={inspection} structure={structure} />
       {/* The editor in place of the card's values while it is edited; the values otherwise. */}
-      <InspectionCard inspection={inspection} action={edit('inspection', 'Edit inspection')}>
+      <InspectionCard
+        inspection={inspection}
+        action={edit('inspection', open ? 'Edit inspection' : 'Change status')}
+      >
         {editing === 'inspection' ? (
           <InspectionEditor inspection={inspection} structure={structure} onDone={done} />
         ) : undefined}

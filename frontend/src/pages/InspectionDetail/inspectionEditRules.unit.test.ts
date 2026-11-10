@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   canChangeStatus,
   cardErrorsOf,
+  isReopening,
+  reopenErrorsOf,
   requiredOf,
   toUpdateRequest,
   valuesOf,
@@ -53,5 +55,22 @@ describe('the Inspection card', () => {
     expect(canChangeStatus('REJ', false)).toBe(false);
     expect(canChangeStatus('REJ', true)).toBe(true);
     expect(canChangeStatus('OFL', true)).toBe(false);
+  });
+
+  it('reopens Reviewed or Accepted, for anyone who edits, back to In Progress or Submitted', () => {
+    expect(canChangeStatus('RVD', false)).toBe(true);
+    expect(canChangeStatus('ACC', false)).toBe(true);
+    expect(isReopening('RVD')).toBe(true);
+    expect(isReopening('ACC')).toBe(true);
+    expect(isReopening('REJ')).toBe(false);
+    expect(isReopening(null)).toBe(false);
+
+    const values = valuesOf(inspection({ status: { code: 'RVD', description: 'Reviewed' } }));
+    expect(reopenErrorsOf(values).statusCode).toBe(
+      'Choose In Progress or Submitted to reopen this inspection.',
+    );
+    expect(reopenErrorsOf({ ...values, statusCode: 'REJ' }).statusCode).toBeDefined();
+    expect(reopenErrorsOf({ ...values, statusCode: 'SUB' }).statusCode).toBeUndefined();
+    expect(reopenErrorsOf({ ...values, statusCode: 'PRO' }).statusCode).toBeUndefined();
   });
 });

@@ -60,7 +60,7 @@ import org.springframework.web.server.ResponseStatusException;
 /** Add Inspection — its questions and its save — against the database. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
 @Import({InspectionCreateService.class, InspectionCreateValidator.class,
-    InspectionFormService.class, InspectionEditService.class})
+    InspectionFormService.class, InspectionEditService.class, LoadRatingService.class})
 class InspectionCreateServiceTest {
 
   private static final LocalDateTime PAST = LocalDateTime.now().minusYears(5);

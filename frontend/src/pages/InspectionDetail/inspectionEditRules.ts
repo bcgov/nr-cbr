@@ -12,8 +12,25 @@ export const REJECTED = 'REJ';
  * Reviewed through the Review dialog.
  */
 export const CARD_STATUSES = new Set([IN_PROGRESS, 'SUB']);
-/** The statuses after which legacy's page is disabled — Reviewed and Accepted, not Rejected. */
+/**
+ * The statuses after which the page is locked — Reviewed and Accepted, not Rejected — except that
+ * the Inspection card may move the status back to In Progress or Submitted (`isReopening`).
+ */
 export const LOCKING_STATUSES = new Set(['RVD', 'ACC']);
+
+/**
+ * Whether the card is reopening a Reviewed or Accepted inspection: only its status changes, and
+ * only to In Progress or Submitted — any user who records inspections, a business request
+ * (2026-11-10; legacy allowed a P.Eng only).
+ */
+export const isReopening = (current: string | null): boolean => LOCKING_STATUSES.has(current ?? '');
+
+/** The card's rule when reopening: the status must move. */
+export const reopenErrorsOf = (values: InspectionValues): Record<string, string | undefined> => ({
+  statusCode: CARD_STATUSES.has(values.statusCode)
+    ? undefined
+    : 'Choose In Progress or Submitted to reopen this inspection.',
+});
 
 /** The stored inspection, as the card's form types it. */
 export const valuesOf = (inspection: InspectionDetailResponse): InspectionValues => ({
@@ -29,10 +46,10 @@ export const valuesOf = (inspection: InspectionDetailResponse): InspectionValues
 
 /**
  * Whether the user may move the status here: between In Progress and Submitted; out of Rejected
- * only a P.Eng, as legacy.
+ * only a P.Eng, as legacy; out of Reviewed or Accepted, back to one of the two.
  */
 export const canChangeStatus = (current: string | null, isPeng: boolean): boolean =>
-  CARD_STATUSES.has(current ?? '') || (current === REJECTED && isPeng);
+  CARD_STATUSES.has(current ?? '') || (current === REJECTED && isPeng) || isReopening(current);
 
 /**
  * The card's rules — Add Inspection's, and legacy's on an update: the date, inspector and company
