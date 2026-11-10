@@ -329,8 +329,8 @@ export const PROTECTED_ROUTES: RouteDescription[] = [
         ),
         isSideMenu: true,
         // Legacy gate: the menu entry is /showInspection + /saveInspection — both, so the blank form
-        // is not offered to someone who cannot save it — which is Level 0 and up; not CBR_ADMIN.
-        // From the tab: /level0Access for Unplanned, /level1Access for Routine.
+        // is not offered to someone who cannot save it — which is Level 1 and up; not CBR_ADMIN.
+        // From the tab: inspection-write for Unplanned, edit for Routine.
         roles: [...ROLE_CAPABILITIES.inspectionWrite],
       },
       {

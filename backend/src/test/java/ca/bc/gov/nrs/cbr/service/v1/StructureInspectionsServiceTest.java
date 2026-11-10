@@ -19,11 +19,13 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.CloseProximityInspectionRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.Comment;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse.CloseProximityInspection;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse.Inspection;
 import jakarta.persistence.EntityManager;
@@ -36,9 +38,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
@@ -190,6 +195,104 @@ class StructureInspectionsServiceTest {
   @DisplayName("the inspection table")
   class Table {
 
+    /** Structure 7's table, ten to a page, in legacy's order. */
+    private StructureInspectionsResponse table(int pageNumber, boolean includeAll) {
+      return service.inspections(7L, pageNumber, 10, includeAll, List.of());
+    }
+
+    /** Structure 7's ids, every inspection, sorted by a header. */
+    private List<String> sortedBy(StructureInspectionSortColumn column, Sort.Direction direction) {
+      return service.inspections(7L, 0, 10, true,
+              List.of(new HeaderSort<>(column, direction))).page().content().stream()
+          .map(Inspection::id).toList();
+    }
+
+    @Test
+    @DisplayName("sorts by a header's shown value, both ways, newest first breaking the ties")
+    void sortsByHeader() {
+      givenStructure(7L, structure -> { });
+      givenInspection(1L, 7L, LocalDate.of(2020, 6, 1), "RVD",
+          inspection -> inspection.inspectorName("sam inspector"));
+      givenInspection(2L, 7L, LocalDate.of(2021, 6, 1), "RVD",
+          inspection -> inspection.inspectorName("Alex Field"));
+      givenInspection(3L, 7L, LocalDate.of(2022, 6, 1), "RVD",
+          inspection -> inspection.inspectorName("Alex Field"));
+      settle();
+
+      // Case-blind; the two Alex Fields tie, and newest first settles them either way.
+      assertThat(sortedBy(StructureInspectionSortColumn.INSPECTOR_NAME, Sort.Direction.ASC))
+          .containsExactly("3", "2", "1");
+      assertThat(sortedBy(StructureInspectionSortColumn.INSPECTOR_NAME, Sort.Direction.DESC))
+          .containsExactly("1", "3", "2");
+    }
+
+    @Test
+    @DisplayName("sorts the type and status by their descriptions, the reviewer by name")
+    void sortsByDecodedValues() {
+      // Described against their codes' order, so a sort by code would fail.
+      entityManager.persist(StrctreInspectionTypeCodeEntity.builder()
+          .strctreInspectionTypeCode("AAA").description("Routine")
+          .effectiveDate(EARLY).expiryDate(LATE).build());
+      entityManager.persist(StrctreInspectionTypeCodeEntity.builder()
+          .strctreInspectionTypeCode("ZZZ").description("Close proximity")
+          .effectiveDate(EARLY).expiryDate(LATE).build());
+      StructureInspectionReviewerEntity zoe = StructureInspectionReviewerEntity.builder()
+          .userid("IDIR\\ZOE").firstName("Zoe").lastName("Able").build();
+      StructureInspectionReviewerEntity ann = StructureInspectionReviewerEntity.builder()
+          .userid("IDIR\\ANN").firstName("Ann").lastName("Zed").build();
+      entityManager.persist(zoe);
+      entityManager.persist(ann);
+      givenStructure(7L, structure -> { });
+      givenInspection(1L, 7L, LocalDate.of(2020, 6, 1), "RVD", inspection -> inspection
+          .strctreInspectionTypeCode("AAA").inspectionReviewerId(zoe.getInspectionReviewerId()));
+      givenInspection(2L, 7L, LocalDate.of(2021, 6, 1), "RVD", inspection -> inspection
+          .strctreInspectionTypeCode("ZZZ").inspectionReviewerId(ann.getInspectionReviewerId()));
+      settle();
+
+      assertThat(sortedBy(StructureInspectionSortColumn.TYPE, Sort.Direction.ASC))
+          .containsExactly("2", "1");
+      // First name, then last, as the column shows them: Ann Zed before Zoe Able.
+      assertThat(sortedBy(StructureInspectionSortColumn.REVIEWED_BY, Sort.Direction.ASC))
+          .containsExactly("2", "1");
+    }
+
+    @Test
+    @DisplayName("sorts every inspection on the server, not only the page on screen")
+    void sortsAcrossPages() {
+      givenStructure(7L, structure -> { });
+      for (long id = 1; id <= 12; id++) {
+        givenInspection(id, 7L, LocalDate.of(2000 + (int) id, 1, 15));
+      }
+      settle();
+
+      // Newest first is legacy's; ascending proves the header decides, across all twelve.
+      assertThat(sortedBy(StructureInspectionSortColumn.INSPECTION_DATE, Sort.Direction.ASC))
+          .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(StructureInspectionSortColumn.class)
+    @DisplayName("every header sorts both ways and still lists every inspection")
+    void everyHeaderSorts(StructureInspectionSortColumn column) {
+      entityManager.persist(StrctreInspectionTypeCodeEntity.builder()
+          .strctreInspectionTypeCode("ROUT").description("Routine")
+          .effectiveDate(EARLY).expiryDate(LATE).build());
+      StructureInspectionReviewerEntity reviewer = StructureInspectionReviewerEntity.builder()
+          .userid("IDIR\\PENG").firstName("Pat").lastName("Engineer").build();
+      entityManager.persist(reviewer);
+      givenStructure(7L, structure -> { });
+      givenInspection(1L, 7L, LocalDate.of(2023, 6, 1), "RVD", inspection -> inspection
+          .strctreInspectionTypeCode("ROUT").siteAtTimeOfInspection("62-001")
+          .inspectionReviewerId(reviewer.getInspectionReviewerId())
+          .pengReviewerDate(LocalDateTime.of(2023, 7, 2, 10, 0)).inspectorName("Sam"));
+      givenInspection(2L, 7L, null);
+      settle();
+
+      for (Sort.Direction direction : Sort.Direction.values()) {
+        assertThat(sortedBy(column, direction)).containsExactlyInAnyOrder("1", "2");
+      }
+    }
+
     @Test
     @DisplayName("lists only inspections after the superstructure went in, newest first, and "
         + "counts the rest, as FIND_NEW_INSPECTIONS_BY_STRUCT does")
@@ -201,7 +304,7 @@ class StructureInspectionsServiceTest {
       givenInspection(4L, 7L, LocalDate.of(2010, 1, 1));
       settle();
 
-      StructureInspectionsResponse response = service.inspections(7L, 0, 10, false);
+      StructureInspectionsResponse response = table(0, false);
 
       assertThat(response.page().content()).extracting(Inspection::id).containsExactly("3", "2");
       assertThat(response.page().totalElements()).isEqualTo(2);
@@ -218,11 +321,11 @@ class StructureInspectionsServiceTest {
       givenInspection(3L, 7L, null);
       settle();
 
-      StructureInspectionsResponse response = service.inspections(7L, 0, 10, false);
+      StructureInspectionsResponse response = table(0, false);
 
       assertThat(response.page().content()).extracting(Inspection::id).containsExactly("3", "2");
       assertThat(response.beforeInstallCount()).isEqualTo(1);
-      assertThat(service.inspections(7L, 0, 10, true).page().content())
+      assertThat(table(0, true).page().content())
           .extracting(Inspection::id).containsExactly("3", "2", "1");
     }
 
@@ -234,7 +337,7 @@ class StructureInspectionsServiceTest {
       givenInspection(2L, 7L, LocalDate.of(2015, 6, 1));
       settle();
 
-      assertThat(service.inspections(7L, 0, 10, true).page().content())
+      assertThat(table(0, true).page().content())
           .extracting(Inspection::id).containsExactly("2", "1");
     }
 
@@ -247,7 +350,7 @@ class StructureInspectionsServiceTest {
       }
       settle();
 
-      StructureInspectionsResponse second = service.inspections(7L, 1, 10, false);
+      StructureInspectionsResponse second = table(1, false);
 
       assertThat(second.page().content()).extracting(Inspection::id).containsExactly("2", "1");
       assertThat(second.page().totalElements()).isEqualTo(12);
@@ -272,7 +375,7 @@ class StructureInspectionsServiceTest {
           .inspectorName("Sam Inspector"));
       settle();
 
-      Inspection row = service.inspections(7L, 0, 10, false).page().content().getFirst();
+      Inspection row = table(0, false).page().content().getFirst();
 
       assertThat(row.type()).isEqualTo(new CodeValue("ROUT", "Routine"));
       assertThat(row.siteId()).isEqualTo("62-001");
@@ -290,7 +393,7 @@ class StructureInspectionsServiceTest {
       givenInspection(1L, 7L, LocalDate.of(2023, 6, 1), "OFL", inspection -> { });
       settle();
 
-      assertThat(service.inspections(7L, 0, 10, false).page().content().getFirst().viewable())
+      assertThat(table(0, false).page().content().getFirst().viewable())
           .isFalse();
     }
 
@@ -301,13 +404,13 @@ class StructureInspectionsServiceTest {
       givenInspection(1L, 7L, LocalDate.of(2023, 6, 1), null, inspection -> { });
       settle();
 
-      assertThat(service.inspections(7L, 0, 10, false).page().content()).isEmpty();
+      assertThat(table(0, false).page().content()).isEmpty();
     }
 
     @Test
     @DisplayName("refuses a structure that does not exist")
     void missingStructure() {
-      assertThatThrownBy(() -> service.inspections(404L, 0, 10, false))
+      assertThatThrownBy(() -> service.inspections(404L, 0, 10, false, List.of()))
           .isInstanceOf(StructureNotFoundException.class);
     }
   }

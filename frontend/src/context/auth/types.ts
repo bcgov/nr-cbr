@@ -6,13 +6,12 @@ export type JwtClaims = Record<string, unknown>;
  *
  * Mirrors the backend `RoleConstants` — keep the two in step.
  *
- * The six live roles, from the WebADE export (`APPLICATION_ROLE` for `APPLICATION_ACRONYM='CBR'`),
+ * The live roles, from the WebADE export (`APPLICATION_ROLE` for `APPLICATION_ACRONYM='CBR'`),
  * each reached in the legacy app through one proxy connection account:
  *
  * | WebADE role | Legacy Oracle role | Legacy proxy | Business profile it appears in |
  * |---|---|---|---|
  * | `GENERAL` | `CBR_GENERAL` | `CBR$WEB1` | every working profile; alone in `CBR_READ_ONLY` |
- * | `LEVEL_0` | `CBR_LEVEL_0` | `CBR$WEB6` | `CBR_INSPECTOR_TECHNICIAN_0` and above |
  * | `LEVEL_1` | `CBR_LEVEL_1` | `CBR$WEB2` | `CBR_INSPECTOR_TECHNICIAN_1` and above |
  * | `LEVEL_2` | `CBR_LEVEL_2` | `CBR$WEB3` | `CBR_INSPECTOR_TECHNICIAN_2` and above |
  * | `PROFESSIONAL_ENGINEER` | `CBR_PROFESSIONAL_ENGINEER` | `CBR$WEB4` | `CBR_MINISTRY_PENG` |
@@ -25,7 +24,6 @@ export type JwtClaims = Record<string, unknown>;
 export const AVAILABLE_ROLES = [
   'CBR_ADMIN',
   'CBR_GENERAL',
-  'CBR_LEVEL_0',
   'CBR_LEVEL_1',
   'CBR_LEVEL_2',
   'CBR_PENG',
@@ -39,14 +37,13 @@ export const AVAILABLE_ROLES = [
  * | Role | Grants |
  * |---|---|
  * | `CBR_GENERAL` | 24 privileges, **all `/show*`** — read only |
- * | `CBR_LEVEL_0` | `/saveInspection`, `/showOfflineInspection`, `/level0Access` |
- * | `CBR_LEVEL_1` | create/edit: save site / structure / inspection, uploads, repair responsibility |
+ * | `CBR_LEVEL_1` | record inspections (offline too); create/edit: save site / structure / inspection, uploads, repair responsibility |
  * | `CBR_LEVEL_2` | destructive: all nine deletes, archive, add site, status override, bulk upload |
  * | `CBR_PENG` | `/approveInspection` (**held by this role alone**), `/pEngAccess` |
  * | `CBR_ADMIN` | the two admin screens, **plus read** |
  * | `CBR_INSPECTION_REVIEWER` | everything `CBR_PENG` has, plus mark an inspection Reviewed and set repair and monitoring items Required or Not Required — legacy's reviewer row |
  *
- * Profiles nest: READ_ONLY ⊂ TECHNICIAN_0 ⊂ TECHNICIAN_1 ⊂ TECHNICIAN_2 ⊂ MINISTRY_PENG ⊂
+ * Profiles nest: READ_ONLY ⊂ TECHNICIAN_1 ⊂ TECHNICIAN_2 ⊂ MINISTRY_PENG ⊂
  * INSPECTION_REVIEWER. The top rung is legacy's reviewer row, which only a P.Eng was given: FAM grants
  * a reviewing P.Eng `CBR_INSPECTION_REVIEWER` in place of `CBR_PENG` (cbr-inspection-reviewer.local.md §10).
  * `CBR_ADMIN` stands apart — it is not on that ladder.
@@ -59,22 +56,19 @@ export const AVAILABLE_ROLES = [
 export const ROLE_CAPABILITIES = {
   read: [
     'CBR_GENERAL',
-    'CBR_LEVEL_0',
     'CBR_LEVEL_1',
     'CBR_LEVEL_2',
     'CBR_PENG',
     'CBR_INSPECTION_REVIEWER',
     'CBR_ADMIN',
   ],
-  /** Record or amend an inspection — narrower than `write`, which also covers sites and structures. */
-  inspectionWrite: [
-    'CBR_LEVEL_0',
-    'CBR_LEVEL_1',
-    'CBR_LEVEL_2',
-    'CBR_PENG',
-    'CBR_INSPECTION_REVIEWER',
-  ],
-  /** The general create/edit surface. `CBR_GENERAL` is read-only; `CBR_LEVEL_0` writes inspections only. */
+  /**
+   * Record or amend an inspection. Today the same roles as `write`: legacy's `LEVEL_0`, which wrote
+   * inspections without touching sites or structures, is not issued by FAM. Kept separate so the
+   * screens still say which kind of write they gate.
+   */
+  inspectionWrite: ['CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_INSPECTION_REVIEWER'],
+  /** The general create/edit surface. `CBR_GENERAL` is read-only. */
   write: ['CBR_LEVEL_1', 'CBR_LEVEL_2', 'CBR_PENG', 'CBR_INSPECTION_REVIEWER'],
   /**
    * Delete / archive / add site / status override / bulk upload.

@@ -1,7 +1,9 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type { PagedResponse } from '@/types/api';
+import type { SortOrder } from '@/utils/headerSort';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
+import { sortParams } from '@/utils/headerSort';
 
 /** One road section as `/api/v1/roads` returns it. */
 export type RoadSectionResponse = {
@@ -39,6 +41,22 @@ export type RoadSearchResult = {
   clientNumber: string | null;
 };
 
+/**
+ * The dialog's sortable columns — the backend's `RoadSortColumn`, one per header. New in CBR:
+ * legacy's dialog had one fixed order (road name, file, branch), still what a search answers with
+ * until a header is clicked.
+ */
+export type RoadSortColumn =
+  | 'FOREST_SERVICE_ROAD'
+  | 'PROJECT_FILE'
+  | 'BRANCH'
+  | 'TENURE_TYPE'
+  | 'CLIENT_NAME'
+  | 'CLIENT_NUMBER';
+
+/** The columns the user sorted by, the first deciding. Empty is legacy's order. */
+export type RoadSort = SortOrder<RoadSortColumn>;
+
 export const EMPTY_ROAD_CRITERIA: RoadSearchCriteria = {
   forestServiceRoad: '',
   forestFileId: '',
@@ -68,16 +86,19 @@ export class RoadService extends HttpClient {
    * <p>`pageNumber` is zero-based, matching the backend. Blank criteria are dropped rather than
    * sent: the server treats a blank as unset either way, and a URL carrying all six is unreadable
    * in the place this gets debugged.
+   *
+   * @param sort the header sorted by; legacy's order when absent
    */
   searchRoads(
     criteria: RoadSearchCriteria,
     pageNumber: number,
     pageSize: number,
+    sort: RoadSort = [],
   ): CancelablePromise<PagedResponse<RoadSearchResult>> {
     return this.doRequest<PagedResponse<RoadSearchResult>>(this.config, {
       method: 'GET',
       url: '/v1/roads/search',
-      query: { ...populated(criteria), pageNumber, pageSize },
+      query: { ...populated(criteria), pageNumber, pageSize, ...sortParams(sort) },
     });
   }
 

@@ -14,11 +14,12 @@ import {
 } from '@carbon/react';
 import { Link } from 'react-router-dom';
 
+import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
+
 import type { InspectionSearchResult, InspectionSort, InspectionSortColumn } from './types';
 import type { FC } from 'react';
 
 import { formatShortDate } from '@/utils/date';
-import { directionOf, nextSort } from '@/utils/headerSort';
 import {
   inspectionStatusLabel,
   inspectionStatusTagType,
@@ -37,8 +38,8 @@ type Props = {
   onPageChange: (next: { page: number; pageSize: number }) => void;
   onDelete: (inspection: InspectionSearchResult) => void;
   /** The header the results are sorted by, or `null` for legacy's default order. */
-  sort?: InspectionSort | null;
-  onSortChange?: (next: InspectionSort | null) => void;
+  sort?: InspectionSort;
+  onSortChange?: (next: InspectionSort) => void;
 };
 
 /**
@@ -90,7 +91,7 @@ const InspectionSearchResults: FC<Props> = ({
   canDelete,
   onPageChange,
   onDelete,
-  sort = null,
+  sort = [],
   onSortChange,
 }) => {
   // The ten legacy columns, and Actions when the user may delete.
@@ -122,20 +123,24 @@ const InspectionSearchResults: FC<Props> = ({
         className="bordered-table"
         data-testid="inspection-search-results"
       >
+        <ClearSort
+          sort={sort}
+          onSortChange={onSortChange}
+          data-testid="inspection-search-clear-sort"
+        />
         <Table useZebraStyles size="lg">
           <TableHead>
             <TableRow>
               {COLUMNS.map(({ column, label }) => (
-                <TableHeader
+                <SortableHeader
                   key={column}
-                  isSortable={Boolean(onSortChange)}
-                  isSortHeader={sort?.column === column}
-                  sortDirection={directionOf(sort, column)}
-                  onClick={() => onSortChange?.(nextSort(sort, column))}
+                  column={column}
+                  sort={sort}
+                  onSortChange={onSortChange}
                   data-testid={`inspection-search-sort-${column}`}
                 >
                   {label}
-                </TableHeader>
+                </SortableHeader>
               ))}
               {/* "Actions", not "Delete": the column is gated on the destructive capability, but
                   naming it after its only current occupant would have to be renamed the moment a

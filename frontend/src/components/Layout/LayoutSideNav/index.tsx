@@ -1,4 +1,4 @@
-import { Email } from '@carbon/icons-react';
+import { Document, Email } from '@carbon/icons-react';
 import {
   SideNav,
   SideNavDivider,
@@ -10,6 +10,7 @@ import {
 import { type FC } from 'react';
 import { Link, matchPath, useLocation } from 'react-router-dom';
 
+import { howToGuideFor } from '@/routes/howToGuides';
 import { getMenuEntries, getOfflineMenuEntries, type MenuItem } from '@/routes/routePaths';
 
 import { useAuth } from '@/context/auth/useAuth';
@@ -39,6 +40,11 @@ export const LayoutSideNav: FC = () => {
   // offline-capable routes.
   const menuEntries =
     online && isLoggedIn ? getMenuEntries(user?.roles || []) : getOfflineMenuEntries();
+
+  // The how-to guide written for this user's roles (see routes/howToGuides). Online only: it is a
+  // PDF served beside the app, with nothing to serve it from offline, and a link that fails in the
+  // field is worse than none.
+  const howToGuide = online && isLoggedIn ? howToGuideFor(user?.roles ?? []) : null;
 
   const childPath = (parentPath: string, child: MenuItem) => {
     // The suffix on its own line rather than a template nested inside a template. A child with no
@@ -164,10 +170,8 @@ export const LayoutSideNav: FC = () => {
           return isSideNavExpanded ? renderMenuItem(route) : renderRailSection(route);
         })}
         {/* Support — pinned to the bottom of the nav regardless of how many role-dependent entries
-            render above it (see the flex rules in index.scss). A plain mailto: rather than a route:
-            it opens the user's own mail client with the shared mailbox pre-addressed. The app tells
-            users to "contact the CBR help desk" when something fails; this is the how. */}
-        {supportEmail && (
+            render above it (see the flex rules in index.scss). Shown when it has either link. */}
+        {(howToGuide || supportEmail) && (
           <>
             {/* The rule above the block, and the thing that pins it down: the divider carries the
                 `margin-block-start: auto`. It is the one element of the three that is present in
@@ -177,13 +181,32 @@ export const LayoutSideNav: FC = () => {
             <li className="side-nav-support-heading" aria-hidden="true">
               Support
             </li>
-            <SideNavLink
-              data-testid="side-nav-link-email-support"
-              href={`mailto:${supportEmail}`}
-              renderIcon={Email}
-            >
-              Report an issue
-            </SideNavLink>
+            {/* A PDF in a new tab rather than a route: the reader follows it while doing what it
+                describes, and replacing the screen with the instructions for it would be a poor
+                trade. */}
+            {howToGuide && (
+              <SideNavLink
+                data-testid="side-nav-link-how-to-guide"
+                href={howToGuide}
+                target="_blank"
+                rel="noopener noreferrer"
+                renderIcon={Document}
+              >
+                How-to guide
+              </SideNavLink>
+            )}
+            {/* A plain mailto: rather than a route: it opens the user's own mail client with the
+                shared mailbox pre-addressed. The app tells users to "contact the CBR help desk"
+                when something fails; this is the how. */}
+            {supportEmail && (
+              <SideNavLink
+                data-testid="side-nav-link-email-support"
+                href={`mailto:${supportEmail}`}
+                renderIcon={Email}
+              >
+                Report an issue
+              </SideNavLink>
+            )}
           </>
         )}
       </SideNavItems>

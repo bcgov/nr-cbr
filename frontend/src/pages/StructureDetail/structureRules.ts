@@ -4,8 +4,15 @@ import type { StructureDetailsRequest } from './structureResponse';
 
 /** Sources that need Year Added to Inventory — legacy's asterisk follows them. */
 export const SOURCES_NEEDING_YEAR_ADDED = new Set(['IR', 'INSR', 'ITM', 'IFS', 'IIO']);
-/** The costs are `NUMBER(6)`, whole dollars. */
+/** Material Cost is `NUMBER(6)`, whole dollars. */
 const COST_MAX = 999_999;
+/**
+ * Installation Cost's ceiling, as the business set it (CBR-816): `INSTALLATION_COST` is
+ * `NUMBER(7)` and holds more, but nothing above this is expected. The server's too.
+ */
+const INSTALLATION_COST_MAX = 4_999_999;
+/** Above this, Installation Cost is warned of, and still saves. */
+const INSTALLATION_COST_WARNING = 1_000_000;
 
 /** The Structure card's values as typed: the numbers are text until saved. */
 export type StructureValues = {
@@ -34,11 +41,11 @@ export const EMPTY_STRUCTURE_VALUES: StructureValues = {
   materialCost: '',
 };
 
-/** A typed cost as a number, null when blank, or NaN when it is not whole dollars in range. */
-const toCost = (typed: string): number | null => {
+/** A typed cost as a number, null when blank, or NaN when it is not whole dollars up to `max`. */
+const toCost = (typed: string, max = COST_MAX): number | null => {
   const trimmed = typed.trim();
   if (!trimmed) return null;
-  return /^\d+$/.test(trimmed) && Number(trimmed) <= COST_MAX ? Number(trimmed) : Number.NaN;
+  return /^\d+$/.test(trimmed) && Number(trimmed) <= max ? Number(trimmed) : Number.NaN;
 };
 
 /** The section's blocking rules — the server's, checked before the round trip. */
@@ -77,8 +84,8 @@ export const structureErrorsOf = (
   ) {
     errors.inventoryAddedYear = 'Year Added to Inventory is required for this Source.';
   }
-  if (Number.isNaN(toCost(values.installationCost))) {
-    errors.installationCost = 'Installation Cost must be whole dollars from $0 to $999,999.';
+  if (Number.isNaN(toCost(values.installationCost, INSTALLATION_COST_MAX))) {
+    errors.installationCost = 'Installation Cost must be whole dollars from $0 to $4,999,999.';
   }
   if (Number.isNaN(toCost(values.materialCost))) {
     errors.materialCost = 'Material Cost must be whole dollars from $0 to $999,999.';
@@ -116,8 +123,11 @@ export const structureWarningsOf = (values: StructureValues): Messages<Structure
       `the year built + 50 years (${built + 50})`,
     );
   }
-  // Legacy also warned of an Installation Cost over $500,000. Dropped on request: users asked for
-  // $1,000,000, past the column's $999,999, whose error already covers it.
+  // Legacy's was over $500,000; raised to $1,000,000 on request (CBR-816).
+  const installation = toCost(values.installationCost, INSTALLATION_COST_MAX);
+  if (installation !== null && installation > INSTALLATION_COST_WARNING) {
+    warnings.installationCost = 'Installation Cost is not in the range $0 through $1,000,000.';
+  }
   return warnings;
 };
 
@@ -130,6 +140,6 @@ export const toStructureRequest = (values: StructureValues): StructureDetailsReq
   sourceCode: values.sourceCode,
   endOfDesignLifeYear: toYear(values.endOfDesignLifeYear),
   asBuiltInfoOnFile: values.asBuiltInfoOnFile,
-  installationCost: toCost(values.installationCost),
+  installationCost: toCost(values.installationCost, INSTALLATION_COST_MAX),
   materialCost: toCost(values.materialCost),
 });

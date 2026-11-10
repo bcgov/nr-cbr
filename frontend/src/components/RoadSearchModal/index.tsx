@@ -9,16 +9,21 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableHeader,
   TableRow,
   TextInput,
 } from '@carbon/react';
 import { useCallback, useState, type FC, type KeyboardEvent } from 'react';
 
 import ClientCombo from '@/components/core/ClientCombo';
+import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 import { Modal } from '@/components/Modal';
 
-import type { RoadSearchCriteria, RoadSearchResult } from '@/services/road.service';
+import type {
+  RoadSearchCriteria,
+  RoadSearchResult,
+  RoadSort,
+  RoadSortColumn,
+} from '@/services/road.service';
 import type { ClientSuggestion } from '@/types/client';
 
 import { useRoadSearch } from '@/hooks/useRoadSearch';
@@ -39,6 +44,16 @@ const ROADS_PER_PAGE = 15;
 
 /** The server bounds a page at two hundred rows, so nothing above that is worth offering. */
 const ROAD_PAGE_SIZES = [15, 50, 100];
+
+/** The six columns, in legacy's order — each sorts by its header. */
+const COLUMNS: { column: RoadSortColumn; label: string }[] = [
+  { column: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
+  { column: 'PROJECT_FILE', label: 'Project File ID#' },
+  { column: 'BRANCH', label: 'Br.' },
+  { column: 'TENURE_TYPE', label: 'Tenure Type' },
+  { column: 'CLIENT_NAME', label: 'Client Name' },
+  { column: 'CLIENT_NUMBER', label: 'Client #' },
+];
 
 type Props = {
   /** A road was chosen — the two halves of the pair the site form records. */
@@ -73,13 +88,20 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
   /** One-based, as Carbon's Pagination counts. */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(ROADS_PER_PAGE);
+  /** The header sorted by — none at first, so legacy's order. */
+  const [sort, setSort] = useState<RoadSort>([]);
+  /** A new sort starts again at the first page. */
+  const sortBy = (next: RoadSort) => {
+    setSort(next);
+    setPage(1);
+  };
   /**
    * The criteria as last submitted, kept apart from the form's live state so that typing does not
    * search — see `useRoadSearch`. `null` until the first press of Search.
    */
   const [submitted, setSubmitted] = useState<RoadSearchCriteria | null>(null);
 
-  const results = useRoadSearch(submitted, page - 1, pageSize);
+  const results = useRoadSearch(submitted, page - 1, pageSize, sort);
 
   const update = useCallback(
     (field: keyof RoadSearchCriteria, value: string) =>
@@ -226,15 +248,23 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
           className="bordered-table"
           data-testid="road-search-results"
         >
+          <ClearSort sort={sort} onSortChange={sortBy} data-testid="road-search-clear-sort" />
           <Table useZebraStyles size="sm">
             <TableHead>
               <TableRow>
-                <TableHeader>Forest Service Road</TableHeader>
-                <TableHeader>Project File ID#</TableHeader>
-                <TableHeader>Br.</TableHeader>
-                <TableHeader>Tenure Type</TableHeader>
-                <TableHeader>Client Name</TableHeader>
-                <TableHeader>Client #</TableHeader>
+                {/* On the server, not the page: the roads are paged there, so sorting only the
+                    rows on screen would order fifteen of them and call it sorted. */}
+                {COLUMNS.map(({ column, label }) => (
+                  <SortableHeader
+                    key={column}
+                    column={column}
+                    sort={sort}
+                    onSortChange={sortBy}
+                    data-testid={`road-search-sort-${column}`}
+                  >
+                    {label}
+                  </SortableHeader>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>

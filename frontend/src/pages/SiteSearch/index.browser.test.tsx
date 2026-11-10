@@ -298,7 +298,7 @@ describe('SiteSearchPage — results', () => {
       expect.objectContaining({ siteId: '12345' }),
       0,
       20,
-      null,
+      [],
     );
   });
 
@@ -344,7 +344,7 @@ describe('SiteSearchPage — results', () => {
     fireEvent.click(screen.getByLabelText('Next page'));
 
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, null);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, []);
     });
   });
 
@@ -360,13 +360,13 @@ describe('SiteSearchPage — results', () => {
     await searchAndWait();
     fireEvent.click(screen.getByLabelText('Next page'));
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, null);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, []);
     });
 
     search();
 
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, []);
     });
   });
 
@@ -533,7 +533,7 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       expect.objectContaining({ businessAreaOrgUnit: '1773' }),
       0,
       20,
-      null,
+      [],
     );
   });
 
@@ -554,7 +554,7 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       expect.objectContaining({ siteStatusCode: '' }),
       0,
       20,
-      null,
+      [],
     );
   });
 
@@ -620,7 +620,7 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       expect.objectContaining({ orgUnit: '18' }),
       0,
       20,
-      null,
+      [],
     );
   });
 
@@ -1150,10 +1150,12 @@ describe('SiteSearchPage — sorting by a header', () => {
     await sortBy('CROSSING_NAME');
 
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
-        column: 'CROSSING_NAME',
-        direction: 'ASC',
-      });
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, [
+        {
+          column: 'CROSSING_NAME',
+          direction: 'ASC',
+        },
+      ]);
     });
   });
 
@@ -1164,15 +1166,17 @@ describe('SiteSearchPage — sorting by a header', () => {
     await sortBy('KILOMETRES');
     await sortBy('KILOMETRES');
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
-        column: 'KILOMETRES',
-        direction: 'DESC',
-      });
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, [
+        {
+          column: 'KILOMETRES',
+          direction: 'DESC',
+        },
+      ]);
     });
 
     await sortBy('KILOMETRES');
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, []);
     });
   });
 
@@ -1183,16 +1187,18 @@ describe('SiteSearchPage — sorting by a header', () => {
     await searchAndWait();
     fireEvent.click(screen.getByLabelText('Next page'));
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, null);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 1, 20, []);
     });
 
     await sortBy('SITE_ID');
 
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, {
-        column: 'SITE_ID',
-        direction: 'ASC',
-      });
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, [
+        {
+          column: 'SITE_ID',
+          direction: 'ASC',
+        },
+      ]);
     });
   });
 
@@ -1215,7 +1221,7 @@ describe('SiteSearchPage — sorting by a header', () => {
     await searchAndWait();
 
     await waitFor(() => {
-      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, null);
+      expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(expect.anything(), 0, 20, []);
     });
   });
 });
@@ -1239,7 +1245,7 @@ describe('SiteSearchPage — coming back to the search', () => {
       expect.objectContaining({ siteId: '62-002' }),
       0,
       20,
-      null,
+      [],
     );
   });
 

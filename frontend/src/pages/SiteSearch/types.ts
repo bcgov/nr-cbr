@@ -1,4 +1,4 @@
-import type { HeaderSort } from '@/utils/headerSort';
+import type { SortOrder } from '@/utils/headerSort';
 
 /**
  * Site Search criteria and results.
@@ -91,8 +91,8 @@ export type SiteSortColumn =
   | 'PROJECT_FILE'
   | 'STATUS';
 
-/** A header the user sorted by, and which way. `null` where used means legacy's order. */
-export type SiteSort = HeaderSort<SiteSortColumn>;
+/** The columns the user sorted by, the first deciding. Empty is legacy's order. */
+export type SiteSort = SortOrder<SiteSortColumn>;
 
 export const EMPTY_CRITERIA: SiteSearchCriteria = {
   siteId: '',

@@ -10,6 +10,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteUpdateRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -52,6 +53,10 @@ public interface SiteApiEndpoint {
    * on the server so it orders every match, not just the page on screen. An unknown value is a
    * 400.
    *
+   * <p><b>By several columns</b> when {@code sortBy} repeats, each with its {@code sortDirection}
+   * in the same order ({@code HeaderSort}): the first decides, and each next breaks the ties before
+   * it.
+   *
    * <p>Gated on {@link CbrAuthorities#READ}, the legacy {@code /showSiteSearch} privilege — every
    * role that can read holds it, and {@code CBR_ADMIN} now does too. This is an admission check, not
    * a row filter: CBR has no region, district or client scoping, so a caller who passes it sees
@@ -63,8 +68,9 @@ public interface SiteApiEndpoint {
       @Valid @ModelAttribute SiteSearchCriteria criteria,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
       @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
-      @RequestParam(name = "sortBy", required = false) SiteSortColumn sortBy,
-      @RequestParam(name = "sortDirection", defaultValue = "ASC") Sort.Direction sortDirection);
+      @RequestParam(name = "sortBy", required = false) List<SiteSortColumn> sortBy,
+      @RequestParam(name = "sortDirection", required = false)
+      List<Sort.Direction> sortDirection);
 
   /**
    * One site, for the detail screen.

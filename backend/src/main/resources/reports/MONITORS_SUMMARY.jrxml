@@ -247,9 +247,9 @@
 					<textField isBlankWhenNull="true">
 						<reportElement x="240" y="72" width="96" height="12" forecolor="#000000" uuid="5a8d9257-9c69-4834-9e0e-cb5159682723"/>
 						<textElement>
-							<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+							<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
 						</textElement>
-						<textFieldExpression><![CDATA[$V{FSR_PN_LABEL}]]></textFieldExpression>
+						<textFieldExpression><![CDATA["REC".equalsIgnoreCase($F{CROSSING_SITE_TYPE_CODE}) ? "Project Name:" : "Forest Service Road:"]]></textFieldExpression>
 					</textField>
 				</band>
 		</groupHeader>

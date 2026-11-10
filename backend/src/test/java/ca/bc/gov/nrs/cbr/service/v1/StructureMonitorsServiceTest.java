@@ -13,8 +13,10 @@ import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureMonitorItemEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
@@ -30,9 +32,12 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -97,7 +102,7 @@ class StructureMonitorsServiceTest {
   private PagedResponse<Monitor> monitors(View view) {
     entityManager.flush();
     entityManager.clear();
-    return service.monitors(7L, view, null, 0, 10, false).page();
+    return service.monitors(7L, view, null, 0, 10, false, List.of()).page();
   }
 
   @Test
@@ -113,11 +118,12 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var listing = service.monitors(7L, View.CURRENT, 10L, 0, 10, false);
+    var listing = service.monitors(7L, View.CURRENT, 10L, 0, 10, false, List.of());
     assertThat(listing.page().content()).extracting(Monitor::number)
         .containsExactlyInAnyOrder(1L, 2L);
     assertThat(listing.beforeInstallCount()).isZero();
-    assertThatThrownBy(() -> service.monitors(7L, View.CURRENT, null, 0, 10, false))
+    assertThatThrownBy(() -> service.monitors(7L, View.CURRENT, null, 0,
+        10, false, List.of()))
         .isInstanceOf(ResponseStatusException.class);
   }
 
@@ -161,10 +167,89 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    PagedResponse<Monitor> second = service.monitors(7L, View.ALL, null, 1, 10, false).page();
+    PagedResponse<Monitor> second = service.monitors(7L, View.ALL, null, 1,
+        10, false, List.of()).page();
 
     assertThat(second.content()).extracting(Monitor::number).containsExactly(2L, 1L);
     assertThat(second.totalElements()).isEqualTo(12);
+  }
+
+  /** The numbers of every item's first page, sorted by a header. */
+  private List<Long> sortedBy(MonitorSortColumn column, Sort.Direction direction) {
+    entityManager.flush();
+    entityManager.clear();
+    return service.monitors(7L, View.ALL, null, 0, 10, false,
+            List.of(new HeaderSort<>(column, direction))).page().content()
+        .stream().map(Monitor::number).toList();
+  }
+
+  private void givenFrequency(String code, String description) {
+    entityManager.persist(MonitorFrequencyCodeEntity.builder()
+        .monitorFrequencyCode(code).description(description).build());
+  }
+
+  @Test
+  @DisplayName("sorts by a header's shown value, both ways, legacy's order breaking the ties")
+  void sortsByHeader() {
+    // Described against their codes' order, so a sort by code would fail.
+    entityManager.persist(MonitoringStatusCodeEntity.builder()
+        .monitoringStatusCode("SUG").description("awaiting review").build());
+    entityManager.persist(MonitoringStatusCodeEntity.builder()
+        .monitoringStatusCode("REQ").description("Required").build());
+    givenMonitor(1L, null, "REQ");
+    givenMonitor(2L, null, "SUG");
+    givenMonitor(3L, null, "REQ");
+
+    // Case-blind. The two Required tie, and legacy's number order (descending) settles them
+    // whichever way the header sorts.
+    assertThat(sortedBy(MonitorSortColumn.STATUS, Sort.Direction.ASC))
+        .containsExactly(2L, 3L, 1L);
+    assertThat(sortedBy(MonitorSortColumn.STATUS, Sort.Direction.DESC))
+        .containsExactly(3L, 1L, 2L);
+  }
+
+  @Test
+  @DisplayName("sorts Monitoring Frequency by its description, then the comment shown after it")
+  void sortsByFrequencyThenComment() {
+    givenFrequency("ANN", "Annually");
+    givenFrequency("OTH", "Other");
+    givenMonitor(1L, null, "REQ",
+        monitor -> monitor.monitorFrequencyCode("OTH").monitorFrequencyCmt("Every spring"));
+    givenMonitor(2L, null, "REQ",
+        monitor -> monitor.monitorFrequencyCode("OTH").monitorFrequencyCmt("After floods"));
+    givenMonitor(3L, null, "REQ", monitor -> monitor.monitorFrequencyCode("ANN"));
+
+    assertThat(sortedBy(MonitorSortColumn.FREQUENCY, Sort.Direction.ASC))
+        .containsExactly(3L, 2L, 1L);
+  }
+
+  @Test
+  @DisplayName("sorts every item on the server, not only the page on screen")
+  void sortsAcrossPages() {
+    for (long id = 1; id <= 12; id++) {
+      givenMonitor(id, null, "REQ");
+    }
+
+    // Legacy's own order is by number descending; ascending proves the header decides.
+    assertThat(sortedBy(MonitorSortColumn.NUMBER, Sort.Direction.ASC))
+        .containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(MonitorSortColumn.class)
+  @DisplayName("every header sorts both ways and still lists every item")
+  void everyHeaderSorts(MonitorSortColumn column) {
+    entityManager.persist(MonitoringStatusCodeEntity.builder()
+        .monitoringStatusCode("REQ").description("Required").build());
+    givenFrequency("ANN", "Annually");
+    givenInspection(10L, LocalDate.of(2023, 6, 1));
+    givenMonitor(1L, 10L, "REQ", monitor -> monitor.monitorFrequencyCode("ANN")
+        .requiredByTimestamp(LocalDateTime.of(2024, 1, 1, 9, 0)));
+    givenMonitor(2L, null, "REQ");
+
+    for (Sort.Direction direction : Sort.Direction.values()) {
+      assertThat(sortedBy(column, direction)).containsExactlyInAnyOrder(1L, 2L);
+    }
   }
 
   @Test
@@ -208,8 +293,8 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var shown = service.monitors(7L, View.ALL, null, 0, 10, false);
-    var all = service.monitors(7L, View.ALL, null, 0, 10, true);
+    var shown = service.monitors(7L, View.ALL, null, 0, 10, false, List.of());
+    var all = service.monitors(7L, View.ALL, null, 0, 10, true, List.of());
 
     // 1 January of the install year is not "after" it; no inspection is always listed.
     assertThat(shown.page().content()).extracting(Monitor::number)
@@ -227,7 +312,7 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    var listing = service.monitors(7L, View.ALL, null, 0, 10, false);
+    var listing = service.monitors(7L, View.ALL, null, 0, 10, false, List.of());
 
     assertThat(listing.page().content()).hasSize(1);
     assertThat(listing.beforeInstallCount()).isZero();
@@ -415,7 +500,8 @@ class StructureMonitorsServiceTest {
         .isInstanceOfSatisfying(FieldValidationException.class, failure ->
             assertThat(failure.getFieldErrors())
                 .containsOnlyKeys("frequencyComment", "description"));
-    assertThat(service.monitors(7L, View.ALL, null, 0, 10, true).page().content()).isEmpty();
+    assertThat(service.monitors(7L, View.ALL, null, 0,
+        10, true, List.of()).page().content()).isEmpty();
   }
 
   @Test
@@ -438,7 +524,8 @@ class StructureMonitorsServiceTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThat(service.monitors(7L, View.ALL, null, 0, 10, false).page().content())
+    assertThat(service.monitors(7L, View.ALL, null, 0,
+        10, false, List.of()).page().content())
         .extracting(Monitor::number).containsExactly(2L);
   }
 
@@ -458,7 +545,8 @@ class StructureMonitorsServiceTest {
   @Test
   @DisplayName("refuses a structure that does not exist")
   void missingStructure() {
-    assertThatThrownBy(() -> service.monitors(404L, View.ALL, null, 0, 10, false))
+    assertThatThrownBy(() -> service.monitors(404L, View.ALL, null, 0,
+        10, false, List.of()))
         .isInstanceOf(StructureNotFoundException.class);
   }
 }

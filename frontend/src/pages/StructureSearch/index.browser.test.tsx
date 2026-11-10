@@ -267,7 +267,7 @@ describe('StructureSearchPage — searching', () => {
         expect.objectContaining({ siteId: 'BOWRON-001' }),
         expect.anything(),
         expect.anything(),
-        null,
+        [],
       ),
     );
     expect(screen.getByTestId('structure-search-siteId')).toHaveValue('BOWRON-001');
@@ -305,7 +305,7 @@ describe('StructureSearchPage — searching', () => {
       }),
       0,
       20,
-      null,
+      [],
     );
   });
 
@@ -343,7 +343,7 @@ describe('StructureSearchPage — searching', () => {
         expect.anything(),
         1,
         20,
-        null,
+        [],
       );
     });
 
@@ -353,7 +353,7 @@ describe('StructureSearchPage — searching', () => {
         expect.anything(),
         0,
         20,
-        null,
+        [],
       );
     });
   });
@@ -600,7 +600,7 @@ describe('StructureSearchPage — sorting by a header', () => {
         expect.anything(),
         0,
         20,
-        { column: 'TYPE_CLASS', direction: 'ASC' },
+        [{ column: 'TYPE_CLASS', direction: 'ASC' }],
       );
     });
   });
@@ -616,7 +616,7 @@ describe('StructureSearchPage — sorting by a header', () => {
         expect.anything(),
         0,
         20,
-        { column: 'STRUCTURE_NAME', direction: 'DESC' },
+        [{ column: 'STRUCTURE_NAME', direction: 'DESC' }],
       );
     });
 
@@ -626,7 +626,7 @@ describe('StructureSearchPage — sorting by a header', () => {
         expect.anything(),
         0,
         20,
-        null,
+        [],
       );
     });
   });
@@ -646,7 +646,7 @@ describe('StructureSearchPage — sorting by a header', () => {
         expect.anything(),
         1,
         20,
-        null,
+        [],
       );
     });
 
@@ -657,7 +657,7 @@ describe('StructureSearchPage — sorting by a header', () => {
         expect.anything(),
         0,
         20,
-        { column: 'MAINTAINER', direction: 'ASC' },
+        [{ column: 'MAINTAINER', direction: 'ASC' }],
       );
     });
   });
@@ -675,7 +675,7 @@ describe('StructureSearchPage — sorting by a header', () => {
         expect.anything(),
         0,
         20,
-        null,
+        [],
       );
     });
   });
@@ -1441,7 +1441,7 @@ describe('StructureSearchPage — coming back to the search', () => {
         expect.objectContaining({ structureName: 'B100' }),
         0,
         20,
-        null,
+        [],
       );
     });
   });

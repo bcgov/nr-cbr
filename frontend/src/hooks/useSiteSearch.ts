@@ -48,7 +48,7 @@ export const useSiteSearch = (
   criteria: SiteSearchCriteria | null,
   pageNumber: number,
   pageSize: number,
-  sort: SiteSort | null = null,
+  sort: SiteSort = [],
 ): UseQueryResult<PagedResponse<SiteSearchResult>> =>
   useQuery({
     queryKey: [SITE_SEARCH_QUERY_KEY, criteria, pageNumber, pageSize, sort],

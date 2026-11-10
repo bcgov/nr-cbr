@@ -9,12 +9,14 @@ import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.specification.v1.InspectionSearchSpecifications;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import org.slf4j.Logger;
@@ -22,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,17 +71,16 @@ public class InspectionSearchService {
    * @param criteria   the caller's filters; every field optional
    * @param pageNumber zero-based
    * @param pageSize   rows per page, capped at {@value #MAX_PAGE_SIZE}
-   * @param sortBy     the results column the user sorted by, or null for the default order
-   * @param direction  which way, when {@code sortBy} is set
+   * @param sort       the columns the user sorted by, first deciding; none for legacy's order
    */
   @Transactional(readOnly = true)
   public PagedResponse<InspectionSearchResult> search(
       InspectionSearchCriteria criteria, int pageNumber, int pageSize,
-      InspectionSortColumn sortBy, Sort.Direction direction) {
+      List<HeaderSort<InspectionSortColumn>> sort) {
     Pageable pageable = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
 
     Page<StructureInspectionEntity> results = structureInspectionRepository.findAll(
-        InspectionSearchSpecifications.matching(criteria, sortBy, direction), pageable);
+        InspectionSearchSpecifications.matching(criteria, sort), pageable);
 
     log.debug("Inspection search matched {} inspection(s) (page {} of {}, criteriaEmpty={})",
         results.getTotalElements(), results.getNumber(), results.getTotalPages(),

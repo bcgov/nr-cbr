@@ -105,7 +105,7 @@ const InspectionDetailPage: FC = () => {
   const reviewed = DOCUMENT_LOCKING_STATUSES.has(inspection?.status.code ?? '');
   /** Reviewed or Accepted: no document added any more — legacy disables its Add then, not on Rejected. */
   const documentsLocked = DOCUMENT_LOCKING_STATUSES.has(inspection?.status.code ?? '');
-  /** Legacy's page: Level 0 and up edit it, until it is Reviewed or Accepted. */
+  /** Legacy's page: Level 1 and up edit it, until it is Reviewed or Accepted. */
   const canEditInspection = canWriteInspection && !documentsLocked;
   /** What it still lacks, by tab — legacy's submit rules and every unanswered question. */
   const outstanding = inspection ? outstandingOf(inspection, form.data) : null;

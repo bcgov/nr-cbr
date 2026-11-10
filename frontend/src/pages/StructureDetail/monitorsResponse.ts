@@ -1,8 +1,20 @@
 import type { CodeValue } from './structureResponse';
 import type { Audited, ItemView } from './UserAudits';
+import type { SortOrder } from '@/utils/headerSort';
 
 /** Which items the Monitoring tab lists — legacy's "Choose Viewing Option". */
 export type MonitorView = ItemView;
+
+/**
+ * The Monitoring tab's sortable columns — the backend's `MonitorSortColumn`, one per header but
+ * Actions. New in CBR: legacy's table had one fixed order, still what the tab shows until a header
+ * is clicked.
+ */
+export type MonitorSortColumn =
+  'NUMBER' | 'STATUS' | 'USER_AUDITS' | 'INSPECTION_DATE' | 'DESCRIPTION' | 'FREQUENCY';
+
+/** The columns the user sorted by, the first deciding. Empty is legacy's order. */
+export type MonitorSort = SortOrder<MonitorSortColumn>;
 
 /**
  * One monitoring item — a row of `GET /v1/structures/{structureId}/monitors`, the backend's

@@ -18,6 +18,7 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureTypeClassCodeEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
@@ -137,18 +138,19 @@ class StructureSearchServiceTest {
       StructureSearchCriteria.StructureSearchCriteriaBuilder criteria) {
     entityManager.flush();
     entityManager.clear();
-    return service.search(criteria.build(), 0, 50, null, Sort.Direction.ASC);
+    return service.search(criteria.build(), 0, 50, List.of());
   }
 
   /** One page of every structure, in legacy's order. */
   private PagedResponse<StructureSearchResult> unsorted(int pageNumber, int pageSize) {
-    return service.search(criteria().build(), pageNumber, pageSize, null, Sort.Direction.ASC);
+    return service.search(criteria().build(), pageNumber, pageSize, List.of());
   }
 
   private List<String> sorted(StructureSortColumn column, Sort.Direction direction) {
     entityManager.flush();
     entityManager.clear();
-    return service.search(criteria().build(), 0, 50, column, direction).content().stream()
+    return service.search(criteria().build(), 0, 50,
+            List.of(new HeaderSort<>(column, direction))).content().stream()
         .map(StructureSearchResult::structureName).toList();
   }
 

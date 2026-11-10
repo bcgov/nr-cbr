@@ -71,7 +71,7 @@ const InspectionSearchPage: FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   /** The header the results are sorted by. Kept across new searches; cleared by Reset. */
-  const [sort, setSort] = useState<InspectionSort | null>(null);
+  const [sort, setSort] = useState<InspectionSort>([]);
   const [pendingDelete, setPendingDelete] = useState<InspectionSearchResult | null>(null);
 
   const structureTypeClassCodes = useStructureTypeClassCodes();
@@ -142,7 +142,7 @@ const InspectionSearchPage: FC = () => {
     setCriteria(EMPTY_CRITERIA);
     setSubmitted(null);
     setPage(1);
-    setSort(null);
+    setSort([]);
   }, []);
 
   return (

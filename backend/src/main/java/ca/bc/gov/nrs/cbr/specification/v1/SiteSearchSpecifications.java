@@ -9,6 +9,7 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntitie
 
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -24,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
@@ -100,24 +100,23 @@ public final class SiteSearchSpecifications {
    * (cbr-auth-and-roles.local.md §3.3).
    */
   public static Specification<CrossingSiteEntity> matching(SiteSearchCriteria criteria) {
-    return matching(criteria, null, Sort.Direction.ASC);
+    return matching(criteria, List.of());
   }
 
   /**
    * Builds the predicate, ordered by the column the user chose — or legacy's order when none.
    *
-   * @param sortBy    the results column whose header was clicked, or null for legacy's order
-   * @param direction which way; ignored when {@code sortBy} is null
+   * @param sort      the columns the user sorted by, first deciding; none for legacy's order
    */
   public static Specification<CrossingSiteEntity> matching(
-      SiteSearchCriteria criteria, SiteSortColumn sortBy, Sort.Direction direction) {
+      SiteSearchCriteria criteria, List<HeaderSort<SiteSortColumn>> sort) {
     return (root, query, builder) -> {
       List<Predicate> predicates = new ArrayList<>();
 
       scalarCriteria(builder, root, criteria, predicates);
       toggleCriteria(builder, root, criteria, predicates);
       maintainedBy(builder, query, root, criteria.primaryUserName()).ifPresent(predicates::add);
-      joinedCriteriaAndProjection(root, query, builder, criteria, predicates, sortBy, direction);
+      joinedCriteriaAndProjection(root, query, builder, criteria, predicates, sort);
 
       return allOf(builder, predicates);
     };
@@ -210,8 +209,7 @@ public final class SiteSearchSpecifications {
       CriteriaBuilder builder,
       SiteSearchCriteria criteria,
       List<Predicate> predicates,
-      SiteSortColumn sortBy,
-      Sort.Direction direction) {
+      List<HeaderSort<SiteSortColumn>> sort) {
     boolean projecting = returnsEntities(query);
     boolean filtering = StringUtils.hasText(criteria.forestServiceRoad());
     if (!projecting && !filtering) {
@@ -224,7 +222,7 @@ public final class SiteSearchSpecifications {
           .ifPresent(predicates::add);
     }
     if (projecting) {
-      fetchAndOrder(root, roadSection, query, builder, sortBy, direction);
+      fetchAndOrder(root, roadSection, query, builder, sort);
     }
   }
 
@@ -305,15 +303,15 @@ public final class SiteSearchSpecifications {
       From<?, ?> roadSection,
       CriteriaQuery<?> query,
       CriteriaBuilder builder,
-      SiteSortColumn sortBy,
-      Sort.Direction direction) {
+      List<HeaderSort<SiteSortColumn>> sort) {
     From<?, ?> orgUnit = (From<?, ?>) root.fetch(ORG_UNIT, JoinType.LEFT);
     From<?, ?> status = (From<?, ?>) root.fetch(STATUS, JoinType.LEFT);
 
     List<Order> order = new ArrayList<>();
-    if (sortBy != null) {
-      for (Expression<?> key : sortKeys(sortBy, root, orgUnit, roadSection, status, builder)) {
-        order.add(direction == Sort.Direction.DESC ? builder.desc(key) : builder.asc(key));
+    for (HeaderSort<SiteSortColumn> header : sort) {
+      for (Expression<?> key :
+          sortKeys(header.column(), root, orgUnit, roadSection, status, builder)) {
+        order.add(header.descending() ? builder.desc(key) : builder.asc(key));
       }
     }
     order.add(builder.asc(orgUnit.get(ORG_UNIT_CODE)));

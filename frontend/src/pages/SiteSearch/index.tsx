@@ -31,6 +31,7 @@ import {
 } from '@/hooks/useConfiguration';
 import { useDeleteSite, useSiteSearch } from '@/hooks/useSiteSearch';
 import { apiErrorMessage } from '@/utils/apiError';
+import { toSortOrder } from '@/utils/headerSort';
 import { readSessionState, writeSessionState } from '@/utils/sessionState';
 
 /**
@@ -55,7 +56,7 @@ type SavedSiteSearch = {
   submitted: SiteSearchCriteria | null;
   page: number;
   pageSize: number;
-  sort: SiteSort | null;
+  sort: SiteSort;
 };
 
 /**
@@ -70,7 +71,8 @@ const restoreSearch = (): SavedSiteSearch | null => {
     submitted: saved.submitted ? { ...EMPTY_CRITERIA, ...saved.submitted } : null,
     page: saved.page ?? 1,
     pageSize: saved.pageSize ?? 20,
-    sort: saved.sort ?? null,
+    // A search kept before sorting by several columns holds one; it restores as a list of one.
+    sort: toSortOrder(saved.sort),
   };
 };
 
@@ -98,7 +100,7 @@ const SiteSearchPage: FC = () => {
   const [page, setPage] = useState(restored?.page ?? 1);
   const [pageSize, setPageSize] = useState(restored?.pageSize ?? 20);
   /** The header the results are sorted by. Kept across new searches; cleared by Reset. */
-  const [sort, setSort] = useState<SiteSort | null>(restored?.sort ?? null);
+  const [sort, setSort] = useState<SiteSort>(restored?.sort ?? []);
 
   useEffect(() => {
     writeSessionState(SITE_SEARCH_STATE_KEY, {
@@ -192,7 +194,7 @@ const SiteSearchPage: FC = () => {
     setCriteria(EMPTY_CRITERIA);
     setSubmitted(null);
     setPage(1);
-    setSort(null);
+    setSort([]);
     setResetToken((token) => token + 1);
   }, []);
 

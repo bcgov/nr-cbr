@@ -108,9 +108,9 @@ public class LoggedUserHelper {
     return CbrRoles.canRead(getAuthorities());
   }
 
-  /** True when the caller may record or amend an inspection. Floor {@link CbrRoles#LEVEL_0}. */
+  /** True when the caller may record or amend an inspection. Floor {@link CbrRoles#LEVEL_1}. */
   public boolean canWriteInspection() {
-    return isAtLeast(CbrRoles.LEVEL_0);
+    return isAtLeast(CbrRoles.LEVEL_1);
   }
 
   /**

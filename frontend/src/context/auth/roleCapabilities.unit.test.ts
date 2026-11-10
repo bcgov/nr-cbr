@@ -18,7 +18,6 @@ import type { ROLE_TYPE } from './types';
  */
 const LADDER: ROLE_TYPE[] = [
   'CBR_GENERAL',
-  'CBR_LEVEL_0',
   'CBR_LEVEL_1',
   'CBR_LEVEL_2',
   'CBR_PENG',
@@ -30,7 +29,7 @@ const atLeast = (floor: ROLE_TYPE): ROLE_TYPE[] => LADDER.slice(LADDER.indexOf(f
 
 describe('ROLE_CAPABILITIES mirrors the backend ladder', () => {
   it.each([
-    ['inspectionWrite', 'CBR_LEVEL_0'],
+    ['inspectionWrite', 'CBR_LEVEL_1'],
     ['write', 'CBR_LEVEL_1'],
     ['destructive', 'CBR_LEVEL_2'],
     ['approve', 'CBR_PENG'],

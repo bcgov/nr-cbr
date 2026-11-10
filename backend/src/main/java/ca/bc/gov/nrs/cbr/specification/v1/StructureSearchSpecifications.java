@@ -14,6 +14,7 @@ import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceCulvertEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -31,7 +32,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.BiFunction;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
@@ -129,11 +129,10 @@ public final class StructureSearchSpecifications {
    * Builds the predicate for a set of criteria — everything matches when nothing is set — sorted by
    * a results column first when one was chosen.
    *
-   * @param sortBy    the results column whose header was clicked, or null for legacy's order
-   * @param direction which way; ignored when {@code sortBy} is null
+   * @param sort      the columns the user sorted by, first deciding; none for legacy's order
    */
   public static Specification<CrossingStructureEntity> matching(
-      StructureSearchCriteria criteria, StructureSortColumn sortBy, Sort.Direction direction) {
+      StructureSearchCriteria criteria, List<HeaderSort<StructureSortColumn>> sort) {
     return (root, query, builder) -> {
       boolean projecting = returnsEntities(query);
       From<?, ?> site = joinOrFetch(root, SITE, JoinType.LEFT, projecting);
@@ -150,7 +149,7 @@ public final class StructureSearchSpecifications {
       }
 
       if (projecting) {
-        fetchAndOrder(root, site, roadSection, orgUnit, query, builder, sortBy, direction);
+        fetchAndOrder(root, site, roadSection, orgUnit, query, builder, sort);
       }
 
       return predicates.isEmpty()
@@ -419,14 +418,13 @@ public final class StructureSearchSpecifications {
       From<?, ?> orgUnit,
       CriteriaQuery<?> query,
       CriteriaBuilder builder,
-      StructureSortColumn sortBy,
-      Sort.Direction direction) {
+      List<HeaderSort<StructureSortColumn>> sort) {
     From<?, ?> typeClass = (From<?, ?>) root.fetch(TYPE_CLASS, JoinType.LEFT);
     List<Order> order = new ArrayList<>();
-    if (sortBy != null) {
+    for (HeaderSort<StructureSortColumn> header : sort) {
       for (Expression<?> key :
-          sortKeys(sortBy, root, site, roadSection, orgUnit, typeClass, builder)) {
-        order.add(direction == Sort.Direction.DESC ? builder.desc(key) : builder.asc(key));
+          sortKeys(header.column(), root, site, roadSection, orgUnit, typeClass, builder)) {
+        order.add(header.descending() ? builder.desc(key) : builder.asc(key));
       }
     }
     order.addAll(legacyOrder(root, site, roadSection, orgUnit, builder));

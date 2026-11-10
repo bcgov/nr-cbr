@@ -8,18 +8,23 @@ import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSegmentEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestFileClientEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSortColumn;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -319,6 +324,82 @@ class RoadSectionServiceTest {
   }
 
   @Nested
+  @DisplayName("sorting by a header")
+  class Sorting {
+
+    private List<String> sorted(RoadSortColumn column, Sort.Direction direction) {
+      entityManager.flush();
+      entityManager.clear();
+      return service.search(RoadSearchCriteria.builder().build(), 0, 15,
+              List.of(new HeaderSort<>(column, direction)))
+          .content().stream().map(RoadSearchResult::forestServiceRoad).toList();
+    }
+
+    @Test
+    @DisplayName("sorts every match both ways, legacy's road-name order breaking the ties")
+    void sortsByAHeader() {
+      givenRoadSection("R00123", "01", "Bowron FSR", "B40");
+      givenRoadSection("R00999", "02", "Deadman Spur", "B01");
+      givenRoadSection("R00555", "01", "Anahim Main", "B40");
+
+      assertThat(sorted(RoadSortColumn.TENURE_TYPE, Sort.Direction.ASC))
+          .containsExactly("Deadman Spur", "Anahim Main", "Bowron FSR");
+      assertThat(sorted(RoadSortColumn.TENURE_TYPE, Sort.Direction.DESC))
+          .containsExactly("Anahim Main", "Bowron FSR", "Deadman Spur");
+    }
+
+    @Test
+    @DisplayName("sorts by several columns, each breaking the ties of the one before")
+    void sortsBySeveralColumns() {
+      givenRoadSection("R00123", "01", "Bowron FSR", "B40");
+      givenRoadSection("R00999", "02", "Deadman Spur", "B01");
+      givenRoadSection("R00555", "01", "Anahim Main", "B40");
+      entityManager.flush();
+      entityManager.clear();
+
+      assertThat(service.search(RoadSearchCriteria.builder().build(), 0, 15, List.of(
+              new HeaderSort<>(RoadSortColumn.TENURE_TYPE, Sort.Direction.DESC),
+              new HeaderSort<>(RoadSortColumn.FOREST_SERVICE_ROAD, Sort.Direction.DESC)))
+          .content()).extracting(RoadSearchResult::forestServiceRoad)
+          .containsExactly("Bowron FSR", "Anahim Main", "Deadman Spur");
+    }
+
+    @Test
+    @DisplayName("sorts by the tenure holder")
+    void sortsByTheHolder() {
+      givenRoadSection("R00123", "01", "Bowron FSR");
+      givenRoadSection("R00999", "02", "Deadman Spur");
+      givenFileHeldBy(1L, "R00123", "00000002", "WEST FRASER MILLS LTD.");
+      givenFileHeldBy(2L, "R00999", "00000001", "CANFOR CORPORATION");
+
+      assertThat(sorted(RoadSortColumn.CLIENT_NAME, Sort.Direction.ASC))
+          .containsExactly("Deadman Spur", "Bowron FSR");
+      assertThat(sorted(RoadSortColumn.CLIENT_NUMBER, Sort.Direction.DESC))
+          .containsExactly("Bowron FSR", "Deadman Spur");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(RoadSortColumn.class)
+    @DisplayName("every header sorts both ways, with or without the tenure holder")
+    void everyHeaderSorts(RoadSortColumn column) {
+      givenRoadSection("R00123", "01", "Bowron FSR");
+      givenRoadSection("R00999", "02", "Deadman Spur");
+      givenFileHeldBy(1L, "R00123", "00001012", "CANFOR CORPORATION");
+
+      for (Sort.Direction direction : Sort.Direction.values()) {
+        assertThat(sorted(column, direction))
+            .containsExactlyInAnyOrder("Bowron FSR", "Deadman Spur");
+        // Without the holder there are no client columns: those two keep legacy's order.
+        assertThat(service.searchWithoutTenureHolder(
+                RoadSearchCriteria.builder().build(), 0, 15,
+                        List.of(new HeaderSort<>(column, direction)))
+            .content()).extracting(RoadSearchResult::forestServiceRoad)
+            .containsExactlyInAnyOrder("Bowron FSR", "Deadman Spur");
+      }
+    }
+  }
+
+  @Nested
   @DisplayName("when the tenure holder cannot be read")
   class WithoutTheGrant {
 
@@ -334,7 +415,8 @@ class RoadSectionServiceTest {
       givenRoadSection("R00999", "02", "Deadman Spur", "B01");
 
       List<RoadSearchResult> roads = service
-          .searchWithoutTenureHolder(RoadSearchCriteria.builder().tenureType("B40").build(), 0, 15)
+          .searchWithoutTenureHolder(RoadSearchCriteria.builder().tenureType("B40").build(), 0, 15,
+              List.of())
           .content();
 
       assertThat(roads)
@@ -356,7 +438,7 @@ class RoadSectionServiceTest {
 
       List<RoadSearchResult> roads = service
           .searchWithoutTenureHolder(
-              RoadSearchCriteria.builder().clientName("canfor").build(), 0, 15)
+              RoadSearchCriteria.builder().clientName("canfor").build(), 0, 15, List.of())
           .content();
 
       assertThat(roads).hasSize(1);
@@ -370,7 +452,7 @@ class RoadSectionServiceTest {
       }
 
       PagedResponse<RoadSearchResult> first =
-          service.searchWithoutTenureHolder(RoadSearchCriteria.builder().build(), 0, 3);
+          service.searchWithoutTenureHolder(RoadSearchCriteria.builder().build(), 0, 3, List.of());
 
       assertThat(first.content()).hasSize(3);
       assertThat(first.totalElements()).isEqualTo(4);

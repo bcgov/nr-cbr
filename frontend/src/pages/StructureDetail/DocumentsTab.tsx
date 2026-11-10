@@ -15,6 +15,7 @@ import {
 import { useState } from 'react';
 
 import DestructiveModal from '@/components/core/DestructiveModal';
+import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 
 import Card from './Card';
 import EditDocumentDialog from './EditDocumentDialog';
@@ -22,6 +23,7 @@ import { opensInTab, openDocument } from './openDocument';
 import UploadDocumentsDialog from './UploadDocumentsDialog';
 
 import type { StructureDocument } from './documentsResponse';
+import type { SortOrder } from '@/utils/headerSort';
 import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
@@ -30,6 +32,7 @@ import { useDeleteDocument, useStructureDocuments } from '@/hooks/useStructureSe
 import API from '@/services/APIs';
 import { apiErrorMessage } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
+import { sortRows } from '@/utils/headerSort';
 
 type Props = {
   structureId: string;
@@ -80,6 +83,41 @@ const groupDocuments = (documents: StructureDocument[]): Group[] => {
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZES = [10, 20, 50];
 
+/** The table's columns but Actions, each sorting by its header. */
+type DocumentColumn = 'AVAILABLE' | 'CREATED' | 'TYPE' | 'OBTAINED_FROM' | 'DESCRIPTION';
+
+/** Available Documents: the attachment type, or failing that the file's name. */
+const availableAs = (document: StructureDocument) =>
+  document.attachmentType.description || document.attachmentType.code || document.filename;
+
+/** Where a file came from, as Obtained From shows it. */
+const obtainedFrom = (document: StructureDocument) =>
+  document.inspectionId === null ? 'Structure' : 'Inspection';
+
+/** What each column shows, so it sorts by that. */
+const documentValue = (document: StructureDocument, column: DocumentColumn) => {
+  switch (column) {
+    case 'AVAILABLE':
+      return availableAs(document);
+    case 'CREATED':
+      return document.created;
+    case 'TYPE':
+      return document.extension;
+    case 'OBTAINED_FROM':
+      return obtainedFrom(document);
+    case 'DESCRIPTION':
+      return document.description;
+  }
+};
+
+const DOCUMENT_COLUMNS: { column: DocumentColumn; label: string; nowrap?: boolean }[] = [
+  { column: 'AVAILABLE', label: 'Available Documents', nowrap: true },
+  { column: 'CREATED', label: 'Photo/Doc Created', nowrap: true },
+  { column: 'TYPE', label: 'Type', nowrap: true },
+  { column: 'OBTAINED_FROM', label: 'Obtained From', nowrap: true },
+  { column: 'DESCRIPTION', label: 'Description' },
+];
+
 type TableProps = {
   title: string;
   documents: StructureDocument[];
@@ -94,7 +132,8 @@ type TableProps = {
 
 /**
  * One card's files, a page at a time. Paged here rather than by the server: a structure has tens of
- * files, not thousands, and the list arrives whole.
+ * files, not thousands, and the list arrives whole — so its headers sort it here too, every file
+ * before the page is cut.
  */
 const DocumentsTable: FC<TableProps> = ({
   title,
@@ -106,23 +145,41 @@ const DocumentsTable: FC<TableProps> = ({
 }) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  /** The header sorted by — none at first, so legacy's order. */
+  const [sort, setSort] = useState<SortOrder<DocumentColumn>>([]);
+  /** A new sort starts again at the first page. */
+  const sortBy = (next: SortOrder<DocumentColumn>) => {
+    setSort(next);
+    setPage(1);
+  };
   // Back to the last page there is when the list shrinks under it — when early files are hidden.
   const lastPage = Math.max(1, Math.ceil(documents.length / pageSize));
   const current = Math.min(page, lastPage);
-  const rows = documents.slice((current - 1) * pageSize, current * pageSize);
+  const rows = sortRows(documents, sort, documentValue).slice(
+    (current - 1) * pageSize,
+    current * pageSize,
+  );
 
   return (
     <>
       {/* Six columns and three actions: anything wider than the card scrolls inside it. */}
+      <ClearSort sort={sort} onSortChange={sortBy} data-testid="structure-documents-clear-sort" />
       <div className="structure-detail__table-scroll">
         <Table size="md" useZebraStyles aria-label={title}>
           <TableHead>
             <TableRow>
-              <TableHeader className="structure-detail__nowrap">Available Documents</TableHeader>
-              <TableHeader className="structure-detail__nowrap">Photo/Doc Created</TableHeader>
-              <TableHeader className="structure-detail__nowrap">Type</TableHeader>
-              <TableHeader className="structure-detail__nowrap">Obtained From</TableHeader>
-              <TableHeader>Description</TableHeader>
+              {DOCUMENT_COLUMNS.map(({ column, label, nowrap }) => (
+                <SortableHeader
+                  key={column}
+                  className={nowrap ? 'structure-detail__nowrap' : undefined}
+                  column={column}
+                  sort={sort}
+                  onSortChange={sortBy}
+                  data-testid={`structure-documents-sort-${column}`}
+                >
+                  {label}
+                </SortableHeader>
+              ))}
               {/* Always: View is everyone's. */}
               <TableHeader>Actions</TableHeader>
             </TableRow>
@@ -133,17 +190,13 @@ const DocumentsTable: FC<TableProps> = ({
               const name = document.filename ?? 'document';
               return (
                 <TableRow key={document.id} data-testid={`structure-document-${document.id}`}>
-                  <TableCell>
-                    {document.attachmentType.description ||
-                      document.attachmentType.code ||
-                      document.filename}
-                  </TableCell>
+                  <TableCell>{availableAs(document)}</TableCell>
                   <TableCell className="structure-detail__nowrap">
                     {formatShortDate(document.created)}
                   </TableCell>
                   <TableCell className="structure-detail__nowrap">{document.extension}</TableCell>
                   <TableCell className="structure-detail__nowrap">
-                    {document.inspectionId === null ? 'Structure' : 'Inspection'}
+                    {obtainedFrom(document)}
                   </TableCell>
                   <TableCell className="structure-detail__comment">
                     {document.description}

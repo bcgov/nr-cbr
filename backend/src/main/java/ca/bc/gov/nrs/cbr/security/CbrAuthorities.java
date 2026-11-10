@@ -19,14 +19,14 @@ package ca.bc.gov.nrs.cbr.security;
  *
  * <table>
  *   <caption>Who can do what</caption>
- *   <tr><th>Capability</th><th>Floor</th><th>GENERAL</th><th>LEVEL_0</th><th>LEVEL_1</th><th>LEVEL_2</th><th>PENG</th><th>INSPECTION_REVIEWER</th><th>ADMIN</th></tr>
- *   <tr><td>{@link #READ}</td><td>GENERAL</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><b>✓</b></td></tr>
- *   <tr><td>{@link #INSPECTION_WRITE}</td><td>LEVEL_0</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #CONTENT_EDIT}</td><td>LEVEL_1</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #DESTRUCTIVE}</td><td>LEVEL_2</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #APPROVE}</td><td>PENG</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #REVIEW}</td><td>INSPECTION_REVIEWER</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
- *   <tr><td>{@link #ADMIN}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+ *   <tr><th>Capability</th><th>Floor</th><th>GENERAL</th><th>LEVEL_1</th><th>LEVEL_2</th><th>PENG</th><th>INSPECTION_REVIEWER</th><th>ADMIN</th></tr>
+ *   <tr><td>{@link #READ}</td><td>GENERAL</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><b>✓</b></td></tr>
+ *   <tr><td>{@link #INSPECTION_WRITE}</td><td>LEVEL_1</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #CONTENT_EDIT}</td><td>LEVEL_1</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #DESTRUCTIVE}</td><td>LEVEL_2</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #APPROVE}</td><td>PENG</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #REVIEW}</td><td>INSPECTION_REVIEWER</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
+ *   <tr><td>{@link #ADMIN}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
  * </table>
  *
  * <p><b>{@link #READ} is the only capability {@link CbrRoles#ADMIN} shares.</b> Administrators can
@@ -53,19 +53,19 @@ public final class CbrAuthorities {
    * {@link CbrRoles#READERS}.
    */
   public static final String READ =
-      "hasAnyAuthority('CBR_GENERAL','CBR_LEVEL_0','CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG',"
+      "hasAnyAuthority('CBR_GENERAL','CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG',"
           + "'CBR_INSPECTION_REVIEWER','CBR_ADMIN')";
 
   /**
    * Record or amend an inspection ({@code /saveInspection}), and the offline capture path.
    *
-   * <p>Floor: {@link CbrRoles#LEVEL_0}. Narrower than {@link #CONTENT_EDIT} on purpose — Level 0
-   * exists to let a field user file an inspection without touching the site or structure it hangs
-   * off.
+   * <p>Floor: {@link CbrRoles#LEVEL_1} — today the same roles as {@link #CONTENT_EDIT}. Legacy put
+   * this a rung lower, on {@code LEVEL_0}, so a field user could file an inspection without touching
+   * the site or structure it hangs off; FAM does not issue that role. Kept as its own capability so
+   * the endpoints still say which kind of write they are.
    */
   public static final String INSPECTION_WRITE =
-      "hasAnyAuthority('CBR_LEVEL_0','CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG',"
-          + "'CBR_INSPECTION_REVIEWER')";
+      "hasAnyAuthority('CBR_LEVEL_1','CBR_LEVEL_2','CBR_PENG','CBR_INSPECTION_REVIEWER')";
 
   /**
    * The general create/edit surface: {@code /saveSite}, {@code /saveStructure},

@@ -14,6 +14,7 @@ import { useState } from 'react';
 
 import DestructiveModal from '@/components/core/DestructiveModal';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
+import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 
 import Card from './Card';
 import CodeWithOther from './CodeWithOther';
@@ -28,6 +29,7 @@ import {
 } from './loadRatingRules';
 
 import type { LoadRatingDetails, LoadRatingEntry } from './structureResponse';
+import type { SortOrder } from '@/utils/headerSort';
 import type { FC } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
@@ -37,6 +39,7 @@ import { holdFocus, useFieldErrors } from '@/hooks/useFieldErrors';
 import { useDeleteLoadRating, useUpdateLoadRatingDetails } from '@/hooks/useStructureSearch';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
+import { sortRows } from '@/utils/headerSort';
 
 /**
  * Whether a load rating predates the superstructure — legacy hides those unless asked
@@ -154,6 +157,36 @@ const DetailsForm: FC<{
   );
 };
 
+/** The history's columns, each sorting by its header. */
+type RatingColumn = 'RATING' | 'REASON' | 'DATE' | 'USER_ID' | 'REVIEWED_DATE' | 'STATUS';
+
+/** What each history column shows, so it sorts by that. */
+const ratingValue = (entry: LoadRatingEntry, column: RatingColumn) => {
+  switch (column) {
+    case 'RATING':
+      return entry.rating;
+    case 'REASON':
+      return [entry.reason.code, entry.reason.description].filter(Boolean).join(' - ');
+    case 'DATE':
+      return entry.date;
+    case 'USER_ID':
+      return entry.userId;
+    case 'REVIEWED_DATE':
+      return entry.reviewedDate;
+    case 'STATUS':
+      return entry.status === 'MANUAL' ? 'Manual' : 'Reviewed';
+  }
+};
+
+const RATING_COLUMNS: { column: RatingColumn; label: string; nowrap?: boolean }[] = [
+  { column: 'RATING', label: 'Load Rating GVW (tonnes)', nowrap: true },
+  { column: 'REASON', label: 'Reason' },
+  { column: 'DATE', label: 'Date', nowrap: true },
+  { column: 'USER_ID', label: 'IDIR ID', nowrap: true },
+  { column: 'REVIEWED_DATE', label: 'Reviewed Date', nowrap: true },
+  { column: 'STATUS', label: 'Status', nowrap: true },
+];
+
 type Props = {
   structureId: string;
   loadRating: LoadRatingDetails;
@@ -187,6 +220,8 @@ const LoadRatingCard: FC<Props> = ({
   const { canEdit, isPeng } = useAuthorization();
   const { display } = useNotification();
   const [showEarlyRatings, setShowEarlyRatings] = useState(false);
+  /** The header the history is sorted by — none at first, so newest first. */
+  const [sort, setSort] = useState<SortOrder<RatingColumn>>([]);
   /** The open rating dialog, if any: a manual rating to edit, or `'new'` to add one. */
   const [dialog, setDialog] = useState<LoadRatingEntry | 'new' | null>(null);
   const [pendingDelete, setPendingDelete] = useState<LoadRatingEntry | null>(null);
@@ -195,9 +230,14 @@ const LoadRatingCard: FC<Props> = ({
   const hiddenRatings = loadRating.history.filter((entry) =>
     beforeInstall(entry, yearBuilt),
   ).length;
-  const ratings = showEarlyRatings
-    ? loadRating.history
-    : loadRating.history.filter((entry) => !beforeInstall(entry, yearBuilt));
+  // Sorted in the browser: the whole history is here, so nothing is paged away from the sort.
+  const ratings = sortRows(
+    showEarlyRatings
+      ? loadRating.history
+      : loadRating.history.filter((entry) => !beforeInstall(entry, yearBuilt)),
+    sort,
+    ratingValue,
+  );
   const current = loadRating.history.find((entry) => entry.current) ?? null;
 
   return (
@@ -286,17 +326,22 @@ const LoadRatingCard: FC<Props> = ({
               />
             </div>
           )}
+          <ClearSort sort={sort} onSortChange={setSort} data-testid="load-rating-clear-sort" />
           <Table size="md" useZebraStyles aria-label="Load rating history">
             <TableHead>
               <TableRow>
-                <TableHeader className="structure-detail__nowrap">
-                  Load Rating GVW (tonnes)
-                </TableHeader>
-                <TableHeader>Reason</TableHeader>
-                <TableHeader className="structure-detail__nowrap">Date</TableHeader>
-                <TableHeader className="structure-detail__nowrap">IDIR ID</TableHeader>
-                <TableHeader className="structure-detail__nowrap">Reviewed Date</TableHeader>
-                <TableHeader className="structure-detail__nowrap">Status</TableHeader>
+                {RATING_COLUMNS.map(({ column, label, nowrap }) => (
+                  <SortableHeader
+                    key={column}
+                    className={nowrap ? 'structure-detail__nowrap' : undefined}
+                    column={column}
+                    sort={sort}
+                    onSortChange={setSort}
+                    data-testid={`load-rating-sort-${column}`}
+                  >
+                    {label}
+                  </SortableHeader>
+                ))}
                 {isPeng && <TableHeader>Actions</TableHeader>}
               </TableRow>
             </TableHead>

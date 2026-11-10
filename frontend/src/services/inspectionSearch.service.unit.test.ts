@@ -99,10 +99,12 @@ describe('InspectionSearchService', () => {
   it('sends the header the user sorted by, and which way', async () => {
     const { service, request } = withMockedRequest();
 
-    await service.searchInspections(criteria({ siteId: '12345' }), 0, 20, {
-      column: 'INSPECTION_DATE',
-      direction: 'DESC',
-    });
+    await service.searchInspections(criteria({ siteId: '12345' }), 0, 20, [
+      {
+        column: 'INSPECTION_DATE',
+        direction: 'DESC',
+      },
+    ]);
 
     expect(urlOf(request)).toContain('sortBy=INSPECTION_DATE');
     expect(urlOf(request)).toContain('sortDirection=DESC');

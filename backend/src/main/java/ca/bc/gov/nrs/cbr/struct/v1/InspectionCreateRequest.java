@@ -10,7 +10,7 @@ import java.util.List;
  * saved inspection.
  *
  * @param structureId                    the structure inspected; complete
- * @param typeCode                       ROUT (Level 1 and up) or UNP (Level 0 and up)
+ * @param typeCode                       ROUT or UNP (Level 1 and up)
  * @param statusCode                     PRO In Progress or SUB Submitted
  * @param inspectionDate                 not in the future; one inspection of a structure a day
  * @param inspectorName                  at most 255

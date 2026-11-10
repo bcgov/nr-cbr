@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 import ca.bc.gov.nrs.cbr.endpoint.v1.SiteApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.SiteSearchService;
 import ca.bc.gov.nrs.cbr.service.v1.SiteService;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteCreatedResponse;
@@ -11,6 +12,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteUpdateRequest;
+import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,9 +38,10 @@ public class SiteApiController implements SiteApiEndpoint {
   @Override
   public ResponseEntity<PagedResponse<SiteSearchResult>> searchSites(
       SiteSearchCriteria criteria, int pageNumber, int pageSize,
-      SiteSortColumn sortBy, Sort.Direction sortDirection) {
+      List<SiteSortColumn> sortBy, List<Sort.Direction> sortDirection) {
     return ResponseEntity.ok(
-        siteSearchService.search(criteria, pageNumber, pageSize, sortBy, sortDirection));
+        siteSearchService.search(
+            criteria, pageNumber, pageSize, HeaderSort.of(sortBy, sortDirection)));
   }
 
   @Override

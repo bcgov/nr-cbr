@@ -77,7 +77,7 @@ class InspectionApiEndpointTest {
   }
 
   @Test
-  @DisplayName("the questions are GET /form for any reader; the save POST, Level 0 and up")
+  @DisplayName("the questions are GET /form for any reader; the save POST, Level 1 and up")
   void addInspectionIsMappedAndGated() {
     Method form = method("inspectionForm");
     Method create = method("createInspection");
@@ -100,7 +100,7 @@ class InspectionApiEndpointTest {
   }
 
   @Test
-  @DisplayName("its repairs and monitors: Level 0 adds and edits, Level 2 deletes")
+  @DisplayName("its repairs and monitors: Level 1 adds and edits, Level 2 deletes")
   void followUpIsMappedAndGated() {
     for (String kind : new String[] {"Repair", "Monitor"}) {
       String path = "/{inspectionId}/" + kind.toLowerCase() + "s";
@@ -140,7 +140,7 @@ class InspectionApiEndpointTest {
   }
 
   @Test
-  @DisplayName("its hazards are PUT /{inspectionId}/hazards, Level 0 and up, as legacy")
+  @DisplayName("its hazards are PUT /{inspectionId}/hazards, Level 1 and up")
   void hazardsAreMappedAndGated() {
     Method update = method("updateHazards");
 
@@ -168,7 +168,7 @@ class InspectionApiEndpointTest {
   }
 
   @Test
-  @DisplayName("its Inspection card is PUT /{inspectionId}, its comments PUT …/comment, Level 0")
+  @DisplayName("its Inspection card is PUT /{inspectionId}, its comments PUT …/comment, Level 1")
   void editIsMappedAndGated() {
     Method update = method("updateInspection");
     Method comment = method("updateInspectionComment");

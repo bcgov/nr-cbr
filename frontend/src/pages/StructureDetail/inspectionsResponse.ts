@@ -1,5 +1,6 @@
 import type { CodeValue, StructureComment } from './structureResponse';
 import type { PagedResponse } from '@/types/api';
+import type { SortOrder } from '@/utils/headerSort';
 
 /** A close proximity inspection that was done, and who recorded it. */
 export type CompletedCloseProximity = {
@@ -72,6 +73,23 @@ export type StructureInspection = {
  * A page of the inspection table — `GET /v1/structures/{structureId}/inspections`, the backend's
  * `StructureInspectionsResponse`.
  */
+/**
+ * The Inspections table's sortable columns — the backend's `StructureInspectionSortColumn`, one per
+ * header. New in CBR: legacy's table was newest first, still what the tab shows until a header is
+ * clicked.
+ */
+export type StructureInspectionSortColumn =
+  | 'INSPECTION_DATE'
+  | 'TYPE'
+  | 'SITE_ID'
+  | 'STATUS'
+  | 'REVIEWED_DATE'
+  | 'REVIEWED_BY'
+  | 'INSPECTOR_NAME';
+
+/** The columns the user sorted by, the first deciding. Empty is legacy's order. */
+export type StructureInspectionSort = SortOrder<StructureInspectionSortColumn>;
+
 export type InspectionsResponse = {
   page: PagedResponse<StructureInspection>;
   /** Inspections from before the superstructure went in, left out unless asked for. */

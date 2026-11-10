@@ -13,10 +13,12 @@ import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionUpdateRequest;
 import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,7 +33,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** The Inspection tab of an inspection's page, edited with legacy's rules. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import({InspectionEditService.class, InspectionFormService.class})
+@Import({InspectionEditService.class, InspectionFormService.class, LoadRatingService.class})
 class InspectionEditServiceTest {
 
   private static final LocalDateTime PAST = LocalDateTime.of(2000, 1, 1, 0, 0);
@@ -253,13 +255,111 @@ class InspectionEditServiceTest {
     inspection(42L, "ACC", DAY.minusDays(2), "Jo");
     InspectionCommentRequest comment = new InspectionCommentRequest("x");
     InspectionUpdateRequest request = card("RVD", DAY, "Jo", "Co");
+    InspectionUpdateRequest accepted = card("ACC", DAY, "Jo", "Co");
 
+    // The card itself, while its status stays Reviewed or Accepted.
     assertThatThrownBy(() -> service.update(41L, request))
         .isInstanceOf(InspectionLockedException.class)
         .hasMessageContaining("can no longer be changed");
+    assertThatThrownBy(() -> service.update(42L, accepted))
+        .isInstanceOf(InspectionLockedException.class);
     assertThatThrownBy(() -> service.updateComment(42L, comment))
         .isInstanceOf(InspectionLockedException.class);
     assertThatThrownBy(() -> service.updateComment(404L, comment))
         .isInstanceOf(InspectionNotFoundException.class);
+  }
+
+  /** A Reviewed inspection as the review leaves it: its reviewer and the P.Eng's date. */
+  private void reviewed(long id, String status, LocalDate date, BigDecimal rating) {
+    inspection(id, status, date, "Jo");
+    StructureInspectionEntity found = entityManager.find(StructureInspectionEntity.class, id);
+    entityManager.merge(found.toBuilder().inspectionReviewerId(3L).pengReviewerDate(PAST).build());
+    if (rating != null) {
+      entityManager.persist(StructureLoadRatingEntity.builder().crossingStructureId(7L)
+          .inspectionId(id).loadRating(rating).entryUserid("IDIR\\X").entryTimestamp(PAST)
+          .build());
+    }
+    entityManager.flush();
+    entityManager.clear();
+  }
+
+  @Test
+  @DisplayName("moves a Reviewed inspection back to Submitted, clearing its review, as legacy")
+  void reopens() {
+    reviewed(41L, "RVD", DAY, null);
+
+    service.update(41L, card("SUB", DAY, "Jo", "Co"));
+
+    StructureInspectionEntity inspection = stored(41L);
+    assertThat(inspection.getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("SUB");
+    assertThat(inspection.getInspectionReviewerId()).isNull();
+    assertThat(inspection.getPengReviewerDate()).isNull();
+    assertThat(inspection.getUpdateUserid()).isEqualTo("IDIR\\INSPECTOR");
+    assertThat(entityManager.createQuery(
+        "SELECT COUNT(s) FROM InspectionReportStatusEntity s WHERE s.inspectionId = 41",
+        Long.class).getSingleResult()).isEqualTo(2L);
+    // A reopening is an audit record, at In Progress too.
+    verify(audit).reopenedAfterCommit(41L);
+  }
+
+  @Test
+  @DisplayName("moves an Accepted inspection back to In Progress too")
+  void reopensAccepted() {
+    reviewed(42L, "ACC", DAY, null);
+
+    service.update(42L, card("pro", DAY, "Jo", "Co"));
+
+    assertThat(stored(42L).getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("PRO");
+  }
+
+  @Test
+  @DisplayName("takes only the status when reopening, whatever the card's other fields say")
+  void reopensStatusOnly() {
+    // No company, which Submitted needs: an old reviewed inspection may lack it.
+    reviewed(41L, "RVD", DAY, null);
+
+    service.update(41L, new InspectionUpdateRequest("SUB", DAY.minusDays(9), "Someone Else",
+        null, 5L, true));
+
+    StructureInspectionEntity inspection = stored(41L);
+    assertThat(inspection.getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("SUB");
+    assertThat(inspection.getInspectionDate()).isEqualTo(DAY);
+    assertThat(inspection.getInspectorName()).isEqualTo("Jo");
+    assertThat(inspection.getInspectionCost()).isNull();
+    assertThat(inspection.getPengInspectionReqInd()).isEqualTo("N");
+  }
+
+  @Test
+  @DisplayName("reopens to In Progress or Submitted only")
+  void reopensToCardStatusesOnly() {
+    reviewed(41L, "RVD", DAY, null);
+
+    assertThat(refused(41L, card("REJ", DAY, "Jo", "Co"))).containsOnly(Map.entry("statusCode",
+        "A Reviewed inspection can only be moved back to In Progress or Submitted."));
+    InspectionUpdateRequest noStatus = card(null, DAY, "Jo", "Co");
+    assertThatThrownBy(() -> service.update(41L, noStatus))
+        .isInstanceOf(InspectionLockedException.class);
+    assertThat(stored(41L).getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("RVD");
+  }
+
+  @Test
+  @DisplayName("gives the structure its previous current load rating, its review flag untouched")
+  void reopeningChoosesTheCurrentRatingAgain() {
+    reviewed(40L, "RVD", DAY.minusYears(3), new BigDecimal("30"));
+    reviewed(41L, "RVD", DAY, new BigDecimal("45"));
+    entityManager.createQuery("""
+        UPDATE CrossingStructureEntity s SET s.currentLoadRating = 45,
+               s.loadRatingUnknownIndicator = 'N' WHERE s.crossingStructureId = 7""")
+        .executeUpdate();
+
+    service.update(41L, card("SUB", DAY, "Jo", "Co"));
+
+    CrossingStructureEntity after = structure();
+    assertThat(after.getCurrentLoadRating()).isEqualByComparingTo("30");
+    assertThat(after.getLoadRatingUnknownIndicator()).isEqualTo("N");
+
+    // The older one reopened too: no reviewed rating is left.
+    service.update(40L, card("PRO", DAY.minusYears(3), "Jo", "Co"));
+    assertThat(structure().getCurrentLoadRating()).isNull();
   }
 }

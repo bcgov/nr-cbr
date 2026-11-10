@@ -9,15 +9,18 @@ import type {
   InspectionScheduleRequest,
   InspectionScheduleResponse,
   InspectionsResponse,
+  StructureInspectionSort,
 } from '@/pages/StructureDetail/inspectionsResponse';
 import type {
   MonitorCreatedResponse,
   MonitorCreateRequest,
+  MonitorSort,
   MonitorUpdateRequest,
   MonitorView,
   StructureMonitor,
 } from '@/pages/StructureDetail/monitorsResponse';
 import type {
+  RepairSort,
   RepairTypeOption,
   RepairUpdateRequest,
   RepairView,
@@ -79,7 +82,7 @@ export class StructureSearchService extends HttpClient {
     criteria: StructureSearchCriteria,
     pageNumber: number,
     pageSize: number,
-    sort: StructureSort | null = null,
+    sort: StructureSort = [],
   ): CancelablePromise<PagedResponse<StructureSearchResult>> {
     return this.doRequest<PagedResponse<StructureSearchResult>>(this.config, {
       method: 'GET',
@@ -543,31 +546,34 @@ export class StructureSearchService extends HttpClient {
   }
 
   /**
-   * A page of a structure's inspections, newest first.
+   * A page of a structure's inspections, sorted by a header or newest first.
    *
    * @param pageNumber zero-based, as the backend expects
    * @param includeBeforeInstall also those from before the superstructure went in
+   * @param sort the header sorted by; newest first when absent
    */
   getStructureInspections(
     structureId: string,
     pageNumber: number,
     pageSize: number,
     includeBeforeInstall: boolean,
+    sort: StructureInspectionSort = [],
   ): CancelablePromise<InspectionsResponse> {
     return this.doRequest<InspectionsResponse>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/inspections',
       path: { structureId },
-      query: { pageNumber, pageSize, includeBeforeInstall },
+      query: { pageNumber, pageSize, includeBeforeInstall, ...sortParams(sort) },
     });
   }
 
   /**
-   * A page of a structure's repairs, in legacy's order.
+   * A page of a structure's repairs, sorted by a header or in legacy's order.
    *
    * @param view outstanding only, or all
    * @param pageNumber zero-based, as the backend expects
    * @param includeBeforeInstall also those raised before the superstructure went in
+   * @param sort the header sorted by; legacy's order when absent
    */
   getStructureRepairs(
     structureId: string,
@@ -577,21 +583,30 @@ export class StructureSearchService extends HttpClient {
     includeBeforeInstall: boolean,
     /** The inspection whose page asks — needed for the `CURRENT` view. */
     inspectionId?: string,
+    sort: RepairSort = [],
   ): CancelablePromise<ItemListing<StructureRepair>> {
     return this.doRequest<ItemListing<StructureRepair>>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/repairs',
       path: { structureId },
-      query: { view, pageNumber, pageSize, includeBeforeInstall, inspectionId },
+      query: {
+        view,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+        inspectionId,
+        ...sortParams(sort),
+      },
     });
   }
 
   /**
-   * A page of a structure's monitoring items, in legacy's order.
+   * A page of a structure's monitoring items, sorted by a header or in legacy's order.
    *
    * @param view outstanding only, or all
    * @param pageNumber zero-based, as the backend expects
    * @param includeBeforeInstall also those raised before the superstructure went in
+   * @param sort the header sorted by; legacy's order when absent
    */
   getStructureMonitors(
     structureId: string,
@@ -601,12 +616,20 @@ export class StructureSearchService extends HttpClient {
     includeBeforeInstall: boolean,
     /** The inspection whose page asks — needed for the `CURRENT` view. */
     inspectionId?: string,
+    sort: MonitorSort = [],
   ): CancelablePromise<ItemListing<StructureMonitor>> {
     return this.doRequest<ItemListing<StructureMonitor>>(this.config, {
       method: 'GET',
       url: '/v1/structures/{structureId}/monitors',
       path: { structureId },
-      query: { view, pageNumber, pageSize, includeBeforeInstall, inspectionId },
+      query: {
+        view,
+        pageNumber,
+        pageSize,
+        includeBeforeInstall,
+        inspectionId,
+        ...sortParams(sort),
+      },
     });
   }
 
