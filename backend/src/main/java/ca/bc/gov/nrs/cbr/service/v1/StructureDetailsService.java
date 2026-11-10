@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -28,8 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Replacement History have services of their own.
  *
  * <p>Legacy's blocking rules ({@code StructureForm.validate}), each beside its field, plus values
- * that fit their columns and years of four digits. Legacy's range warnings — a year before 1900 — never
- * blocked its save and do not block this one; the page shows them as the user types. Only these
+ * that fit their columns and years of four digits. Legacy's range warnings — a year before 1900,
+ * an Installation Cost over $1,000,000 — never blocked its save and do not block this one; the
+ * page shows them as the user types. Only these
  * columns and the update audit are written, so nothing else is blanked and an archived structure
  * stays archived.
  */
@@ -41,8 +43,13 @@ public class StructureDetailsService {
   /** The years are {@code NUMBER(4)}, and a year is written with all four digits. */
   private static final int YEAR_MIN = 1000;
   private static final int YEAR_MAX = 9999;
-  /** The costs are {@code NUMBER(6)}, whole dollars. */
+  /** {@code MATERIAL_COST NUMBER(6)}, whole dollars. */
   private static final long COST_MAX = 999_999L;
+  /**
+   * Installation Cost's ceiling, as the business set it (CBR-816): {@code INSTALLATION_COST} is
+   * {@code NUMBER(7)} and holds more, but nothing above this is expected.
+   */
+  private static final long INSTALLATION_COST_MAX = 4_999_999L;
   /** Sources that need Year Added to Inventory — legacy's {@code StructureForm.validate}. */
   private static final Set<String> SOURCES_NEEDING_YEAR_ADDED =
       Set.of("IR", "INSR", "ITM", "IFS", "IIO");
@@ -126,8 +133,9 @@ public class StructureDetailsService {
     if (request.asBuiltInfoOnFile() == null) {
       errors.put("asBuiltInfoOnFile", "As Built Information on File is required.");
     }
-    checkCost(errors, "installationCost", "Installation Cost", request.installationCost());
-    checkCost(errors, "materialCost", "Material Cost", request.materialCost());
+    checkCost(errors, "installationCost", "Installation Cost", request.installationCost(),
+        INSTALLATION_COST_MAX);
+    checkCost(errors, "materialCost", "Material Cost", request.materialCost(), COST_MAX);
   }
 
   /** Year Superstructure Fabricated: not after this year, nor after the year installed. */
@@ -258,11 +266,11 @@ public class StructureDetailsService {
     }
   }
 
-  /** A cost the column holds: whole dollars from 0 to 999,999, or none. */
+  /** A cost in range: whole dollars from 0 to {@code max}, or none. */
   private static void checkCost(Map<String, String> errors, String field, String label,
-      Long cost) {
-    if (cost != null && (cost < 0 || cost > COST_MAX)) {
-      errors.put(field, label + " must be from $0 to $999,999.");
+      Long cost, long max) {
+    if (cost != null && (cost < 0 || cost > max)) {
+      errors.put(field, String.format(Locale.ROOT, "%s must be from $0 to $%,d.", label, max));
     }
   }
 
