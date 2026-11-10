@@ -1,0 +1,22 @@
+{
+  "levels": [
+    { "id": "view", "title": "View All", "capabilities": ["read"] },
+    { "id": "level-1", "title": "Inspector Level 1", "capabilities": ["read", "write"] },
+    {
+      "id": "level-2",
+      "title": "Inspector Level 2",
+      "capabilities": ["read", "write", "destructive"]
+    },
+    {
+      "id": "peng",
+      "title": "PENG",
+      "capabilities": ["read", "write", "destructive", "approve"]
+    },
+    {
+      "id": "reviewer",
+      "title": "Inspector Reviewer",
+      "capabilities": ["read", "write", "destructive", "approve", "review"]
+    }
+  ],
+  "admin": { "capability": "admin", "suffix": "-admin", "title": "Administrator" }
+}

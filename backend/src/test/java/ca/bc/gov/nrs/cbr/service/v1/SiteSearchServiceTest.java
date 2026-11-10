@@ -6,6 +6,7 @@ import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
@@ -13,6 +14,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -78,12 +80,13 @@ class SiteSearchServiceTest {
 
   private PagedResponse<SiteSearchResult> searchAll(int pageNumber, int pageSize) {
     flushAndClear();
-    return service.search(SiteSearchCriteria.builder().build(), pageNumber, pageSize, null, null);
+    return service.search(SiteSearchCriteria.builder().build(), pageNumber, pageSize, List.of());
   }
 
   private java.util.List<String> sortedBy(SiteSortColumn column, Sort.Direction direction) {
     flushAndClear();
-    return service.search(SiteSearchCriteria.builder().build(), 0, 20, column, direction)
+    return service.search(SiteSearchCriteria.builder().build(), 0, 20,
+            List.of(new HeaderSort<>(column, direction)))
         .content().stream().map(SiteSearchResult::id).toList();
   }
 
@@ -106,7 +109,7 @@ class SiteSearchServiceTest {
     flushAndClear();
 
     assertThat(service.search(SiteSearchCriteria.builder().businessAreaOrgUnit("1773").build(),
-        0, 20, null, null).content()).extracting(SiteSearchResult::id).containsExactly("IN-BCTS");
+        0, 20, List.of()).content()).extracting(SiteSearchResult::id).containsExactly("IN-BCTS");
     assertThat(searchAll(0, 20).content()).hasSize(3);
   }
 
@@ -121,6 +124,20 @@ class SiteSearchServiceTest {
         .containsExactly("SITE-B", "SITE-A", "SITE-C");
     assertThat(sortedBy(SiteSortColumn.KILOMETRES, Sort.Direction.DESC))
         .containsExactly("SITE-A", "SITE-C", "SITE-B");
+  }
+
+  @Test
+  @DisplayName("sorts by several columns, each breaking the ties of the one before")
+  void sortsBySeveralColumns() {
+    givenNamedSite("SITE-A", "Same Creek", "1.0");
+    givenNamedSite("SITE-B", "Other Creek", "5.0");
+    givenNamedSite("SITE-C", "Same Creek", "3.0");
+    flushAndClear();
+
+    assertThat(service.search(SiteSearchCriteria.builder().build(), 0, 20, List.of(
+            new HeaderSort<>(SiteSortColumn.CROSSING_NAME, Sort.Direction.DESC),
+            new HeaderSort<>(SiteSortColumn.KILOMETRES, Sort.Direction.DESC)))
+        .content()).extracting(SiteSearchResult::id).containsExactly("SITE-C", "SITE-A", "SITE-B");
   }
 
   @Test

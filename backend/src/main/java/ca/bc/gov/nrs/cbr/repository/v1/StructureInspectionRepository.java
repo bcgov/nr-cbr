@@ -86,17 +86,25 @@ public interface StructureInspectionRepository
    * them with the early ones. Joined inner to the current status, as legacy is, so an
    * inspection with no status history is not listed; the status and its code are fetched with the
    * page rather than one row at a time.
+   *
+   * <p>Unordered here: the order comes on the {@code Pageable}, built by
+   * {@code StructureInspectionsService} — the header the user sorted by, then legacy's newest
+   * first. The aliases it may name are {@code inspection}, {@code statusCode}, and
+   * {@code typeCode} and {@code reviewer} (what the type and reviewer columns show); the last two
+   * are left joins, so an inspection with no type or reviewer is still listed.
    */
   @Query(value = """
       SELECT inspection
         FROM StructureInspectionEntity inspection
         JOIN FETCH inspection.currentStatus status
-        LEFT JOIN FETCH status.statusCode
+        LEFT JOIN FETCH status.statusCode statusCode
+        LEFT JOIN StrctreInspectionTypeCodeEntity typeCode
+          ON typeCode.strctreInspectionTypeCode = inspection.strctreInspectionTypeCode
+        LEFT JOIN StructureInspectionReviewerEntity reviewer
+          ON reviewer.inspectionReviewerId = inspection.inspectionReviewerId
        WHERE inspection.crossingStructureId = :structureId
          AND (:includeAll = TRUE OR inspection.inspectionDate IS NULL
               OR inspection.inspectionDate > :after)
-       ORDER BY CASE WHEN inspection.inspectionDate IS NULL THEN 0 ELSE 1 END,
-                inspection.inspectionDate DESC, inspection.inspectionId DESC
       """,
       countQuery = """
       SELECT COUNT(inspection)

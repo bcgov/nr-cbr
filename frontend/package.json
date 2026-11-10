@@ -26,7 +26,8 @@
     "e2e:all-browsers": "playwright test",
     "pree2e:ui": "playwright install chromium",
     "e2e:ui": "playwright test --ui",
-    "e2e:report": "playwright show-report"
+    "e2e:report": "playwright show-report",
+    "guides:build": "node scripts/build-guides.mjs"
   },
   "dependencies": {
     "@carbon/icons-react": "^11.64.0",
@@ -55,7 +56,7 @@
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^4.6.0",
+    "@vitejs/plugin-react": "^6.0.0",
     "@vitest/browser": "^5.0.5",
     "@vitest/browser-playwright": "^5.0.5",
     "@vitest/coverage-v8": "^5.0.5",
@@ -68,12 +69,13 @@
     "eslint-plugin-react-refresh": "^0.5.0",
     "globals": "^17.0.0",
     "happy-dom": "^21.0.4",
+    "markdown-it": "^15.0.3",
     "playwright": "^1.64.1",
     "prettier": "^3.6.2",
     "sass": "^1.90.0",
     "typescript": "~5.9.0",
     "typescript-eslint": "^8.35.1",
-    "vite": "^7.3.2",
+    "vite": "^8.0.0",
     "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.5",
     "vitest-browser-react": "^2.3.0"

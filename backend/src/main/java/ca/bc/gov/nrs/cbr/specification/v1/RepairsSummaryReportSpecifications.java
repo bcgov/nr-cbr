@@ -6,6 +6,7 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
+import ca.bc.gov.nrs.cbr.model.v1.RepairPriorityCodeOrderEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeXrefEntity;
@@ -27,6 +28,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import org.hibernate.query.criteria.HibernateCriteriaBuilder;
+import org.hibernate.query.criteria.JpaRoot;
+import org.hibernate.query.sqm.tree.SqmJoinType;
 import org.springframework.util.StringUtils;
 
 /**
@@ -89,6 +93,8 @@ public final class RepairsSummaryReportSpecifications {
   private static final String REPAIR_NUMBER = "repairNumber";
   private static final String REPAIR_STATUS = "repairStatusCode";
   private static final String REPAIR_PRIORITY = "repairPriorityCode";
+  private static final String RANKED_PRIORITY = "repairPriorityCode";
+  private static final String PRIORITY_RANK = "repairPriorityCodeOrder";
   private static final String REPAIR_TYPE = "structureRepairTypeCode";
   private static final String REPAIR_QUANTITY = "repairQuantity";
   private static final String ESTIMATE = "estimate";
@@ -120,9 +126,9 @@ public final class RepairsSummaryReportSpecifications {
    * structure's repairs together, newest inspection first, then by status (descending), priority
    * and repair number.
    *
-   * <p>TODO: rank priority by {@code REPAIR_PRIORITY_CODE_ORDER.REPAIR_PRIORITY_CODE_ORDER}, as
-   * legacy does, once the role holds SELECT on it — see the same TODO on
-   * {@code StructureRepairRepository.findPageByStructure}. Until then priority sorts by its code.
+   * <p>Priority sorts by its rank in {@code REPAIR_PRIORITY_CODE_ORDER}, as legacy's
+   * {@code ORDER BY RPCO.REPAIR_PRIORITY_CODE_ORDER} does — a left join, as legacy's is, with a
+   * repair whose priority has no rank after the ranked ones.
    */
   public static CriteriaQuery<RepairsSummaryLine> lines(
       CriteriaBuilder builder, RepairsSummaryCriteria criteria) {
@@ -133,6 +139,11 @@ public final class RepairsSummaryReportSpecifications {
     From<?, ?> site = structure.join(SITE, JoinType.LEFT);
     From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
     From<?, ?> district = site.join(ORG_UNIT, JoinType.LEFT);
+    // No association maps the rank, so Hibernate's entity join reaches it.
+    var priorityOrder = ((JpaRoot<StructureRepairEntity>) repair)
+        .join(RepairPriorityCodeOrderEntity.class, SqmJoinType.LEFT);
+    priorityOrder.on(
+        builder.equal(priorityOrder.get(RANKED_PRIORITY), repair.get(REPAIR_PRIORITY)));
 
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(builder.equal(repair.get(STRUCTURE_ID), structure.get(STRUCTURE_ID)));
@@ -178,7 +189,7 @@ public final class RepairsSummaryReportSpecifications {
             repair.get(DESCRIPTION)))
         .where(predicates.toArray(new Predicate[0]))
         .orderBy(order(criteria.sortOrDefault(), builder, repair, structure, site, roadSection,
-            inspection));
+            inspection, priorityOrder));
   }
 
   private static void structureCriteria(
@@ -322,7 +333,7 @@ public final class RepairsSummaryReportSpecifications {
   /**
    * The order chosen, then legacy's own: structure (descending, its id keeping each structure's
    * repairs together), inspection date (newest first, its id keeping each inspection's together),
-   * status (descending), priority, repair number.
+   * status (descending), priority rank, repair number.
    */
   private static List<Order> order(
       RepairsSummarySort sort,
@@ -331,7 +342,8 @@ public final class RepairsSummaryReportSpecifications {
       Root<CrossingStructureEntity> structure,
       From<?, ?> site,
       From<?, ?> roadSection,
-      From<?, ?> inspection) {
+      From<?, ?> inspection,
+      From<?, ?> priorityOrder) {
     List<Order> order = new ArrayList<>(switch (sort) {
       case PROJECT_BRANCH_KM -> List.of(
           builder.asc(site.get(FOREST_FILE_ID)),
@@ -348,7 +360,8 @@ public final class RepairsSummaryReportSpecifications {
         builder.desc(inspection.get(INSPECTION_DATE)),
         builder.asc(inspection.get(INSPECTION_ID)),
         builder.desc(repair.get(REPAIR_STATUS)),
-        builder.asc(repair.get(REPAIR_PRIORITY)),
+        // Nulls last: a repair whose priority has no rank, after the ranked ones.
+        ((HibernateCriteriaBuilder) builder).asc(priorityOrder.get(PRIORITY_RANK), false),
         builder.asc(repair.get(REPAIR_NUMBER)),
         builder.asc(repair.get(REPAIR_ID))));
     return order;

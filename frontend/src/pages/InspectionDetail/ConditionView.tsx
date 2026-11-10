@@ -32,7 +32,7 @@ type Props = {
   loading: boolean;
   items: InspectionItem[];
   inspectionId: string;
-  /** Whether the user may edit the cards — Level 0 and up, until Reviewed or Accepted. */
+  /** Whether the user may edit the cards — Level 1 and up, until Reviewed or Accepted. */
   editable: boolean;
 };
 

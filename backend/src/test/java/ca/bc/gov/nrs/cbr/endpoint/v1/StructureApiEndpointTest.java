@@ -10,7 +10,9 @@ import jakarta.validation.Valid;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,8 +62,10 @@ class StructureApiEndpointTest {
   @DisplayName("search takes the criteria as one bound object, then the paging and the sort")
   void searchBindsCriteriaAsAnObject() {
     assertThat(searchStructures().getParameterTypes()).containsExactly(
-        StructureSearchCriteria.class, int.class, int.class,
-        StructureSortColumn.class, Sort.Direction.class);
+        StructureSearchCriteria.class, int.class, int.class, List.class, List.class);
+    assertThat(searchStructures().getGenericParameterTypes()).extracting(Type::getTypeName)
+        .endsWith("java.util.List<" + StructureSortColumn.class.getName() + ">",
+            "java.util.List<" + Sort.Direction.class.getName() + ">");
   }
 
   @Test
@@ -189,8 +193,6 @@ class StructureApiEndpointTest {
         Arguments.of("getRepairs", "GET", "/{structureId}/repairs", CbrAuthorities.READ),
         Arguments.of("getRepairTypes", "GET", "/{structureId}/repair-types",
             CbrAuthorities.READ),
-        Arguments.of("createRepair", "POST", "/{structureId}/repairs",
-            CbrAuthorities.CONTENT_EDIT),
         Arguments.of("updateRepair", "PUT", "/{structureId}/repairs/{repairId}",
             CbrAuthorities.CONTENT_EDIT),
         Arguments.of("deleteRepair", "DELETE", "/{structureId}/repairs/{repairId}",

@@ -276,6 +276,28 @@ describe('RoadSearchModal', () => {
     expect(roadApi.searchRoads).toHaveBeenLastCalledWith(expect.anything(), 1, 15);
   });
 
+  it('sorts by a header on the server, from the first page', async () => {
+    roadApi.searchRoads.mockImplementation((_criteria, pageNumber: number) =>
+      Promise.resolve(paged(roadsFrom(pageNumber * 15, 15), 40, pageNumber)),
+    );
+    renderModal();
+    search();
+    await screen.findByText('Road 0');
+    fireEvent.click(screen.getByLabelText('Next page'));
+    await screen.findByText('Road 15');
+
+    fireEvent.click(screen.getByTestId('road-search-sort-TENURE_TYPE'));
+
+    await vi.waitFor(() =>
+      expect(roadApi.searchRoads).toHaveBeenLastCalledWith(expect.anything(), 0, 15, [
+        {
+          column: 'TENURE_TYPE',
+          direction: 'ASC',
+        },
+      ]),
+    );
+  });
+
   it('goes back to the first page when a new search is run', async () => {
     // Page three of the previous answer is an empty table in this one.
     roadApi.searchRoads.mockImplementation((_criteria, pageNumber: number) =>

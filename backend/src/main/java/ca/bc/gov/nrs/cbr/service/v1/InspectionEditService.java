@@ -5,6 +5,7 @@ import ca.bc.gov.nrs.cbr.exception.InspectionLockedException;
 import ca.bc.gov.nrs.cbr.exception.InspectionNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
+import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.InspectionReportStatusRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
@@ -88,11 +89,12 @@ public class InspectionEditService {
   private final InspectionFormService forms;
   private final LoggedUserHelper loggedUser;
   private final InspectionAuditRecorder audit;
+  private final LoadRatingService loadRatings;
 
   public InspectionEditService(StructureInspectionRepository inspections,
       InspectionReportStatusRepository statuses, StructureInspectionItemRepository items,
       CrossingStructureRepository structures, InspectionFormService forms,
-      LoggedUserHelper loggedUser, InspectionAuditRecorder audit) {
+      LoggedUserHelper loggedUser, InspectionAuditRecorder audit, LoadRatingService loadRatings) {
     this.inspections = inspections;
     this.statuses = statuses;
     this.items = items;
@@ -100,20 +102,27 @@ public class InspectionEditService {
     this.forms = forms;
     this.loggedUser = loggedUser;
     this.audit = audit;
+    this.loadRatings = loadRatings;
   }
 
   /**
    * Saves the Inspection card: status, date, inspector, company, cost and Professional
-   * Inspection Required.
+   * Inspection Required. Once the inspection is Reviewed or Accepted, only its status — see
+   * {@link #reopen}.
    *
    * @throws InspectionNotFoundException if there is no such inspection
-   * @throws InspectionLockedException   once it is Reviewed or Accepted
+   * @throws InspectionLockedException   once it is Reviewed or Accepted, unless the status moves
+   *                                     back to In Progress or Submitted
    * @throws FieldValidationException    with a message for each field at fault
    */
   @Transactional
   public void update(long inspectionId, InspectionUpdateRequest request) {
-    StructureInspectionEntity inspection = open(inspectionId);
+    StructureInspectionEntity inspection = find(inspectionId);
     String current = statusOf(inspection);
+    if (current != null && LOCKING_STATUSES.containsKey(current)) {
+      reopen(inspection, current, upper(InspectionCreateValidator.trimmed(request.statusCode())));
+      return;
+    }
     String status = upper(InspectionCreateValidator.trimmed(request.statusCode()));
     String name = InspectionCreateValidator.trimmed(request.inspectorName());
     String company = InspectionCreateValidator.trimmed(request.inspectorCompanyName());
@@ -148,6 +157,60 @@ public class InspectionEditService {
     }
     log.info("Updated inspection {}, status {}", inspectionId, status);
     audit.afterCommit(inspectionId);
+  }
+
+  /**
+   * Moves a Reviewed or Accepted inspection back to In Progress or Submitted, so it can be changed
+   * and reviewed again. Any user who records inspections may (2026-11-10, a business request);
+   * legacy allowed a P.Eng only.
+   *
+   * <p>Only the status is taken: the card's other fields are locked until it has moved, and old
+   * reviewed inspections may lack fields now required, which must not stop a reopening.
+   *
+   * <p>As legacy's save does when an inspection leaves Reviewed ({@code InspectionAction:957-966},
+   * {@code CBR.INSERT_INSPECTION_STATUS}, {@code CBR.UPDATE_CURRENT_LOAD_RATING}): the reviewer
+   * and the P.Eng review date are cleared, a status row is added, and the structure's current
+   * load rating is chosen again — this inspection's no longer counts. Load Rating Review
+   * Required is left as it is: legacy's procedure sets it when this inspection held the current
+   * rating, but the same save then wrote back the value the page had loaded. The schedule, repairs
+   * and monitors the review set are left as they are, as legacy left them.
+   *
+   * @throws InspectionLockedException if the status stays Reviewed or Accepted
+   * @throws FieldValidationException  if it moves anywhere but In Progress or Submitted
+   */
+  private void reopen(StructureInspectionEntity inspection, String current, String status) {
+    long inspectionId = inspection.getInspectionId();
+    if (status == null || LOCKING_STATUSES.containsKey(status)) {
+      throw new InspectionLockedException(inspectionId, LOCKING_STATUSES.get(current), LOCKED);
+    }
+    if (!EDITABLE_STATUSES.contains(status)) {
+      throw new FieldValidationException("Inspection cannot be saved", Map.of(STATUS_FIELD,
+          "A " + LOCKING_STATUSES.get(current)
+              + " inspection can only be moved back to In Progress or Submitted."));
+    }
+    String user = loggedUser.getLoggedUserId();
+    LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    inspections.save(inspection.toBuilder()
+        .inspectionReviewerId(null)
+        .pengReviewerDate(null)
+        .updateUserid(user)
+        .updateTimestamp(now)
+        .build());
+    statuses.save(InspectionReportStatusEntity.builder()
+        .inspectionId(inspectionId)
+        .inspectionReportStatusCode(status)
+        .entryUserid(user)
+        .entryTimestamp(now)
+        .build());
+    // The current rating is read through each inspection's latest status: the new row must be in.
+    statuses.flush();
+    Long structureId = inspection.getCrossingStructureId();
+    structures.updateCurrentLoadRating(structureId, loadRatings.currentLoadRating(structureId)
+        .map(StructureLoadRatingEntity::getLoadRating)
+        .orElse(null), null);
+    log.info("Inspection {} moved from {} back to {}", inspectionId, current, status);
+    // An audit record either way: Submitted is recorded anyway, In Progress for a reopening.
+    audit.reopenedAfterCommit(inspectionId);
   }
 
   /** Every reason the card cannot be saved, refused together. */
@@ -345,10 +408,15 @@ public class InspectionEditService {
     return Boolean.TRUE.equals(value) ? YES : "N";
   }
 
+  /** The inspection, once it is known to exist. */
+  private StructureInspectionEntity find(long inspectionId) {
+    return inspections.findById(inspectionId)
+        .orElseThrow(() -> new InspectionNotFoundException(inspectionId));
+  }
+
   /** The inspection, once it is known to exist and not yet Reviewed or Accepted. */
   private StructureInspectionEntity open(long inspectionId) {
-    StructureInspectionEntity inspection = inspections.findById(inspectionId)
-        .orElseThrow(() -> new InspectionNotFoundException(inspectionId));
+    StructureInspectionEntity inspection = find(inspectionId);
     String status = statusOf(inspection);
     if (status != null && LOCKING_STATUSES.containsKey(status)) {
       throw new InspectionLockedException(inspectionId, LOCKING_STATUSES.get(status), LOCKED);

@@ -173,7 +173,7 @@ describe('NewInspectionPage', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'B100' }));
     await waitFor(() => expect(structureApi.getStructure).toHaveBeenCalledWith('7'));
 
-    // Routine is Level 1's: a Level 0 user is offered Unplanned only.
+    // Routine needs the edit capability: inspection-write alone is offered Unplanned only.
     const options = within(screen.getByTestId('inspection-typeCode')).getAllByRole('option');
     expect(options.map((option) => option.textContent)).toEqual(['Choose a type', 'Unplanned']);
   });

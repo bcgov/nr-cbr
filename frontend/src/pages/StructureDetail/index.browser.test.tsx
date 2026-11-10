@@ -62,7 +62,6 @@ const api = vi.hoisted(() => ({
   getStructureRepairs: vi.fn(),
   deleteStructureRepair: vi.fn(),
   getStructureRepairTypes: vi.fn(),
-  createStructureRepair: vi.fn(),
   updateStructureRepair: vi.fn(),
   getStructureMonitors: vi.fn(),
   createStructureMonitor: vi.fn(),
@@ -308,6 +307,12 @@ const repairsPage = (
 /** Opens the Details tab; Information is the one selected on arrival. */
 const openDetails = () => userEvent.click(screen.getByTestId('structure-tab-details'));
 
+/** The ids of a table's rows, top to bottom, from their `data-testid`s under a prefix. */
+const rowOrder = (prefix: string) =>
+  Array.from(document.querySelectorAll(`tr[data-testid^="${prefix}"]`)).map((row) =>
+    row.getAttribute('data-testid')!.slice(prefix.length),
+  );
+
 /** A read-only field's value, found by its label within a container. */
 const valueOf = (label: string, container: HTMLElement = document.body) => {
   const labelElement = within(container)
@@ -465,8 +470,6 @@ beforeEach(() => {
     { code: 'RAIL', description: 'Railing', unit: 'm', groupCode: 'STRU' },
     { code: '800A', description: 'Other', unit: null, groupCode: 'MISC' },
   ]);
-  api.createStructureRepair.mockReset();
-  api.createStructureRepair.mockResolvedValue({ id: '40', number: 4 });
   api.updateStructureRepair.mockReset();
   api.updateStructureRepair.mockResolvedValue(undefined);
   configurationApi.getRepairStatusCodes.mockResolvedValue([
@@ -1629,6 +1632,59 @@ describe('StructureDetailPage — Details tab', () => {
     expect(screen.getByTestId('load-rating-r0')).toBeInTheDocument();
   });
 
+  it('sorts the load rating history by several headers until cleared', async () => {
+    await showing(bridge());
+    await openDetails();
+    await userEvent.click(
+      screen.getByText('Show ratings from before the superstructure was installed (1)'),
+    );
+
+    // Reason: Design first, then the two Inspections in their default order.
+    await userEvent.click(screen.getByTestId('load-rating-sort-REASON'));
+    expect(rowOrder('load-rating-r')).toEqual(['1', '2', '0']);
+
+    // The rating breaks the Inspections' tie: 45 before 60.
+    await userEvent.click(screen.getByTestId('load-rating-sort-RATING'));
+    expect(rowOrder('load-rating-r')).toEqual(['1', '0', '2']);
+    expect(screen.getByTestId('load-rating-sort-REASON')).toMatchTextContent(/sort 1 of 2/);
+    expect(screen.getByTestId('load-rating-sort-RATING')).toMatchTextContent(/sort 2 of 2/);
+
+    // Clicked again it turns descending in place; once more and it drops out, leaving Reason.
+    await userEvent.click(screen.getByTestId('load-rating-sort-RATING'));
+    expect(rowOrder('load-rating-r')).toEqual(['1', '2', '0']);
+    await userEvent.click(screen.getByTestId('load-rating-sort-RATING'));
+    expect(rowOrder('load-rating-r')).toEqual(['1', '2', '0']);
+    expect(screen.getByTestId('load-rating-sort-REASON')).not.toMatchTextContent(/sort/);
+
+    // Clear sort: the default order, and the button gone with nothing left to clear.
+    await userEvent.click(screen.getByTestId('load-rating-clear-sort'));
+    expect(rowOrder('load-rating-r')).toEqual(['2', '1', '0']);
+    expect(screen.queryByTestId('load-rating-clear-sort')).not.toBeInTheDocument();
+  });
+
+  it('sorts the load rating history by a header in the browser; a third click restores it', async () => {
+    await showing(bridge());
+    await openDetails();
+    expect(rowOrder('load-rating-r')).toEqual(['2', '1']);
+
+    // Reason as shown: "DES - Design" before "INSP - Inspection".
+    await userEvent.click(screen.getByTestId('load-rating-sort-REASON'));
+    expect(rowOrder('load-rating-r')).toEqual(['1', '2']);
+
+    await userEvent.click(screen.getByTestId('load-rating-sort-REASON'));
+    expect(rowOrder('load-rating-r')).toEqual(['2', '1']);
+    // A third click takes it out: the default order, and Rating alone from here.
+    await userEvent.click(screen.getByTestId('load-rating-sort-REASON'));
+    expect(screen.queryByTestId('load-rating-clear-sort')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('load-rating-sort-RATING'));
+    expect(rowOrder('load-rating-r')).toEqual(['2', '1']);
+    await userEvent.click(screen.getByTestId('load-rating-sort-RATING'));
+    expect(rowOrder('load-rating-r')).toEqual(['1', '2']);
+    await userEvent.click(screen.getByTestId('load-rating-sort-RATING'));
+    expect(rowOrder('load-rating-r')).toEqual(['2', '1']);
+  });
+
   it('links the structures this one replaced, in a new tab', async () => {
     await showing(bridge());
     await openDetails();
@@ -2072,6 +2128,27 @@ describe('StructureDetailPage — Documents & Photos', () => {
     filename: `${id}.jpg`,
     auditRecord: false,
     ...overrides,
+  });
+
+  it("sorts a card's files by a header in the browser, every file before the page is cut", async () => {
+    api.getDocuments.mockResolvedValue({
+      documents: [
+        doc('1', { description: 'north abutment' }),
+        doc('2', { description: 'Approach' }),
+        doc('3', { description: null }),
+      ],
+    });
+    await showing(bridge());
+    await openDocuments();
+    await screen.findByTestId('structure-document-1');
+    expect(rowOrder('structure-document-')).toEqual(['1', '2', '3']);
+
+    // Case-blind, a blank last.
+    await userEvent.click(screen.getByTestId('structure-documents-sort-DESCRIPTION'));
+    expect(rowOrder('structure-document-')).toEqual(['2', '1', '3']);
+
+    await userEvent.click(screen.getByTestId('structure-documents-sort-DESCRIPTION'));
+    expect(rowOrder('structure-document-')).toEqual(['3', '1', '2']);
   });
 
   describe('adding, editing and deleting', () => {
@@ -2604,7 +2681,7 @@ describe('StructureDetailPage — Inspections', () => {
   const openInspections = () => userEvent.click(screen.getByTestId('structure-tab-inspections'));
 
   describe('adding an inspection', () => {
-    it('offers Add unplanned inspection from Level 0, and Add routine inspection from Level 1', async () => {
+    it('offers Add unplanned inspection on inspection-write, and Add routine inspection on edit', async () => {
       authorization.canWriteInspection = true;
       await showing(bridge());
       await openInspections();
@@ -3110,6 +3187,57 @@ describe('StructureDetailPage — Inspections', () => {
     );
   });
 
+  it('sorts the completed close proximity inspections by a header in the browser', async () => {
+    api.getInspectionSchedule.mockResolvedValue(
+      schedule({
+        completedCloseProximity: [
+          { id: '6', completed: '2024-06-01', userId: 'IDIR\\ZED' },
+          { id: '5', completed: '2021-06-01', userId: 'IDIR\\ABLE' },
+        ],
+      }),
+    );
+    await showing(bridge());
+    await openInspections();
+    await screen.findByTestId('close-proximity-6');
+
+    await userEvent.click(screen.getByTestId('close-proximity-sort-USER_ID'));
+    expect(rowOrder('close-proximity-')).toEqual(['5', '6']);
+
+    // Cleared, so the date sorts alone rather than behind the IDIR ID.
+    await userEvent.click(screen.getByTestId('close-proximity-clear-sort'));
+    await userEvent.click(screen.getByTestId('close-proximity-sort-COMPLETED'));
+    expect(rowOrder('close-proximity-')).toEqual(['5', '6']);
+    await userEvent.click(screen.getByTestId('close-proximity-sort-COMPLETED'));
+    expect(rowOrder('close-proximity-')).toEqual(['6', '5']);
+  });
+
+  it('sorts the inspections by a header on the server, from the first page', async () => {
+    const rows = Array.from({ length: 10 }, (_, index) => inspection(String(index + 1)));
+    api.getStructureInspections.mockResolvedValue(
+      inspectionsPage(rows, {
+        page: { content: rows, totalElements: 12, totalPages: 2, pageNumber: 0, pageSize: 10 },
+      }),
+    );
+    await showing(bridge());
+    await openInspections();
+    await screen.findByTestId('structure-section-inspections');
+    await userEvent.click(await screen.findByRole('button', { name: 'Next page' }));
+    await vi.waitFor(() =>
+      expect(api.getStructureInspections).toHaveBeenLastCalledWith('7', 1, 10, false),
+    );
+
+    await userEvent.click(screen.getByTestId('structure-inspections-sort-TYPE'));
+
+    await vi.waitFor(() =>
+      expect(api.getStructureInspections).toHaveBeenLastCalledWith('7', 0, 10, false, [
+        {
+          column: 'TYPE',
+          direction: 'ASC',
+        },
+      ]),
+    );
+  });
+
   it('lists each inspection, linked to its page in a new tab', async () => {
     api.getStructureInspections.mockResolvedValue(inspectionsPage([inspection('41')]));
     await showing(bridge());
@@ -3304,6 +3432,85 @@ describe('StructureDetailPage — Repairs', () => {
     );
   });
 
+  it('sends every column sorted by, in order, each click adding one', async () => {
+    api.getStructureRepairs.mockResolvedValue(repairsPage([repair('3')]));
+    await showing(bridge());
+    await openRepairs();
+
+    await userEvent.click(await screen.findByTestId('structure-repairs-sort-PRIORITY'));
+    await userEvent.click(screen.getByTestId('structure-repairs-sort-NUMBER'));
+
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith(
+        '7',
+        'OUTSTANDING',
+        0,
+        10,
+        false,
+        undefined,
+        [
+          { column: 'PRIORITY', direction: 'ASC' },
+          { column: 'NUMBER', direction: 'ASC' },
+        ],
+      ),
+    );
+
+    // Clear sort: legacy's order again, asked for with no sort at all.
+    await userEvent.click(screen.getByTestId('structure-repairs-clear-sort'));
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 0, 10, false),
+    );
+    expect(screen.queryByTestId('structure-repairs-clear-sort')).not.toBeInTheDocument();
+  });
+
+  it('sorts by a header on the server, from the first page; a third click restores the order', async () => {
+    api.getStructureRepairs.mockResolvedValue(
+      repairsPage(
+        Array.from({ length: 10 }, (_, index) => repair(String(index + 1))),
+        12,
+      ),
+    );
+    await showing(bridge());
+
+    await openRepairs();
+    await userEvent.click(await screen.findByRole('button', { name: 'Next page' }));
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 1, 10, false),
+    );
+
+    const priority = screen.getByTestId('structure-repairs-sort-PRIORITY');
+    await userEvent.click(priority);
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith(
+        '7',
+        'OUTSTANDING',
+        0,
+        10,
+        false,
+        undefined,
+        [{ column: 'PRIORITY', direction: 'ASC' }],
+      ),
+    );
+
+    await userEvent.click(priority);
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith(
+        '7',
+        'OUTSTANDING',
+        0,
+        10,
+        false,
+        undefined,
+        [{ column: 'PRIORITY', direction: 'DESC' }],
+      ),
+    );
+
+    await userEvent.click(priority);
+    await vi.waitFor(() =>
+      expect(api.getStructureRepairs).toHaveBeenLastCalledWith('7', 'OUTSTANDING', 0, 10, false),
+    );
+  });
+
   it('asks for the repairs from before the superstructure went in when ticked', async () => {
     api.getStructureRepairs.mockResolvedValue(repairsPage([], 0, 3));
     await showing(bridge());
@@ -3410,103 +3617,16 @@ describe('StructureDetailPage — Repairs', () => {
       'Repairs could not be loaded',
     );
   });
-  describe('Add', () => {
-    it('offers Add repair over the table only from Level 1 up', async () => {
-      await showing(bridge());
+  it('offers no Add repair, even from Level 1 up — a repair is added through an inspection', async () => {
+    // CBR-858: legacy's repairs added here belonged to no inspection and were never carried onto
+    // a later one. Edit and Delete stay; see the Edit block below.
+    authorization.canEdit = true;
+    await showing(bridge());
 
-      await openRepairs();
-      await screen.findByTestId('structure-section-repairs');
+    await openRepairs();
+    await screen.findByTestId('structure-section-repairs');
 
-      expect(screen.queryByTestId('structure-repair-add')).not.toBeInTheDocument();
-    });
-
-    it('adds a repair as Suggested, and says which number it took', async () => {
-      authorization.canEdit = true;
-      await showing(bridge());
-      await openRepairs();
-
-      await userEvent.click(await screen.findByTestId('structure-repair-add'));
-      const dialog = await screen.findByTestId('repair-dialog');
-      await vi.waitFor(() =>
-        expect(within(dialog).getByTestId('repair-type').querySelectorAll('option')).toHaveLength(
-          4,
-        ),
-      );
-      expect(dialog).toMatchTextContent('Add repair');
-      // No number before saving, a locked status, and nothing only a completed repair has.
-      expect(within(dialog).queryByText('Repair Number')).not.toBeInTheDocument();
-      expect(dialog).toMatchTextContent('Suggested');
-      expect(within(dialog).queryByTestId('repair-status')).not.toBeInTheDocument();
-      expect(within(dialog).queryByTestId('repair-completed-date')).not.toBeInTheDocument();
-      expect(within(dialog).queryByTestId('repair-actualCost')).not.toBeInTheDocument();
-
-      await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
-      await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), 'DECK');
-      await userEvent.type(within(dialog).getByTestId('repair-estimate'), '2500');
-      await userEvent.type(within(dialog).getByTestId('repair-quantity'), '8');
-      await userEvent.type(within(dialog).getByTestId('repair-description'), 'New planks.');
-      await userEvent.click(within(dialog).getByTestId('repair-save'));
-
-      await vi.waitFor(() =>
-        expect(api.createStructureRepair).toHaveBeenCalledWith('7', {
-          priorityCode: 'H',
-          estimate: 2500,
-          typeCode: 'DECK',
-          quantity: 8,
-          description: 'New planks.',
-        }),
-      );
-      await vi.waitFor(() =>
-        expect(display).toHaveBeenCalledWith(
-          expect.objectContaining({ kind: 'success', title: 'Repair 4 added' }),
-        ),
-      );
-      expect(screen.queryByTestId('repair-dialog')).not.toBeInTheDocument();
-    });
-
-    it('adds nothing without a priority and a type, and says so beside each', async () => {
-      authorization.canEdit = true;
-      await showing(bridge());
-      await openRepairs();
-
-      await userEvent.click(await screen.findByTestId('structure-repair-add'));
-      const dialog = await screen.findByTestId('repair-dialog');
-      await userEvent.click(within(dialog).getByTestId('repair-save'));
-
-      expect(dialog).toMatchTextContent('Repair Priority is required.');
-      expect(dialog).toMatchTextContent('Repair Type is required.');
-      expect(api.createStructureRepair).not.toHaveBeenCalled();
-    });
-
-    it('says so when the add fails for no field', async () => {
-      authorization.canEdit = true;
-      api.createStructureRepair.mockRejectedValue(new Error('boom'));
-      await showing(bridge());
-      await openRepairs();
-
-      await userEvent.click(await screen.findByTestId('structure-repair-add'));
-      const dialog = await screen.findByTestId('repair-dialog');
-      await vi.waitFor(() =>
-        expect(
-          within(dialog).getByTestId('repair-priority').querySelectorAll('option'),
-        ).toHaveLength(3),
-      );
-      await userEvent.selectOptions(within(dialog).getByTestId('repair-priority'), 'H');
-      await vi.waitFor(() =>
-        expect(within(dialog).getByTestId('repair-type').querySelectorAll('option')).toHaveLength(
-          4,
-        ),
-      );
-      await userEvent.selectOptions(within(dialog).getByTestId('repair-type'), 'DECK');
-      await userEvent.click(within(dialog).getByTestId('repair-save'));
-
-      await vi.waitFor(() =>
-        expect(display).toHaveBeenCalledWith(
-          expect.objectContaining({ kind: 'error', title: 'The repair was not added' }),
-        ),
-      );
-      expect(screen.getByTestId('repair-dialog')).toBeInTheDocument();
-    });
+    expect(screen.queryByTestId('structure-repair-add')).not.toBeInTheDocument();
   });
 
   describe('Edit', () => {
@@ -3753,6 +3873,27 @@ describe('StructureDetailPage — Monitoring', () => {
       expect(api.getStructureMonitors).toHaveBeenLastCalledWith('7', 'ALL', 0, 10, false),
     );
     expect(api.getStructureRepairs).not.toHaveBeenCalled();
+  });
+
+  it('sorts the items by a header on the server', async () => {
+    api.getStructureMonitors.mockResolvedValue(repairsPage([monitor('2')]));
+    await showing(bridge());
+
+    await openMonitoring();
+    const frequency = await screen.findByTestId('structure-monitors-sort-FREQUENCY');
+    await userEvent.click(frequency);
+
+    await vi.waitFor(() =>
+      expect(api.getStructureMonitors).toHaveBeenLastCalledWith(
+        '7',
+        'OUTSTANDING',
+        0,
+        10,
+        false,
+        undefined,
+        [{ column: 'FREQUENCY', direction: 'ASC' }],
+      ),
+    );
   });
 
   it('asks for the monitoring items from before the superstructure went in when ticked', async () => {

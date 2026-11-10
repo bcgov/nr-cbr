@@ -1,4 +1,4 @@
-import type { HeaderSort } from '@/utils/headerSort';
+import type { SortOrder } from '@/utils/headerSort';
 
 /**
  * Structure Search criteria and results.
@@ -130,8 +130,8 @@ export type StructureSortColumn =
   | 'PROJECT_FILE'
   | 'MAINTAINER';
 
-/** A header the user sorted by, and which way. `null` where used means legacy's order. */
-export type StructureSort = HeaderSort<StructureSortColumn>;
+/** The columns the user sorted by, the first deciding. Empty is legacy's order. */
+export type StructureSort = SortOrder<StructureSortColumn>;
 
 export const EMPTY_CRITERIA: StructureSearchCriteria = {
   structureName: '',

@@ -1,8 +1,30 @@
 import type { CodeValue } from './structureResponse';
 import type { Audited, ItemView } from './UserAudits';
+import type { SortOrder } from '@/utils/headerSort';
 
 /** Which repairs the Repairs tab lists — legacy's "Choose Viewing Option". */
 export type RepairView = ItemView;
+
+/**
+ * The Repairs tab's sortable columns — the backend's `RepairSortColumn`, one per header but
+ * Actions. New in CBR: legacy's table had one fixed order, still what the tab shows until a header
+ * is clicked.
+ */
+export type RepairSortColumn =
+  | 'NUMBER'
+  | 'STATUS'
+  | 'TYPE'
+  | 'USER_AUDITS'
+  | 'INSPECTION_DATE'
+  | 'PRIORITY'
+  | 'COMPLETED_DATE'
+  | 'ESTIMATE'
+  | 'ACTUAL_COST'
+  | 'QUANTITY'
+  | 'DESCRIPTION';
+
+/** The columns the user sorted by, the first deciding. Empty is legacy's order. */
+export type RepairSort = SortOrder<RepairSortColumn>;
 
 /**
  * One repair — a row of `GET /v1/structures/{structureId}/repairs`, the backend's

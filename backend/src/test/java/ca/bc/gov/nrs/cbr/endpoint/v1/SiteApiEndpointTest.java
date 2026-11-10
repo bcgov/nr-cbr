@@ -6,7 +6,9 @@ import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import java.lang.reflect.Method;
+import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Sort;
@@ -120,12 +122,15 @@ class SiteApiEndpointTest {
     // 17 criteria as positional parameters would have to be repeated identically in the interface,
     // the controller override and the service call, where transposing two same-typed neighbours
     // compiles and returns the wrong rows.
-    // The sort pair is not criteria — it orders the answer rather than narrowing it — so it travels
-    // beside the paging, as two typed parameters a bad value cannot slip through.
+    // The sort is not criteria — it orders the answer rather than narrowing it — so it travels
+    // beside the paging, as two typed lists a bad value cannot slip through: the columns, and a
+    // direction for each.
     assertThat(searchSites().getParameterTypes())
         .containsExactly(
-            SiteSearchCriteria.class, int.class, int.class,
-            SiteSortColumn.class, Sort.Direction.class);
+            SiteSearchCriteria.class, int.class, int.class, List.class, List.class);
+    assertThat(searchSites().getGenericParameterTypes()).extracting(Type::getTypeName)
+        .endsWith("java.util.List<" + SiteSortColumn.class.getName() + ">",
+            "java.util.List<" + Sort.Direction.class.getName() + ">");
   }
 
   @Test

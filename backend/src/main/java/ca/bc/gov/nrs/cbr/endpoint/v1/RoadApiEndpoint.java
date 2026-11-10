@@ -5,7 +5,10 @@ import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSortColumn;
+import java.util.List;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,13 +38,25 @@ public interface RoadApiEndpoint {
    * <p><b>Server-side paging, as Site Search and Inspection Search have.</b> Legacy caps the dialog
    * at two hundred roads and says so on screen when it fills; paging instead puts every match in
    * reach and lets the dialog say how many there are.
+   *
+   * <p><b>Sorted by a column</b> when {@code sortBy} names one ({@link RoadSortColumn}),
+   * {@code sortDirection} {@code ASC} or {@code DESC}; legacy's order — road name, file, branch —
+   * otherwise, which also breaks ties. On the server, so it orders every match rather than the page
+   * on screen. An unknown value is a 400.
+   *
+   * <p><b>By several columns</b> when {@code sortBy} repeats, each with its {@code sortDirection}
+   * in the same order ({@code HeaderSort}): the first decides, and each next breaks the ties before
+   * it.
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/search")
   ResponseEntity<PagedResponse<RoadSearchResult>> searchRoads(
       @ModelAttribute RoadSearchCriteria criteria,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-      @RequestParam(name = "pageSize", defaultValue = "15") int pageSize);
+      @RequestParam(name = "pageSize", defaultValue = "15") int pageSize,
+      @RequestParam(name = "sortBy", required = false) List<RoadSortColumn> sortBy,
+      @RequestParam(name = "sortDirection", required = false)
+      List<Sort.Direction> sortDirection);
 
   /**
    * The road section named by a Project File ID# and a Br.

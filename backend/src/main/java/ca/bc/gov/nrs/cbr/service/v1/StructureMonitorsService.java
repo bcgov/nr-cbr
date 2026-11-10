@@ -11,8 +11,10 @@ import ca.bc.gov.nrs.cbr.repository.v1.MonitorFrequencyCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureMonitorItemRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
@@ -34,6 +36,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
@@ -97,12 +101,13 @@ public class StructureMonitorsService {
    * @param inspectionId the inspection whose page asks; needed for {@link View#CURRENT}, else null
    * @param pageNumber   zero-based
    * @param pageSize     held to between 1 and 100
+   * @param sort       the columns the user sorted by, first deciding; none for legacy's order
    * @throws StructureNotFoundException if there is no such structure
    * @throws ResponseStatusException 400 for {@link View#CURRENT} without an inspection
    */
   @Transactional(readOnly = true)
   public Listing monitors(long structureId, View view, Long inspectionId, int pageNumber,
-      int pageSize, boolean includeBeforeInstall) {
+      int pageSize, boolean includeBeforeInstall, List<HeaderSort<MonitorSortColumn>> sort) {
     InstallCutoff cutoff = InstallCutoff.of(structures.findById(structureId)
         .orElseThrow(() -> new StructureNotFoundException(structureId)));
     boolean current = view == View.CURRENT;
@@ -115,7 +120,8 @@ public class StructureMonitorsService {
     Page<StructureMonitorItemEntity> page = monitors.findPageByStructure(
         structureId, current ? inspectionId : null, outstandingOnly, OUTSTANDING_STATUSES,
         includeBeforeInstall || cutoff.none() || current, cutoff.installed(),
-        PageRequest.of(Math.max(pageNumber, 0), Math.clamp(pageSize, 1, MAX_PAGE_SIZE)));
+        PageRequest.of(Math.max(pageNumber, 0), Math.clamp(pageSize, 1, MAX_PAGE_SIZE),
+            order(sort)));
     List<StructureMonitorItemEntity> rows = page.getContent();
 
     Map<String, String> statusNames = statuses
@@ -148,6 +154,45 @@ public class StructureMonitorsService {
             ? 0
             : monitors.countBeforeInstall(
                 structureId, outstandingOnly, OUTSTANDING_STATUSES, cutoff.installed()));
+  }
+
+  /**
+   * The page's order: the columns the user sorted by, each breaking the ties of the one before,
+   * then legacy's order, which breaks its ties — status descending, then newest inspection (an item
+   * with no inspection before them all, where Oracle's descending sort puts it), then number
+   * descending. The id closes it, so the order is total and no item shows on two pages, or on none.
+   *
+   * <p>The null placement is spelled out rather than left to {@code NULLS FIRST}: Oracle and the
+   * test database place nulls differently by default. Text sorts without regard to case, as the
+   * searches' headers do. Aliases are those of
+   * {@code StructureMonitorItemRepository.findPageByStructure}.
+   */
+  private static Sort order(List<HeaderSort<MonitorSortColumn>> sort) {
+    Sort legacy = JpaSort.unsafe(Sort.Direction.DESC, "monitor.monitoringStatusCode")
+        // In parentheses: Spring Data prefixes a bare CASE with the entity's alias.
+        .andUnsafe(Sort.Direction.ASC,
+            "(CASE WHEN inspection.inspectionDate IS NULL THEN 0 ELSE 1 END)")
+        .andUnsafe(Sort.Direction.DESC, "inspection.inspectionDate", "monitor.monitorNumber",
+            "monitor.monitorId");
+    Sort chosen = Sort.unsorted();
+    for (HeaderSort<MonitorSortColumn> header : sort) {
+      chosen = chosen.and(JpaSort.unsafe(header.direction(), keys(header.column())));
+    }
+    return chosen.and(legacy);
+  }
+
+  /** What a column sorts on — the value it shows. */
+  private static String[] keys(MonitorSortColumn column) {
+    return switch (column) {
+      case NUMBER -> new String[] {"monitor.monitorNumber"};
+      case STATUS -> new String[] {"UPPER(statusCode.description)"};
+      case USER_AUDITS -> new String[] {"COALESCE(monitor.completedByTimestamp, "
+          + "monitor.requiredByTimestamp, monitor.suggestedByTimestamp)"};
+      case INSPECTION_DATE -> new String[] {"inspection.inspectionDate"};
+      case DESCRIPTION -> new String[] {"UPPER(monitor.description)"};
+      case FREQUENCY -> new String[] {
+          "UPPER(frequencyCode.description)", "UPPER(monitor.monitorFrequencyCmt)"};
+    };
   }
 
   /**

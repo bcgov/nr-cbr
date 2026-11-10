@@ -15,18 +15,16 @@ public interface RepairPriorityCodeRepository
     extends JpaRepository<RepairPriorityCodeEntity, String> {
 
   /**
-   * The current priorities, by code.
-   *
-   * <p>TODO: order by {@code REPAIR_PRIORITY_CODE_ORDER.REPAIR_PRIORITY_CODE_ORDER} and leave out a
-   * priority with no row there, as legacy's {@code FIND_REPAIR_PRIORITY_CODES} does, once
-   * {@code FSA_CBR_READ_WRITE_ROLE} holds SELECT on it — see the same TODO on
-   * {@code StructureRepairRepository.findPageByStructure}.
+   * The current priorities, most pressing first, by {@code REPAIR_PRIORITY_CODE_ORDER}; a priority
+   * with no rank there is left out, as legacy's {@code FIND_REPAIR_PRIORITIES} leaves it.
    */
   @Query("""
       SELECT code
         FROM RepairPriorityCodeEntity code
+        JOIN RepairPriorityCodeOrderEntity priorityOrder
+          ON priorityOrder.repairPriorityCode = code.repairPriorityCode
        WHERE CURRENT_TIMESTAMP BETWEEN code.effectiveDate AND code.expiryDate
-       ORDER BY code.repairPriorityCode
+       ORDER BY priorityOrder.repairPriorityCodeOrder, code.repairPriorityCode
       """)
   List<RepairPriorityCodeEntity> findAllCurrent();
 }

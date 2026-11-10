@@ -13,11 +13,11 @@ import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.PierRequest;
-import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
-import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.ReplacementDetailsRequest;
@@ -33,6 +33,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureNameSuggestion;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInformationRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityRequest;
@@ -79,6 +80,10 @@ public interface StructureApiEndpoint {
    * <p><b>Sorted by a results column</b> when {@code sortBy} names one
    * ({@link StructureSortColumn}), {@code sortDirection} {@code ASC} or {@code DESC}; legacy's fixed
    * order otherwise, which also breaks a chosen column's ties.
+   *
+   * <p><b>By several columns</b> when {@code sortBy} repeats, each with its {@code sortDirection}
+   * in the same order ({@code HeaderSort}): the first decides, and each next breaks the ties before
+   * it.
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/search")
@@ -86,8 +91,9 @@ public interface StructureApiEndpoint {
       @Valid @ModelAttribute StructureSearchCriteria criteria,
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
       @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
-      @RequestParam(name = "sortBy", required = false) StructureSortColumn sortBy,
-      @RequestParam(name = "sortDirection", defaultValue = "ASC") Sort.Direction sortDirection);
+      @RequestParam(name = "sortBy", required = false) List<StructureSortColumn> sortBy,
+      @RequestParam(name = "sortDirection", required = false)
+      List<Sort.Direction> sortDirection);
 
   /**
    * Archives structures — legacy's "Archive All Selected" on Structure Search.
@@ -643,6 +649,15 @@ public interface StructureApiEndpoint {
    * A page of the structure's inspections, newest first — legacy's inspection table, paged here.
    * Those dated before the superstructure was installed only with {@code includeBeforeInstall}.
    *
+   * <p><b>Sorted by a column</b> when {@code sortBy} names one
+   * ({@link StructureInspectionSortColumn}), {@code sortDirection} {@code ASC} or {@code DESC};
+   * newest first otherwise, which also breaks ties. On the server, so it orders every inspection
+   * rather than the page on screen. An unknown value is a 400.
+   *
+   * <p><b>By several columns</b> when {@code sortBy} repeats, each with its {@code sortDirection}
+   * in the same order ({@code HeaderSort}): the first decides, and each next breaks the ties before
+   * it.
+   *
    * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
    *
    * @param structureId          the {@code CROSSING_STRUCTURE_ID}
@@ -657,11 +672,23 @@ public interface StructureApiEndpoint {
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
       @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
       @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
-      boolean includeBeforeInstall);
+      boolean includeBeforeInstall,
+      @RequestParam(name = "sortBy", required = false) List<StructureInspectionSortColumn> sortBy,
+      @RequestParam(name = "sortDirection", required = false)
+      List<Sort.Direction> sortDirection);
 
   /**
    * A page of the structure's repairs — legacy's Repairs tab, paged here. Outstanding repairs by
    * default, as legacy opens; {@code view=ALL} for every one.
+   *
+   * <p><b>Sorted by a column</b> when {@code sortBy} names one ({@link RepairSortColumn}),
+   * {@code sortDirection} {@code ASC} or {@code DESC}; legacy's order otherwise, which also breaks
+   * ties. On the server, so it orders every repair rather than the page on screen. An unknown value
+   * is a 400.
+   *
+   * <p><b>By several columns</b> when {@code sortBy} repeats, each with its {@code sortDirection}
+   * in the same order ({@code HeaderSort}): the first decides, and each next breaks the ties before
+   * it.
    *
    * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
    *
@@ -682,7 +709,10 @@ public interface StructureApiEndpoint {
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
       @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
       @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
-      boolean includeBeforeInstall);
+      boolean includeBeforeInstall,
+      @RequestParam(name = "sortBy", required = false) List<RepairSortColumn> sortBy,
+      @RequestParam(name = "sortDirection", required = false)
+      List<Sort.Direction> sortDirection);
 
   /**
    * The repair types that apply to the structure, each with its group — the Repair Item dialog's
@@ -695,22 +725,6 @@ public interface StructureApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/{structureId}/repair-types")
   List<RepairTypeOption> getRepairTypes(@PathVariable("structureId") long structureId);
-
-  /**
-   * Adds a repair to the structure — legacy's Add Repair. Always Suggested; the structure's next
-   * number.
-   *
-   * <p>Gated on {@link CbrAuthorities#CONTENT_EDIT} — Level 1 and up, as legacy's button.
-   * <b>201</b> with the new repair's id and number; <b>404</b> when there is no such structure;
-   * <b>400</b> with {@code fieldErrors} when a field is refused.
-   *
-   * @param structureId the {@code CROSSING_STRUCTURE_ID}
-   */
-  @PreAuthorize(CbrAuthorities.CONTENT_EDIT)
-  @PostMapping("/{structureId}/repairs")
-  ResponseEntity<RepairCreatedResponse> createRepair(
-      @PathVariable("structureId") long structureId,
-      @RequestBody RepairCreateRequest request);
 
   /**
    * Saves an edit to one repair — legacy's "Repair Item" dialog.
@@ -748,6 +762,15 @@ public interface StructureApiEndpoint {
    * A page of the structure's monitoring items — legacy's Monitoring tab, paged here. Outstanding
    * items by default, as legacy opens; {@code view=ALL} for every one.
    *
+   * <p><b>Sorted by a column</b> when {@code sortBy} names one ({@link MonitorSortColumn}),
+   * {@code sortDirection} {@code ASC} or {@code DESC}; legacy's order otherwise, which also breaks
+   * ties. On the server, so it orders every item rather than the page on screen. An unknown value
+   * is a 400.
+   *
+   * <p><b>By several columns</b> when {@code sortBy} repeats, each with its {@code sortDirection}
+   * in the same order ({@code HeaderSort}): the first decides, and each next breaks the ties before
+   * it.
+   *
    * <p>Gated on {@link CbrAuthorities#READ}. <b>404</b> when there is no such structure.
    *
    * @param structureId the {@code CROSSING_STRUCTURE_ID}
@@ -768,7 +791,10 @@ public interface StructureApiEndpoint {
       @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
       @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
       @RequestParam(name = "includeBeforeInstall", defaultValue = "false")
-      boolean includeBeforeInstall);
+      boolean includeBeforeInstall,
+      @RequestParam(name = "sortBy", required = false) List<MonitorSortColumn> sortBy,
+      @RequestParam(name = "sortDirection", required = false)
+      List<Sort.Direction> sortDirection);
 
   /**
    * Adds a monitoring item to the structure — legacy's Add Monitor. Always Suggested; the

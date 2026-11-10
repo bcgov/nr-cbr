@@ -41,6 +41,7 @@ import {
 } from '@/hooks/useConfiguration';
 import { useArchiveStructures, useStructureSearch } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
+import { toSortOrder } from '@/utils/headerSort';
 import { readSessionState, writeSessionState } from '@/utils/sessionState';
 
 /**
@@ -67,7 +68,7 @@ type SavedStructureSearch = {
   submitted: StructureSearchCriteria | null;
   page: number;
   pageSize: number;
-  sort: StructureSort | null;
+  sort: StructureSort;
 };
 
 /**
@@ -79,7 +80,7 @@ type SavedStructureSearch = {
 const initialSearch = (siteId: string | null): SavedStructureSearch => {
   if (siteId) {
     const criteria = { ...EMPTY_CRITERIA, siteId };
-    return { criteria, submitted: criteria, page: 1, pageSize: 20, sort: null };
+    return { criteria, submitted: criteria, page: 1, pageSize: 20, sort: [] };
   }
   const saved = readSessionState<Partial<SavedStructureSearch>>(STRUCTURE_SEARCH_STATE_KEY);
   return {
@@ -87,7 +88,8 @@ const initialSearch = (siteId: string | null): SavedStructureSearch => {
     submitted: saved?.submitted ? { ...EMPTY_CRITERIA, ...saved.submitted } : null,
     page: saved?.page ?? 1,
     pageSize: saved?.pageSize ?? 20,
-    sort: saved?.sort ?? null,
+    // A search kept before sorting by several columns holds one; it restores as a list of one.
+    sort: toSortOrder(saved?.sort),
   };
 };
 
@@ -105,7 +107,7 @@ const StructureSearchPage: FC = () => {
   const [pageSize, setPageSize] = useState(initial.pageSize);
   const [resetToken, setResetToken] = useState(0);
   /** The header the results are sorted by. Kept across new searches; cleared by Reset. */
-  const [sort, setSort] = useState<StructureSort | null>(initial.sort);
+  const [sort, setSort] = useState<StructureSort>(initial.sort);
 
   useEffect(() => {
     writeSessionState(STRUCTURE_SEARCH_STATE_KEY, {
@@ -240,7 +242,7 @@ const StructureSearchPage: FC = () => {
     setCriteria(EMPTY_CRITERIA);
     setSubmitted(null);
     setPage(1);
-    setSort(null);
+    setSort([]);
     setSelected(new Map());
     setResetToken((token) => token + 1);
   }, []);

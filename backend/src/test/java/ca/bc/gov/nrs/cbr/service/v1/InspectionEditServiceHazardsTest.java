@@ -30,7 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** An inspection's Hydraulic Hazards, edited on its page — {@link InspectionEditService}. */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import({InspectionEditService.class, InspectionFormService.class})
+@Import({InspectionEditService.class, InspectionFormService.class, LoadRatingService.class})
 class InspectionEditServiceHazardsTest {
 
   private static final LocalDateTime PAST = LocalDateTime.of(2000, 1, 1, 0, 0);

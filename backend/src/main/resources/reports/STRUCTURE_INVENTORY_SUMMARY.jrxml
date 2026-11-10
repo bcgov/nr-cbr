@@ -345,9 +345,9 @@ Inspctn
 Date]]></text>
 			</staticText>
 			<staticText>
-				<reportElement x="711" y="91" width="43" height="42" uuid="20125255-d6be-48bf-94ee-388599bbf597"/>
+				<reportElement x="711" y="94" width="43" height="39" uuid="20125255-d6be-48bf-94ee-388599bbf597"/>
 				<textElement textAlignment="Center">
-					<font fontName="Arial" size="9" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					<font fontName="Arial" size="8" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
 				</textElement>
 				<text><![CDATA[Year Super- structure
 Installed]]></text>

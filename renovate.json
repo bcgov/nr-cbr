@@ -2,6 +2,14 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Presets from https://github.com/bcgov/renovate-config",
   "extends": [
-    "github>bcgov/renovate-config#2026.9.26"
+    "github>bcgov/renovate-config#2026.10.29"
+  ],
+  "packageRules": [
+    {
+      "description": "Stay on Java 21: Java 24+ fails the Oracle TCPS handshake (TLS_RSA_* ciphers disabled, JDK-8245545). Lift once the DB listener offers ECDHE ciphers, moving the runtime image, the Maven build image and <java.version> in pom.xml together.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["eclipse-temurin"],
+      "allowedVersions": "<22"
+    }
   ]
 }

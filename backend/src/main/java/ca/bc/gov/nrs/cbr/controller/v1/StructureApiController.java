@@ -25,16 +25,17 @@ import ca.bc.gov.nrs.cbr.struct.v1.CreatedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CulvertDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.DocumentUpdateRequest;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionScheduleRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingDetailsRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.LoadRatingRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.MonitorSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.PierRequest;
-import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
-import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.ReplacementDetailsRequest;
@@ -50,6 +51,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureNameSuggestion;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInformationRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionScheduleResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInspectionsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureMonitorsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureRepairResponsibilityRequest;
@@ -128,9 +130,10 @@ public class StructureApiController implements StructureApiEndpoint {
   @Override
   public ResponseEntity<PagedResponse<StructureSearchResult>> searchStructures(
       StructureSearchCriteria criteria, int pageNumber, int pageSize,
-      StructureSortColumn sortBy, Sort.Direction sortDirection) {
+      List<StructureSortColumn> sortBy, List<Sort.Direction> sortDirection) {
     return ResponseEntity.ok(
-        structureSearchService.search(criteria, pageNumber, pageSize, sortBy, sortDirection));
+        structureSearchService.search(
+            criteria, pageNumber, pageSize, HeaderSort.of(sortBy, sortDirection)));
   }
 
   @Override
@@ -364,30 +367,26 @@ public class StructureApiController implements StructureApiEndpoint {
   }
 
   @Override
-  public StructureInspectionsResponse getInspections(
-      long structureId, int pageNumber, int pageSize, boolean includeBeforeInstall) {
+  public StructureInspectionsResponse getInspections(long structureId, int pageNumber,
+      int pageSize, boolean includeBeforeInstall, List<StructureInspectionSortColumn> sortBy,
+      List<Sort.Direction> sortDirection) {
     return inspectionsService.inspections(
-        structureId, pageNumber, pageSize, includeBeforeInstall);
+        structureId, pageNumber, pageSize, includeBeforeInstall,
+        HeaderSort.of(sortBy, sortDirection));
   }
 
   @Override
   public StructureRepairsResponse.Listing getRepairs(long structureId,
       StructureRepairsResponse.View view, Long inspectionId, int pageNumber, int pageSize,
-      boolean includeBeforeInstall) {
-    return repairsService.repairs(
-        structureId, view, inspectionId, pageNumber, pageSize, includeBeforeInstall);
+      boolean includeBeforeInstall, List<RepairSortColumn> sortBy,
+      List<Sort.Direction> sortDirection) {
+    return repairsService.repairs(structureId, view, inspectionId, pageNumber, pageSize,
+        includeBeforeInstall, HeaderSort.of(sortBy, sortDirection));
   }
 
   @Override
   public List<RepairTypeOption> getRepairTypes(long structureId) {
     return repairsService.repairTypes(structureId);
-  }
-
-  @Override
-  public ResponseEntity<RepairCreatedResponse> createRepair(
-      long structureId, RepairCreateRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(repairsService.create(structureId, null, request));
   }
 
   @Override
@@ -406,9 +405,10 @@ public class StructureApiController implements StructureApiEndpoint {
   @Override
   public StructureMonitorsResponse.Listing getMonitors(long structureId,
       StructureMonitorsResponse.View view, Long inspectionId, int pageNumber, int pageSize,
-      boolean includeBeforeInstall) {
-    return monitorsService.monitors(
-        structureId, view, inspectionId, pageNumber, pageSize, includeBeforeInstall);
+      boolean includeBeforeInstall, List<MonitorSortColumn> sortBy,
+      List<Sort.Direction> sortDirection) {
+    return monitorsService.monitors(structureId, view, inspectionId, pageNumber, pageSize,
+        includeBeforeInstall, HeaderSort.of(sortBy, sortDirection));
   }
 
   @Override

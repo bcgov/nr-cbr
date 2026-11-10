@@ -17,9 +17,11 @@ import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeOrderRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairTypeXrefRepository;
 import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairCreatedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RepairSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairTypeOption;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
@@ -43,6 +45,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -120,12 +124,13 @@ public class StructureRepairsService {
    * @param inspectionId the inspection whose page asks; needed for {@link View#CURRENT}, else null
    * @param pageNumber   zero-based
    * @param pageSize     held to between 1 and 100
+   * @param sort       the columns the user sorted by, first deciding; none for legacy's order
    * @throws StructureNotFoundException if there is no such structure
    * @throws ResponseStatusException 400 for {@link View#CURRENT} without an inspection
    */
   @Transactional(readOnly = true)
   public Listing repairs(long structureId, View view, Long inspectionId, int pageNumber,
-      int pageSize, boolean includeBeforeInstall) {
+      int pageSize, boolean includeBeforeInstall, List<HeaderSort<RepairSortColumn>> sort) {
     InstallCutoff cutoff = InstallCutoff.of(structures.findById(structureId)
         .orElseThrow(() -> new StructureNotFoundException(structureId)));
     boolean current = view == View.CURRENT;
@@ -138,7 +143,8 @@ public class StructureRepairsService {
     Page<StructureRepairEntity> page = repairs.findPageByStructure(
         structureId, current ? inspectionId : null, outstandingOnly, OUTSTANDING_STATUSES,
         includeBeforeInstall || cutoff.none() || current, cutoff.installed(),
-        PageRequest.of(Math.max(pageNumber, 0), Math.clamp(pageSize, 1, MAX_PAGE_SIZE)));
+        PageRequest.of(Math.max(pageNumber, 0), Math.clamp(pageSize, 1, MAX_PAGE_SIZE),
+            order(sort)));
     List<StructureRepairEntity> rows = page.getContent();
 
     Map<String, String> priorityNames = descriptions(priorities, rows,
@@ -185,6 +191,53 @@ public class StructureRepairsService {
   }
 
   /**
+   * The page's order: the columns the user sorted by, each breaking the ties of the one before,
+   * then legacy's order, which breaks its ties — newest inspection first (a repair with no
+   * inspection before them all, where Oracle's descending sort puts it), then priority by its rank
+   * (an unranked one last, where legacy's inner join left it out), then status descending, then
+   * number. The id closes it, so the order is total and no repair shows on two pages, or on none.
+   *
+   * <p>The null placements are spelled out rather than left to {@code NULLS FIRST}: Oracle and the
+   * test database place nulls differently by default. Text sorts without regard to case, as the
+   * searches' headers do. Aliases are those of
+   * {@code StructureRepairRepository.findPageByStructure}.
+   */
+  private static Sort order(List<HeaderSort<RepairSortColumn>> sort) {
+    // Each CASE in parentheses: Spring Data prefixes a bare one with the entity's alias.
+    Sort legacy = JpaSort.unsafe(Sort.Direction.ASC,
+            "(CASE WHEN inspection.inspectionDate IS NULL THEN 0 ELSE 1 END)")
+        .andUnsafe(Sort.Direction.DESC, "inspection.inspectionDate")
+        .andUnsafe(Sort.Direction.ASC,
+            "(CASE WHEN priorityOrder.repairPriorityCodeOrder IS NULL THEN 1 ELSE 0 END)",
+            "priorityOrder.repairPriorityCodeOrder")
+        .andUnsafe(Sort.Direction.DESC, "repair.repairStatusCode")
+        .andUnsafe(Sort.Direction.ASC, "repair.repairNumber", "repair.repairId");
+    Sort chosen = Sort.unsorted();
+    for (HeaderSort<RepairSortColumn> header : sort) {
+      chosen = chosen.and(JpaSort.unsafe(header.direction(), key(header.column())));
+    }
+    return chosen.and(legacy);
+  }
+
+  /** What a column sorts on — the value it shows. */
+  private static String key(RepairSortColumn column) {
+    return switch (column) {
+      case NUMBER -> "repair.repairNumber";
+      case STATUS -> "UPPER(statusCode.description)";
+      case TYPE -> "UPPER(typeCode.description)";
+      case USER_AUDITS -> "COALESCE(repair.completedByTimestamp, repair.requiredByTimestamp, "
+          + "repair.suggestedByTimestamp)";
+      case INSPECTION_DATE -> "inspection.inspectionDate";
+      case PRIORITY -> "priorityOrder.repairPriorityCodeOrder";
+      case COMPLETED_DATE -> "repair.completedDate";
+      case ESTIMATE -> "repair.estimate";
+      case ACTUAL_COST -> "repair.actualCost";
+      case QUANTITY -> "repair.repairQuantity";
+      case DESCRIPTION -> "UPPER(repair.description)";
+    };
+  }
+
+  /**
    * The repair types that apply to the structure, each with its group — the Repair Item dialog's
    * Repair Type list before its group checkboxes narrow it. In legacy's order: by group, then the
    * type's order. A type in two groups appears once in each.
@@ -208,17 +261,19 @@ public class StructureRepairsService {
    * {@code CBR.INSERT_REPAIR}).
    *
    * <p>As legacy: the repair is Suggested, stamped Suggested by the user, not carried forward, and
-   * belongs to the inspection it was added from — legacy's Repairs & Monitoring tab — or, from the
-   * structure page, to none; it takes the structure's next number (over every repair, those an
-   * inspection raised included) and its id from {@code STRUCTURE_REPAIR_SEQ} through the entity's
-   * generator. The priority, type, amounts and description are checked as an edit checks them.
+   * belongs to the inspection it was added from — legacy's Repairs & Monitoring tab. Unlike legacy,
+   * always to an inspection, of any type (CBR-858): the structure page no longer adds repairs, as
+   * legacy's unattached ones were never carried onto a later inspection. It takes the structure's
+   * next number (over every repair, those an inspection raised included) and its id from
+   * {@code STRUCTURE_REPAIR_SEQ} through the entity's generator. The priority, type, amounts and
+   * description are checked as an edit checks them.
    *
-   * @param inspectionId the inspection it was added from, or null from the structure page
+   * @param inspectionId the inspection it was added from
    * @throws StructureNotFoundException if there is no such structure
    * @throws FieldValidationException   with a message for each field at fault
    */
   @Transactional
-  public RepairCreatedResponse create(long structureId, Long inspectionId,
+  public RepairCreatedResponse create(long structureId, long inspectionId,
       RepairCreateRequest request) {
     if (!structures.existsById(structureId)) {
       throw new StructureNotFoundException(structureId);

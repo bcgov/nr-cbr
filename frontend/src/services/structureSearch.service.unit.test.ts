@@ -86,7 +86,9 @@ describe('StructureSearchService', () => {
   it('sends the sort only when a header was chosen', async () => {
     const { service, request } = withMockedRequest();
 
-    await service.searchStructures(criteria(), 0, 20, { column: 'MAINTAINER', direction: 'DESC' });
+    await service.searchStructures(criteria(), 0, 20, [
+      { column: 'MAINTAINER', direction: 'DESC' },
+    ]);
 
     expect(urlOf(request)).toContain('sortBy=MAINTAINER');
     expect(urlOf(request)).toContain('sortDirection=DESC');
@@ -213,6 +215,45 @@ describe('StructureSearchService', () => {
       expect.objectContaining({
         method: 'GET',
         url: '/api/v1/structures/7/monitors?view=OUTSTANDING&pageNumber=0&pageSize=10&includeBeforeInstall=false',
+      }),
+    );
+  });
+
+  it("sends the header a structure's repairs and monitoring items are sorted by", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.getStructureRepairs('7', 'ALL', 0, 10, false, undefined, [
+      {
+        column: 'PRIORITY',
+        direction: 'DESC',
+      },
+    ]);
+    await service.getStructureMonitors('7', 'CURRENT', 0, 10, false, '41', [
+      {
+        column: 'FREQUENCY',
+        direction: 'ASC',
+      },
+    ]);
+    await service.getStructureInspections('7', 0, 10, true, [
+      {
+        column: 'REVIEWED_BY',
+        direction: 'DESC',
+      },
+    ]);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/api/v1/structures/7/repairs?view=ALL&pageNumber=0&pageSize=10&includeBeforeInstall=false&sortBy=PRIORITY&sortDirection=DESC',
+      }),
+    );
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/api/v1/structures/7/monitors?view=CURRENT&pageNumber=0&pageSize=10&includeBeforeInstall=false&inspectionId=41&sortBy=FREQUENCY&sortDirection=ASC',
+      }),
+    );
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/api/v1/structures/7/inspections?pageNumber=0&pageSize=10&includeBeforeInstall=true&sortBy=REVIEWED_BY&sortDirection=DESC',
       }),
     );
   });

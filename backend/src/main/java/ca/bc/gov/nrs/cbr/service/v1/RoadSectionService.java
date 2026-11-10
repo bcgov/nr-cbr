@@ -4,10 +4,13 @@ import ca.bc.gov.nrs.cbr.exception.RoadSectionNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSectionRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSegmentRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSortColumn;
+import java.util.List;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +18,8 @@ import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -93,11 +98,24 @@ public class RoadSectionService {
    */
   public PagedResponse<RoadSearchResult> search(
       RoadSearchCriteria criteria, int pageNumber, int pageSize) {
-    Pageable limit = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
+    return search(criteria, pageNumber, pageSize, List.of());
+  }
+
+  /**
+   * The same search, sorted by the columns the user chose — legacy's order breaking their ties.
+   *
+   * @param sort       the columns the user sorted by, first deciding; none for legacy's order
+   */
+  public PagedResponse<RoadSearchResult> search(RoadSearchCriteria criteria, int pageNumber,
+      int pageSize, List<HeaderSort<RoadSortColumn>> sort) {
+    int number = Math.max(pageNumber, 0);
+    int size = boundedPageSize(pageSize);
 
     if (Boolean.FALSE.equals(tenureHolderReadable)) {
-      return withoutTenureHolder(criteria, limit);
+      return withoutTenureHolder(criteria, PageRequest.of(number, size,
+          order(sort, false)));
     }
+    Pageable limit = PageRequest.of(number, size, order(sort, true));
 
     try {
       Page<RoadSearchResult> roads = roadSections.search(
@@ -119,8 +137,47 @@ public class RoadSectionService {
           + "tenure holder. Grant SELECT on THE.FOREST_FILE_CLIENT to the application role to "
           + "restore the client name, the client number and the two criteria that match on them.",
           missingGrant);
-      return withoutTenureHolder(criteria, limit);
+      return withoutTenureHolder(criteria, PageRequest.of(number, size,
+          order(sort, false)));
     }
+  }
+
+  /**
+   * The page's order: the columns the user sorted by, each breaking the ties of the one before,
+   * then legacy's — road name, file, branch. With the tenure holder, the client number closes it,
+   * so a road held by two clients lists its two rows the same way every time and the order is total
+   * across pages.
+   *
+   * <p>Without the holder ({@code withClient} false) the client columns do not exist, so sorting by
+   * either is legacy's order alone. Selected columns only, as the {@code DISTINCT} requires.
+   */
+  private static Sort order(List<HeaderSort<RoadSortColumn>> sort, boolean withClient) {
+    Sort legacy = JpaSort.unsafe(Sort.Direction.ASC,
+        "road.roadSectName", "road.forestFileId", "road.roadSectionId");
+    if (withClient) {
+      legacy = legacy.and(JpaSort.unsafe(Sort.Direction.ASC, "client.clientNumber"));
+    }
+    Sort chosen = Sort.unsorted();
+    for (HeaderSort<RoadSortColumn> header : sort) {
+      String key = key(header.column(), withClient);
+      // A client column without the holder is left to legacy's order.
+      if (key != null) {
+        chosen = chosen.and(JpaSort.unsafe(header.direction(), key));
+      }
+    }
+    return chosen.and(legacy);
+  }
+
+  /** What a column sorts on — a selected column, as the {@code DISTINCT} requires. */
+  private static String key(RoadSortColumn column, boolean withClient) {
+    return switch (column) {
+      case FOREST_SERVICE_ROAD -> "road.roadSectName";
+      case PROJECT_FILE -> "road.forestFileId";
+      case BRANCH -> "road.roadSectionId";
+      case TENURE_TYPE -> "road.fileTypeCode";
+      case CLIENT_NAME -> withClient ? "client.clientName" : null;
+      case CLIENT_NUMBER -> withClient ? "client.clientNumber" : null;
+    };
   }
 
   /**
@@ -129,10 +186,10 @@ public class RoadSectionService {
    * <p>Package-private rather than public: it is the same answer {@link #search} gives once it has
    * learned the table cannot be read, and no caller should be choosing it.
    */
-  PagedResponse<RoadSearchResult> searchWithoutTenureHolder(
-      RoadSearchCriteria criteria, int pageNumber, int pageSize) {
-    return withoutTenureHolder(
-        criteria, PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize)));
+  PagedResponse<RoadSearchResult> searchWithoutTenureHolder(RoadSearchCriteria criteria,
+      int pageNumber, int pageSize, List<HeaderSort<RoadSortColumn>> sort) {
+    return withoutTenureHolder(criteria, PageRequest.of(Math.max(pageNumber, 0),
+        boundedPageSize(pageSize), order(sort, false)));
   }
 
   /**
