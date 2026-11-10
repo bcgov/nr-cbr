@@ -113,6 +113,38 @@ class InspectionAuditRecorderTest {
         any());
   }
 
+  @ParameterizedTest(name = "reopened to {0}")
+  @CsvSource({"PRO, In Progress", "SUB, Submitted"})
+  @DisplayName("records a reopening — a Reviewed one moved back — at In Progress too, by anyone")
+  void recordsReopening(String status, String reads) {
+    given(status, false);
+
+    recorder.recordSafely(INSPECTION, true);
+
+    String line = "Audit record - " + reads
+        + " - saved by IDIR\\\\JSMITH on \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}";
+    verify(documents).addAuditRecord(eq(7L), eq(INSPECTION),
+        matches("62-001 - B1 - 2025 inspection - " + reads
+            + " - \\d{4}-\\d{2}-\\d{2} \\d{4}\\.pdf"),
+        matches(line), eq(PDF));
+  }
+
+  @Test
+  @DisplayName("records a reopening even when the same save asked for an ordinary record first")
+  void reopeningJoinsTheSave() {
+    given("PRO", false);
+    TransactionSynchronizationManager.initSynchronization();
+
+    recorder.afterCommit(INSPECTION);
+    recorder.reopenedAfterCommit(INSPECTION);
+
+    assertThat(TransactionSynchronizationManager.getSynchronizations()).hasSize(1);
+    TransactionSynchronizationManager.getSynchronizations()
+        .forEach(TransactionSynchronization::afterCommit);
+    verify(documents).addAuditRecord(eq(7L), eq(INSPECTION), anyString(),
+        matches("Audit record - In Progress - .*"), eq(PDF));
+  }
+
   @Test
   @DisplayName("logs a record it cannot make, and lets the save stand")
   void failureIsLogged() {

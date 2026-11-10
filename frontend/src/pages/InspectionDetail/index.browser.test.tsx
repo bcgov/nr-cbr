@@ -892,13 +892,55 @@ describe('InspectionDetailPage', () => {
       authorization.isPeng = true;
     });
 
-    it('offers no Edit once Reviewed, as legacy disables its page', async () => {
+    it('once Reviewed, offers only Change status, the other cards locked', async () => {
       renderPage();
       await screen.findByTestId('inspection-inspection');
 
-      expect(screen.queryByTestId('inspection-edit')).not.toBeInTheDocument();
+      expect(screen.getByTestId('inspection-edit')).toMatchTextContent('Change status');
       expect(screen.queryByTestId('comments-edit')).not.toBeInTheDocument();
       expect(screen.queryByTestId('peng-comments-edit')).not.toBeInTheDocument();
+    });
+
+    it('moves a Reviewed one back to Submitted — any Level 1 and up — taking only its status', async () => {
+      // Neither a P.Eng nor a reviewer: Level 1 may reopen it.
+      authorization.isPeng = false;
+      authorization.isInspectionReviewer = false;
+      inspectionApi.updateInspection.mockResolvedValue(undefined);
+      renderPage();
+      await screen.findByTestId('inspection-inspection');
+
+      await userEvent.click(screen.getByTestId('inspection-edit'));
+      const status = screen.getByTestId('inspection-edit-statusCode');
+      await waitFor(() =>
+        expect(
+          within(status)
+            .getAllByRole('option')
+            .map((option) => option.textContent),
+        ).toEqual(['In Progress', 'Reviewed', 'Submitted']),
+      );
+      // The rest of the card is read-only until the status has moved.
+      expect(screen.queryByTestId('inspection-edit-inspectorName')).not.toBeInTheDocument();
+
+      // Saved unchanged, it says what to do instead.
+      await userEvent.click(screen.getByTestId('inspection-save'));
+      expect(screen.getByTestId('inspection-section-inspection')).toMatchTextContent(
+        /Choose In Progress or Submitted to reopen this inspection\./,
+      );
+      expect(inspectionApi.updateInspection).not.toHaveBeenCalled();
+
+      fireEvent.change(status, { target: { value: 'SUB' } });
+      expect(screen.getByTestId('inspection-section-inspection')).toMatchTextContent(
+        /Saving clears the review/,
+      );
+      await userEvent.click(screen.getByTestId('inspection-save'));
+      await waitFor(() =>
+        expect(inspectionApi.updateInspection).toHaveBeenCalledWith(
+          '41',
+          expect.objectContaining({ statusCode: 'SUB' }),
+        ),
+      );
+      authorization.isPeng = true;
+      authorization.isInspectionReviewer = true;
     });
 
     it('offers Reviewed and the PEng Comments to a P.Eng only', async () => {
