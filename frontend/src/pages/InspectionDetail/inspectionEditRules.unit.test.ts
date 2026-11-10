@@ -4,8 +4,10 @@ import {
   canChangeStatus,
   cardErrorsOf,
   isReopening,
+  offeredStatuses,
   reopenErrorsOf,
   requiredOf,
+  statusHelpOf,
   toUpdateRequest,
   valuesOf,
 } from './inspectionEditRules';
@@ -72,5 +74,28 @@ describe('the Inspection card', () => {
     expect(reopenErrorsOf({ ...values, statusCode: 'REJ' }).statusCode).toBeDefined();
     expect(reopenErrorsOf({ ...values, statusCode: 'SUB' }).statusCode).toBeUndefined();
     expect(reopenErrorsOf({ ...values, statusCode: 'PRO' }).statusCode).toBeUndefined();
+  });
+
+  it('offers the card statuses, the current one, and a reviewer Reviewed and Rejected', () => {
+    const all = ['PRO', 'REJ', 'RVD', 'SUB', 'ACC'].map((code) => ({ code }));
+    const codes = (current: string | null, reviewer: boolean) =>
+      offeredStatuses(all, current, reviewer).map(({ code }) => code);
+
+    expect(codes('PRO', false)).toEqual(['PRO', 'SUB']);
+    expect(codes('PRO', true)).toEqual(['PRO', 'REJ', 'RVD', 'SUB']);
+    expect(codes('REJ', true)).toEqual(['PRO', 'REJ', 'RVD', 'SUB']);
+    // Reopening: back to the card's two, the status it has shown.
+    expect(codes('RVD', true)).toEqual(['PRO', 'RVD', 'SUB']);
+    expect(codes('ACC', true)).toEqual(['PRO', 'SUB', 'ACC']);
+  });
+
+  it('says what saving the picked status does beyond the card', () => {
+    expect(statusHelpOf('REJ', 'SUB', '2026-11-10')).toBe(
+      "Saving reschedules the structure's next routine inspection to 2027/11/10, then yearly.",
+    );
+    expect(statusHelpOf('REJ', 'REJ', '2026-11-10')).toBeUndefined();
+    expect(statusHelpOf('SUB', 'RVD', '2026-11-10')).toMatch(/^Saving clears the review/);
+    expect(statusHelpOf('RVD', 'RVD', '2026-11-10')).toBeUndefined();
+    expect(statusHelpOf('SUB', 'PRO', '2026-11-10')).toBeUndefined();
   });
 });

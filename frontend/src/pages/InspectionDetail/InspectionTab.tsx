@@ -16,14 +16,15 @@ import DateField from '@/pages/StructureDetail/DateField';
 import { requiredLabel } from '@/utils/requiredLabel';
 
 import {
-  CARD_STATUSES,
   LOCKING_STATUSES,
-  REJECTED,
+  REVIEWED,
   canChangeStatus,
   cardErrorsOf,
   isReopening,
+  offeredStatuses,
   reopenErrorsOf,
   requiredOf,
+  statusHelpOf,
   toUpdateRequest,
   valuesOf,
 } from './inspectionEditRules';
@@ -57,7 +58,7 @@ import {
   IN_PROGRESS,
   type InspectionValues,
 } from '@/pages/NewInspection/inspectionRules';
-import { addYears, fromCalendar, toIso } from '@/pages/StructureDetail/dateBox';
+import { fromCalendar, toIso } from '@/pages/StructureDetail/dateBox';
 import { describe, money, yesNo } from '@/pages/StructureDetail/format';
 import { apiErrorMessage, apiFieldErrors } from '@/utils/apiError';
 import { formatShortDate } from '@/utils/date';
@@ -111,8 +112,6 @@ const useSaved = (what: string) => {
   };
 };
 
-/** Reviewed — a P.Eng's, saved through the Review dialog rather than with the card. */
-const REVIEWED = 'RVD';
 /** The Review dialog's own fields; any other refusal is the card's. */
 const REVIEW_FIELDS = new Set<string>([
   'loadRating',
@@ -121,6 +120,24 @@ const REVIEW_FIELDS = new Set<string>([
   'nextRoutineDate',
   'routineFrequencyYears',
 ]);
+
+/** The card's other fields while it is reopened: read-only until the status has moved. */
+const ReopenedFields: FC<{ inspection: InspectionDetailResponse }> = ({ inspection }) => (
+  <>
+    <ReadOnlyField
+      label="Date of Inspection"
+      value={formatShortDate(inspection.inspectionDate)}
+      emptyText="No date yet"
+    />
+    <ReadOnlyField label="Inspector Name" value={inspection.inspectorName} />
+    <ReadOnlyField label="Inspection Company Name" value={inspection.inspectorCompanyName} />
+    <ReadOnlyField label="Cost of Inspection" value={money(inspection.cost)} />
+    <ReadOnlyField
+      label="Professional Inspection Required?"
+      value={yesNo(inspection.professionalInspectionRequired)}
+    />
+  </>
+);
 
 /**
  * The Inspection card's form: status, date, inspector, company, cost, professional. An inspection
@@ -217,19 +234,7 @@ const InspectionEditor: FC<{
     });
   };
 
-  // In Progress and Submitted, and the status it has if neither (Rejected, Reviewed, Accepted), so
-  // it reads right; for an inspection reviewer, Reviewed through the Review dialog and, from In
-  // Progress or Submitted, Rejected. Reopening offers only the first two.
-  const reviewable = isInspectionReviewer && CARD_STATUSES.has(current ?? '');
-  const offered = (statuses.data ?? []).filter(
-    (status) =>
-      CARD_STATUSES.has(status.code) ||
-      status.code === current ||
-      (!reopening && isInspectionReviewer && status.code === REVIEWED) ||
-      (reviewable && status.code === REJECTED),
-  );
-  const rejecting = values.statusCode === REJECTED && current !== REJECTED;
-  const reopened = reopening && values.statusCode !== current;
+  const offered = offeredStatuses(statuses.data ?? [], current, isInspectionReviewer);
   const today = toIso(fromCalendar(new Date())) ?? '';
 
   return (
@@ -244,13 +249,7 @@ const InspectionEditor: FC<{
             value={values.statusCode}
             invalid={Boolean(shown.statusCode)}
             invalidText={shown.statusCode}
-            helperText={
-              rejecting
-                ? `Saving reschedules the structure's next routine inspection to ${addYears(today, 1)}, then yearly.`
-                : reopened
-                  ? "Saving clears the review — its reviewer and date — and this inspection's load rating stops counting as the structure's current one."
-                  : undefined
-            }
+            helperText={statusHelpOf(values.statusCode, current, today)}
             onChange={(event) => change('statusCode', event.target.value)}
             onBlur={() => form.leave('statusCode')}
           >
@@ -266,23 +265,7 @@ const InspectionEditor: FC<{
           />
         )}
         {reopening ? (
-          <>
-            <ReadOnlyField
-              label="Date of Inspection"
-              value={formatShortDate(inspection.inspectionDate)}
-              emptyText="No date yet"
-            />
-            <ReadOnlyField label="Inspector Name" value={inspection.inspectorName} />
-            <ReadOnlyField
-              label="Inspection Company Name"
-              value={inspection.inspectorCompanyName}
-            />
-            <ReadOnlyField label="Cost of Inspection" value={money(inspection.cost)} />
-            <ReadOnlyField
-              label="Professional Inspection Required?"
-              value={yesNo(inspection.professionalInspectionRequired)}
-            />
-          </>
+          <ReopenedFields inspection={inspection} />
         ) : (
           <>
             <DateField

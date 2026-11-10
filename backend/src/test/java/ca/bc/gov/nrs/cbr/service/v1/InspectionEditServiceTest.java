@@ -255,12 +255,13 @@ class InspectionEditServiceTest {
     inspection(42L, "ACC", DAY.minusDays(2), "Jo");
     InspectionCommentRequest comment = new InspectionCommentRequest("x");
     InspectionUpdateRequest request = card("RVD", DAY, "Jo", "Co");
+    InspectionUpdateRequest accepted = card("ACC", DAY, "Jo", "Co");
 
     // The card itself, while its status stays Reviewed or Accepted.
     assertThatThrownBy(() -> service.update(41L, request))
         .isInstanceOf(InspectionLockedException.class)
         .hasMessageContaining("can no longer be changed");
-    assertThatThrownBy(() -> service.update(42L, card("ACC", DAY, "Jo", "Co")))
+    assertThatThrownBy(() -> service.update(42L, accepted))
         .isInstanceOf(InspectionLockedException.class);
     assertThatThrownBy(() -> service.updateComment(42L, comment))
         .isInstanceOf(InspectionLockedException.class);
@@ -335,7 +336,8 @@ class InspectionEditServiceTest {
 
     assertThat(refused(41L, card("REJ", DAY, "Jo", "Co"))).containsOnly(Map.entry("statusCode",
         "A Reviewed inspection can only be moved back to In Progress or Submitted."));
-    assertThatThrownBy(() -> service.update(41L, card(null, DAY, "Jo", "Co")))
+    InspectionUpdateRequest noStatus = card(null, DAY, "Jo", "Co");
+    assertThatThrownBy(() -> service.update(41L, noStatus))
         .isInstanceOf(InspectionLockedException.class);
     assertThat(stored(41L).getCurrentStatus().getInspectionReportStatusCode()).isEqualTo("RVD");
   }
