@@ -77,20 +77,25 @@ export const INSPECTION_STATUS = {
 /**
  * Site statuses that decide whether a crossing must be inspected.
  *
- * <p>`ACTIVE` and `BARRICADED` mean the crossing is still there to be driven over; the rest mean it
- * is gone, never built, or someone else's. Legacy spells both lists out in `SiteForm.validate`.
+ * <p>`ACTIVE` and `BARRICADED` mean the crossing is still there to be driven over, and
+ * `INACCESSIBLE` (which replaced LRMOPS) is to be inspected too — the business's rule, 2026-11.
+ * Legacy spells both lists out in `SiteForm.validate`.
  */
 export const SITE_STATUS = {
   ACTIVE: 'ACT',
   BARRICADED: 'BAR',
-  /** Not built yet — so it may carry no structures at all. */
+  INACCESSIBLE: 'INAC',
+  /** Proposed / Under Construction — may carry structures (business, 2026-11; legacy refused). */
   PROPOSED: 'PP',
   /** Closed, but its structures may still be standing. */
   DEACTIVATED: 'DAC',
 } as const;
 
-/** The statuses a crossing may not be inspected under. */
-export const UNINSPECTABLE_STATUSES = ['TRN', 'DAC', 'UCON', 'PP', 'ARC', 'LRM'];
+/**
+ * The statuses a crossing may not be inspected under. UCON, TRN and LRM are retired (expired and
+ * out of every list) but stay here should a stored site still carry one.
+ */
+export const UNINSPECTABLE_STATUSES = ['DAC', 'PP', 'ARC', 'UCON', 'TRN', 'LRM'];
 
 /**
  * Byte limits of the columns behind the free-text fields.

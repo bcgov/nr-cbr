@@ -42,7 +42,6 @@ public class StructureInformationService {
 
   /** {@code CROSSING_STRUCTURE_NAME VARCHAR2(14 BYTE)}. */
   private static final int NAME_MAX = 14;
-  private static final String PROPOSED = "PP";
   private static final String STORAGE = "STRG";
   private static final String NAME = "structureName";
   private static final String SITE = "siteId";
@@ -84,7 +83,7 @@ public class StructureInformationService {
    * Saves the structure's name and site.
    *
    * <p>As legacy: the name is required, at most 14 characters, and changed only at Level 2; a site
-   * must exist, be complete, and not be Proposed, and once the structure has a site it cannot be
+   * must exist and be complete, and once the structure has a site it cannot be
    * cleared. A rename records the old name in {@code CROSSING_STRUCTURE_NAME_HIST}, as legacy's
    * {@code UPDATE_STRUCTURE} did. A field sent unchanged is not checked again.
    *
@@ -158,8 +157,9 @@ public class StructureInformationService {
   }
 
   /**
-   * Why a structure cannot stand on this site — it does not exist, is incomplete, or is Proposed —
-   * or null when it can. Shared with Add Structure.
+   * Why a structure cannot stand on this site — it does not exist or is incomplete — or null when
+   * it can. Shared with Add Structure. A Proposed / Under Construction site may have structures
+   * (business, 2026-11), unlike legacy.
    */
   String siteProblem(String siteId) {
     // Not Optional.map: a site with nothing wrong maps to null, which map() would take for "none".
@@ -168,16 +168,14 @@ public class StructureInformationService {
   }
 
   /**
-   * Why a structure cannot move to this site, or null — legacy's {@code Site.isComplete()} and its
-   * Proposed check, each with its own sentence where legacy said "Site # is invalid." for both.
+   * Why a structure cannot move to this site, or null — legacy's {@code Site.isComplete()}, with its
+   * own sentence where legacy said "Site # is invalid.". Legacy's Proposed check is gone: a Proposed /
+   * Under Construction site may have structures (business, 2026-11).
    */
   private String problemWith(CrossingSiteEntity site) {
     String id = site.getCrossingSiteId();
     if (!complete(site)) {
       return "Site " + id + " is incomplete. Complete it on its Site Detail page first.";
-    }
-    if (PROPOSED.equals(site.getCrossingSiteStatusCode())) {
-      return "Site " + id + " is Proposed. A structure cannot be moved to a Proposed site.";
     }
     return null;
   }

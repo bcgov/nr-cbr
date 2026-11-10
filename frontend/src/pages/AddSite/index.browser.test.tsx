@@ -352,7 +352,7 @@ describe('AddSitePage — validation', () => {
 
     expect(
       await inCard().findByText(
-        /An Active or Barricaded\/Closed Crossing site must be set to Inspect/,
+        /An Active, Barricaded\/Closed or Inaccessible Crossing site must be set to Inspect/,
       ),
     ).toBeInTheDocument();
   });

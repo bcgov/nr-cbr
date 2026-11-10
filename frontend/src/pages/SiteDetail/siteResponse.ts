@@ -44,7 +44,8 @@ const blank = (value: StoredValue) =>
  * Whether a structure may be added to the site — legacy's three checks on Site Detail's Add
  * Structure button, which the server repeats on save: the site is complete (legacy's
  * `Site.isComplete()`: status, inspection status, district and type set, and a crossing name and
- * kilometres unless it is a storage site), and it is not Proposed or closed (deactivated).
+ * kilometres unless it is a storage site), and it is not closed (deactivated). Unlike legacy, a
+ * Proposed / Under Construction site may take structures (business, 2026-11).
  */
 export const canAddStructureTo = (site: SiteDetailResponse): boolean => {
   if (
@@ -58,7 +59,7 @@ export const canAddStructureTo = (site: SiteDetailResponse): boolean => {
   const complete =
     site.crossingSiteTypeCode === SITE_TYPE.STORAGE ||
     (!blank(site.crossingName) && !blank(site.pointOfCommencementDistance));
-  return complete && !['PP', 'DAC'].includes(site.crossingSiteStatusCode ?? '');
+  return complete && site.crossingSiteStatusCode !== 'DAC';
 };
 
 const asText = (value: StoredValue): string =>
