@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.configuration.ObjectStorageProperties;
 import java.net.URI;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -78,6 +79,23 @@ public class ObjectStorageService implements DisposableBean {
         RequestBody.fromBytes(content));
   }
 
+  /**
+   * Stores {@code content} at {@code key} with its MD5 as {@code Content-MD5}, and returns the
+   * stored object's ETag as the gateway sent it (quoted).
+   *
+   * <p>The gateway refuses a body whose MD5 differs from the header, so a corrupted upload is never
+   * stored; and for a single-part upload the ETag is the MD5 of what it stored, which lets the
+   * caller check the copy end to end. The BLOB copy uses this.
+   *
+   * @param md5 the MD5 digest of {@code content} (16 bytes, not hex)
+   */
+  public String putObjectWithMd5(String key, String contentType, byte[] content, byte[] md5) {
+    return client().putObject(
+        builder -> builder.bucket(bucket).key(key).contentType(contentType)
+            .contentMD5(Base64.getEncoder().encodeToString(md5)),
+        RequestBody.fromBytes(content)).eTag();
+  }
+
   /** The object's bytes; {@link NoSuchKeyException} when there is none. */
   public byte[] getObjectBytes(String key) {
     return client().getObjectAsBytes(builder -> builder.bucket(bucket).key(key)).asByteArray();
@@ -102,6 +120,20 @@ public class ObjectStorageService implements DisposableBean {
       return true;
     } catch (NoSuchKeyException missing) {
       return false;
+    }
+  }
+
+  /**
+   * The object's ETag as the gateway sends it (quoted), without fetching it; empty when there is
+   * no object. The BLOB copy's "already copied?": for a single-part upload the ETag is the MD5 of
+   * the bytes.
+   */
+  public Optional<String> objectEtag(String key) {
+    try {
+      return Optional.ofNullable(
+          client().headObject(builder -> builder.bucket(bucket).key(key)).eTag());
+    } catch (NoSuchKeyException missing) {
+      return Optional.empty();
     }
   }
 
