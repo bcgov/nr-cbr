@@ -10,6 +10,7 @@ import ca.bc.gov.nrs.cbr.util.DocumentMediaTypes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -69,7 +70,7 @@ public class FileCopyService {
       log.error("{}: file {} failed", JOB_NAME, fileId, failed);
       status = BatchJobItemStatus.ERROR;
     }
-    items.updateStatus(JOB_NAME, fileId, status, LocalDateTime.now());
+    items.updateStatus(JOB_NAME, fileId, status, LocalDateTime.now(ZoneId.systemDefault()));
     return CompletableFuture.completedFuture(status);
   }
 
@@ -134,6 +135,12 @@ public class FileCopyService {
     return "";
   }
 
+  /**
+   * The bytes' MD5. Not a security use: S3's {@code Content-MD5} header and a single-part upload's
+   * ETag are defined as MD5, so it is the only digest that lets the gateway and this job check the
+   * copy end to end. Nothing is signed, hashed for storage or compared against an attacker's input.
+   */
+  @SuppressWarnings("java:S4790")
   private static byte[] md5(byte[] content) {
     try {
       return MessageDigest.getInstance("MD5").digest(content);

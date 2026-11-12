@@ -5,6 +5,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.BatchJobItemRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.BatchJobItemRepository.StatusCount;
 import ca.bc.gov.nrs.cbr.service.v1.FileCopyService;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,7 +103,7 @@ public class PurgeBatchJobItemsScheduler {
     if (error > 0) {
       return "skipped, " + error + " ERROR rows";
     }
-    if (lastChange.get().isAfter(LocalDateTime.now().minusDays(afterDays))) {
+    if (lastChange.get().isAfter(LocalDateTime.now(ZoneId.systemDefault()).minusDays(afterDays))) {
       return "skipped, last changed " + lastChange.get().toLocalDate() + " (kept " + afterDays
           + " days)";
     }

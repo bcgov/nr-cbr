@@ -5,6 +5,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.BatchJobItemRepository;
 import ca.bc.gov.nrs.cbr.service.v1.FileCopyService;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -86,50 +87,73 @@ public class FileCopyTaskSchedulerService {
       return 0;
     }
     if (cursor == null) {
-      cursor = items.findHighestItemId(JOB_NAME, BatchJobItemStatus.READY)
-          .map(highest -> randomStart.applyAsLong(highest) - 1)
-          .orElse(null);
-      if (cursor == null) {
-        return 0;
-      }
+      cursor = startingCursor();
     }
-    List<Long> ids = new ArrayList<>(
-        items.findItemIds(JOB_NAME, BatchJobItemStatus.READY, cursor, free));
-    if (ids.size() < free && cursor >= 0) {
-      // Past the last READY id: wrap round to the lowest.
-      for (long id : items.findItemIds(JOB_NAME, BatchJobItemStatus.READY, -1,
-          free + inFlight.size())) {
-        if (ids.size() < free && !ids.contains(id)) {
-          ids.add(id);
-        }
-      }
+    if (cursor == null) {
+      return 0;
     }
-
     int handedOut = 0;
-    for (long id : ids) {
-      if (!inFlight.add(id)) {
-        continue;
-      }
-      try {
-        fileCopyService.copyFile(id).whenComplete((status, failed) -> {
-          inFlight.remove(id);
-          if (failed != null) {
-            log.error("{}: file {}'s outcome could not be saved; it stays READY", JOB_NAME, id,
-                failed);
-          }
-        });
-      } catch (TaskRejectedException full) {
-        inFlight.remove(id);
-        log.warn("{}: the copy executor is full; the rest wait for the next firing", JOB_NAME);
+    for (long id : nextReady(free)) {
+      HandOut outcome = handOut(id);
+      if (outcome == HandOut.EXECUTOR_FULL) {
         break;
       }
-      cursor = id;
-      handedOut++;
+      if (outcome == HandOut.HANDED_OUT) {
+        cursor = id;
+        handedOut++;
+      }
     }
     if (handedOut > 0) {
       log.debug("{}: {} files handed out, {} in flight", JOB_NAME, handedOut, inFlight.size());
     }
     return handedOut;
+  }
+
+  /** What became of one file offered to the copy executor. */
+  private enum HandOut { HANDED_OUT, ALREADY_IN_FLIGHT, EXECUTOR_FULL }
+
+  /** A random point among the READY ids, just below it; null when nothing is READY. */
+  private Long startingCursor() {
+    return items.findHighestItemId(JOB_NAME, BatchJobItemStatus.READY)
+        .map(highest -> randomStart.applyAsLong(highest) - 1)
+        .orElse(null);
+  }
+
+  /** Up to {@code free} READY ids after the cursor, wrapping round to the lowest past the last. */
+  private List<Long> nextReady(int free) {
+    List<Long> ids = new ArrayList<>(
+        items.findItemIds(JOB_NAME, BatchJobItemStatus.READY, cursor, free));
+    if (ids.size() < free && cursor >= 0) {
+      items.findItemIds(JOB_NAME, BatchJobItemStatus.READY, -1, free + inFlight.size()).stream()
+          .filter(id -> !ids.contains(id))
+          .limit((long) free - ids.size())
+          .forEach(ids::add);
+    }
+    return ids;
+  }
+
+  /**
+   * Hands one file to the copy executor, unless it is already in flight on this pod; it leaves
+   * flight when its copy finishes, saved or not.
+   */
+  private HandOut handOut(long id) {
+    if (!inFlight.add(id)) {
+      return HandOut.ALREADY_IN_FLIGHT;
+    }
+    try {
+      fileCopyService.copyFile(id).whenComplete((status, failed) -> {
+        inFlight.remove(id);
+        if (failed != null) {
+          log.error("{}: file {}'s outcome could not be saved; it stays READY", JOB_NAME, id,
+              failed);
+        }
+      });
+      return HandOut.HANDED_OUT;
+    } catch (TaskRejectedException full) {
+      inFlight.remove(id);
+      log.warn("{}: the copy executor is full; the rest wait for the next firing", JOB_NAME);
+      return HandOut.EXECUTOR_FULL;
+    }
   }
 
   /**
@@ -149,7 +173,7 @@ public class FileCopyTaskSchedulerService {
     long error = counts.get(BatchJobItemStatus.ERROR);
     long total = ready + done + error;
     long pace = items.countByJobNameAndStatusAndUpdateTimestampAfter(JOB_NAME,
-        BatchJobItemStatus.DONE, LocalDateTime.now().minus(PACE_WINDOW));
+        BatchJobItemStatus.DONE, LocalDateTime.now(ZoneId.systemDefault()).minus(PACE_WINDOW));
     log.info("{}: READY={} DONE={} ERROR={} ({}% done; {} added now; {} done in the last 15 min{})",
         JOB_NAME, ready, done, error, total == 0 ? 100 : done * 100 / total, added, pace,
         pace == 0 || ready == 0 ? "" : "; about " + eta(ready, pace) + " left");

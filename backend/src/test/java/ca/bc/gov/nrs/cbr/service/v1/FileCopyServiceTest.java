@@ -91,8 +91,7 @@ class FileCopyServiceTest {
 
     assertThat(service.copy(42)).isEqualTo(BatchJobItemStatus.DONE);
 
-    verify(storage).putObjectWithMd5(eq("docs/42"), eq("image/jpeg"), eq(content),
-        eq(md5(content)));
+    verify(storage).putObjectWithMd5("docs/42", "image/jpeg", content, md5(content));
     verify(storage, never()).deleteObject(anyString());
   }
 
