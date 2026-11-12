@@ -599,7 +599,7 @@ Required]]></text>
 			<textField textAdjust="ScaleFont" isBlankWhenNull="true">
 				<reportElement x="612" y="6" width="35" height="12" uuid="c64c55da-9616-4e11-9f1a-8642f5d10412"/>
 				<textElement>
-					<font fontName="Arial" size="9" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+					<font fontName="Arial" size="8" isBold="false" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
 				</textElement>
 				<textFieldExpression><![CDATA[$F{USER_KM}]]></textFieldExpression>
 			</textField>

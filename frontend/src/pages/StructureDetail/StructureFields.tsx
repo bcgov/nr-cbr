@@ -14,6 +14,8 @@ import { useBuiltByCodes, useStructureSourceCodes } from '@/hooks/useConfigurati
 /** The boxes' lengths, as legacy's `maxlength`: a year's four digits, a cost's six. */
 const YEAR_LENGTH = 4;
 const COST_LENGTH = 6;
+/** Installation Cost goes to $4,999,999 (CBR-816): seven digits. */
+const INSTALLATION_COST_LENGTH = 7;
 
 type Field = keyof StructureValues;
 
@@ -125,7 +127,7 @@ const StructureFields: FC<Props> = ({
         <RadioButton id="structure-as-built-yes" labelText="Yes" value="Y" />
         <RadioButton id="structure-as-built-no" labelText="No" value="N" />
       </RadioButtonGroup>
-      {textField('installationCost', 'Installation Cost ($)', COST_LENGTH)}
+      {textField('installationCost', 'Installation Cost ($)', INSTALLATION_COST_LENGTH)}
       {textField('materialCost', 'Material Cost ($)', COST_LENGTH)}
     </div>
   );

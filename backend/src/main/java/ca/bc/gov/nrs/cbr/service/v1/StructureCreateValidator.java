@@ -40,7 +40,8 @@ import org.springframework.stereotype.Component;
  * on legacy's new-structure page.
  *
  * <p>The site, as legacy's Site Detail button and save: it must exist and be complete, and not be
- * Proposed or closed. Legacy checked closed only in the browser and accepted no site at all.
+ * closed. Legacy checked closed only in the browser and accepted no site at all. Unlike legacy, a
+ * Proposed / Under Construction site may have structures (business, 2026-11).
  */
 @Component
 public class StructureCreateValidator {

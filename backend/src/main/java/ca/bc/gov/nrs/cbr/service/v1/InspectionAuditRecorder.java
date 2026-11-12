@@ -24,7 +24,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>Applied to every save from the inspection's page: a record when, saved, it is Submitted, by
  * anyone — legacy skipped an active reviewer's save, nr-cbr does not — or Reviewed or Accepted by an
- * inspection reviewer ({@code CBR_INSPECTION_REVIEWER}, legacy's active reviewer row). None In Progress or Rejected. Every record is kept.
+ * inspection reviewer ({@code CBR_INSPECTION_REVIEWER}, legacy's active reviewer row). None In
+ * Progress or Rejected — except a reopening: a Reviewed or Accepted inspection moved back to In
+ * Progress is recorded ({@link #reopenedAfterCommit}; 2026-11-10). Every record is kept.
  *
  * <p>Made once the save has committed, in a transaction of its own, so it shows the inspection as
  * saved. As legacy, a record that cannot be made is logged and the save stands.
@@ -38,6 +40,8 @@ public class InspectionAuditRecorder {
   private static final Map<String, String> RECORDED = Map.of(
       "SUB", "Submitted", "RVD", "Reviewed", "ACC", "Accepted");
   private static final String SUBMITTED = "SUB";
+  /** In Progress: recorded only when a reopening brings it there. */
+  private static final String IN_PROGRESS = "PRO";
   private static final ZoneId PACIFIC = ZoneId.of("America/Vancouver");
   private static final DateTimeFormatter PRINTED = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm");
   private static final DateTimeFormatter SAVED = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -69,41 +73,66 @@ public class InspectionAuditRecorder {
    * transaction however often it is called.
    */
   public void afterCommit(long inspectionId) {
+    register(inspectionId, false);
+  }
+
+  /**
+   * As {@link #afterCommit}, for a save that moved a Reviewed or Accepted inspection back to In
+   * Progress or Submitted: then In Progress is recorded too — the reopening is an audit record.
+   * (Submitted is recorded anyway.)
+   */
+  public void reopenedAfterCommit(long inspectionId) {
+    register(inspectionId, true);
+  }
+
+  private void register(long inspectionId, boolean reopened) {
     if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      recordSafely(inspectionId);
+      recordSafely(inspectionId, reopened);
       return;
     }
-    boolean registered = TransactionSynchronizationManager.getSynchronizations().stream()
-        .anyMatch(sync -> sync instanceof After after && after.inspectionId == inspectionId);
-    if (!registered) {
-      TransactionSynchronizationManager.registerSynchronization(new After(inspectionId));
+    After registered = TransactionSynchronizationManager.getSynchronizations().stream()
+        .filter(sync -> sync instanceof After after && after.inspectionId == inspectionId)
+        .map(After.class::cast)
+        .findFirst()
+        .orElse(null);
+    if (registered == null) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new After(inspectionId, reopened));
+    } else if (reopened) {
+      registered.reopened = true;
     }
   }
 
   /** The record, made once the transaction it was asked for in commits. */
   private final class After implements TransactionSynchronization {
     private final long inspectionId;
+    private boolean reopened;
 
-    private After(long inspectionId) {
+    private After(long inspectionId, boolean reopened) {
       this.inspectionId = inspectionId;
+      this.reopened = reopened;
     }
 
     @Override
     public void afterCommit() {
-      recordSafely(inspectionId);
+      recordSafely(inspectionId, reopened);
     }
   }
 
   /** The record, if the inspection as saved calls for one; any failure logged, never thrown. */
   void recordSafely(long inspectionId) {
+    recordSafely(inspectionId, false);
+  }
+
+  void recordSafely(long inspectionId, boolean reopened) {
     try {
-      ownTransaction.executeWithoutResult(status -> make(inspectionId));
+      ownTransaction.executeWithoutResult(status -> make(inspectionId, reopened));
     } catch (RuntimeException failed) {
       log.error("Could not make the audit record of inspection {}", inspectionId, failed);
     }
   }
 
-  private void make(long inspectionId) {
+  private void make(long inspectionId, boolean reopened) {
     StructureInspectionEntity inspection = inspections.findById(inspectionId).orElse(null);
     if (inspection == null) {
       return;
@@ -111,14 +140,18 @@ public class InspectionAuditRecorder {
     InspectionReportStatusEntity current = inspection.getCurrentStatus();
     String code = current == null ? null : current.getInspectionReportStatusCode();
     String user = loggedUser.getLoggedUserId();
-    if (!RECORDED.containsKey(code)) {
+    String status;
+    if (reopened && IN_PROGRESS.equals(code)) {
+      // Reopened to In Progress, by anyone who may reopen.
+      status = "In Progress";
+    } else if (!RECORDED.containsKey(code)) {
       return;
-    }
-    // Submitted by anyone; Reviewed or Accepted by a reviewer alone, as legacy.
-    if (!SUBMITTED.equals(code) && !loggedUser.isInspectionReviewer()) {
+    } else if (!SUBMITTED.equals(code) && !loggedUser.isInspectionReviewer()) {
+      // Submitted by anyone; Reviewed or Accepted by a reviewer alone, as legacy.
       return;
+    } else {
+      status = RECORDED.get(code);
     }
-    String status = RECORDED.get(code);
     LocalDateTime now = LocalDateTime.now(PACIFIC);
     // The PDF's line and the document's description, the same words. Hyphens, not dashes: the
     // database's character set does not keep an en dash.

@@ -23,7 +23,7 @@ final class SiteTestFixtures {
     LocalDateTime from = LocalDateTime.now().minusYears(10);
     LocalDateTime until = LocalDateTime.now().plusYears(10);
 
-    for (String code : new String[] {"ACT", "PP", "DAC"}) {
+    for (String code : new String[] {"ACT", "PP", "DAC", "INAC"}) {
       if (entityManager.find(CrossingSiteStatusCodeEntity.class, code) == null) {
         entityManager.persist(CrossingSiteStatusCodeEntity.builder()
             .crossingSiteStatusCode(code).description(code)

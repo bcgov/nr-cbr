@@ -239,15 +239,15 @@ class StructureCreateServiceTest {
   }
 
   @Test
-  @DisplayName("refuses a taken name, a Proposed, closed or incomplete site, and too few spans")
+  @DisplayName("refuses a taken name, a closed or incomplete site, and too few spans")
   void refuses() {
     List<SpanRequest> oneSpan = List.of(new SpanRequest(1L, new BigDecimal("12")));
     assertThat(refused(newBridge("b500", "62-PP", oneSpan, List.of(new PierRequest(1L, "CRIB")))))
         .contains(
             Map.entry("structureName", "Structure B500 already exists."),
-            Map.entry("siteId",
-                "Site 62-PP is Proposed. A structure cannot be moved to a Proposed site."),
-            Map.entry("spans", "Number of spans must be greater than number of piers."));
+            Map.entry("spans", "Number of spans must be greater than number of piers."))
+        // A Proposed / Under Construction site takes structures now (business, 2026-11).
+        .doesNotContainKey("siteId");
     assertThat(refused(newBridge("B601", "62-DAC", oneSpan, List.of())))
         .containsEntry("siteId",
             "Site 62-DAC is closed (deactivated). A structure cannot be added to it.");

@@ -288,21 +288,26 @@ describe('crossFieldErrors', () => {
   // All three are SiteForm.validate's, and all three say the same thing differently: whether a site
   // gets inspected has to agree with what it is and what state it is in.
 
-  it.each(['ACT', 'BAR'])('refuses a standing crossing (%s) marked Do Not Inspect', (status) => {
-    const messages = crossFieldErrors(
-      valid({
-        crossingSiteTypeCode: 'CRS',
-        crossingSiteStatusCode: status,
-        structureInspectionStatusCode: 'DNI',
-      }),
-    );
+  // INAC (Inaccessible, which replaced LRMOPS) must be inspected too — the business's rule, 2026-11.
+  it.each(['ACT', 'BAR', 'INAC'])(
+    'refuses a crossing that is %s but marked Do Not Inspect',
+    (status) => {
+      const messages = crossFieldErrors(
+        valid({
+          crossingSiteTypeCode: 'CRS',
+          crossingSiteStatusCode: status,
+          structureInspectionStatusCode: 'DNI',
+        }),
+      );
 
-    // On Inspection Status, which is legacy's field for all three rules.
-    expect(Object.keys(messages)).toEqual(['structureInspectionStatusCode']);
-    expect(messages.structureInspectionStatusCode).toContain('must be set to Inspect');
-  });
+      // On Inspection Status, which is legacy's field for all three rules.
+      expect(Object.keys(messages)).toEqual(['structureInspectionStatusCode']);
+      expect(messages.structureInspectionStatusCode).toContain('must be set to Inspect');
+    },
+  );
 
-  it.each(['TRN', 'DAC', 'UCON', 'PP', 'ARC', 'LRM'])(
+  // UCON, TRN and LRM are retired, but a stored site might still carry one.
+  it.each(['DAC', 'PP', 'ARC', 'UCON', 'TRN', 'LRM'])(
     'refuses a crossing that is %s but marked Inspect',
     (status) => {
       const messages = crossFieldErrors(
@@ -445,13 +450,13 @@ describe('crossFieldWarnings', () => {
 });
 
 describe('savedSiteConflicts', () => {
-  it('refuses a Proposed site that already has structures', () => {
+  it('lets a Proposed / Under Construction site keep its structures', () => {
+    // Legacy refused it; the business lifted it when Under Construction joined Proposed (2026-11).
     const conflicts = savedSiteConflicts(valid({ crossingSiteStatusCode: 'PP' }), {
       activeStructureCount: 2,
     });
 
-    expect(conflicts.errors.crossingSiteStatusCode).toContain('2');
-    expect(conflicts.warnings).toEqual({});
+    expect(conflicts).toEqual({ errors: {}, warnings: {} });
   });
 
   it('only warns about a Deactivated site that still has them', () => {

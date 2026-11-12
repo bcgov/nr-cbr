@@ -147,15 +147,27 @@ class StructureDetailsServiceTest {
   @DisplayName("refuses unknown codes, years over 4 digits and costs the column cannot hold")
   void refusesWhatTheColumnsCannotHold() {
     StructureDetailsRequest request = new StructureDetailsRequest("NOPE", null, 20000, null,
-        "NOPE", null, null, 1_000_000L, -1L);
+        "NOPE", null, null, 5_000_000L, -1L);
 
     assertThat(refused(7L, request)).containsExactly(
         Map.entry("builtByCode", "Built For is not one of the listed values."),
         Map.entry("yearBuilt", "Year Superstructure Installed must be a 4-digit year, e.g. 2004."),
         Map.entry("sourceCode", "Source is not one of the listed values."),
         Map.entry("asBuiltInfoOnFile", "As Built Information on File is required."),
-        Map.entry("installationCost", "Installation Cost must be from $0 to $999,999."),
+        Map.entry("installationCost", "Installation Cost must be from $0 to $4,999,999."),
         Map.entry("materialCost", "Material Cost must be from $0 to $999,999."));
+  }
+
+  @Test
+  @DisplayName("takes an Installation Cost up to $4,999,999, past Material Cost's $999,999")
+  void installationCostUpToItsOwnCeiling() {
+    service.updateStructure(7L, new StructureDetailsRequest("MOF", null, null, null, "MOF", null,
+        true, 4_999_999L, 999_999L));
+
+    assertThat(stored(7L).getInstallationCost()).isEqualTo(4_999_999L);
+    assertThat(refused(7L, new StructureDetailsRequest("MOF", null, null, null, "MOF", null, true,
+        1_000_000L, 1_000_000L)))
+        .containsExactly(Map.entry("materialCost", "Material Cost must be from $0 to $999,999."));
   }
 
   @Test

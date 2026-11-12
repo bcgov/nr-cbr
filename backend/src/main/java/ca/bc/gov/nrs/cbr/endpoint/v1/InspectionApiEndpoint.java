@@ -260,8 +260,14 @@ public interface InspectionApiEndpoint {
    *
    * <p>Gated on {@link CbrAuthorities#INSPECTION_WRITE} — Level 1 and up, legacy's
    * {@code /level0Access}; Professional Inspection Required is a Level 2 user's, checked by the
-   * service. <b>204</b>; <b>404</b> when there is no such inspection; <b>409</b> once it is
-   * Reviewed or Accepted; <b>400</b> with {@code fieldErrors}.
+   * service.
+   *
+   * <p>A Reviewed or Accepted inspection takes only its status, and only back to In Progress or
+   * Submitted: that clears its review, and the structure's current load rating is chosen again
+   * (the service's {@code reopen}). Its other fields are ignored until it has moved.
+   *
+   * <p><b>204</b>; <b>404</b> when there is no such inspection; <b>409</b> when it is Reviewed or
+   * Accepted and stays so; <b>400</b> with {@code fieldErrors}.
    */
   @PreAuthorize(CbrAuthorities.INSPECTION_WRITE)
   @PutMapping("/{inspectionId}")

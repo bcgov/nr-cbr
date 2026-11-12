@@ -69,8 +69,6 @@ public class SiteValidator {
   private static final String SITE_DETAILS = "pointOfAccessDescription";
   private static final String SITE_STATUS = "crossingSiteStatusCode";
 
-  private static final String PROPOSED = "PP";
-
   private static final String CROSSING = "CRS";
   private static final String RECREATION = "REC";
   private static final String STORAGE = "STRG";
@@ -78,12 +76,18 @@ public class SiteValidator {
   private static final String INSPECT = "INS";
   private static final String DO_NOT_INSPECT = "DNI";
 
-  /** Statuses under which a crossing is still standing and must therefore be inspected. */
-  private static final Set<String> STANDING = Set.of("ACT", "BAR");
+  /**
+   * Statuses under which a crossing must be inspected: still standing (Active, Barricaded), or
+   * Inaccessible ({@code INAC}, which replaced LRMOPS) — the business's rule, 2026-11.
+   */
+  private static final Set<String> STANDING = Set.of("ACT", "BAR", "INAC");
 
-  /** Statuses under which a crossing must not be inspected. */
+  /**
+   * Statuses under which a crossing must not be inspected. UCON, TRN and LRM are retired (expired
+   * and out of every list) but stay here should a request still carry one.
+   */
   private static final Set<String> NOT_STANDING =
-      Set.of("TRN", "DAC", "UCON", "PP", "ARC", "LRM");
+      Set.of("DAC", "PP", "ARC", "UCON", "TRN", "LRM");
 
   private final CrossingSiteStatusCodeRepository siteStatusCodes;
   private final CrossingSiteTypeCodeRepository siteTypeCodes;
@@ -105,7 +109,7 @@ public class SiteValidator {
   }
 
   /**
-   * Checks a new site, throwing if anything is wrong with it.
+   * Checks a site, new or edited, throwing if anything is wrong with it.
    *
    * <p>Collects every problem rather than stopping at the first. A user who has to press Save six
    * times to be told six things has been told the same thing six times.
@@ -118,19 +122,6 @@ public class SiteValidator {
    * @throws SiteValidationException if anything fails
    */
   public void validate(SiteCreateRequest request, boolean siteIdTaken, Long roadSegmentId) {
-    validate(request, siteIdTaken, roadSegmentId, 0);
-  }
-
-  /**
-   * Checks a site, new or edited, throwing if anything is wrong with it.
-   *
-   * @param activeStructureCount structures standing on the site — zero for a site being created,
-   *                             which owns nothing yet. Only the edit can make it matter: see
-   *                             {@link #checkStructures}
-   */
-  public void validate(
-      SiteCreateRequest request, boolean siteIdTaken, Long roadSegmentId,
-      long activeStructureCount) {
     Map<String, String> errors = new LinkedHashMap<>();
     String type = trimmed(request.crossingSiteTypeCode());
 
@@ -143,7 +134,6 @@ public class SiteValidator {
     checkOrgUnits(request, errors);
     checkInspectionAgreesWithStatus(request, type, errors);
     checkRoadResolves(request, type, roadSegmentId, errors);
-    checkStructures(request, activeStructureCount, errors);
 
     if (!errors.isEmpty()) {
       throw new SiteValidationException(errors);
@@ -342,14 +332,14 @@ public class SiteValidator {
     if (CROSSING.equals(type) && STANDING.contains(status) && DO_NOT_INSPECT.equals(inspection)) {
       errors.put(
           INSPECTION_STATUS,
-          "An Active or Barricaded/Closed Crossing site must be set to Inspect.");
+          "An Active, Barricaded/Closed or Inaccessible Crossing site must be set to Inspect.");
     } else if (CROSSING.equals(type)
         && NOT_STANDING.contains(status)
         && INSPECT.equals(inspection)) {
       errors.put(
           INSPECTION_STATUS,
-          "A Crossing site that is Transferred, Deactivated, Under Construction, Proposed, "
-              + "Archived or LRMOPS must be set to Do Not Inspect.");
+          "A Crossing site that is Deactivated, Proposed / Under Construction or Archived must be "
+              + "set to Do Not Inspect.");
     } else if (STORAGE.equals(type) && INSPECT.equals(inspection)) {
       errors.put(
           INSPECTION_STATUS, "A Storage site must be set to Do Not Inspect.");
@@ -379,24 +369,6 @@ public class SiteValidator {
         && StringUtils.hasText(request.roadSectionId())) {
       errors.putIfAbsent(
           FOREST_FILE_ID, "No road matches this Project File ID# and Br.");
-    }
-  }
-
-  /**
-   * A Proposed site may not have structures standing on it.
-   *
-   * <p>Legacy's {@code errors.site.proposed}, raised on {@code crossingSiteStatusCode} in the edit
-   * branch of {@code SiteAction.validate} and refused by the save gate. Only an edit can reach it:
-   * a site being created owns no structures. A Deactivated site with structures is a warning in
-   * legacy and does not refuse the save, so it is not here — Site Detail shows it.
-   */
-  private void checkStructures(
-      SiteCreateRequest request, long activeStructureCount, Map<String, String> errors) {
-    if (PROPOSED.equals(trimmed(request.crossingSiteStatusCode())) && activeStructureCount > 0) {
-      errors.putIfAbsent(
-          SITE_STATUS,
-          "A Proposed site cannot have structures, and this one has " + activeStructureCount
-              + ". Change the status, or archive the structures first.");
     }
   }
 
