@@ -26,6 +26,12 @@ server:
 spring:
   application:
     name: cbr-backend
+  # The scheduled tasks (schedulers package) — the file copy's two and the purge — run side by side;
+  # Boot's default scheduler has one thread.
+  task:
+    scheduling:
+      pool:
+        size: 3
   servlet:
     multipart:
       # Inspection photos and as-built drawings. file-size-threshold stays at its 0 default so every
@@ -255,3 +261,31 @@ logging:
     oracle.jdbc: ${ORACLE_JDBC_LOG_LEVEL:INFO}
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${spring.application.name}] [%X{X-TRACE-ID:-},${PID:-}] [%t] %logger:%L - %m%n%wEx"
+
+# ── Scheduled jobs ────────────────────────────────────────────────────────────
+# After EDUC-STUDENT-ASSESSMENT-API: each task a cron and its ShedLock lock times, one pod at a time
+# (locks in THE.CBR_SHEDLOCK); work items in THE.CBR_BATCH_JOB_ITEM. Every cron defaults to "-",
+# Spring's "never": switch a task on with `oc set env`, not in the deployment template, so the next
+# deploy switches it off again. ("${X:-}" is the env var X, else "-".)
+
+# FILE_COPY — the attachments' BLOBs to the object store (DELETE-AFTER-FILE-MIGRATION).
+# The fill lists new files and logs progress and the gate (grep "FILE_COPY"); e.g. 0 */15 * * * *.
+scheduled.jobs.fill.file.copy.items.cron: "${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON:-}"
+scheduled.jobs.fill.file.copy.items.cron.lockAtLeastFor: ${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON_LOCK_AT_LEAST_FOR:1m}
+scheduled.jobs.fill.file.copy.items.cron.lockAtMostFor: ${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON_LOCK_AT_MOST_FOR:10m}
+# The copy hands READY files to the copy executor; e.g. 0/2 * * * * * with locks 1700ms / 1900ms.
+scheduled.jobs.copy.files.cron: "${SCHEDULED_JOBS_COPY_FILES_CRON:-}"
+scheduled.jobs.copy.files.cron.lockAtLeastFor: ${SCHEDULED_JOBS_COPY_FILES_CRON_LOCK_AT_LEAST_FOR:1700ms}
+scheduled.jobs.copy.files.cron.lockAtMostFor: ${SCHEDULED_JOBS_COPY_FILES_CRON_LOCK_AT_MOST_FOR:1900ms}
+# Files in flight per pod at most, and copied at once (each holds one file of 10 MB at most).
+number.files.process.copy: ${NUMBER_OF_FILES_TO_PROCESS_COPY:200}
+threads.file.copy: ${THREADS_FILE_COPY:4}
+
+# Purge of finished jobs' work items (PurgeBatchJobItemsScheduler); e.g. 0 0 2 * * *. Only the jobs
+# listed, once switched off, with no READY or ERROR rows, and unchanged for after.days. Listing a
+# job is the decision that its rows are no longer needed: FILE_COPY only after FILE_PURGE is filled.
+scheduled.jobs.purge.batch.job.items.cron: "${SCHEDULED_JOBS_PURGE_BATCH_JOB_ITEMS_CRON:-}"
+scheduled.jobs.purge.batch.job.items.cron.lockAtLeastFor: ${SCHEDULED_JOBS_PURGE_BATCH_JOB_ITEMS_CRON_LOCK_AT_LEAST_FOR:1m}
+scheduled.jobs.purge.batch.job.items.cron.lockAtMostFor: ${SCHEDULED_JOBS_PURGE_BATCH_JOB_ITEMS_CRON_LOCK_AT_MOST_FOR:30m}
+purge.batch.job.items.jobs: ${PURGE_BATCH_JOB_ITEMS_JOBS:}
+purge.batch.job.items.after.days: ${PURGE_BATCH_JOB_ITEMS_AFTER_DAYS:30}
