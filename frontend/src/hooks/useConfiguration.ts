@@ -16,6 +16,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 
 import { ONE_MINUTE, THREE_HOURS } from '@/config/react-query/TimeUnits';
 import API from '@/services/APIs';
+import { districtsKey } from '@/utils/multiSelect';
 
 /** Query key prefix for every `/api/v1/configuration/*` lookup. */
 export const CONFIGURATION_QUERY_KEY = 'configuration';
@@ -352,13 +353,16 @@ const INSPECTIONS_CONDUCTED_LOOKUPS = [
  * management area is a *former* district that rolls up into the selected one, so "all management
  * areas" is not a question the screen asks.
  */
-export const managementAreasQuery = (forestDistrictOrgUnitNo: string) =>
-  queryOptions({
-    queryKey: [CONFIGURATION_QUERY_KEY, 'management-areas', forestDistrictOrgUnitNo],
-    queryFn: () => API.configuration.getManagementAreas(forestDistrictOrgUnitNo),
+export const managementAreasQuery = (forestDistricts: string | readonly string[]) => {
+  // One district, or several when Forest District is a multi-select: their areas together.
+  const key = districtsKey(forestDistricts);
+  return queryOptions({
+    queryKey: [CONFIGURATION_QUERY_KEY, 'management-areas', key],
+    queryFn: () => API.configuration.getManagementAreas(key),
     staleTime: REFERENCE_DATA_STALE_TIME,
-    enabled: forestDistrictOrgUnitNo !== '',
+    enabled: key !== '',
   });
+};
 
 /**
  * Inspection Search's Reviewed By list, from CSS through the backend.
@@ -471,8 +475,8 @@ export const useRecreationProjectName = (
 };
 
 export const useManagementAreas = (
-  forestDistrictOrgUnitNo: string,
-): UseQueryResult<OrgUnitOption[]> => useQuery(managementAreasQuery(forestDistrictOrgUnitNo));
+  forestDistricts: string | readonly string[],
+): UseQueryResult<OrgUnitOption[]> => useQuery(managementAreasQuery(forestDistricts));
 
 /** What a screen needs to know about the reference data as a whole. */
 export type ReferenceDataState = {

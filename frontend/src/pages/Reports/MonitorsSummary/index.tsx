@@ -9,6 +9,7 @@ import { EMPTY_CRITERIA, FORMATS, SORT_OPTIONS } from './types';
 
 import type { FC } from 'react';
 
+import { orgUnitOptions, withIsNull } from '@/components/core/MultiCodeSelect/options';
 import {
   useMonitoringStatusCodes,
   useMonitorsSummaryReferenceDataState,
@@ -74,7 +75,7 @@ const MonitorsSummaryPage: FC = () => {
           <>
             {/* The structure, its site and its items */}
             {fields.text('structureName', 'Structure #', 14)}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'siteStatusCode',
               'Site Status',
               'Any status',
@@ -86,7 +87,7 @@ const MonitorsSummaryPage: FC = () => {
               'Any site type',
               codeTables.siteTypeCodes,
             )}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'monitoringStatusCode',
               'Monitoring Status',
               'Any status',
@@ -94,17 +95,18 @@ const MonitorsSummaryPage: FC = () => {
             )}
 
             {/* Where it is held, and its road */}
-            {fields.orgUnitSelect(
+            {fields.orgUnitMultiSelect(
               'orgUnit',
               'Forest District',
               'Any district',
               codeTables.forestDistricts,
             )}
-            {fields.orgUnitSelect(
+            {fields.multiSelect(
               'businessAreaOrgUnit',
               'BCTS Business Area',
               'Any business area',
-              codeTables.businessAreas,
+              withIsNull(orgUnitOptions(codeTables.businessAreas)),
+              { filterable: true },
             )}
             {fields.text('forestServiceRoad', 'Forest Service Road', 20)}
             <div className="report-criteria__paired">

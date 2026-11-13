@@ -42,6 +42,7 @@ import {
 import { useArchiveStructures, useStructureSearch } from '@/hooks/useStructureSearch';
 import { apiErrorMessage } from '@/utils/apiError';
 import { toSortOrder } from '@/utils/headerSort';
+import { areasAfterDistrictChange, restoreCriteria } from '@/utils/multiSelect';
 import { readSessionState, writeSessionState } from '@/utils/sessionState';
 
 /**
@@ -84,8 +85,9 @@ const initialSearch = (siteId: string | null): SavedStructureSearch => {
   }
   const saved = readSessionState<Partial<SavedStructureSearch>>(STRUCTURE_SEARCH_STATE_KEY);
   return {
-    criteria: { ...EMPTY_CRITERIA, ...saved?.criteria },
-    submitted: saved?.submitted ? { ...EMPTY_CRITERIA, ...saved.submitted } : null,
+    // A filter saved as one value, before it became a multi-select, restores as a list of it.
+    criteria: restoreCriteria(EMPTY_CRITERIA, saved?.criteria ?? null),
+    submitted: saved?.submitted ? restoreCriteria(EMPTY_CRITERIA, saved.submitted) : null,
     page: saved?.page ?? 1,
     pageSize: saved?.pageSize ?? 20,
     // A search kept before sorting by several columns holds one; it restores as a list of one.
@@ -224,9 +226,18 @@ const StructureSearchPage: FC = () => {
       setCriteria((current) => ({
         ...current,
         [field]: value,
-        // A management area belongs to one district; keeping it after the district changes would
-        // apply a filter the user can no longer see.
-        ...(field === 'orgUnit' ? { managementOrgUnit: '' } : {}),
+        // A management area belongs to one district: removing a district clears the areas picked,
+        // which would otherwise apply a filter the user can no longer see; adding one keeps them.
+        // See areasAfterDistrictChange.
+        ...(field === 'orgUnit'
+          ? {
+              managementOrgUnit: areasAfterDistrictChange(
+                current.orgUnit,
+                value as string[],
+                current.managementOrgUnit,
+              ),
+            }
+          : {}),
       }));
     },
     [],

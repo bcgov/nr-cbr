@@ -1,8 +1,10 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.anyOf;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.integerRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.longRange;
@@ -14,6 +16,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySort;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
+import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -294,7 +297,7 @@ public final class StructureInventoryReportSpecifications {
     equalsNumber(builder, site.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
     equalsNumber(builder, site.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
         .ifPresent(predicates::add);
-    equalsNumber(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnit())
+    equalsNumberOrNone(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnit())
         .ifPresent(predicates::add);
     decimalRange(builder, site.get(KILOMETRES), criteria.kiloStart(), criteria.kiloEnd())
         .ifPresent(predicates::add);
@@ -358,11 +361,12 @@ public final class StructureInventoryReportSpecifications {
       Root<CrossingStructureEntity> root,
       String column,
       String code) {
-    if (!StringUtils.hasText(code)) {
+    List<String> codes = CriteriaValues.of(code);
+    if (codes.isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(builder.exists(
-        bridge(query, builder, root, (bridge, b) -> b.equal(bridge.get(column), code.trim()))));
+    return Optional.of(builder.exists(bridge(query, builder, root,
+        (bridge, b) -> anyOf(b, bridge.<String>get(column), codes).orElseThrow())));
   }
 
   private static Optional<Predicate> culvertHas(
@@ -371,11 +375,12 @@ public final class StructureInventoryReportSpecifications {
       Root<CrossingStructureEntity> root,
       String column,
       String code) {
-    if (!StringUtils.hasText(code)) {
+    List<String> codes = CriteriaValues.of(code);
+    if (codes.isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(builder.exists(
-        culvert(query, builder, root, (culvert, b) -> b.equal(culvert.get(column), code.trim()))));
+    return Optional.of(builder.exists(culvert(query, builder, root,
+        (culvert, b) -> anyOf(b, culvert.<String>get(column), codes).orElseThrow())));
   }
 
   /** This structure's bridge row, if it has one that meets {@code condition}. */

@@ -35,7 +35,9 @@ import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
+import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
@@ -367,16 +369,19 @@ public class ConfigurationService {
    * list: the parameter reaches the server as form text, and a malformed one means the dropdown was
    * never populated rather than that anything failed.
    *
-   * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}, as submitted
+   * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}, as submitted, or
+   *                                several comma-separated
    */
   @Cacheable("managementAreas")
   public List<OrgUnitResponse> getManagementAreas(String forestDistrictOrgUnitNo) {
-    Long orgUnitNo = parseOrgUnitNo(forestDistrictOrgUnitNo);
-    if (orgUnitNo == null) {
-      return List.of();
-    }
-    return cbrOrgUnitRepository.findManagementAreas(orgUnitNo).stream()
+    // One district, or several comma-separated when Forest District is a multi-select: their areas
+    // together, district by district in the order given.
+    return CriteriaValues.of(forestDistrictOrgUnitNo).stream()
+        .map(ConfigurationService::parseOrgUnitNo)
+        .filter(Objects::nonNull)
+        .flatMap(orgUnitNo -> cbrOrgUnitRepository.findManagementAreas(orgUnitNo).stream())
         .map(ConfigurationService::toOrgUnit)
+        .distinct()
         .toList();
   }
 

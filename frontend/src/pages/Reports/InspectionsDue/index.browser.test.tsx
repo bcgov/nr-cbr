@@ -9,6 +9,8 @@ import InspectionsDuePage from './index';
 
 import type { InspectionsDueVariant } from './types';
 
+import { multiSelectOptions } from '@/config/tests/multiSelect';
+
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
@@ -95,16 +97,19 @@ describe('InspectionsDuePage', () => {
   const SHARED_LABELS = [
     'Inspection Status',
     'Site Type',
+    'Close Proximity Inspection Required?',
+    'Project File ID#',
+    'Br.',
+    'Special Equipment Requirements',
+  ];
+  // Multi-selects: their labels name a list box rather than a form control.
+  const MULTI_SELECT_LABELS = [
     'Type/Class',
     'Site Status',
-    'Close Proximity Inspection Required?',
     'Forest District',
     'Management Area',
     'BCTS Business Area',
-    'Project File ID#',
-    'Br.',
     'Special Access Requirements',
-    'Special Equipment Requirements',
   ];
 
   it.each(['summary', 'detailed'] as const)(
@@ -112,11 +117,18 @@ describe('InspectionsDuePage', () => {
     async (variant) => {
       renderPage(variant);
 
-      await waitFor(() => expect(byId(variant, 'structureTypeClassCode')).not.toBeDisabled());
+      await waitFor(async () =>
+        expect(await multiSelectOptions(`${ID[variant]}-structureTypeClassCode`)).toEqual([
+          'PB - Permanent Bridge',
+        ]),
+      );
       for (const label of SHARED_LABELS) {
         expect(
           screen.getByLabelText(label, { selector: 'input:not([type=radio]), select' }),
         ).toBeInTheDocument();
+      }
+      for (const label of MULTI_SELECT_LABELS) {
+        expect(screen.getByText(label)).toBeInTheDocument();
       }
       expect(screen.getByText('Next Planned Inspection Date')).toBeInTheDocument();
       expect(screen.getByText('No Next Planned Inspection Date')).toBeInTheDocument();
@@ -130,10 +142,17 @@ describe('InspectionsDuePage', () => {
   it('asks the Blank for a Structure #, with no "no date" switch and no Sort By', async () => {
     renderPage('blank');
 
-    await waitFor(() => expect(byId('blank', 'structureTypeClassCode')).not.toBeDisabled());
+    await waitFor(async () =>
+      expect(await multiSelectOptions('inspections-blank-structureTypeClassCode')).toEqual([
+        'PB - Permanent Bridge',
+      ]),
+    );
     expect(byId('blank', 'structureName')).toBeInTheDocument();
     for (const label of SHARED_LABELS) {
       expect(screen.getByLabelText(label, { selector: 'input, select' })).toBeInTheDocument();
+    }
+    for (const label of MULTI_SELECT_LABELS) {
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.queryByText('No Next Planned Inspection Date')).not.toBeInTheDocument();
     expect(screen.queryByText('Sort By')).not.toBeInTheDocument();

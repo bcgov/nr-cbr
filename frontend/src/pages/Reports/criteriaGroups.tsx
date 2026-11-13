@@ -4,6 +4,8 @@ import type { criteriaFields } from './criteriaFields';
 import type { StructureInventoryCommonCriteria } from './types';
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 
+import { orgUnitOptions, withIsNull } from '@/components/core/MultiCodeSelect/options';
+
 /** The boxes a report form builds, bound to its criteria. */
 export type CriteriaFields<C extends object> = ReturnType<typeof criteriaFields<C>>;
 
@@ -25,11 +27,11 @@ export type CommonCodeTables = {
 
 /** The site: its status and type, its road, and how far along it. */
 export const siteGroup = <C extends StructureInventoryCommonCriteria>(
-  { codeSelect, text, range }: CriteriaFields<C>,
+  { codeSelect, codeMultiSelect, text, range }: CriteriaFields<C>,
   codeTables: CommonCodeTables,
 ) => (
   <>
-    {codeSelect('siteStatusCode', 'Site Status', 'Any status', codeTables.siteStatusCodes)}
+    {codeMultiSelect('siteStatusCode', 'Site Status', 'Any status', codeTables.siteStatusCodes)}
     {codeSelect('siteTypeCode', 'Site Type', 'Any site type', codeTables.siteTypeCodes)}
     {roadFields({ text })}
     {range('kiloStart', 'kiloEnd', 'Kilometres', 'kilometres')}
@@ -46,12 +48,12 @@ export const roadFields = <C extends { forestFileId: string; roadSectionId: stri
   </div>
 );
 
-/** Special Access Requirements — a select on the site. */
+/** Special Access Requirements — a multi-select on the site. */
 export const specialAccess = <C extends StructureInventoryCommonCriteria>(
-  { codeSelect }: CriteriaFields<C>,
+  { codeMultiSelect }: CriteriaFields<C>,
   codeTables: CommonCodeTables,
 ) =>
-  codeSelect(
+  codeMultiSelect(
     'specialAccessCode',
     'Special Access Requirements',
     'Any requirement',
@@ -102,24 +104,33 @@ export type AreaCriteria = Pick<
  * waiting on a district — and its BCTS Business Area.
  */
 export const areaGroup = <C extends AreaCriteria>(
-  { orgUnitSelect }: Pick<CriteriaFields<C>, 'orgUnitSelect'>,
+  { multiSelect }: Pick<CriteriaFields<C>, 'multiSelect'>,
   codeTables: Pick<CommonCodeTables, 'forestDistricts' | 'managementAreas' | 'businessAreas'>,
   options: { criteria: C; loading: boolean },
 ) => (
   <>
-    {orgUnitSelect('orgUnit', 'Forest District', 'Any district', codeTables.forestDistricts)}
-    {orgUnitSelect(
+    {multiSelect(
+      'orgUnit',
+      'Forest District',
+      'Any district',
+      orgUnitOptions(codeTables.forestDistricts),
+      { filterable: true },
+    )}
+    {multiSelect(
       'managementOrgUnit',
       'Management Area',
-      options.criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
-      codeTables.managementAreas,
-      options.loading,
+      options.criteria.orgUnit.length === 0
+        ? 'Select a forest district first'
+        : 'Any management area',
+      orgUnitOptions(codeTables.managementAreas),
+      { filterable: true, disabled: options.loading || options.criteria.orgUnit.length === 0 },
     )}
-    {orgUnitSelect(
+    {multiSelect(
       'businessAreaOrgUnit',
       'BCTS Business Area',
       'Any business area',
-      codeTables.businessAreas,
+      withIsNull(orgUnitOptions(codeTables.businessAreas)),
+      { filterable: true },
     )}
   </>
 );

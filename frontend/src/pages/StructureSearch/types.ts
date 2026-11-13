@@ -21,18 +21,18 @@ export type StructureSearchCriteria = {
   structureName: string;
   /** Downrated Structure? — design load rating above the current one, or no current rating. */
   downrated: boolean;
-  structureTypeClassCode: string;
+  structureTypeClassCode: string[];
   portableStructure: boolean;
   /** From the bridge record, so it only ever matches a bridge. */
-  superstructureTypeCode: string;
+  superstructureTypeCode: string[];
   /** From the bridge record, so it only ever matches a bridge. */
   structureCurbTypeCode: string;
   /** From the culvert record, so it only ever matches a culvert. */
-  culvertTypeCode: string;
+  culvertTypeCode: string[];
   incomplete: boolean;
 
   siteId: string;
-  siteStatusCode: string;
+  siteStatusCode: string[];
   forestFileId: string;
   /** "Br." on the legacy form — the road section, shown beside Project File ID#. */
   roadSectionId: string;
@@ -43,12 +43,12 @@ export type StructureSearchCriteria = {
   crossingName: string;
 
   /** Forest District. Changing it clears {@link managementOrgUnit} — see the page. */
-  orgUnit: string;
+  orgUnit: string[];
   /** Off, the default, leaves archived structures out — legacy's rule. */
   includeArchived: boolean;
-  managementOrgUnit: string;
+  managementOrgUnit: string[];
   /** BCTS Business Area, as on the reports. Not on legacy's form: added on request. */
-  businessAreaOrgUnit: string;
+  businessAreaOrgUnit: string[];
   clientNumber: string;
   clientLocationCode: string;
   /** Designated Maintainer by name, for a term that is not a pick from the lookup. */
@@ -66,7 +66,7 @@ export type StructureSearchCriteria = {
   /** Year Superstructure Installed, yyyy. */
   yearBuiltStart: string;
   yearBuiltEnd: string;
-  specialAccessCode: string;
+  specialAccessCode: string[];
   specialEquipmentCode: string;
   /** Built For — `BUILT_BY_CODE`. Not on legacy's form: added on request. */
   builtByCode: string;
@@ -136,14 +136,14 @@ export type StructureSort = SortOrder<StructureSortColumn>;
 export const EMPTY_CRITERIA: StructureSearchCriteria = {
   structureName: '',
   downrated: false,
-  structureTypeClassCode: '',
+  structureTypeClassCode: [],
   portableStructure: false,
-  superstructureTypeCode: '',
+  superstructureTypeCode: [],
   structureCurbTypeCode: '',
-  culvertTypeCode: '',
+  culvertTypeCode: [],
   incomplete: false,
   siteId: '',
-  siteStatusCode: '',
+  siteStatusCode: [],
   forestFileId: '',
   roadSectionId: '',
   siteTypeCode: '',
@@ -151,10 +151,10 @@ export const EMPTY_CRITERIA: StructureSearchCriteria = {
   kiloStart: '',
   kiloEnd: '',
   crossingName: '',
-  orgUnit: '',
+  orgUnit: [],
   includeArchived: false,
-  managementOrgUnit: '',
-  businessAreaOrgUnit: '',
+  managementOrgUnit: [],
+  businessAreaOrgUnit: [],
   clientNumber: '',
   clientLocationCode: '',
   primaryUserName: '',
@@ -166,7 +166,7 @@ export const EMPTY_CRITERIA: StructureSearchCriteria = {
   closureYearEnd: '',
   yearBuiltStart: '',
   yearBuiltEnd: '',
-  specialAccessCode: '',
+  specialAccessCode: [],
   specialEquipmentCode: '',
   builtByCode: '',
   maintainerLabel: '',

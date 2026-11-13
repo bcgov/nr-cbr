@@ -36,8 +36,11 @@ public record RepairsSummaryCriteria(
   /** Suggested or required. */
   public static final String SUGGESTED_OR_REQUIRED = "SOR";
 
-  /** What separates the codes of a group of priorities or of classes. */
-  public static final String GROUP_SEPARATOR = "&";
+  /**
+   * What separates the codes of a group of priorities or of classes, as a {@code split} pattern:
+   * legacy's {@code &} ({@code U&H&M}), or the comma a multi-select sends ({@code U,H,M}).
+   */
+  public static final String GROUP_SEPARATOR = "[&,]";
 
   /** The order chosen, or legacy's default: project, branch and kilometre. */
   public RepairsSummarySort sortOrDefault() {

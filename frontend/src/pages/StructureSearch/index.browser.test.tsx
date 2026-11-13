@@ -6,6 +6,8 @@ import { page, userEvent } from 'vitest/browser';
 
 import StructureSearchPage from './index';
 
+import { multiSelectOptions, multiSelectText, toggleMultiSelect } from '@/config/tests/multiSelect';
+
 const api = vi.hoisted(() => ({
   getStructureTypeClassCodes: vi.fn(),
   getSuperstructureTypeCodes: vi.fn(),
@@ -183,7 +185,8 @@ describe('StructureSearchPage — criteria form', () => {
     renderPage();
 
     expect(screen.getByLabelText('Structure #')).toBeInTheDocument();
-    expect(screen.getByLabelText('Type/Class')).toBeInTheDocument();
+    // A multi-select: its label names a list box rather than a form control.
+    expect(screen.getByText('Type/Class')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Downrated Structure\?/ })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Portable Structure\?/ })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Incomplete Data\?/ })).toBeInTheDocument();
@@ -459,17 +462,17 @@ describe('StructureSearchPage — the dropdowns come from the server', () => {
     api.getSpecialEquipmentCodes.mockResolvedValue([{ code: 'CRN', description: 'Crane' }]);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('structure-search-superstructureTypeCode')).toMatchTextContent(
+    await waitFor(async () => {
+      expect(await multiSelectOptions('structure-search-superstructureTypeCode')).toEqual([
         'STL - Steel',
-      );
+      ]);
     });
     expect(screen.getByTestId('structure-search-structureCurbTypeCode')).toMatchTextContent(
       'TMB - Timber',
     );
-    expect(screen.getByTestId('structure-search-culvertTypeCode')).toMatchTextContent(
+    expect(await multiSelectOptions('structure-search-culvertTypeCode')).toEqual([
       'CSP - Corrugated',
-    );
+    ]);
     expect(screen.getByTestId('structure-search-specialEquipmentCode')).toMatchTextContent(
       'CRN - Crane',
     );
@@ -503,14 +506,28 @@ describe('StructureSearchPage — the dropdowns come from the server', () => {
       { orgUnitNo: '1773', orgUnitCode: 'TCH', orgUnitName: 'Chinook' },
     ]);
     renderPage();
-    const area = screen.getByTestId('structure-search-businessAreaOrgUnit');
-    await waitFor(() => expect(area).toMatchTextContent(/Any business area\s*TCH - Chinook/));
-    expect(area).toHaveValue('');
+    expect(multiSelectText('structure-search-businessAreaOrgUnit')).toContain('Any business area');
+    await waitFor(async () => {
+      // "Is null" first, for structures held by no business area (UAT pick list).
+      expect(await multiSelectOptions('structure-search-businessAreaOrgUnit')).toEqual([
+        'Is null',
+        'TCH - Chinook',
+      ]);
+    });
 
-    fireEvent.change(area, { target: { value: '1773' } });
+    await toggleMultiSelect('structure-search-businessAreaOrgUnit', 'TCH - Chinook');
     search();
     await waitFor(() =>
-      expect(sentCriteria()).toEqual(expect.objectContaining({ businessAreaOrgUnit: '1773' })),
+      expect(sentCriteria()).toEqual(expect.objectContaining({ businessAreaOrgUnit: ['1773'] })),
+    );
+
+    // The server reads NONE as "no business area".
+    await toggleMultiSelect('structure-search-businessAreaOrgUnit', 'Is null');
+    search();
+    await waitFor(() =>
+      expect(sentCriteria()).toEqual(
+        expect.objectContaining({ businessAreaOrgUnit: ['NONE', '1773'] }),
+      ),
     );
   });
 
@@ -522,7 +539,7 @@ describe('StructureSearchPage — the dropdowns come from the server', () => {
     await searchAndWait();
   });
 
-  it('clears the chosen management area when the district changes', async () => {
+  it('clears the chosen management areas when a district is removed', async () => {
     api.getForestDistricts.mockResolvedValue([
       { orgUnitNo: '18', orgUnitCode: 'DPG', orgUnitName: 'Prince George' },
       { orgUnitNo: '21', orgUnitCode: 'DKA', orgUnitName: 'Thompson Rivers' },
@@ -531,22 +548,29 @@ describe('StructureSearchPage — the dropdowns come from the server', () => {
       { orgUnitNo: '26', orgUnitCode: 'DRV', orgUnitName: 'Robson Valley' },
     ]);
     renderPage();
-    await waitFor(() => {
-      expect(screen.getByTestId('structure-search-orgUnit')).toMatchTextContent('Prince George');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('structure-search-orgUnit')).toHaveLength(2);
     });
-    fireEvent.change(screen.getByTestId('structure-search-orgUnit'), { target: { value: '18' } });
-    await waitFor(() => {
-      expect(screen.getByTestId('structure-search-managementOrgUnit')).toMatchTextContent(
-        'Robson Valley',
-      );
+    await toggleMultiSelect('structure-search-orgUnit', 'DPG - Prince George');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('structure-search-managementOrgUnit')).toEqual([
+        'DRV - Robson Valley',
+      ]);
     });
-    fireEvent.change(screen.getByTestId('structure-search-managementOrgUnit'), {
-      target: { value: '26' },
-    });
+    await toggleMultiSelect('structure-search-managementOrgUnit', 'DRV - Robson Valley');
 
-    fireEvent.change(screen.getByTestId('structure-search-orgUnit'), { target: { value: '21' } });
-
-    expect(screen.getByTestId('structure-search-managementOrgUnit')).toHaveValue('');
+    // Swapping Prince George for Thompson Rivers removes the area's district.
+    await toggleMultiSelect(
+      'structure-search-orgUnit',
+      'DKA - Thompson Rivers',
+      'DPG - Prince George',
+    );
+    search();
+    await waitFor(() =>
+      expect(sentCriteria()).toEqual(
+        expect.objectContaining({ orgUnit: ['21'], managementOrgUnit: [] }),
+      ),
+    );
   });
 });
 

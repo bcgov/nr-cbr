@@ -36,10 +36,19 @@ export const EMPTY_CRITERIA: StructureDetailReportCriteria = {
   roadSectionId: '',
 };
 
+/** One value as a multi-select's list: none when blank. */
+const asList = (value: string): string[] => (value.trim() === '' ? [] : [value]);
+
 /**
  * The criteria as Structure Search's: legacy's page ran the same structure search, so this one asks
- * the same endpoint, archived structures left out as there.
+ * the same endpoint, archived structures left out as there. Its district and area stay single
+ * choices (they were not on the UAT pick list); Structure Search takes them as lists of one.
  */
 export const toStructureSearch = (
   criteria: StructureDetailReportCriteria,
-): StructureSearchCriteria => ({ ...EMPTY_SEARCH, ...criteria });
+): StructureSearchCriteria => ({
+  ...EMPTY_SEARCH,
+  ...criteria,
+  orgUnit: asList(criteria.orgUnit),
+  managementOrgUnit: asList(criteria.managementOrgUnit),
+});

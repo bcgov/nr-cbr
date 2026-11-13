@@ -15,15 +15,15 @@ export { SORT_OPTIONS, type ReportFormat, type StructureInventorySort } from '..
  * Every criterion is optional — legacy runs the report with none set.
  */
 export type StructureInventorySummaryCriteria = StructureInventoryCommonCriteria & {
-  structureTypeClassCode: string;
+  structureTypeClassCode: string[];
   /** From the culvert record, so it only ever matches a culvert. */
-  culvertTypeCode: string;
+  culvertTypeCode: string[];
   /** From the bridge record, so it only ever matches a bridge. */
-  superstructureTypeCode: string;
+  superstructureTypeCode: string[];
   /** From the culvert record. */
-  culvertMaterialCode: string;
+  culvertMaterialCode: string[];
   /** From the bridge record. */
-  deckTypeCode: string;
+  deckTypeCode: string[];
   /** The culvert's opening width, in whole millimetres. */
   openingWidthMin: string;
   openingWidthMax: string;
@@ -35,11 +35,11 @@ export const FORMATS: readonly ReportFormat[] = ['CSV', 'PDF'];
 /** Legacy's defaults: nothing set, sorted by project, branch and user km. */
 export const EMPTY_CRITERIA: StructureInventorySummaryCriteria = {
   ...EMPTY_COMMON_CRITERIA,
-  structureTypeClassCode: '',
-  culvertTypeCode: '',
-  superstructureTypeCode: '',
-  culvertMaterialCode: '',
-  deckTypeCode: '',
+  structureTypeClassCode: [],
+  culvertTypeCode: [],
+  superstructureTypeCode: [],
+  culvertMaterialCode: [],
+  deckTypeCode: [],
   openingWidthMin: '',
   openingWidthMax: '',
 };

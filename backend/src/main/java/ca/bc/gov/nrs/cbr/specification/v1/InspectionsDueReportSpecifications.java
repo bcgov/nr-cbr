@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.specification.v1;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.dayRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
@@ -196,7 +197,7 @@ public final class InspectionsDueReportSpecifications {
     equalsNumber(builder, site.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
     equalsNumber(builder, site.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
         .ifPresent(predicates::add);
-    equalsNumber(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnit())
+    equalsNumberOrNone(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnit())
         .ifPresent(predicates::add);
   }
 

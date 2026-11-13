@@ -12,11 +12,11 @@ export type { ReportFormat } from '../types';
  */
 export type ReplacementStructuresSummaryCriteria = MaintainerCriteria & {
   /** Forest District. Changing it clears {@link managementOrgUnit}. */
-  orgUnit: string;
-  managementOrgUnit: string;
-  siteStatusCode: string;
+  orgUnit: string[];
+  managementOrgUnit: string[];
+  siteStatusCode: string[];
   siteTypeCode: string;
-  businessAreaOrgUnit: string;
+  businessAreaOrgUnit: string[];
   /** Estimated Load Restriction Date, years `yyyy` — legacy's full log haul traffic date. */
   loadRestrictionYearStart: string;
   loadRestrictionYearEnd: string;
@@ -34,11 +34,11 @@ export const FORMATS = ['CSV', 'PDF'] as const;
 
 /** Legacy's defaults: nothing set. */
 export const EMPTY_CRITERIA: ReplacementStructuresSummaryCriteria = {
-  orgUnit: '',
-  managementOrgUnit: '',
-  siteStatusCode: '',
+  orgUnit: [],
+  managementOrgUnit: [],
+  siteStatusCode: [],
   siteTypeCode: '',
-  businessAreaOrgUnit: '',
+  businessAreaOrgUnit: [],
   loadRestrictionYearStart: '',
   loadRestrictionYearEnd: '',
   replacementYearStart: '',

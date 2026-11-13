@@ -1,8 +1,10 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.anyOf;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.integerRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
@@ -17,6 +19,7 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
+import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -221,7 +224,7 @@ public final class StructureSearchSpecifications {
     equalsNumber(builder, site.get(ORG_UNIT_NO), criteria.orgUnit()).ifPresent(predicates::add);
     equalsNumber(builder, site.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnit())
         .ifPresent(predicates::add);
-    equalsNumber(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnit())
+    equalsNumberOrNone(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnit())
         .ifPresent(predicates::add);
     decimalRange(builder, site.get(KILOMETRES), criteria.kiloStart(), criteria.kiloEnd())
         .ifPresent(predicates::add);
@@ -236,17 +239,19 @@ public final class StructureSearchSpecifications {
       Root<CrossingStructureEntity> root,
       StructureSearchCriteria criteria,
       List<Predicate> predicates) {
-    if (StringUtils.hasText(criteria.superstructureTypeCode())) {
-      predicates.add(builder.exists(bridge(query, builder, root, (bridge, b) -> b.equal(
-          bridge.get(SUPERSTRUCTURE_TYPE), criteria.superstructureTypeCode().trim()))));
+    List<String> superstructureTypes = CriteriaValues.of(criteria.superstructureTypeCode());
+    if (!superstructureTypes.isEmpty()) {
+      predicates.add(builder.exists(bridge(query, builder, root, (bridge, b) ->
+          anyOf(b, bridge.<String>get(SUPERSTRUCTURE_TYPE), superstructureTypes).orElseThrow())));
     }
     if (StringUtils.hasText(criteria.structureCurbTypeCode())) {
       predicates.add(builder.exists(bridge(query, builder, root, (bridge, b) -> b.equal(
           bridge.get(CURB_TYPE), criteria.structureCurbTypeCode().trim()))));
     }
-    if (StringUtils.hasText(criteria.culvertTypeCode())) {
-      predicates.add(builder.exists(culvert(query, builder, root, (culvert, b) -> b.equal(
-          culvert.get(CULVERT_TYPE), criteria.culvertTypeCode().trim()))));
+    List<String> culvertTypes = CriteriaValues.of(criteria.culvertTypeCode());
+    if (!culvertTypes.isEmpty()) {
+      predicates.add(builder.exists(culvert(query, builder, root, (culvert, b) ->
+          anyOf(b, culvert.<String>get(CULVERT_TYPE), culvertTypes).orElseThrow())));
     }
   }
 
