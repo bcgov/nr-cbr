@@ -25,8 +25,7 @@ jobs:
       contents: read
     # Job-level, NOT step-level: a step's own `env:` block is not in scope for
     # that same step's `if:`, so gating on step-level vars silently evaluates
-    # them as empty and the step never runs. Same reason the frontend job's
-    # VANITY_HOST sits at job level in reusable-deploy.yml.
+    # them as empty and the step never runs.
     env:
       SONAR_TOKEN: ${{ secrets.sonar_token_backend }}
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY_BACKEND }}

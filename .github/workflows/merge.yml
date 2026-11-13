@@ -109,11 +109,14 @@ jobs:
   # Before the first PROD enable, confirm all of:
   #   - The OpenShift licence plate and the prod namespace exist, and the
   #     `prod` GitHub Environment carries oc_namespace / oc_token.
-  #   - VANITY_HOST is set on the `prod` Environment, plus the three
-  #     VANITY_TLS_* secrets. PROD is deliberately given NO default cluster
-  #     route (reusable-deploy.yml applies openshift.route.yml only when
-  #     target != 'prod'), so a missing VANITY_HOST skips the vanity Route in
-  #     silence and leaves production with no public URL at all.
+  #   - The PROD vanity Route exists. PROD is deliberately given NO default
+  #     cluster route (reusable-deploy.yml applies openshift.route.yml only
+  #     when target != 'prod'); the deploy no longer creates the vanity Route
+  #     either. cert-keeper.yml creates it (`nr-cbr-vanity-url`) with the
+  #     Entrust cert from the `prod` TLS_CERTIFICATE / TLS_PRIVATE_KEY /
+  #     TLS_CA_CERTIFICATE secrets, once the repository variable ROUTE_HOST is
+  #     set — run it by hand right after the first PROD deploy, or production
+  #     has no public URL.
   #   - The CSS integration has PROD's redirect URI registered, and
   #     KEYCLOAK_ISSUER_URI / KEYCLOAK_CLIENT_ID point at the PROD realm.
   #   - The Oracle credentials on the `prod` Environment reach the PROD
@@ -140,13 +143,6 @@ jobs:
   #     clamav_host: ${{ secrets.clamav_host }}
   #     css_api_client_id: ${{ secrets.css_api_client_id }}
   #     css_api_client_secret: ${{ secrets.css_api_client_secret }}
-  #     # PROD vanity Route (cbr.nrs.gov.bc.ca) — the ONLY public URL on prod.
-  #     # Consumed only when the `prod` environment also defines the VANITY_HOST
-  #     # variable; the deploy step skips itself otherwise, which would leave
-  #     # prod with no route at all. See frontend/openshift.vanity-route.yml.
-  #     vanity_tls_certificate: ${{ secrets.VANITY_TLS_CERTIFICATE }}
-  #     vanity_tls_key: ${{ secrets.VANITY_TLS_KEY }}
-  #     vanity_tls_ca_certificate: ${{ secrets.VANITY_TLS_CA_CERTIFICATE }}
   #   with:
   #     environment: prod
   #     target: prod
