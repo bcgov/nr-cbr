@@ -52,9 +52,12 @@ export const multiSelectSelected = async (testId: string): Promise<string[]> => 
 /** Ticks (or unticks) each option named — its full text, e.g. `ACT - Active` — then closes. */
 export const toggleMultiSelect = async (testId: string, ...texts: string[]): Promise<void> => {
   await open(testId);
-  for (const text of texts) {
-    await userEvent.click(within(box(testId)).getByRole('option', { name: text }));
-  }
+  // One click after another, as a user ticks them: chained, since clicks run together would race.
+  await texts.reduce(
+    (clicked, text) =>
+      clicked.then(() => userEvent.click(within(box(testId)).getByRole('option', { name: text }))),
+    Promise.resolve(),
+  );
   await close(testId);
 };
 

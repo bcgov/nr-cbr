@@ -15,7 +15,9 @@ export const joinValues = (values: readonly string[]): string =>
  * D2 then D1 share one cache entry. Accepts a single district too, for the forms not yet changed.
  */
 export const districtsKey = (districts: string | readonly string[]): string =>
-  typeof districts === 'string' ? districts.trim() : joinValues([...districts].sort());
+  typeof districts === 'string'
+    ? districts.trim()
+    : joinValues([...districts].sort((a, b) => a.localeCompare(b)));
 
 /**
  * The management areas to keep when the districts change.
