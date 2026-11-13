@@ -91,108 +91,97 @@ jobs:
   #   with:
   #     target: test
 
-  # ── PROD deploy + monitor + promote: DISABLED ════════════════════════
+  # ── PROD deploy + monitor + promote ══════════════════════════════════
   #
-  # CBR has never deployed to PROD, and must not until go-live. The three jobs
-  # below are commented out rather than guarded by an `if:` so that no
-  # combination of inputs, re-run or workflow_dispatch can reach production —
-  # a condition is something you can get wrong, an absent job is not.
+  # Every merge to main deploys TEST, then PROD with the same PR image.
+  # monitor-prod and promote declare `needs: [deploy-prod]`, so the three jobs
+  # must be enabled or disabled as a set.
   #
-  # Merges to main deploy TEST only (see `deploy-test` above). PR previews go
-  # to the dev namespace via pr-open.yml.
+  # deploy-prod waits on deploy-test (not `tests`, the Playwright job, which is
+  # disabled above — a `needs` on a missing job makes the whole file invalid).
   #
-  # They are disabled AS A SET, and must be re-enabled as a set: `monitor-prod`
-  # and `promote` declare `needs: [deploy-prod]`, so uncommenting any one of
-  # them on its own makes the WHOLE workflow file invalid — every run fails,
-  # including TEST.
-  #
-  # Before the first PROD enable, confirm all of:
+  # Before relying on PROD, confirm all of:
   #   - The OpenShift licence plate and the prod namespace exist, and the
   #     `prod` GitHub Environment carries oc_namespace / oc_token.
-  #   - VANITY_HOST is set on the `prod` Environment, plus the three
-  #     VANITY_TLS_* secrets. PROD is deliberately given NO default cluster
-  #     route (reusable-deploy.yml applies openshift.route.yml only when
-  #     target != 'prod'), so a missing VANITY_HOST skips the vanity Route in
-  #     silence and leaves production with no public URL at all.
+  #   - The PROD vanity Route exists. PROD is deliberately given NO default
+  #     cluster route (reusable-deploy.yml applies openshift.route.yml only
+  #     when target != 'prod'), and the deploy does not create the vanity
+  #     Route either. cert-keeper.yml creates it (`nr-cbr-vanity-url`) with the
+  #     Entrust cert from the `prod` TLS_CERTIFICATE / TLS_PRIVATE_KEY /
+  #     TLS_CA_CERTIFICATE secrets, once the repository variable ROUTE_HOST is
+  #     set. Without it, production has no public URL.
   #   - The CSS integration has PROD's redirect URI registered, and
   #     KEYCLOAK_ISSUER_URI / KEYCLOAK_CLIENT_ID point at the PROD realm.
   #   - The Oracle credentials on the `prod` Environment reach the PROD
   #     database, not TEST.
-  #
-  # deploy-prod:
-  #   name: PROD Deploys (${{ needs.init.outputs.pr }})
-  #   needs: [tests, init]
-  #   permissions:
-  #     contents: read
-  #   uses: ./.github/workflows/reusable-deploy.yml
-  #   secrets:
-  #     oc_namespace: ${{ secrets.oc_namespace }}
-  #     oc_token: ${{ secrets.oc_token }}
-  #     database_user: ${{ secrets.database_user }}
-  #     database_password: ${{ secrets.database_password }}
-  #     database_host: ${{ secrets.database_host }}
-  #     database_service_name: ${{ secrets.database_service_name }}
-  #     keystore_secret: ${{ secrets.keystore_secret }}
-  #     object_storage_host: ${{ secrets.object_storage_host }}
-  #     object_storage_bucket: ${{ secrets.object_storage_bucket }}
-  #     object_storage_access_key: ${{ secrets.object_storage_access_key }}
-  #     object_storage_secret_key: ${{ secrets.object_storage_secret_key }}
-  #     clamav_host: ${{ secrets.clamav_host }}
-  #     css_api_client_id: ${{ secrets.css_api_client_id }}
-  #     css_api_client_secret: ${{ secrets.css_api_client_secret }}
-  #     # PROD vanity Route (cbr.nrs.gov.bc.ca) — the ONLY public URL on prod.
-  #     # Consumed only when the `prod` environment also defines the VANITY_HOST
-  #     # variable; the deploy step skips itself otherwise, which would leave
-  #     # prod with no route at all. See frontend/openshift.vanity-route.yml.
-  #     vanity_tls_certificate: ${{ secrets.VANITY_TLS_CERTIFICATE }}
-  #     vanity_tls_key: ${{ secrets.VANITY_TLS_KEY }}
-  #     vanity_tls_ca_certificate: ${{ secrets.VANITY_TLS_CA_CERTIFICATE }}
-  #   with:
-  #     environment: prod
-  #     target: prod
-  #     tag: ${{ needs.init.outputs.pr }}
-  #     backend_replicas: "3"
-  #     frontend_replicas: "3"
 
-  # # Sync Sysdig email alerts for PROD. No-ops cleanly if SYSDIG_API_TOKEN is
-  # # unset — adoption is gradual. Alert templates live in monitoring/alerts/.
-  # monitor-prod:
-  #   name: Sysdig Monitor (PROD)
-  #   needs: [deploy-prod]
-  #   runs-on: ubuntu-24.04
-  #   environment: prod
-  #   permissions:
-  #     contents: read
-  #   timeout-minutes: 5
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #     # Consolidated from bcgov/action-sysdig-monitor into the bcgov/actions
-  #     # suite. v0.5.0 is the first release carrying sysdig-monitor, and it
-  #     # keeps the __APP__ template substitution that monitoring/alerts/*.json
-  #     # depend on — don't downgrade this pin.
-  #     - uses: bcgov/actions-openshift/sysdig-monitor@4dbe4f6d25d14cbdb01e525a302e61e31f96c3ed # v0.5.0
-  #       with:
-  #         sysdig_api_token: ${{ secrets.SYSDIG_API_TOKEN }}
-  #         oc_namespace: ${{ secrets.oc_namespace }}
-  #         app: nr-cbr
+  deploy-prod:
+    name: PROD Deploys (${{ needs.init.outputs.pr }})
+    needs: [deploy-test, init]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/reusable-deploy.yml
+    secrets:
+      oc_namespace: ${{ secrets.oc_namespace }}
+      oc_token: ${{ secrets.oc_token }}
+      database_user: ${{ secrets.database_user }}
+      database_password: ${{ secrets.database_password }}
+      database_host: ${{ secrets.database_host }}
+      database_service_name: ${{ secrets.database_service_name }}
+      keystore_secret: ${{ secrets.keystore_secret }}
+      object_storage_host: ${{ secrets.object_storage_host }}
+      object_storage_bucket: ${{ secrets.object_storage_bucket }}
+      object_storage_access_key: ${{ secrets.object_storage_access_key }}
+      object_storage_secret_key: ${{ secrets.object_storage_secret_key }}
+      clamav_host: ${{ secrets.clamav_host }}
+      css_api_client_id: ${{ secrets.css_api_client_id }}
+      css_api_client_secret: ${{ secrets.css_api_client_secret }}
+    with:
+      environment: prod
+      target: prod
+      tag: ${{ needs.init.outputs.pr }}
+      backend_replicas: "3"
+      frontend_replicas: "3"
 
-  # # After PROD is up, alias the PR image as :prod in GHCR. Creates a durable
-  # # record of "this is the image running in production right now" and a
-  # # rollback target.
-  # promote:
-  #   name: Promote Images
-  #   needs: [deploy-prod, init]
-  #   runs-on: ubuntu-slim
-  #   permissions:
-  #     packages: write
-  #   strategy:
-  #     matrix:
-  #       package: [backend, frontend]
-  #   timeout-minutes: 1
-  #   steps:
-  #     - uses: shrink/actions-docker-registry-tag@e6aaef25c595b6e0edd18bf4c7dbfea3abd43299 # v5
-  #       with:
-  #         registry: ghcr.io
-  #         repository: ${{ github.repository }}/${{ matrix.package }}
-  #         target: ${{ needs.init.outputs.pr }}
-  #         tags: prod
+  # Sync Sysdig email alerts for PROD. No-ops cleanly if SYSDIG_API_TOKEN is
+  # unset — adoption is gradual. Alert templates live in monitoring/alerts/.
+  monitor-prod:
+    name: Sysdig Monitor (PROD)
+    needs: [deploy-prod]
+    runs-on: ubuntu-24.04
+    environment: prod
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      # Consolidated from bcgov/action-sysdig-monitor into the bcgov/actions
+      # suite. v0.5.0 is the first release carrying sysdig-monitor, and it
+      # keeps the __APP__ template substitution that monitoring/alerts/*.json
+      # depend on — don't downgrade this pin.
+      - uses: bcgov/actions-openshift/sysdig-monitor@4dbe4f6d25d14cbdb01e525a302e61e31f96c3ed # v0.5.0
+        with:
+          sysdig_api_token: ${{ secrets.SYSDIG_API_TOKEN }}
+          oc_namespace: ${{ secrets.oc_namespace }}
+          app: nr-cbr
+
+  # After PROD is up, alias the PR image as :prod in GHCR. Creates a durable
+  # record of "this is the image running in production right now" and a
+  # rollback target.
+  promote:
+    name: Promote Images
+    needs: [deploy-prod, init]
+    runs-on: ubuntu-slim
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        package: [backend, frontend]
+    timeout-minutes: 1
+    steps:
+      - uses: shrink/actions-docker-registry-tag@e6aaef25c595b6e0edd18bf4c7dbfea3abd43299 # v5
+        with:
+          registry: ghcr.io
+          repository: ${{ github.repository }}/${{ matrix.package }}
+          target: ${{ needs.init.outputs.pr }}
+          tags: prod
