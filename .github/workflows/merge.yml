@@ -148,13 +148,13 @@ jobs:
   monitor-prod:
     name: Sysdig Monitor (PROD)
     needs: [deploy-prod]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     environment: prod
     permissions:
       contents: read
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Consolidated from bcgov/action-sysdig-monitor into the bcgov/actions
       # suite. v0.5.0 is the first release carrying sysdig-monitor, and it
       # keeps the __APP__ template substitution that monitoring/alerts/*.json
