@@ -5,6 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import RepairsSummaryPage, { REPAIRS_SUMMARY_STATE_KEY } from './index';
 
+import {
+  multiSelectOptions,
+  multiSelectSelected,
+  toggleMultiSelect,
+} from '@/config/tests/multiSelect';
+
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
@@ -90,23 +96,28 @@ describe('RepairsSummaryPage', () => {
   it("offers legacy's criteria, less Admin Area and Road Responsibility", async () => {
     renderPage();
 
-    await waitFor(() => expect(byId('repairClassCode')).not.toBeDisabled());
+    await waitFor(() => expect(byId('repairStatusCode')).not.toBeDisabled());
     for (const label of [
       'Structure #',
       'Site #',
-      'Site Status',
       'Site Type',
       'Repair Status',
-      'Repair Priority',
-      'Structural Safety',
-      'Forest District',
-      'Management Area',
-      'BCTS Business Area',
       'Forest Service Road',
       'Project File ID#',
       'Br.',
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    // Multi-selects: their labels name a list box rather than a form control.
+    for (const label of [
+      'Site Status',
+      'Repair Priority',
+      'Structural Safety',
+      'Forest District',
+      'Management Area',
+      'BCTS Business Area',
+    ]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getByText('Designated Maintainer')).toBeInTheDocument();
     expect(screen.getByText('Downrated Structure?')).toBeInTheDocument();
@@ -115,10 +126,12 @@ describe('RepairsSummaryPage', () => {
     expect(screen.queryByText(/Road Responsibility/)).not.toBeInTheDocument();
   });
 
-  it("lists legacy's groups of codes after the codes themselves", async () => {
+  it("keeps legacy's groups of statuses, and lists priorities and safety as codes only", async () => {
+    // Repair Status is still one choice, so its groups stay. Priority and Structural Safety are
+    // multi-selects now: ticking several replaces legacy's ready-made groups ("U&H&M", "N&S").
     renderPage();
 
-    await waitFor(() => expect(byId('repairClassCode')).not.toBeDisabled());
+    await waitFor(() => expect(byId('repairStatusCode')).not.toBeDisabled());
     expect(optionTexts('repairStatusCode')).toEqual([
       'Any status',
       'COM - Completed',
@@ -126,20 +139,34 @@ describe('RepairsSummaryPage', () => {
       'SOR - Suggested or Required',
       'OUT - Outstanding',
     ]);
-    expect(optionTexts('repairPriorityCode')).toEqual([
-      'Any priority',
-      'H - High',
-      'U - Urgent',
-      'U&H&M - Urgent, High and Medium',
-      'H&M - High and Medium',
-      'M&L - Medium and Low',
-    ]);
-    expect(optionTexts('repairClassCode')).toEqual([
-      'Any structural safety',
+    await waitFor(async () =>
+      expect(await multiSelectOptions('repairs-summary-repairPriorityCode')).toEqual([
+        'H - High',
+        'U - Urgent',
+      ]),
+    );
+    expect(await multiSelectOptions('repairs-summary-repairClassCode')).toEqual([
       'N - Non-structural',
       'S - Structural',
-      'N&S - Non-structural and Structural',
     ]);
+  });
+
+  it('sends every priority and safety class ticked', async () => {
+    renderPage();
+    await waitFor(async () =>
+      expect(await multiSelectOptions('repairs-summary-repairPriorityCode')).toHaveLength(2),
+    );
+
+    await toggleMultiSelect('repairs-summary-repairPriorityCode', 'H - High', 'U - Urgent');
+    await toggleMultiSelect('repairs-summary-repairClassCode', 'S - Structural');
+    fireEvent.click(byId('run-PDF'));
+
+    await waitFor(() =>
+      expect(reportApi.repairsSummary).toHaveBeenCalledWith(
+        expect.objectContaining({ repairPriorityCode: ['H', 'U'], repairClassCode: ['S'] }),
+        'PDF',
+      ),
+    );
   });
 
   it("starts at legacy's defaults: Outstanding repairs, sorted by project and branch", async () => {
@@ -188,19 +215,24 @@ describe('RepairsSummaryPage', () => {
 
   it('keeps the criteria for the tab, and Clear goes back to the defaults', async () => {
     const { unmount } = renderPage();
-    await waitFor(() => expect(byId('repairPriorityCode')).not.toBeDisabled());
+    await waitFor(async () =>
+      expect(await multiSelectOptions('repairs-summary-repairPriorityCode')).toHaveLength(2),
+    );
     type('structureName', 'B10');
-    type('repairPriorityCode', 'H&M');
+    await toggleMultiSelect('repairs-summary-repairPriorityCode', 'H - High');
     fireEvent.click(byId('sortBy-SITE_ID'));
     unmount();
 
     renderPage();
 
     expect(byId('structureName')).toHaveValue('B10');
-    await waitFor(() => expect(byId('repairPriorityCode')).toHaveValue('H&M'));
+    await waitFor(async () =>
+      expect(await multiSelectSelected('repairs-summary-repairPriorityCode')).toEqual(['H - High']),
+    );
     expect(byId('sortBy-SITE_ID')).toBeChecked();
     expect(JSON.parse(sessionStorage.getItem(REPAIRS_SUMMARY_STATE_KEY) ?? '{}')).toMatchObject({
       structureName: 'B10',
+      repairPriorityCode: ['H'],
     });
 
     fireEvent.click(byId('reset'));
@@ -210,16 +242,37 @@ describe('RepairsSummaryPage', () => {
     expect(byId('sortBy-PROJECT_BRANCH_KM')).toBeChecked();
   });
 
-  it("loads the district's management areas, and drops the area when the district changes", async () => {
+  it("loads the districts' management areas, and drops the areas when a district is removed", async () => {
     renderPage();
+    await waitFor(async () =>
+      expect(await multiSelectOptions('repairs-summary-orgUnit')).toHaveLength(2),
+    );
+    await toggleMultiSelect('repairs-summary-orgUnit', 'DPG - Prince George');
+    await waitFor(async () =>
+      expect(await multiSelectOptions('repairs-summary-managementOrgUnit')).toEqual([
+        'MA - Area of 1',
+      ]),
+    );
+    await toggleMultiSelect('repairs-summary-managementOrgUnit', 'MA - Area of 1');
 
-    await waitFor(() => expect(byId('orgUnit')).not.toBeDisabled());
-    type('orgUnit', '1');
-    await screen.findByRole('option', { name: 'MA - Area of 1' });
-    type('managementOrgUnit', '10');
-    type('orgUnit', '2');
+    // Adding a district keeps the area: it still belongs to a district chosen.
+    await toggleMultiSelect('repairs-summary-orgUnit', 'DMH - 100 Mile House');
+    fireEvent.click(byId('run-PDF'));
+    await waitFor(() =>
+      expect(reportApi.repairsSummary).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orgUnit: ['1', '2'], managementOrgUnit: ['10'] }),
+        'PDF',
+      ),
+    );
 
-    await screen.findByRole('option', { name: 'MA - Area of 2' });
-    expect(byId('managementOrgUnit')).toHaveValue('');
+    // Removing one drops it: the area may be the removed district's, invisible in the list.
+    await toggleMultiSelect('repairs-summary-orgUnit', 'DPG - Prince George');
+    fireEvent.click(byId('run-PDF'));
+    await waitFor(() =>
+      expect(reportApi.repairsSummary).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orgUnit: ['2'], managementOrgUnit: [] }),
+        'PDF',
+      ),
+    );
   });
 });

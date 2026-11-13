@@ -61,11 +61,11 @@ export type InspectionSearchCriteria = {
   siteId: string;
   /** "Structure #" on the legacy form, though the value is the structure's name. */
   structureName: string;
-  structureTypeClassCode: string;
+  structureTypeClassCode: string[];
   closeProximity: boolean;
   inspectionTypeCode: string;
   mostRecentInspections: boolean;
-  inspectionReportStatusCode: string;
+  inspectionReportStatusCode: string[];
   /** "Previously Reviewed Inspections Only?" — legacy `findChangedReviewed`. */
   findChangedReviewed: boolean;
   forestFileId: string;
@@ -85,10 +85,10 @@ export type InspectionSearchCriteria = {
   inspectionDateStart: string;
   inspectionDateEnd: string;
   /** Forest District. Changing it re-filters {@link managementOrgUnitNo}. */
-  orgUnitNo: string;
-  managementOrgUnitNo: string;
+  orgUnitNo: string[];
+  managementOrgUnitNo: string[];
   /** BCTS Business Area — a third, separate org-unit filter, not a child of the district. */
-  businessAreaOrgUnitNo: string;
+  businessAreaOrgUnitNo: string[];
   inspectorName: string;
   /** Reviewed By: a reviewer's user ID, `IDIR\JSMITH`. */
   reviewerUserId: string;
@@ -139,11 +139,11 @@ export type InspectionSearchResult = {
 export const EMPTY_CRITERIA: InspectionSearchCriteria = {
   siteId: '',
   structureName: '',
-  structureTypeClassCode: '',
+  structureTypeClassCode: [],
   closeProximity: false,
   inspectionTypeCode: '',
   mostRecentInspections: false,
-  inspectionReportStatusCode: '',
+  inspectionReportStatusCode: [],
   findChangedReviewed: false,
   forestFileId: '',
   roadSectionId: '',
@@ -151,9 +151,9 @@ export const EMPTY_CRITERIA: InspectionSearchCriteria = {
   forestServiceRoad: '',
   inspectionDateStart: '',
   inspectionDateEnd: '',
-  orgUnitNo: '',
-  managementOrgUnitNo: '',
-  businessAreaOrgUnitNo: '',
+  orgUnitNo: [],
+  managementOrgUnitNo: [],
+  businessAreaOrgUnitNo: [],
   inspectorName: '',
   reviewerUserId: '',
 };

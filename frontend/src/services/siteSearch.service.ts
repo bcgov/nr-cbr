@@ -10,6 +10,7 @@ import type {
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
 import { sortParams } from '@/utils/headerSort';
+import { joinValues } from '@/utils/multiSelect';
 
 /** What `POST /v1/sites` answers with: the number the site was stored under, upper-cased. */
 export type SiteCreatedResponse = { siteId: string };
@@ -140,6 +141,9 @@ const populated = (criteria: SiteSearchCriteria): Record<string, string | boolea
     }
     if (typeof value === 'string' && value.trim() !== '') {
       query[field] = value.trim();
+    } else if (Array.isArray(value) && joinValues(value) !== '') {
+      // A multi-select's picks, comma-separated in the one parameter.
+      query[field] = joinValues(value);
     } else if (value === true) {
       query[field] = true;
     }

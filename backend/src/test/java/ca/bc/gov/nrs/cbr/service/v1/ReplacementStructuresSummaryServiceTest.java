@@ -307,6 +307,17 @@ class ReplacementStructuresSummaryServiceTest {
   }
 
   @Test
+  @DisplayName("names every value of a multi-select in the criteria line; an unknown code as itself")
+  void criteriaLineNamesSeveralValues() {
+    assertThat(criteriaLine.of(
+        ReplacementStructuresCriteria.builder().siteStatusCode("ACT,ZZZ").build()))
+        .isEqualTo("Site Status: Active, ZZZ");
+    assertThat(criteriaLine.of(
+        ReplacementStructuresCriteria.builder().businessAreaOrgUnit("NONE,3000").build()))
+        .isEqualTo("Business Area: Is null, Cariboo-Chilcotin Business Area");
+  }
+
+  @Test
   @DisplayName("produces the PDF: a page to a district, each year headed on every page it runs onto")
   void producesThePdf() throws Exception {
     site("62-001", s -> s);

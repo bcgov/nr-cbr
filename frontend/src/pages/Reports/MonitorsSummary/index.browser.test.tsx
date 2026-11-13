@@ -5,6 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import MonitorsSummaryPage, { MONITORS_SUMMARY_STATE_KEY } from './index';
 
+import {
+  multiSelectOptions,
+  multiSelectSelected,
+  multiSelectText,
+  toggleMultiSelect,
+} from '@/config/tests/multiSelect';
+
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
@@ -69,20 +76,28 @@ describe('MonitorsSummaryPage', () => {
   it("offers legacy's criteria, less Area and Road Responsibility, and no Management Area", async () => {
     renderPage();
 
-    await waitFor(() => expect(byId('monitoringStatusCode')).not.toBeDisabled());
-    expect(screen.getByRole('option', { name: 'ACT - Active' })).toBeInTheDocument();
+    await waitFor(async () =>
+      expect(await multiSelectOptions('monitors-summary-monitoringStatusCode')).toEqual([
+        'ACT - Active',
+      ]),
+    );
     for (const label of [
       'Structure #',
-      'Site Status',
       'Site Type',
-      'Monitoring Status',
-      'Forest District',
-      'BCTS Business Area',
       'Forest Service Road',
       'Project File ID#',
       'Br.',
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    // Multi-selects: their labels name a list box rather than a form control.
+    for (const label of [
+      'Site Status',
+      'Monitoring Status',
+      'Forest District',
+      'BCTS Business Area',
+    ]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getByText('Designated Maintainer')).toBeInTheDocument();
     expect(screen.getByText('Most Recent Inspections Only?')).toBeInTheDocument();
@@ -136,19 +151,25 @@ describe('MonitorsSummaryPage', () => {
 
   it('keeps the criteria for the tab, and Clear forgets them', async () => {
     const { unmount } = renderPage();
-    await waitFor(() => expect(byId('orgUnit')).not.toBeDisabled());
+    await waitFor(async () =>
+      expect(await multiSelectOptions('monitors-summary-orgUnit')).toEqual(['DPG - Prince George']),
+    );
     type('structureName', 'B10');
-    type('orgUnit', '1');
+    await toggleMultiSelect('monitors-summary-orgUnit', 'DPG - Prince George');
     fireEvent.click(byId('sortBy-ROAD_NAME_STRUCTURE'));
     unmount();
 
     renderPage();
 
     expect(byId('structureName')).toHaveValue('B10');
-    await waitFor(() => expect(byId('orgUnit')).toHaveValue('1'));
+    // The box names its picks once the districts have loaded; only then can the list be opened.
+    await waitFor(() =>
+      expect(multiSelectText('monitors-summary-orgUnit')).toContain('DPG - Prince George'),
+    );
+    expect(await multiSelectSelected('monitors-summary-orgUnit')).toEqual(['DPG - Prince George']);
     expect(byId('sortBy-ROAD_NAME_STRUCTURE')).toBeChecked();
     const saved = JSON.parse(sessionStorage.getItem(MONITORS_SUMMARY_STATE_KEY) ?? '{}');
-    expect(saved).toMatchObject({ structureName: 'B10', orgUnit: '1' });
+    expect(saved).toMatchObject({ structureName: 'B10', orgUnit: ['1'] });
     expect(saved).not.toHaveProperty('managementOrgUnit');
 
     fireEvent.click(byId('reset'));

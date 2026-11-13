@@ -50,17 +50,17 @@ export const DETAIL_SORT_OPTIONS: readonly SortOption<InspectionsConductedDetail
 export type InspectionsConductedCriteria = MaintainerCriteria & {
   /** Structure #. A contains match. */
   structureName: string;
-  siteTypeCode: string;
-  inspectionReportStatusCode: string;
+  siteTypeCode: string[];
+  inspectionReportStatusCode: string[];
   /** The Detail's only: Routine by default, as legacy's. The Summary leaves it blank. */
   inspectionTypeCode: string;
   /** The first and last months of the inspection dates, `yyyy/mm`. */
   inspectionDateStart: string;
   inspectionDateEnd: string;
   /** Forest District. Changing it clears {@link managementOrgUnit}. */
-  orgUnit: string;
-  managementOrgUnit: string;
-  businessAreaOrgUnit: string;
+  orgUnit: string[];
+  managementOrgUnit: string[];
+  businessAreaOrgUnit: string[];
   forestFileId: string;
   /** "Br." — the road section, beside Project File ID#. */
   roadSectionId: string;
@@ -74,13 +74,13 @@ export type InspectionsConductedCriteria = MaintainerCriteria & {
 
 const EMPTY: Omit<InspectionsConductedCriteria, 'inspectionTypeCode' | 'sortBy'> = {
   structureName: '',
-  siteTypeCode: '',
-  inspectionReportStatusCode: '',
+  siteTypeCode: [],
+  inspectionReportStatusCode: [],
   inspectionDateStart: '',
   inspectionDateEnd: '',
-  orgUnit: '',
-  managementOrgUnit: '',
-  businessAreaOrgUnit: '',
+  orgUnit: [],
+  managementOrgUnit: [],
+  businessAreaOrgUnit: [],
   forestFileId: '',
   roadSectionId: '',
   clientNumber: '',

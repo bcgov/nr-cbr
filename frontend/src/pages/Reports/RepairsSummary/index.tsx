@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { areaGroup } from '../criteriaGroups';
 import MaintainerFields from '../MaintainerFields';
 import ReportCriteriaForm from '../ReportCriteriaForm';
 import ReportPageLayout from '../ReportPageLayout';
@@ -7,14 +8,7 @@ import { useCommonCodeTables } from '../useCommonCodeTables';
 import { useReportCriteria } from '../useReportCriteria';
 import { useReportDownload } from '../useReportDownload';
 
-import {
-  EMPTY_CRITERIA,
-  FORMATS,
-  REPAIR_PRIORITY_GROUPS,
-  REPAIR_STATUS_GROUPS,
-  SORT_OPTIONS,
-  repairClassOptions,
-} from './types';
+import { EMPTY_CRITERIA, FORMATS, REPAIR_STATUS_GROUPS, SORT_OPTIONS } from './types';
 
 import type { FC } from 'react';
 
@@ -62,14 +56,6 @@ const RepairsSummaryPage: FC = () => {
     () => [...(repairStatusCodes.data ?? []), ...REPAIR_STATUS_GROUPS],
     [repairStatusCodes.data],
   );
-  const priorityOptions = useMemo(
-    () => [...(repairPriorityCodes.data ?? []), ...REPAIR_PRIORITY_GROUPS],
-    [repairPriorityCodes.data],
-  );
-  const classOptions = useMemo(
-    () => repairClassOptions(repairClassCodes.data ?? []),
-    [repairClassCodes.data],
-  );
 
   const { run, running } = useReportDownload({
     report: useRepairsSummaryReport(),
@@ -102,7 +88,7 @@ const RepairsSummaryPage: FC = () => {
             {/* The structure and its site */}
             {fields.text('structureName', 'Structure #', 14)}
             {fields.text('siteId', 'Site #', 10)}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'siteStatusCode',
               'Site Status',
               'Any status',
@@ -117,40 +103,26 @@ const RepairsSummaryPage: FC = () => {
 
             {/* The repairs, and the road */}
             {fields.codeSelect('repairStatusCode', 'Repair Status', 'Any status', statusOptions)}
-            {fields.codeSelect(
+            {/* Multi-selects of the codes themselves, in place of legacy's ready-made groups. */}
+            {fields.codeMultiSelect(
               'repairPriorityCode',
               'Repair Priority',
               'Any priority',
-              priorityOptions,
+              repairPriorityCodes.data ?? [],
             )}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'repairClassCode',
               'Structural Safety',
               'Any structural safety',
-              classOptions,
+              repairClassCodes.data ?? [],
             )}
             {fields.text('forestServiceRoad', 'Forest Service Road', 20)}
 
             {/* Where the structure is held */}
-            {fields.orgUnitSelect(
-              'orgUnit',
-              'Forest District',
-              'Any district',
-              codeTables.forestDistricts,
-            )}
-            {fields.orgUnitSelect(
-              'managementOrgUnit',
-              'Management Area',
-              criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
-              codeTables.managementAreas,
-              referenceData.isLoading || managementAreasLoading,
-            )}
-            {fields.orgUnitSelect(
-              'businessAreaOrgUnit',
-              'BCTS Business Area',
-              'Any business area',
-              codeTables.businessAreas,
-            )}
+            {areaGroup(fields, codeTables, {
+              criteria,
+              loading: referenceData.isLoading || managementAreasLoading,
+            })}
             <div className="report-criteria__paired">
               {fields.text('forestFileId', 'Project File ID#', 10)}
               {fields.text('roadSectionId', 'Br.', 30)}

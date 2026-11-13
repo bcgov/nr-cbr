@@ -324,6 +324,22 @@ class ConfigurationServiceTest {
   }
 
   @Test
+  @DisplayName("several districts, comma-separated: their areas together, district by district")
+  void listsTheAreasOfSeveralDistricts() {
+    // Forest District is a multi-select (UAT pick list, 2026-11): Management Area lists the areas
+    // of every district ticked. A non-number among them is skipped, not an error.
+    when(orgUnits.findManagementAreas(1812L))
+        .thenReturn(List.of(orgUnit(21L, "DKA", "Thompson Rivers")));
+    when(orgUnits.findManagementAreas(18L))
+        .thenReturn(List.of(orgUnit(26L, "DRV", "Robson Valley")));
+
+    assertThat(service.getManagementAreas("1812, x,18"))
+        .containsExactly(
+            new OrgUnitResponse("21", "DKA", "Thompson Rivers"),
+            new OrgUnitResponse("26", "DRV", "Robson Valley"));
+  }
+
+  @Test
   @DisplayName("a missing or malformed district is an empty list, not an error")
   void toleratesAnUnusableDistrict() {
     // Legacy's own answer: SiteSearchAction catches the NumberFormatException from `new Long(...)`
