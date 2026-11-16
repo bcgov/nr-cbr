@@ -32,6 +32,7 @@ import {
 import { useDeleteSite, useSiteSearch } from '@/hooks/useSiteSearch';
 import { apiErrorMessage } from '@/utils/apiError';
 import { toSortOrder } from '@/utils/headerSort';
+import { areasAfterDistrictChange, restoreCriteria } from '@/utils/multiSelect';
 import { readSessionState, writeSessionState } from '@/utils/sessionState';
 
 /**
@@ -67,8 +68,10 @@ const restoreSearch = (): SavedSiteSearch | null => {
   const saved = readSessionState<Partial<SavedSiteSearch>>(SITE_SEARCH_STATE_KEY);
   if (!saved) return null;
   return {
-    criteria: { ...EMPTY_CRITERIA, ...saved.criteria },
-    submitted: saved.submitted ? { ...EMPTY_CRITERIA, ...saved.submitted } : null,
+    // restoreCriteria also turns a filter saved as one value, before it became a multi-select, into
+    // a list of that value.
+    criteria: restoreCriteria(EMPTY_CRITERIA, saved.criteria ?? null),
+    submitted: saved.submitted ? restoreCriteria(EMPTY_CRITERIA, saved.submitted) : null,
     page: saved.page ?? 1,
     pageSize: saved.pageSize ?? 20,
     // A search kept before sorting by several columns holds one; it restores as a list of one.
@@ -174,10 +177,18 @@ const SiteSearchPage: FC = () => {
       setCriteria((current) => ({
         ...current,
         [field]: value,
-        // Changing the district changes which management areas exist, so a selection made under
-        // the old one has to go. Leaving it would submit a management area that is not in the list
-        // the user can now see — a filter they cannot tell is applied.
-        ...(field === 'orgUnit' ? { managementOrgUnit: '' } : {}),
+        // Changing the districts changes which management areas exist. Removing one clears the
+        // areas picked — one of them may be the removed district's, a filter the user could no
+        // longer see in the list; adding one keeps them. See areasAfterDistrictChange.
+        ...(field === 'orgUnit'
+          ? {
+              managementOrgUnit: areasAfterDistrictChange(
+                current.orgUnit,
+                value as string[],
+                current.managementOrgUnit,
+              ),
+            }
+          : {}),
       }));
     },
     [],

@@ -25,14 +25,20 @@ export type RepairsSummaryCriteria = OwnerCriteria & {
   structureName: string;
   /** Site #. A contains match. */
   siteId: string;
-  siteStatusCode: string;
+  siteStatusCode: string[];
   siteTypeCode: string;
   /** A repair status, or one of legacy's groups of them — {@link REPAIR_STATUS_GROUPS}. */
   repairStatusCode: string;
-  /** A repair priority, or one of legacy's groups of them — {@link REPAIR_PRIORITY_GROUPS}. */
-  repairPriorityCode: string;
-  /** "Structural Safety": a repair class, or any two of them — {@link repairClassOptions}. */
-  repairClassCode: string;
+  /**
+   * Repair Priority — a multi-select. It replaces legacy's ready-made groups ("Urgent, High and
+   * Medium" and the rest), which the UAT pick list asked to change: any combination can be ticked.
+   */
+  repairPriorityCode: string[];
+  /**
+   * "Structural Safety" — a multi-select of the repair classes, replacing legacy's list of every
+   * pair of them ("Structural and Non-structural").
+   */
+  repairClassCode: string[];
   /** The road's name. A contains match. */
   forestServiceRoad: string;
   forestFileId: string;
@@ -54,42 +60,21 @@ export const REPAIR_STATUS_GROUPS: readonly CodeOption[] = [
   { code: 'OUT', description: 'Outstanding' },
 ];
 
-/** Legacy's own groups of repair priorities, listed after the priorities themselves. */
-export const REPAIR_PRIORITY_GROUPS: readonly CodeOption[] = [
-  { code: 'U&H&M', description: 'Urgent, High and Medium' },
-  { code: 'H&M', description: 'High and Medium' },
-  { code: 'M&L', description: 'Medium and Low' },
-];
-
-/**
- * Structural Safety's options: each repair class, then every pair of them — "S&N", "Structural
- * and Non-structural" — as legacy builds them from the code table.
- */
-export const repairClassOptions = (classes: readonly CodeOption[]): CodeOption[] => [
-  ...classes,
-  ...classes.flatMap((first, index) =>
-    classes.slice(index + 1).map((second) => ({
-      code: `${first.code}&${second.code}`,
-      description: `${first.description} and ${second.description}`,
-    })),
-  ),
-];
-
 /** Legacy's defaults: Outstanding repairs, sorted by project and branch. */
 export const EMPTY_CRITERIA: RepairsSummaryCriteria = {
   structureName: '',
   siteId: '',
-  siteStatusCode: '',
+  siteStatusCode: [],
   siteTypeCode: '',
   clientNumber: '',
   clientLocationCode: '',
   maintainerLabel: '',
   repairStatusCode: 'OUT',
-  repairPriorityCode: '',
-  repairClassCode: '',
-  orgUnit: '',
-  businessAreaOrgUnit: '',
-  managementOrgUnit: '',
+  repairPriorityCode: [],
+  repairClassCode: [],
+  orgUnit: [],
+  businessAreaOrgUnit: [],
+  managementOrgUnit: [],
   forestServiceRoad: '',
   forestFileId: '',
   roadSectionId: '',

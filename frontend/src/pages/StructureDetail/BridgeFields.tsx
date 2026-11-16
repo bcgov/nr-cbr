@@ -6,11 +6,20 @@ import {
   TextArea,
   TextInput,
 } from '@carbon/react';
+import { useState } from 'react';
 
 import FieldWithCounter from '@/components/core/FieldWithCounter';
 import { requiredLabel } from '@/utils/requiredLabel';
 
-import { DURABLE, OTHER, TEXT_MAX, type BridgeStored, type BridgeValues } from './bridgeRules';
+import {
+  DURABLE,
+  OTHER,
+  STANDARD_DECK_WIDTHS,
+  TEXT_MAX,
+  standardDeckWidth,
+  type BridgeStored,
+  type BridgeValues,
+} from './bridgeRules';
 import { withStored, type FieldsProps } from './formFields';
 
 import type { CodeValue } from './structureResponse';
@@ -41,6 +50,79 @@ type Props = FieldsProps<BridgeValues> & {
   leading?: ReactNode;
   /** Shown after Portable Structure — the card's Number of Spans. */
   afterPortable?: ReactNode;
+};
+
+const OTHER_WIDTH = 'OTHER';
+
+type DeckWidthProps = {
+  /** The width as typed, in metres — what is saved, whichever way it was chosen. */
+  value: string;
+  error?: string;
+  warning?: string;
+  required: boolean;
+  change: (value: string) => void;
+  leave: () => void;
+};
+
+/**
+ * Deck Width: a choice of the standard widths, or Other with the width typed (UAT, "CBR Test
+ * Changes", 2026-11). The stored column stays a number, so the choice is only how it is entered.
+ *
+ * <p>A stored width that is neither standard one shows as Other with its value. Once Other is
+ * picked it stays picked while the width is typed — typing 4.27 there does not snap the choice
+ * back and take the box away mid-word.
+ */
+const DeckWidthField: FC<DeckWidthProps> = ({ value, error, warning, required, change, leave }) => {
+  const standard = standardDeckWidth(value);
+  const [otherPicked, setOtherPicked] = useState(() => value.trim() !== '' && standard === null);
+  let choice = '';
+  if (otherPicked) choice = OTHER_WIDTH;
+  else if (standard) choice = standard;
+  else if (value.trim()) choice = OTHER_WIDTH;
+  const typing = choice === OTHER_WIDTH;
+
+  const choose = (picked: string) => {
+    setOtherPicked(picked === OTHER_WIDTH);
+    // Other starts blank, so a standard width chosen before is not saved by mistake.
+    change(picked === OTHER_WIDTH ? '' : picked);
+  };
+
+  return (
+    <>
+      <Select
+        id="bridge-deckWidth-choice"
+        data-testid="bridge-deckWidth-choice"
+        labelText={requiredLabel('Deck Width (metres)', required)}
+        value={choice}
+        invalid={!typing && Boolean(error)}
+        invalidText={error}
+        onChange={(event) => choose(event.target.value)}
+        onBlur={leave}
+      >
+        <SelectItem value="" text="None" />
+        {STANDARD_DECK_WIDTHS.map((width) => (
+          <SelectItem key={width} value={width} text={width} />
+        ))}
+        <SelectItem value={OTHER_WIDTH} text="Other" />
+      </Select>
+      {typing && (
+        <TextInput
+          id="bridge-deckWidth"
+          data-testid="bridge-deckWidth"
+          labelText={requiredLabel('If Other, Deck Width (metres)', true)}
+          inputMode="decimal"
+          maxLength={8}
+          value={value}
+          invalid={Boolean(error)}
+          invalidText={error}
+          warn={!error && Boolean(warning)}
+          warnText={warning}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => change(event.target.value)}
+          onBlur={leave}
+        />
+      )}
+    </>
+  );
 };
 
 /**
@@ -150,7 +232,14 @@ const BridgeFields: FC<Props> = ({
         withStored(codes.data?.deckTypes, storedCodes.deckType),
       )}
       {values.deckTypeCode === OTHER && details('deckTypeComment', 'Deck Type Details')}
-      {metres('deckWidth', requiredLabel('Deck Width (metres)', Boolean(stored.deckWidth)), 8)}
+      <DeckWidthField
+        value={values.deckWidth}
+        error={shown.deckWidth}
+        warning={warnings.deckWidth}
+        required={Boolean(stored.deckWidth)}
+        change={(value) => change('deckWidth', value)}
+        leave={() => leave('deckWidth')}
+      />
       {select(
         'runningSurfaceCode',
         requiredLabel('Running Surface', Boolean(stored.runningSurfaceCode)),

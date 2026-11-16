@@ -7,6 +7,13 @@ import ReplacementStructuresSummaryPage, {
   REPLACEMENT_STRUCTURES_SUMMARY_STATE_KEY,
 } from './index';
 
+import {
+  multiSelectOptions,
+  multiSelectSelected,
+  multiSelectText,
+  toggleMultiSelect,
+} from '@/config/tests/multiSelect';
+
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
@@ -77,16 +84,20 @@ describe('ReplacementStructuresSummaryPage', () => {
   it("offers legacy's criteria, less Area, with no Sort By", async () => {
     renderPage();
 
-    await waitFor(() => expect(byId('siteStatusCode')).not.toBeDisabled());
-    expect(screen.getByRole('option', { name: 'ACT - Active' })).toBeInTheDocument();
+    await waitFor(async () =>
+      expect(await multiSelectOptions('replacement-structures-summary-siteStatusCode')).toEqual([
+        'ACT - Active',
+      ]),
+    );
+    expect(screen.getByLabelText('Site Type')).toBeInTheDocument();
+    // Multi-selects: their labels name a list box rather than a form control.
     for (const label of [
       'Forest District',
       'Management Area',
       'Site Status',
-      'Site Type',
       'BCTS Business Area',
     ]) {
-      expect(screen.getByLabelText(label)).toBeInTheDocument();
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
     for (const legend of ['Estimated Load Restriction', 'Estimated Replacement', 'Capital Road']) {
       expect(screen.getByText(legend)).toBeInTheDocument();
@@ -149,25 +160,46 @@ describe('ReplacementStructuresSummaryPage', () => {
     expect(saveFile).not.toHaveBeenCalled();
   });
 
-  it("loads the district's management areas, and drops the area when the district changes", async () => {
+  it("loads the districts' management areas, and drops the areas when a district is removed", async () => {
     renderPage();
+    await waitFor(async () =>
+      expect(await multiSelectOptions('replacement-structures-summary-orgUnit')).toHaveLength(2),
+    );
+    await toggleMultiSelect('replacement-structures-summary-orgUnit', 'DPG - Prince George');
+    await waitFor(async () =>
+      expect(await multiSelectOptions('replacement-structures-summary-managementOrgUnit')).toEqual([
+        'MA - Area of 1',
+      ]),
+    );
+    await toggleMultiSelect('replacement-structures-summary-managementOrgUnit', 'MA - Area of 1');
 
-    await waitFor(() => expect(byId('orgUnit')).not.toBeDisabled());
-    type('orgUnit', '1');
-    await screen.findByRole('option', { name: 'MA - Area of 1' });
-    type('managementOrgUnit', '10');
-    expect(byId('managementOrgUnit')).toHaveValue('10');
+    // Adding a district keeps the area: it still belongs to a district chosen.
+    await toggleMultiSelect('replacement-structures-summary-orgUnit', 'DMH - 100 Mile House');
+    fireEvent.click(byId('run-PDF'));
+    await waitFor(() =>
+      expect(reportApi.replacementStructuresSummary).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orgUnit: ['1', '2'], managementOrgUnit: ['10'] }),
+        'PDF',
+      ),
+    );
 
-    type('orgUnit', '2');
-
-    await screen.findByRole('option', { name: 'MA - Area of 2' });
-    expect(byId('managementOrgUnit')).toHaveValue('');
+    // Removing one drops it: the area may be the removed district's, invisible in the list.
+    await toggleMultiSelect('replacement-structures-summary-orgUnit', 'DPG - Prince George');
+    fireEvent.click(byId('run-PDF'));
+    await waitFor(() =>
+      expect(reportApi.replacementStructuresSummary).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orgUnit: ['2'], managementOrgUnit: [] }),
+        'PDF',
+      ),
+    );
   });
 
   it('keeps the criteria for the tab, and Clear forgets them', async () => {
     const { unmount } = renderPage();
-    await waitFor(() => expect(byId('orgUnit')).not.toBeDisabled());
-    type('orgUnit', '1');
+    await waitFor(async () =>
+      expect(await multiSelectOptions('replacement-structures-summary-orgUnit')).toHaveLength(2),
+    );
+    await toggleMultiSelect('replacement-structures-summary-orgUnit', 'DPG - Prince George');
     type('replacementYearStart', '2027');
     fireEvent.click(byId('capitalRoad'));
     unmount();
@@ -175,12 +207,24 @@ describe('ReplacementStructuresSummaryPage', () => {
     renderPage();
 
     expect(byId('replacementYearStart')).toHaveValue('2027');
-    await waitFor(() => expect(byId('orgUnit')).toHaveValue('1'));
+    // The box names its picks once the districts have loaded; only then can the list be opened.
+    await waitFor(() =>
+      expect(multiSelectText('replacement-structures-summary-orgUnit')).toContain(
+        'DPG - Prince George',
+      ),
+    );
+    expect(await multiSelectSelected('replacement-structures-summary-orgUnit')).toEqual([
+      'DPG - Prince George',
+    ]);
     expect(byId('capitalRoad')).toBeChecked();
     const saved = JSON.parse(
       sessionStorage.getItem(REPLACEMENT_STRUCTURES_SUMMARY_STATE_KEY) ?? '{}',
     );
-    expect(saved).toMatchObject({ orgUnit: '1', replacementYearStart: '2027', capitalRoad: true });
+    expect(saved).toMatchObject({
+      orgUnit: ['1'],
+      replacementYearStart: '2027',
+      capitalRoad: true,
+    });
 
     fireEvent.click(byId('reset'));
 

@@ -79,7 +79,7 @@ const ReplacementStructuresSummaryPage: FC = () => {
             })}
 
             {/* Its site */}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'siteStatusCode',
               'Site Status',
               'Any status',

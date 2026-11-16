@@ -10,6 +10,8 @@ import {
 } from '@carbon/react';
 import { useRef } from 'react';
 
+import MultiCodeSelect from '@/components/core/MultiCodeSelect';
+
 import { criteriaErrors, isMonth } from './validation';
 
 import type {
@@ -20,6 +22,13 @@ import type {
 } from './types';
 import type { ChangeEvent, FC, SubmitEventHandler } from 'react';
 
+import {
+  codeOptions,
+  orgUnitOptions,
+  type MultiCodeOption,
+  type MultiFields,
+  withIsNull,
+} from '@/components/core/MultiCodeSelect/options';
 import { MONTH_FORMAT, formatMonth, parseMonth } from '@/utils/month';
 
 export type CodeTables = {
@@ -181,32 +190,27 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
     </Select>
   );
 
-  const orgUnitSelect = (
-    field: keyof Criteria,
+  /**
+   * A filter that takes several values — the dropdowns highlighted in the UAT "CBR Pick list".
+   * Nothing ticked is any. The long org-unit lists get a type-to-filter box.
+   */
+  const multiSelect = (
+    field: MultiFields<Criteria>,
     labelText: string,
     anyText: string,
-    options: OrgUnitOption[],
-    loading = codeTablesLoading,
+    options: readonly MultiCodeOption[],
+    { filterable = false, disabled = codeTablesLoading } = {},
   ) => (
-    <Select
+    <MultiCodeSelect
       id={`inspection-search-${field}`}
-      data-testid={`inspection-search-${field}`}
-      labelText={labelText}
-      disabled={loading}
-      value={String(criteria[field])}
-      onChange={(event) => onChange(field, event.target.value as never)}
-    >
-      <SelectItem value="" text={anyText} />
-      {options.map((option) => (
-        <SelectItem
-          key={option.orgUnitNo}
-          // The number, not the code: it is what the inspection's org unit holds, and the code is
-          // not unique across the org hierarchy. Only the label changes here.
-          value={option.orgUnitNo}
-          text={label(option.orgUnitCode, option.orgUnitName)}
-        />
-      ))}
-    </Select>
+      titleText={labelText}
+      placeholder={anyText}
+      options={options}
+      selected={criteria[field]}
+      onChange={(values) => onChange(field, values)}
+      filterable={filterable}
+      disabled={disabled}
+    />
   );
 
   /**
@@ -327,11 +331,11 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
             behind it holds a name. The legacy label is kept: it is what the business calls the
             field, and it is what the user is looking for. */}
         {text('structureName', 'Structure #', 14)}
-        {codeSelect(
+        {multiSelect(
           'structureTypeClassCode',
           'Type/Class',
           'Any type or class',
-          codeTables.structureTypeClassCodes,
+          codeOptions(codeTables.structureTypeClassCodes),
         )}
         {codeSelect(
           'inspectionTypeCode',
@@ -340,11 +344,11 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
           codeTables.inspectionTypeCodes,
         )}
 
-        {codeSelect(
+        {multiSelect(
           'inspectionReportStatusCode',
           'Inspection Report Status',
           'Any status',
-          codeTables.inspectionReportStatusCodes,
+          codeOptions(codeTables.inspectionReportStatusCodes),
         )}
 
         <div className="inspection-search__paired">
@@ -360,24 +364,38 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
             org unit that loses least by being separated: BCTS Business Area is a third, independent
             filter, not a child of the district the way Management Area is, so the two that have to
             stay adjacent still are. */}
-        {orgUnitSelect(
+        {multiSelect(
           'businessAreaOrgUnitNo',
           'BCTS Business Area',
           'Any business area',
-          codeTables.businessAreas,
+          // "Is null" first: structures held by no business area (UAT pick list).
+          withIsNull(orgUnitOptions(codeTables.businessAreas)),
+          { filterable: true },
         )}
 
         {dateRange()}
 
-        {orgUnitSelect('orgUnitNo', 'Forest District', 'Any district', codeTables.forestDistricts)}
-        {orgUnitSelect(
+        {multiSelect(
+          'orgUnitNo',
+          'Forest District',
+          'Any district',
+          orgUnitOptions(codeTables.forestDistricts),
+          { filterable: true },
+        )}
+        {multiSelect(
           'managementOrgUnitNo',
           'Management Area',
           // Until a district is chosen this list is empty by design, so "Any management area" would
           // be offering a filter over nothing. Saying what is missing is the more useful blank.
-          criteria.orgUnitNo === '' ? 'Select a forest district first' : 'Any management area',
-          codeTables.managementAreas,
-          codeTablesLoading || managementAreasLoading,
+          criteria.orgUnitNo.length === 0
+            ? 'Select a forest district first'
+            : 'Any management area',
+          orgUnitOptions(codeTables.managementAreas),
+          {
+            filterable: true,
+            disabled:
+              codeTablesLoading || managementAreasLoading || criteria.orgUnitNo.length === 0,
+          },
         )}
         {text('inspectorName', 'Inspector Name', 255)}
 

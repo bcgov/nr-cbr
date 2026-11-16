@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import StructureInventoryDetailedPage, { STRUCTURE_INVENTORY_DETAILED_STATE_KEY } from './index';
 
+import { multiSelectOptions, toggleMultiSelect } from '@/config/tests/multiSelect';
+
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
@@ -87,10 +89,11 @@ describe('StructureInventoryDetailedPage', () => {
     ]) {
       expect(screen.getByText(legend)).toBeInTheDocument();
     }
-    expect(screen.getByLabelText('BCTS Business Area')).toBeInTheDocument();
+    // A multi-select: its label names a list box rather than a form control.
+    expect(screen.getByText('BCTS Business Area')).toBeInTheDocument();
     expect(screen.getByText('Capital Road')).toBeInTheDocument();
     for (const summaryOnly of ['Type/Class', 'Deck Type', 'Culvert Material']) {
-      expect(screen.queryByLabelText(summaryOnly)).not.toBeInTheDocument();
+      expect(screen.queryByText(summaryOnly)).not.toBeInTheDocument();
     }
     expect(screen.queryByText('Opening Width (mm)')).not.toBeInTheDocument();
   });
@@ -171,19 +174,38 @@ describe('StructureInventoryDetailedPage', () => {
     expect(saveFile).not.toHaveBeenCalled();
   });
 
-  it("loads the district's management areas, and drops the area when the district changes", async () => {
+  it("loads the districts' management areas, and drops the areas when a district is removed", async () => {
     renderPage();
+    await waitFor(async () =>
+      expect(await multiSelectOptions('structure-inventory-detailed-orgUnit')).toHaveLength(2),
+    );
+    await toggleMultiSelect('structure-inventory-detailed-orgUnit', 'DPG - Prince George');
+    await waitFor(async () =>
+      expect(await multiSelectOptions('structure-inventory-detailed-managementOrgUnit')).toEqual([
+        'MA - Area of 1',
+      ]),
+    );
+    await toggleMultiSelect('structure-inventory-detailed-managementOrgUnit', 'MA - Area of 1');
 
-    await waitFor(() => expect(byId('orgUnit')).not.toBeDisabled());
-    type('orgUnit', '1');
-    await screen.findByRole('option', { name: 'MA - Area of 1' });
-    type('managementOrgUnit', '10');
-    expect(byId('managementOrgUnit')).toHaveValue('10');
+    // Adding a district keeps the area: it still belongs to a district chosen.
+    await toggleMultiSelect('structure-inventory-detailed-orgUnit', 'DMH - 100 Mile House');
+    fireEvent.click(byId('run-PDF'));
+    await waitFor(() =>
+      expect(reportApi.structureInventoryDetailed).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orgUnit: ['1', '2'], managementOrgUnit: ['10'] }),
+        'PDF',
+      ),
+    );
 
-    type('orgUnit', '2');
-
-    await screen.findByRole('option', { name: 'MA - Area of 2' });
-    expect(byId('managementOrgUnit')).toHaveValue('');
+    // Removing one drops it: the area may be the removed district's, invisible in the list.
+    await toggleMultiSelect('structure-inventory-detailed-orgUnit', 'DPG - Prince George');
+    fireEvent.click(byId('run-PDF'));
+    await waitFor(() =>
+      expect(reportApi.structureInventoryDetailed).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orgUnit: ['2'], managementOrgUnit: [] }),
+        'PDF',
+      ),
+    );
   });
 
   it('keeps the criteria for the tab, apart from the Summary, and Clear forgets them', () => {

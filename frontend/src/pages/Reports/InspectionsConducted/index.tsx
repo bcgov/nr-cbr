@@ -137,7 +137,7 @@ const InspectionsConductedPage: FC<{ variant: InspectionsConductedVariant }> = (
           <>
             {/* The structure and the inspection */}
             {fields.text('structureName', 'Structure #', 14)}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'siteTypeCode',
               'Site Type',
               'Any site type',
@@ -150,7 +150,7 @@ const InspectionsConductedPage: FC<{ variant: InspectionsConductedVariant }> = (
                 'Any inspection type',
                 inspectionTypeCodes.data ?? [],
               )}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'inspectionReportStatusCode',
               'Inspection Report Status',
               'Any status',

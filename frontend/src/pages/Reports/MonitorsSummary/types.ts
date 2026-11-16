@@ -22,12 +22,12 @@ export const SORT_OPTIONS: readonly SortOption<MonitorsSummarySort>[] = [
 export type MonitorsSummaryCriteria = MaintainerCriteria & {
   /** Structure #. A contains match. */
   structureName: string;
-  siteStatusCode: string;
+  siteStatusCode: string[];
   siteTypeCode: string;
-  monitoringStatusCode: string;
+  monitoringStatusCode: string[];
   /** Forest District. */
-  orgUnit: string;
-  businessAreaOrgUnit: string;
+  orgUnit: string[];
+  businessAreaOrgUnit: string[];
   /** The road's name. A contains match. */
   forestServiceRoad: string;
   forestFileId: string;
@@ -47,14 +47,14 @@ export const FORMATS = ['CSV', 'PDF'] as const;
 /** Legacy's defaults: nothing set, sorted by project, branch and kilometre. */
 export const EMPTY_CRITERIA: MonitorsSummaryCriteria = {
   structureName: '',
-  siteStatusCode: '',
+  siteStatusCode: [],
   siteTypeCode: '',
   clientNumber: '',
   clientLocationCode: '',
   maintainerLabel: '',
-  monitoringStatusCode: '',
-  orgUnit: '',
-  businessAreaOrgUnit: '',
+  monitoringStatusCode: [],
+  orgUnit: [],
+  businessAreaOrgUnit: [],
   forestServiceRoad: '',
   forestFileId: '',
   roadSectionId: '',

@@ -54,20 +54,20 @@ export type InspectionsDueCriteria = MaintainerCriteria & {
   noNextPlannedInspectionDate: boolean;
   siteTypeCode: string;
   /** Type/Class. */
-  structureTypeClassCode: string;
+  structureTypeClassCode: string[];
   /** Close Proximity Inspection Required?: blank for either, `Y` or `N`. */
   closeProximity: string;
   /** Inspection Status — the structure's. */
   structureInspectionStatusCode: string;
-  siteStatusCode: string;
+  siteStatusCode: string[];
   /** Forest District. Changing it clears {@link managementOrgUnit}. */
-  orgUnit: string;
-  managementOrgUnit: string;
-  businessAreaOrgUnit: string;
+  orgUnit: string[];
+  managementOrgUnit: string[];
+  businessAreaOrgUnit: string[];
   forestFileId: string;
   /** "Br." — the road section, beside Project File ID#. */
   roadSectionId: string;
-  specialAccessCode: string;
+  specialAccessCode: string[];
   /** A code, {@link NO_SPECIAL_EQUIPMENT} for none, or blank for any. */
   specialEquipmentCode: string;
   /** The Blank's order is fixed; it keeps the default, unshown. */
@@ -81,19 +81,19 @@ export const EMPTY_CRITERIA: InspectionsDueCriteria = {
   nextPlannedInspectionDateEnd: '',
   noNextPlannedInspectionDate: false,
   siteTypeCode: '',
-  structureTypeClassCode: '',
+  structureTypeClassCode: [],
   closeProximity: '',
   structureInspectionStatusCode: '',
-  siteStatusCode: '',
-  orgUnit: '',
-  managementOrgUnit: '',
-  businessAreaOrgUnit: '',
+  siteStatusCode: [],
+  orgUnit: [],
+  managementOrgUnit: [],
+  businessAreaOrgUnit: [],
   forestFileId: '',
   roadSectionId: '',
   clientNumber: '',
   clientLocationCode: '',
   maintainerLabel: '',
-  specialAccessCode: '',
+  specialAccessCode: [],
   specialEquipmentCode: '',
   sortBy: 'FOREST_SERVICE_ROAD',
 };

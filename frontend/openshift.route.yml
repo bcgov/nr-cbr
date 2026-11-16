@@ -3,8 +3,8 @@
 #
 # Split out of openshift.deploy.yml so it can be applied PER ENVIRONMENT: TEST
 # and PR previews need it (they have no custom hostname), but PROD serves ONLY
-# the vanity Route (openshift.vanity-route.yml) — no default route there, so
-# cbr.nrs.gov.bc.ca is the single public URL in production.
+# the vanity Route (created by .github/workflows/cert-keeper.yml) — no default
+# route there, so cbr.nrs.gov.bc.ca is the single public URL in production.
 #
 # OpenShift v1 templates can't render an object conditionally (`oc process`
 # emits every object), so the gating lives in the pipeline: reusable-deploy.yml

@@ -9,6 +9,8 @@ import InspectionsConductedPage from './index';
 
 import type { InspectionsConductedVariant } from './types';
 
+import { multiSelectOptions } from '@/config/tests/multiSelect';
+
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
   getSiteTypeCodes: vi.fn(),
@@ -93,27 +95,32 @@ beforeEach(() => {
 });
 
 describe('InspectionsConductedPage', () => {
-  const SHARED_LABELS = [
-    'Structure #',
+  const SHARED_LABELS = ['Structure #', 'Project File ID#', 'Br.', 'Inspector Name'];
+  // Multi-selects: their labels name a list box rather than a form control.
+  const MULTI_SELECT_LABELS = [
     'Site Type',
     'Inspection Report Status',
     'Forest District',
     'Management Area',
     'BCTS Business Area',
-    'Project File ID#',
-    'Br.',
-    'Inspector Name',
   ];
 
   it("offers the Summary legacy's criteria, without Inspection Type, Area or Road Responsibility", async () => {
     renderPage('summary');
 
-    await waitFor(() => expect(byId('summary', 'inspectionReportStatusCode')).not.toBeDisabled());
+    await waitFor(async () =>
+      expect(
+        await multiSelectOptions('inspections-conducted-summary-inspectionReportStatusCode'),
+      ).toEqual(['ACC - Accepted']),
+    );
     // As text boxes and selects: the Summary also has a "Project File ID#" sort.
     for (const label of SHARED_LABELS) {
       expect(
         screen.getByLabelText(label, { selector: 'input:not([type=radio]), select' }),
       ).toBeInTheDocument();
+    }
+    for (const label of MULTI_SELECT_LABELS) {
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getByText('Inspection Date')).toBeInTheDocument();
     for (const toggle of [
@@ -147,6 +154,9 @@ describe('InspectionsConductedPage', () => {
       expect(
         screen.getByLabelText(label, { selector: 'input:not([type=radio]), select' }),
       ).toBeInTheDocument();
+    }
+    for (const label of MULTI_SELECT_LABELS) {
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(byId('detail', 'sortBy-PROJECT_BRANCH_USER_KM')).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Road Name, User KM (Asc)' })).not.toBeChecked();

@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
+import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -12,6 +13,8 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import org.springframework.util.StringUtils;
@@ -54,29 +57,56 @@ final class SearchPredicates {
         builder.upper(path), WILDCARD + value.trim().toUpperCase(Locale.ROOT) + WILDCARD));
   }
 
-  /** A code, exactly. */
+  /**
+   * A code, exactly — or any of several, comma-separated, as a multi-select sends them
+   * ({@link CriteriaValues}).
+   */
   static Optional<Predicate> equalsText(
       CriteriaBuilder builder, Expression<String> path, String value) {
-    if (!StringUtils.hasText(value)) {
-      return Optional.empty();
-    }
-    return Optional.of(builder.equal(path, value.trim()));
+    return anyOf(builder, path, CriteriaValues.of(value));
   }
 
   /**
-   * An org unit number, exactly. A value that is not a number is treated as unset rather than as a
-   * 500 — the form only ever sends one picked from a list.
+   * An org unit number, exactly — or any of several, comma-separated. A value that is not a number
+   * is left out rather than a 500, and if none is a number the criterion is unset: the form only
+   * ever sends numbers picked from a list.
    */
   static Optional<Predicate> equalsNumber(
       CriteriaBuilder builder, Expression<Long> path, String value) {
-    if (!StringUtils.hasText(value)) {
+    List<Long> numbers = new ArrayList<>();
+    for (String one : CriteriaValues.of(value)) {
+      try {
+        numbers.add(Long.valueOf(one));
+      } catch (NumberFormatException ex) {
+        // Not a number: not one of the form's values, so not a filter.
+      }
+    }
+    return anyOf(builder, path, numbers);
+  }
+
+  /**
+   * As {@link #equalsNumber}, where {@link CriteriaValues#NONE} among the values also matches a row
+   * with no number — BCTS Business Area's "Is null". {@code NONE} alone finds only those rows.
+   */
+  static Optional<Predicate> equalsNumberOrNone(
+      CriteriaBuilder builder, Expression<Long> path, String value) {
+    boolean none = CriteriaValues.of(value).contains(CriteriaValues.NONE);
+    Optional<Predicate> numbers = equalsNumber(builder, path, value);
+    if (!none) {
+      return numbers;
+    }
+    return Optional.of(numbers
+        .map(match -> builder.or(builder.isNull(path), match))
+        .orElseGet(() -> builder.isNull(path)));
+  }
+
+  /** {@code = value} for one, {@code IN (…)} for several, nothing for none. */
+  static <T> Optional<Predicate> anyOf(
+      CriteriaBuilder builder, Expression<T> path, List<T> values) {
+    if (values.isEmpty()) {
       return Optional.empty();
     }
-    try {
-      return Optional.of(builder.equal(path, Long.valueOf(value.trim())));
-    } catch (NumberFormatException ex) {
-      return Optional.empty();
-    }
+    return Optional.of(values.size() == 1 ? builder.equal(path, values.get(0)) : path.in(values));
   }
 
   /**

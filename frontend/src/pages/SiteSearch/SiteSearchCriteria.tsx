@@ -2,6 +2,7 @@ import { Search as SearchIcon } from '@carbon/icons-react';
 import { Button, Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
 import ClientCombo from '@/components/core/ClientCombo';
+import MultiCodeSelect from '@/components/core/MultiCodeSelect';
 
 import { criteriaErrors } from './validation';
 
@@ -9,6 +10,12 @@ import type { CodeOption, OrgUnitOption, SiteSearchCriteria as Criteria } from '
 import type { ClientSuggestion } from '@/types/client';
 import type { FC, SubmitEventHandler } from 'react';
 
+import {
+  codeOptions,
+  orgUnitOptions,
+  type MultiCodeOption,
+  type MultiFields,
+} from '@/components/core/MultiCodeSelect/options';
 import { useClientLocations } from '@/hooks/useClientSearch';
 import { MIN_CLIENT_TERM_LENGTH, clientLabel, locationLabel } from '@/utils/clientSearch';
 
@@ -71,6 +78,8 @@ type Props = {
  */
 const label = (code: string | null, description: string | null): string =>
   [code, description].filter(Boolean).join(' - ');
+
+type MultiField = MultiFields<Criteria>;
 
 const SiteSearchCriteriaForm: FC<Props> = ({
   criteria,
@@ -191,32 +200,27 @@ const SiteSearchCriteriaForm: FC<Props> = ({
     </Select>
   );
 
-  const orgUnitSelect = (
-    field: keyof Criteria,
+  /**
+   * A filter that takes several values — Status, Forest District and the rest highlighted in the UAT
+   * "CBR Pick list". Nothing ticked is any. The long org-unit lists get a type-to-filter box.
+   */
+  const multiSelect = (
+    field: MultiField,
     labelText: string,
     anyText: string,
-    options: OrgUnitOption[],
-    loading = codeTablesLoading,
+    options: readonly MultiCodeOption[],
+    { filterable = false, disabled = codeTablesLoading } = {},
   ) => (
-    <Select
+    <MultiCodeSelect
       id={`site-search-${field}`}
-      data-testid={`site-search-${field}`}
-      labelText={labelText}
-      disabled={loading}
-      value={String(criteria[field])}
-      onChange={(event) => onChange(field, event.target.value as never)}
-    >
-      <SelectItem value="" text={anyText} />
-      {options.map((option) => (
-        <SelectItem
-          key={option.orgUnitNo}
-          // The number, not the code: it is what CROSSING_SITE.ORG_UNIT_NO holds, and the code is
-          // not unique across the org hierarchy. Only the label changes here.
-          value={option.orgUnitNo}
-          text={label(option.orgUnitCode, option.orgUnitName)}
-        />
-      ))}
-    </Select>
+      titleText={labelText}
+      placeholder={anyText}
+      options={options}
+      selected={criteria[field]}
+      onChange={(values) => onChange(field, values)}
+      filterable={filterable}
+      disabled={disabled}
+    />
   );
 
   /**
@@ -260,7 +264,12 @@ const SiteSearchCriteriaForm: FC<Props> = ({
     <form onSubmit={submit} data-testid="site-search-form" className="site-search__form">
       <div className="site-search__criteria">
         {text('siteId', 'Site #', 14)}
-        {codeSelect('siteStatusCode', 'Status', 'Any status', codeTables.siteStatusCodes)}
+        {multiSelect(
+          'siteStatusCode',
+          'Status',
+          'Any status',
+          codeOptions(codeTables.siteStatusCodes),
+        )}
 
         <div className="site-search__paired">
           {text('forestFileId', 'Project File ID#', 10)}
@@ -321,29 +330,39 @@ const SiteSearchCriteriaForm: FC<Props> = ({
         </Select>
         {text('crossingName', 'Crossing Name', 20)}
 
-        {orgUnitSelect('orgUnit', 'Forest District', 'Any district', codeTables.forestDistricts)}
-        {orgUnitSelect(
+        {multiSelect(
+          'orgUnit',
+          'Forest District',
+          'Any district',
+          orgUnitOptions(codeTables.forestDistricts),
+          { filterable: true },
+        )}
+        {multiSelect(
           'managementOrgUnit',
           'Management Area',
           // Until a district is chosen this list is empty by design, so "Any management area" would
           // be offering a filter over nothing. Saying what is missing is the more useful blank.
-          criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
-          codeTables.managementAreas,
-          codeTablesLoading || managementAreasLoading,
+          criteria.orgUnit.length === 0 ? 'Select a forest district first' : 'Any management area',
+          orgUnitOptions(codeTables.managementAreas),
+          {
+            filterable: true,
+            disabled: codeTablesLoading || managementAreasLoading || criteria.orgUnit.length === 0,
+          },
         )}
-        {orgUnitSelect(
+        {multiSelect(
           'businessAreaOrgUnit',
           'BCTS Business Area',
           'Any business area',
-          codeTables.businessAreas,
+          orgUnitOptions(codeTables.businessAreas),
+          { filterable: true },
         )}
         {range('kiloStart', 'kiloEnd', 'Kilometres')}
 
-        {codeSelect(
+        {multiSelect(
           'specialAccessCode',
           'Special Access Requirements',
           'Any requirement',
-          codeTables.specialAccessCodes,
+          codeOptions(codeTables.specialAccessCodes),
         )}
         {codeSelect('siteTypeCode', 'Site Type', 'Any site type', codeTables.siteTypeCodes)}
 

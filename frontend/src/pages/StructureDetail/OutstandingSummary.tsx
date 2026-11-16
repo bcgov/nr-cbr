@@ -5,8 +5,8 @@ import type { FC } from 'react';
 type Props = {
   /** Every outstanding item on the structure. */
   total: number;
-  /** How many tabs carry at least one of them. */
-  tabs: number;
+  /** How many tabs carry at least one of them; left out on a page of one tab (Add Structure). */
+  tabs?: number;
   /** True once adding an inspection has been refused for these items. */
   refused?: boolean;
   /** What the items stand in the way of — the structure's: adding an inspection. */
@@ -50,14 +50,15 @@ const OutstandingSummary: FC<Props> = ({
     );
   }
   const items = total === 1 ? 'required item' : 'required items';
-  const where = tabs === 1 ? '1 tab' : `${tabs} tabs`;
+  let where = '';
+  if (tabs !== undefined) where = tabs === 1 ? ' across 1 tab' : ` across ${tabs} tabs`;
   return (
     <InlineNotification
       className="structure-detail__outstanding-summary"
       kind="info"
       lowContrast
       hideCloseButton
-      title={`${total} ${items} outstanding across ${where}`}
+      title={`${total} ${items} outstanding${where}`}
       subtitle={subtitle}
       data-testid={testId}
     />

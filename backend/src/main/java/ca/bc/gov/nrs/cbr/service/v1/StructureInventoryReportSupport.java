@@ -10,6 +10,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
+import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
@@ -31,6 +32,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.springframework.beans.factory.annotation.Value;
@@ -302,22 +305,39 @@ public class StructureInventoryReportSupport {
     return hasTo ? Optional.of("<= " + to.trim()) : Optional.empty();
   }
 
-  /** A code's description, or the code itself when the list does not hold it. */
+  /**
+   * A code's description, or the code itself when the list does not hold it. Several codes — a
+   * multi-select's, comma-separated — are each named, joined by {@code ", "}.
+   */
   static Optional<String> code(List<CodeOptionResponse> options, String code) {
-    return text(code).map(wanted -> options.stream()
+    return named(code, wanted -> options.stream()
         .filter(option -> wanted.equals(option.code()))
-        .map(CodeOptionResponse::description)
-        .filter(StringUtils::hasText)
-        .findFirst()
-        .orElse(wanted));
+        .map(CodeOptionResponse::description));
   }
 
+  /** How the criteria line names BCTS Business Area's "Is null" pick — as the form shows it. */
+  static final String IS_NULL = "Is null";
+
+  /**
+   * An org unit's name, or its number when the list does not hold it; several as {@link #code}.
+   * The "Is null" pick ({@link CriteriaValues#NONE}) reads as such.
+   */
   static Optional<String> orgUnit(List<OrgUnitResponse> options, String orgUnitNo) {
-    return text(orgUnitNo).map(wanted -> options.stream()
-        .filter(option -> wanted.equals(option.orgUnitNo()))
-        .map(OrgUnitResponse::orgUnitName)
-        .filter(StringUtils::hasText)
-        .findFirst()
-        .orElse(wanted));
+    return named(orgUnitNo, wanted -> CriteriaValues.NONE.equals(wanted)
+        ? Stream.of(IS_NULL)
+        : options.stream()
+            .filter(option -> wanted.equals(option.orgUnitNo()))
+            .map(OrgUnitResponse::orgUnitName));
+  }
+
+  private static Optional<String> named(
+      String values, Function<String, Stream<String>> names) {
+    List<String> wanted = CriteriaValues.of(values);
+    if (wanted.isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(wanted.stream()
+        .map(one -> names.apply(one).filter(StringUtils::hasText).findFirst().orElse(one))
+        .collect(Collectors.joining(", ")));
   }
 }

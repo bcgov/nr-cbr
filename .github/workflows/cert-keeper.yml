@@ -1,0 +1,70 @@
+name: Cert Keeper
+
+# Creates the PROD vanity Route (nr-cbr-vanity-url -> nr-cbr-frontend-prod) and
+# installs the Entrust certificate for it, using
+# bcgov/actions-openshift/cert-keeper in pre-supplied certificate mode (v0.9.0+).
+# Adapted from the quickstart-openshift template's cert-keeper.yml.
+#
+# Run by hand: Actions > Cert Keeper > Run workflow. Run with dry_run=true first
+# (validates the PEMs, logs in, checks the Route, changes nothing), then with
+# dry_run=false to apply. Before replacing a certificate on an existing Route it
+# saves the old one to a `nr-cbr-vanity-url-backup-<hash>` Secret.
+#
+# Configuration:
+#   - Repository variable ROUTE_HOST (e.g. cbr.nrs.gov.bc.ca). Read in the
+#     job-level `if:`, which runs before the `prod` environment is loaded, so it
+#     must be a repository variable, not an environment one.
+#   - `prod` environment secrets, from the Entrust certificate package:
+#       TLS_CERTIFICATE     <- cbr.nrs.gov.bc.ca.pem (leaf only)
+#       TLS_PRIVATE_KEY     <- cbr.nrs.gov.bc.ca.key (unencrypted)
+#       TLS_CA_CERTIFICATE  <- Entrust OV TLS Issuing RSA CA 2.pem (intermediate only, no roots)
+#   - The `prod` environment's oc_namespace / oc_token / oc_server. The token
+#     must be able to get/create routes and create secrets.
+#
+# Renewal: the Entrust certificate is NOT renewed automatically. Before it
+# expires, update the three TLS_* secrets and run this again. To switch to
+# automatic Let's Encrypt renewals instead, remove the tls_* and dry_run inputs,
+# add a daily `schedule` trigger, and delete the TLS_* secrets (see the
+# cert-keeper README).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: true = validate PEMs and check the Route only, false = apply"
+        required: true
+        type: choice
+        default: "true"
+        options:
+          - "true"
+          - "false"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  cert-keeper:
+    name: Install certificate for ${{ vars.ROUTE_HOST }} (dry_run=${{ inputs.dry_run }})
+    if: vars.ROUTE_HOST != ''
+    environment: prod
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Install the certificate on the Route
+        uses: bcgov/actions-openshift/cert-keeper@45d8c7f7d0d5e3b15786cb99a83f410e01547133 # v0.9.0
+        with:
+          hostname: ${{ vars.ROUTE_HOST }}
+          route_name: nr-cbr-vanity-url
+          target_service: nr-cbr-frontend-prod
+          tls_certificate: ${{ secrets.TLS_CERTIFICATE }}
+          tls_private_key: ${{ secrets.TLS_PRIVATE_KEY }}
+          tls_ca_certificate: ${{ secrets.TLS_CA_CERTIFICATE }}
+          dry_run: ${{ inputs.dry_run }}
+          oc_namespace: ${{ secrets.oc_namespace }}
+          oc_server: ${{ vars.oc_server }}
+          oc_token: ${{ secrets.oc_token }}

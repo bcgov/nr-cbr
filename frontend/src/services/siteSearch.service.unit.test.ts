@@ -101,6 +101,15 @@ describe('SiteSearchService', () => {
     expect(urlOf(request)).not.toContain('crossingName');
   });
 
+  it("sends a multi-select's picks comma-separated, and nothing when none is ticked", async () => {
+    const { service, request } = withMockedRequest();
+
+    await service.searchSites(criteria({ siteStatusCode: ['ACT', 'BAR'], orgUnit: [] }), 0, 20);
+
+    expect(decodeURIComponent(urlOf(request))).toContain('siteStatusCode=ACT,BAR');
+    expect(urlOf(request)).not.toContain('orgUnit');
+  });
+
   it('sends a toggle only when it is on', async () => {
     // Both are one-way filters: on means "capital roads only", off means no filter rather than
     // "non-capital roads only". Sending false would suggest the server should exclude them.

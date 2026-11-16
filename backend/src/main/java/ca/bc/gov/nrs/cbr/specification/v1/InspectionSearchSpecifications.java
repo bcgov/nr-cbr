@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.specification.v1;
 
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
@@ -219,7 +220,7 @@ public final class InspectionSearchSpecifications {
       equalsNumber(builder, site.get(ORG_UNIT_NO), criteria.orgUnitNo()).ifPresent(predicates::add);
       equalsNumber(builder, site.get(MANAGEMENT_ORG_UNIT_NO), criteria.managementOrgUnitNo())
           .ifPresent(predicates::add);
-      equalsNumber(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnitNo())
+      equalsNumberOrNone(builder, site.get(BUSINESS_AREA_ORG_UNIT_NO), criteria.businessAreaOrgUnitNo())
           .ifPresent(predicates::add);
 
       siteIdPredicate(builder, root, site, criteria).ifPresent(predicates::add);

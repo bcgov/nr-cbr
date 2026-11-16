@@ -78,7 +78,7 @@ describe('outstandingOf', () => {
     ]);
   });
 
-  it("lists legacy's required fields and water measurements when blank, past In Progress", () => {
+  it("lists legacy's required fields when blank past In Progress, but never the water measurements", () => {
     const result = outstandingOf(
       inspection({
         inspectionDate: null,
@@ -94,13 +94,8 @@ describe('outstandingOf', () => {
     expect(result.inspection).toEqual([
       { title: 'Inspection', items: ['Date of Inspection', 'Inspection Company Name'] },
     ]);
-    // A measurement of 0 is a measurement.
-    expect(result.hazards).toEqual([
-      {
-        title: 'Hydraulic Hazards',
-        items: ['Estimated Present Water Level Depth', 'Estimated High Water Level Clearance'],
-      },
-    ]);
+    // Optional at any status (UAT, "CBR Test Changes", 2026-11).
+    expect(result.hazards).toEqual([]);
     expect(result.condition).toEqual([]);
   });
 

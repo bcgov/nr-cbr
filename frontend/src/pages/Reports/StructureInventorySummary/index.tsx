@@ -93,19 +93,19 @@ const StructureInventorySummaryPage: FC = () => {
         {(fields) => (
           <>
             {/* The structure */}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'structureTypeClassCode',
               'Type/Class',
               'Any type/class',
               structureTypeClassCodes.data ?? [],
             )}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'superstructureTypeCode',
               'Superstructure Type',
               'Any superstructure type',
               superstructureTypeCodes.data ?? [],
             )}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'deckTypeCode',
               'Deck Type',
               'Any deck type',
@@ -113,13 +113,13 @@ const StructureInventorySummaryPage: FC = () => {
             )}
             {portableStatus(fields, codeTables)}
 
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'culvertTypeCode',
               'Culvert Type',
               'Any culvert type',
               culvertTypeCodes.data ?? [],
             )}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'culvertMaterialCode',
               'Culvert Material',
               'Any culvert material',

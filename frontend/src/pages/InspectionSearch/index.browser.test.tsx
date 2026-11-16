@@ -8,6 +8,8 @@ import InspectionSearchPage from './index';
 
 import type { OrgUnitOption } from '@/types/configuration';
 
+import { multiSelectOptions, toggleMultiSelect } from '@/config/tests/multiSelect';
+
 const authorization = vi.hoisted(() => ({ canDelete: false }));
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
@@ -474,10 +476,10 @@ describe('InspectionSearchPage — reference data', () => {
     api.getForestDistricts.mockResolvedValue(districts);
     renderPage();
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole('option', { name: 'DPG - Prince George Natural Resource District' }),
-      ).toBeInTheDocument();
+    await waitFor(async () => {
+      expect(await multiSelectOptions('inspection-search-orgUnitNo')).toContain(
+        'DPG - Prince George Natural Resource District',
+      );
     });
   });
 
@@ -497,20 +499,21 @@ describe('InspectionSearchPage — reference data', () => {
     ]);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-structureTypeClassCode')).toMatchTextContent(
+    await waitFor(async () => {
+      expect(await multiSelectOptions('inspection-search-structureTypeClassCode')).toEqual([
         'BRIDGE - Forest service bridge',
-      );
+      ]);
     });
     expect(screen.getByTestId('inspection-search-inspectionTypeCode')).toMatchTextContent(
       'ROUT - Routine',
     );
-    expect(screen.getByTestId('inspection-search-inspectionReportStatusCode')).toMatchTextContent(
+    expect(await multiSelectOptions('inspection-search-inspectionReportStatusCode')).toEqual([
       'SUB - Submitted',
-    );
-    expect(screen.getByTestId('inspection-search-businessAreaOrgUnitNo')).toMatchTextContent(
+    ]);
+    expect(await multiSelectOptions('inspection-search-businessAreaOrgUnitNo')).toEqual([
+      'Is null',
       'TBA - Babine Business Area',
-    );
+    ]);
   });
 
   it('offers the offline and accepted statuses a data-entry form would hide', async () => {
@@ -523,10 +526,41 @@ describe('InspectionSearchPage — reference data', () => {
     ]);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'OFL - Offline' })).toBeInTheDocument();
+    await waitFor(async () => {
+      expect(await multiSelectOptions('inspection-search-inspectionReportStatusCode')).toEqual([
+        'ACC - Accepted',
+        'OFL - Offline',
+      ]);
     });
-    expect(screen.getByRole('option', { name: 'ACC - Accepted' })).toBeInTheDocument();
+  });
+
+  it('searches on every status ticked', async () => {
+    api.getInspectionReportStatusCodes.mockResolvedValue([
+      { code: 'SUB', description: 'Submitted' },
+      { code: 'RVD', description: 'Reviewed' },
+    ]);
+    renderPage();
+    await waitFor(async () => {
+      expect(await multiSelectOptions('inspection-search-inspectionReportStatusCode')).toHaveLength(
+        2,
+      );
+    });
+
+    await toggleMultiSelect(
+      'inspection-search-inspectionReportStatusCode',
+      'SUB - Submitted',
+      'RVD - Reviewed',
+    );
+    search();
+
+    await waitFor(() => {
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(
+        expect.objectContaining({ inspectionReportStatusCode: ['SUB', 'RVD'] }),
+        0,
+        20,
+        [],
+      );
+    });
   });
 
   it('loads management areas for the chosen district, and not before', async () => {
@@ -534,54 +568,58 @@ describe('InspectionSearchPage — reference data', () => {
     api.getManagementAreas.mockResolvedValue(areas);
     renderPage();
 
-    // The districts have to be on the page first: a <select> silently ignores a value it has no
-    // option for, so firing the change early leaves the criterion blank and the test green for the
-    // wrong reason.
-    await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-orgUnitNo')).toMatchTextContent(
-        'DPG - Prince George Natural Resource District',
-      );
+    await waitFor(async () => {
+      expect(await multiSelectOptions('inspection-search-orgUnitNo')).toHaveLength(2);
     });
     expect(api.getManagementAreas).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByTestId('inspection-search-orgUnitNo'), {
-      target: { value: '10' },
-    });
+    await toggleMultiSelect(
+      'inspection-search-orgUnitNo',
+      'DPG - Prince George Natural Resource District',
+    );
 
     await waitFor(() => expect(api.getManagementAreas).toHaveBeenCalledWith('10'));
   });
 
-  it('drops a chosen management area when the district changes underneath it', async () => {
+  it('drops the chosen management areas when a district is removed', async () => {
     api.getForestDistricts.mockResolvedValue(districts);
     api.getManagementAreas.mockResolvedValue(areas);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-orgUnitNo')).toMatchTextContent(
-        'DPG - Prince George Natural Resource District',
-      );
+    await waitFor(async () => {
+      expect(await multiSelectOptions('inspection-search-orgUnitNo')).toHaveLength(2);
     });
-
-    fireEvent.change(screen.getByTestId('inspection-search-orgUnitNo'), {
-      target: { value: '10' },
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId('inspection-search-managementOrgUnitNo')).toMatchTextContent(
+    await toggleMultiSelect(
+      'inspection-search-orgUnitNo',
+      'DPG - Prince George Natural Resource District',
+    );
+    await waitFor(async () => {
+      expect(await multiSelectOptions('inspection-search-managementOrgUnitNo')).toEqual([
         'DVA - Vanderhoof Forest District',
-      );
+      ]);
     });
-    fireEvent.change(screen.getByTestId('inspection-search-managementOrgUnitNo'), {
-      target: { value: '11' },
-    });
-    expect(screen.getByTestId('inspection-search-managementOrgUnitNo')).toHaveValue('11');
+    await toggleMultiSelect(
+      'inspection-search-managementOrgUnitNo',
+      'DVA - Vanderhoof Forest District',
+    );
 
-    fireEvent.change(screen.getByTestId('inspection-search-orgUnitNo'), {
-      target: { value: '20' },
-    });
+    await toggleMultiSelect(
+      'inspection-search-orgUnitNo',
+      'DCK - Chilliwack Natural Resource District',
+      'DPG - Prince George Natural Resource District',
+    );
+    search();
 
     // Left alone it would submit a management area that is not in the list the user can now see — a
     // filter they cannot tell is applied.
-    expect(screen.getByTestId('inspection-search-managementOrgUnitNo')).toHaveValue('');
+    await waitFor(() => {
+      expect(searchApi.searchInspections).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orgUnitNo: ['20'], managementOrgUnitNo: [] }),
+        0,
+        20,
+        [],
+      );
+    });
   });
 
   it('says which filters are missing when a lookup fails, and still lets the search run', async () => {

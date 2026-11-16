@@ -11,6 +11,7 @@ import type {
 } from '@/pages/Reports/StructureInventorySummary/types';
 
 import { HttpClient } from '@/config/api/types';
+import { joinValues } from '@/utils/multiSelect';
 
 /** `maintainerLabel` is what the maintainer lookup displays; the server filters on the number. */
 const DISPLAY_ONLY: ReadonlySet<string> = new Set(['maintainerLabel']);
@@ -24,6 +25,9 @@ const populated = (criteria: object): Record<string, string | boolean> => {
     }
     if (typeof value === 'string' && value.trim() !== '') {
       query[field] = value.trim();
+    } else if (Array.isArray(value) && joinValues(value) !== '') {
+      // A multi-select's picks, comma-separated in the one parameter.
+      query[field] = joinValues(value);
     } else if (value === true) {
       query[field] = true;
     }

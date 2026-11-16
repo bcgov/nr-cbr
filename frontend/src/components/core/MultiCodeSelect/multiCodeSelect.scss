@@ -1,0 +1,13 @@
+// Once something is ticked, the filterable box shows the picks as its input's placeholder (see
+// index.tsx). Placeholder grey would read as "nothing picked", so they take the normal text colour.
+.multi-code-select--picked input::placeholder {
+  color: var(--cds-text-primary);
+  opacity: 1;
+}
+
+// The picks can be long; the plain box's label cuts off with an ellipsis rather than wrapping.
+.multi-code-select .cds--list-box__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

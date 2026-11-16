@@ -16,8 +16,8 @@ parameters:
     description: PR number, 'test', or 'prod'
     required: true
   # NOTE: SLOT and DOMAIN used to live here, but they only ever fed the Route
-  # hostname. The Route moved to openshift.route.yml / openshift.vanity-route.yml,
-  # so both parameters moved with it — don't re-add them here.
+  # hostname. The Route moved to openshift.route.yml (and, for PROD, to
+  # .github/workflows/cert-keeper.yml), so don't re-add them here.
   - name: IMAGE_TAG
     description: Container image tag (PR number, 'test', or 'prod')
     value: latest
@@ -211,11 +211,11 @@ objects:
   # ── Route ─────────────────────────────────────────────────
   # Deliberately NOT here. The frontend Route lives in its own template so it
   # can be applied per environment: openshift.route.yml (default cluster
-  # hostname) for TEST and PR previews, openshift.vanity-route.yml
-  # (cbr.nrs.gov.bc.ca) for PROD only. `oc process` emits every object in a
-  # template, so a Route defined here would be created in every environment —
-  # which is exactly what we need to avoid to keep PROD on a single URL.
-  # See the two route templates and the deploy steps in reusable-deploy.yml.
+  # hostname) for TEST and PR previews. PROD's only Route is the vanity Route
+  # (cbr.nrs.gov.bc.ca), which .github/workflows/cert-keeper.yml creates with
+  # its TLS cert. `oc process` emits every object in a template, so a Route
+  # defined here would be created in every environment — which is exactly what
+  # we need to avoid to keep PROD on a single URL.
 
   # ── NetworkPolicy: ingress from OpenShift router ───────────
   - apiVersion: networking.k8s.io/v1

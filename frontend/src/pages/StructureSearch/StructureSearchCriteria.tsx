@@ -2,6 +2,7 @@ import { Search as SearchIcon } from '@carbon/icons-react';
 import { Button, Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
 import ClientCombo from '@/components/core/ClientCombo';
+import MultiCodeSelect from '@/components/core/MultiCodeSelect';
 
 import { criteriaErrors } from './validation';
 
@@ -9,6 +10,13 @@ import type { CodeOption, OrgUnitOption, StructureSearchCriteria as Criteria } f
 import type { ClientSuggestion } from '@/types/client';
 import type { FC, SubmitEventHandler } from 'react';
 
+import {
+  codeOptions,
+  orgUnitOptions,
+  type MultiCodeOption,
+  type MultiFields,
+  withIsNull,
+} from '@/components/core/MultiCodeSelect/options';
 import { useClientLocations } from '@/hooks/useClientSearch';
 import { MIN_CLIENT_TERM_LENGTH, clientLabel, locationLabel } from '@/utils/clientSearch';
 
@@ -138,30 +146,27 @@ const StructureSearchCriteriaForm: FC<Props> = ({
     </Select>
   );
 
-  const orgUnitSelect = (
-    field: keyof Criteria,
+  /**
+   * A filter that takes several values — the dropdowns highlighted in the UAT "CBR Pick list".
+   * Nothing ticked is any. The long org-unit lists get a type-to-filter box.
+   */
+  const multiSelect = (
+    field: MultiFields<Criteria>,
     labelText: string,
     anyText: string,
-    options: OrgUnitOption[],
-    loading = codeTablesLoading,
+    options: readonly MultiCodeOption[],
+    { filterable = false, disabled = codeTablesLoading } = {},
   ) => (
-    <Select
+    <MultiCodeSelect
       id={`structure-search-${field}`}
-      data-testid={`structure-search-${field}`}
-      labelText={labelText}
-      disabled={loading}
-      value={String(criteria[field])}
-      onChange={(event) => onChange(field, event.target.value as never)}
-    >
-      <SelectItem value="" text={anyText} />
-      {options.map((option) => (
-        <SelectItem
-          key={option.orgUnitNo}
-          value={option.orgUnitNo}
-          text={label(option.orgUnitCode, option.orgUnitName)}
-        />
-      ))}
-    </Select>
+      titleText={labelText}
+      placeholder={anyText}
+      options={options}
+      selected={criteria[field]}
+      onChange={(values) => onChange(field, values)}
+      filterable={filterable}
+      disabled={disabled}
+    />
   );
 
   /**
@@ -216,17 +221,17 @@ const StructureSearchCriteriaForm: FC<Props> = ({
       <div className="structure-search__criteria">
         {/* The structure */}
         {text('structureName', 'Structure #', 20)}
-        {codeSelect(
+        {multiSelect(
           'structureTypeClassCode',
           'Type/Class',
           'Any type/class',
-          codeTables.structureTypeClassCodes,
+          codeOptions(codeTables.structureTypeClassCodes),
         )}
-        {codeSelect(
+        {multiSelect(
           'superstructureTypeCode',
           'Superstructure Type',
           'Any superstructure type',
-          codeTables.superstructureTypeCodes,
+          codeOptions(codeTables.superstructureTypeCodes),
         )}
         {codeSelect(
           'structureCurbTypeCode',
@@ -235,11 +240,11 @@ const StructureSearchCriteriaForm: FC<Props> = ({
           codeTables.structureCurbTypeCodes,
         )}
 
-        {codeSelect(
+        {multiSelect(
           'culvertTypeCode',
           'Culvert Type',
           'Any culvert type',
-          codeTables.culvertTypeCodes,
+          codeOptions(codeTables.culvertTypeCodes),
         )}
         {range('yearBuiltStart', 'yearBuiltEnd', 'Year Superstructure Installed', 'year')}
         {codeSelect(
@@ -252,7 +257,12 @@ const StructureSearchCriteriaForm: FC<Props> = ({
 
         {/* The site it stands on */}
         {text('siteId', 'Site #', 14)}
-        {codeSelect('siteStatusCode', 'Site Status', 'Any status', codeTables.siteStatusCodes)}
+        {multiSelect(
+          'siteStatusCode',
+          'Site Status',
+          'Any status',
+          codeOptions(codeTables.siteStatusCodes),
+        )}
         <div className="structure-search__paired">
           {text('forestFileId', 'Project File ID#', 10)}
           {text('roadSectionId', 'Br.', 30)}
@@ -262,26 +272,37 @@ const StructureSearchCriteriaForm: FC<Props> = ({
         {text('forestServiceRoad', 'Forest Service Road', 20)}
         {range('kiloStart', 'kiloEnd', 'Kilometres', 'kilometres')}
         {text('crossingName', 'Crossing Name', 20)}
-        {codeSelect(
+        {multiSelect(
           'specialAccessCode',
           'Special Access Requirements',
           'Any requirement',
-          codeTables.specialAccessCodes,
+          codeOptions(codeTables.specialAccessCodes),
         )}
 
-        {orgUnitSelect('orgUnit', 'Forest District', 'Any district', codeTables.forestDistricts)}
-        {orgUnitSelect(
+        {multiSelect(
+          'orgUnit',
+          'Forest District',
+          'Any district',
+          orgUnitOptions(codeTables.forestDistricts),
+          { filterable: true },
+        )}
+        {multiSelect(
           'managementOrgUnit',
           'Management Area',
-          criteria.orgUnit === '' ? 'Select a forest district first' : 'Any management area',
-          codeTables.managementAreas,
-          codeTablesLoading || managementAreasLoading,
+          criteria.orgUnit.length === 0 ? 'Select a forest district first' : 'Any management area',
+          orgUnitOptions(codeTables.managementAreas),
+          {
+            filterable: true,
+            disabled: codeTablesLoading || managementAreasLoading || criteria.orgUnit.length === 0,
+          },
         )}
-        {orgUnitSelect(
+        {multiSelect(
           'businessAreaOrgUnit',
           'BCTS Business Area',
           'Any business area',
-          codeTables.businessAreas,
+          // "Is null" first: structures held by no business area (UAT pick list).
+          withIsNull(orgUnitOptions(codeTables.businessAreas)),
+          { filterable: true },
         )}
         <ClientCombo
           key={resetToken}

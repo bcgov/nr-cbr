@@ -14,10 +14,10 @@ import {
 
 /**
  * The lists the Structure Inventory reports' shared boxes draw on — the management areas for the
- * district chosen. A failed lookup is an empty list, not a blocked form: every criterion is
+ * districts chosen. A failed lookup is an empty list, not a blocked form: every criterion is
  * optional, and the page reports the failure above the form instead.
  */
-export const useCommonCodeTables = (orgUnit: string) => {
+export const useCommonCodeTables = (orgUnit: string | readonly string[]) => {
   const siteStatusCodes = useSiteStatusCodes();
   const siteTypeCodes = useSiteTypeCodes();
   const specialAccessCodes = useSpecialAccessCodes();

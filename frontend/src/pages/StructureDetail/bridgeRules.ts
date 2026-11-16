@@ -43,6 +43,19 @@ export const toMetres = (typed: string, scale: number): number | null => {
   return pattern.test(trimmed) ? Number(trimmed) : Number.NaN;
 };
 
+/**
+ * The standard deck widths offered as Deck Width's choices, in metres — 14 and 16 feet (UAT,
+ * "CBR Test Changes", 2026-11). Any other width is typed under Other.
+ */
+export const STANDARD_DECK_WIDTHS = ['4.27', '4.88'] as const;
+
+/** The standard width a typed Deck Width is, whatever its trailing zeros; null for any other. */
+export const standardDeckWidth = (typed: string): string | null => {
+  const value = toMetres(typed, 2);
+  if (value === null || Number.isNaN(value)) return null;
+  return STANDARD_DECK_WIDTHS.find((width) => Number(width) === value) ?? null;
+};
+
 /** What was stored, so a field that had a value is required (legacy's tier rule). */
 export type BridgeStored = { [K in Field]?: boolean };
 

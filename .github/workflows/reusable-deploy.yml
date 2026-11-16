@@ -102,21 +102,6 @@ on:
           CBR's CSS API account secret (CSS_API_CLIENT_SECRET), for the Reviewed By list. Optional:
           unset, the list is empty.
         required: false
-      vanity_tls_certificate:
-        description: |
-          PEM leaf/server certificate for the PROD vanity Route hostname
-          (vars.VANITY_HOST). Applied only on PROD when VANITY_HOST is set.
-        required: false
-      vanity_tls_key:
-        description: |
-          PEM private key (unencrypted) matching vanity_tls_certificate.
-        required: false
-      vanity_tls_ca_certificate:
-        description: |
-          PEM CA chain for the vanity certificate: the Entrust intermediate
-          followed by the Sectigo R46 cross-signing root. See the chain notes
-          in frontend/openshift.vanity-route.yml.
-        required: false
 
     outputs:
       triggered:
@@ -202,11 +187,6 @@ jobs:
       contents: read
     outputs:
       triggered: ${{ steps.deploy.outputs.triggered }}
-    # Job-level so the vanity step's `if:` can read it (a step's own `env` is
-    # not available to that step's `if`). Environment-scoped var — set only on
-    # the `prod` environment; empty everywhere else, which skips the step.
-    env:
-      VANITY_HOST: ${{ vars.VANITY_HOST }}
     steps:
       - uses: bcgov/action-deployer-openshift@e2d60eb9cacceb89c3b97d8dcf0a2c460eea5eab # v4.2.3
         id: deploy
@@ -254,9 +234,10 @@ jobs:
 
       # Default cluster-domain Route (nr-cbr-<slot>.apps.gold...). Applied on
       # every environment EXCEPT prod — PROD is served ONLY by the vanity Route
-      # below, so it gets no default route and has a single public URL. TEST and
-      # PR previews have no custom hostname and need this. Its own template
-      # because `oc process` can't skip an object per environment.
+      # (nr-cbr-vanity-url), which .github/workflows/cert-keeper.yml creates with
+      # its TLS cert, so it gets no default route and has a single public URL.
+      # TEST and PR previews have no custom hostname and need this. Its own
+      # template because `oc process` can't skip an object per environment.
       - name: Default Route (non-PROD)
         if: ${{ inputs.target != 'prod' }}
         uses: bcgov/action-deployer-openshift@e2d60eb9cacceb89c3b97d8dcf0a2c460eea5eab # v4.2.3
@@ -271,35 +252,4 @@ jobs:
             -p NAME="nr-cbr"
             -p ZONE="${{ inputs.target }}"
             -p SLOT="${{ inputs.slot || inputs.target }}"
-          triggers: ${{ inputs.triggers }}
-
-      # PROD vanity Route (cbr.nrs.gov.bc.ca). On PROD this is the ONLY public
-      # Route — the default-route step above is skipped for prod.
-      #
-      # Runs only on PROD and only when the vanity host is configured
-      # (VANITY_HOST unset -> skipped), so TEST and PR previews are unaffected.
-      # The cert / key / chain are multiline PEM secrets: routed through env
-      # and passed as "$VAR" (single bash expansion) so their newlines survive
-      # — same reasoning as DATABASE_PASSWORD in the backend job above.
-      - name: Vanity Route (PROD)
-        if: ${{ inputs.target == 'prod' && env.VANITY_HOST != '' }}
-        uses: bcgov/action-deployer-openshift@e2d60eb9cacceb89c3b97d8dcf0a2c460eea5eab # v4.2.3
-        env:
-          VANITY_TLS_CERTIFICATE: ${{ secrets.vanity_tls_certificate }}
-          VANITY_TLS_KEY: ${{ secrets.vanity_tls_key }}
-          VANITY_TLS_CA_CERTIFICATE: ${{ secrets.vanity_tls_ca_certificate }}
-        with:
-          file: frontend/openshift.vanity-route.yml
-          oc_namespace: ${{ secrets.oc_namespace }}
-          oc_server: ${{ vars.oc_server }}
-          oc_token: ${{ secrets.oc_token }}
-          debug: false
-          overwrite: true
-          parameters:
-            -p NAME="nr-cbr"
-            -p ZONE="${{ inputs.target }}"
-            -p VANITY_HOST="$VANITY_HOST"
-            -p VANITY_TLS_CERTIFICATE="$VANITY_TLS_CERTIFICATE"
-            -p VANITY_TLS_KEY="$VANITY_TLS_KEY"
-            -p VANITY_TLS_CA_CERTIFICATE="$VANITY_TLS_CA_CERTIFICATE"
           triggers: ${{ inputs.triggers }}

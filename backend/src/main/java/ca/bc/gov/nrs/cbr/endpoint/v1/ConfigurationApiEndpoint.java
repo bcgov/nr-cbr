@@ -127,8 +127,9 @@ public interface ConfigurationApiEndpoint {
    * Management areas within one forest district — the Management Area select, which is repopulated
    * whenever Forest District changes and is empty until a district is chosen.
    *
-   * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}; required, because
-   *                                the screen never asks for every management area at once
+   * @param forestDistrictOrgUnitNo the selected district's {@code ORG_UNIT_NO}, or several
+   *                                comma-separated — their areas together; required, because the
+   *                                screen never asks for every management area at once
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/management-areas")

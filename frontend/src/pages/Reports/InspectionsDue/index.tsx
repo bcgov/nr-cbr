@@ -203,13 +203,13 @@ const InspectionsDuePage: FC<{ variant: InspectionsDueVariant }> = ({ variant })
               'Any site type',
               codeTables.siteTypeCodes,
             )}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'structureTypeClassCode',
               'Type/Class',
               'Any type/class',
               typeClassCodes.data ?? [],
             )}
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'siteStatusCode',
               'Site Status',
               'Any status',
@@ -237,7 +237,7 @@ const InspectionsDuePage: FC<{ variant: InspectionsDueVariant }> = ({ variant })
               maintainerLabel={criteria.maintainerLabel}
               onChange={updateCriteria}
             />
-            {fields.codeSelect(
+            {fields.codeMultiSelect(
               'specialAccessCode',
               'Special Access Requirements',
               'Any requirement',

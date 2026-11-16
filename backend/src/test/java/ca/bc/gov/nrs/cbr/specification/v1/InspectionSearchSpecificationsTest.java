@@ -13,6 +13,7 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
+import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -539,6 +540,18 @@ class InspectionSearchSpecificationsTest {
       assertThat(search(criteria().orgUnitNo("26").build())).isEmpty();
       assertThat(search(criteria().managementOrgUnitNo("1833").build())).isEmpty();
       assertThat(search(criteria().businessAreaOrgUnitNo("18").build())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("business area's \"Is null\" finds sites with none, alone or beside an area")
+    void businessAreaIsNull() {
+      givenCompleteInspection(1L, "SUB");
+
+      // The site has business area 1833, so "Is null" alone leaves it out…
+      assertThat(search(criteria().businessAreaOrgUnitNo(CriteriaValues.NONE).build())).isEmpty();
+      // …and "Is null or 1833" keeps it.
+      assertThat(search(criteria().businessAreaOrgUnitNo("NONE,1833").build()))
+          .containsExactly(1L);
     }
   }
 

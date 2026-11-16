@@ -21,14 +21,14 @@ export type StructureInventoryCommonCriteria = {
   clientLocationCode: string;
   /** The label of the maintainer picked. <b>Display state, not a criterion.</b> */
   maintainerLabel: string;
-  siteStatusCode: string;
+  siteStatusCode: string[];
   downrated: boolean;
   capitalRoad: boolean;
   siteTypeCode: string;
-  /** Forest District. Changing it clears {@link managementOrgUnit}. */
-  orgUnit: string;
-  businessAreaOrgUnit: string;
-  managementOrgUnit: string;
+  /** Forest District. Removing one clears {@link managementOrgUnit}. */
+  orgUnit: string[];
+  businessAreaOrgUnit: string[];
+  managementOrgUnit: string[];
   forestFileId: string;
   /** "Br." — the road section, beside Project File ID#. */
   roadSectionId: string;
@@ -40,7 +40,7 @@ export type StructureInventoryCommonCriteria = {
   loadRestrictionYearEnd: string;
   replacementYearStart: string;
   replacementYearEnd: string;
-  specialAccessCode: string;
+  specialAccessCode: string[];
   portableSuperstructureStatusCode: string;
   sortBy: StructureInventorySort;
 };
@@ -50,13 +50,13 @@ export const EMPTY_COMMON_CRITERIA: StructureInventoryCommonCriteria = {
   clientNumber: '',
   clientLocationCode: '',
   maintainerLabel: '',
-  siteStatusCode: '',
+  siteStatusCode: [],
   downrated: false,
   capitalRoad: false,
   siteTypeCode: '',
-  orgUnit: '',
-  businessAreaOrgUnit: '',
-  managementOrgUnit: '',
+  orgUnit: [],
+  businessAreaOrgUnit: [],
+  managementOrgUnit: [],
   forestFileId: '',
   roadSectionId: '',
   kiloStart: '',
@@ -67,7 +67,7 @@ export const EMPTY_COMMON_CRITERIA: StructureInventoryCommonCriteria = {
   loadRestrictionYearEnd: '',
   replacementYearStart: '',
   replacementYearEnd: '',
-  specialAccessCode: '',
+  specialAccessCode: [],
   portableSuperstructureStatusCode: '',
   sortBy: 'PROJECT_BRANCH_USER_KM',
 };

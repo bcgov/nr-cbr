@@ -23,7 +23,8 @@ export type { CodeOption, OrgUnitOption } from '@/types/configuration';
  */
 export type SiteSearchCriteria = {
   siteId: string;
-  siteStatusCode: string;
+  /** Status — a multi-select; empty is any. */
+  siteStatusCode: string[];
   forestFileId: string;
   /** "Br." on the legacy form — the road section, shown beside Project File ID#. */
   roadSectionId: string;
@@ -34,13 +35,13 @@ export type SiteSearchCriteria = {
   crossingName: string;
   clientLocationCode: string;
   /** Forest District. Changing it re-filters {@link managementOrgUnit} — see the note in index.tsx. */
-  orgUnit: string;
+  orgUnit: string[];
   kiloStart: string;
   kiloEnd: string;
-  managementOrgUnit: string;
+  managementOrgUnit: string[];
   /** BCTS Business Area, as on the reports. Not on legacy's form: added on request. */
-  businessAreaOrgUnit: string;
-  specialAccessCode: string;
+  businessAreaOrgUnit: string[];
+  specialAccessCode: string[];
   incomplete: boolean;
   siteTypeCode: string;
   capitalRoad: boolean;
@@ -96,7 +97,7 @@ export type SiteSort = SortOrder<SiteSortColumn>;
 
 export const EMPTY_CRITERIA: SiteSearchCriteria = {
   siteId: '',
-  siteStatusCode: '',
+  siteStatusCode: [],
   forestFileId: '',
   roadSectionId: '',
   structureInspectionStatusCode: '',
@@ -104,12 +105,12 @@ export const EMPTY_CRITERIA: SiteSearchCriteria = {
   clientNumber: '',
   crossingName: '',
   clientLocationCode: '',
-  orgUnit: '',
+  orgUnit: [],
   kiloStart: '',
   kiloEnd: '',
-  managementOrgUnit: '',
-  businessAreaOrgUnit: '',
-  specialAccessCode: '',
+  managementOrgUnit: [],
+  businessAreaOrgUnit: [],
+  specialAccessCode: [],
   incomplete: false,
   siteTypeCode: '',
   capitalRoad: false,

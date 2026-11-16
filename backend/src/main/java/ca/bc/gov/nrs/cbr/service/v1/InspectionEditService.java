@@ -13,7 +13,6 @@ import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionUpdateRequest;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -347,8 +346,8 @@ public class InspectionEditService {
 
   /**
    * Saves the Hydraulic Hazards tab: the three water measurements — metres, to one decimal place,
-   * from 0 to 99999.9, and required past In Progress or once given (legacy's "Required field.",
-   * which its save ignored) — the five hazards, and their comments, at most 2000. Legacy's range
+   * from 0 to 99999.9, and optional at any status (UAT, "CBR Test Changes", 2026-11; legacy
+   * required them past In Progress) — the five hazards, and their comments, at most 2000. Legacy's range
    * warnings stay warnings, on the page.
    *
    * @throws InspectionNotFoundException if there is no such inspection
@@ -358,7 +357,7 @@ public class InspectionEditService {
   @Transactional
   public void updateHazards(long inspectionId, HazardsUpdateRequest request) {
     StructureInspectionEntity inspection = open(inspectionId);
-    validateHazards(request, statusOf(inspection), inspection);
+    validateHazards(request);
     inspections.save(inspection.toBuilder()
         .channelPwlDepth(request.presentWaterDepth())
         .channelPwlWidth(request.presentWaterWidth())
@@ -376,31 +375,18 @@ public class InspectionEditService {
     audit.afterCommit(inspectionId);
   }
 
-  private static void validateHazards(HazardsUpdateRequest request, String status,
-      StructureInspectionEntity stored) {
+  private static void validateHazards(HazardsUpdateRequest request) {
     Map<String, String> errors = new LinkedHashMap<>();
-    boolean pastInProgress = status != null && !IN_PROGRESS.equals(status);
-    measurement(errors, "presentWaterDepth", "Estimated Present Water Level Depth",
-        request.presentWaterDepth(), pastInProgress || stored.getChannelPwlDepth() != null);
-    measurement(errors, "presentWaterWidth", "Estimated Present Water Level Width",
-        request.presentWaterWidth(), pastInProgress || stored.getChannelPwlWidth() != null);
-    measurement(errors, "highWaterClearance", "Estimated High Water Level Clearance",
-        request.highWaterClearance(),
-        pastInProgress || stored.getChannelHwlClearance() != null);
+    InspectionCreateValidator.metres(errors, "presentWaterDepth",
+        "Estimated Present Water Level Depth", request.presentWaterDepth());
+    InspectionCreateValidator.metres(errors, "presentWaterWidth",
+        "Estimated Present Water Level Width", request.presentWaterWidth());
+    InspectionCreateValidator.metres(errors, "highWaterClearance",
+        "Estimated High Water Level Clearance", request.highWaterClearance());
     InspectionCreateValidator.tooLong(errors, "hazardComment", "Comments", request.comment(),
         HAZARD_COMMENT_MAX);
     if (!errors.isEmpty()) {
       throw new FieldValidationException("Hydraulic hazards cannot be saved", errors);
-    }
-  }
-
-  /** Required when legacy marks it so; otherwise metres, when given. */
-  private static void measurement(Map<String, String> errors, String field, String label,
-      BigDecimal value, boolean required) {
-    if (value == null && required) {
-      errors.put(field, label + " is required.");
-    } else {
-      InspectionCreateValidator.metres(errors, field, label, value);
     }
   }
 

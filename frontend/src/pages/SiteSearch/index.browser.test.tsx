@@ -8,6 +8,14 @@ import SiteSearchPage from './index';
 
 import type { CodeOption } from '@/types/configuration';
 
+import {
+  multiSelectDisabled,
+  multiSelectOptions,
+  multiSelectSelected,
+  multiSelectText,
+  toggleMultiSelect,
+} from '@/config/tests/multiSelect';
+
 const authorization = vi.hoisted(() => ({ canDelete: false }));
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
@@ -506,15 +514,14 @@ describe('SiteSearchPage — the Delete column is privilege-gated', () => {
 
 describe('SiteSearchPage — the dropdowns come from the server', () => {
   it('names the unfiltered option rather than leaving it blank', async () => {
-    // A blank first option reads as a value that failed to load, and gives a user who has set the
-    // filter no obvious way to unset it.
+    // A blank box reads as a value that failed to load. Nothing ticked is "any", and says so.
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('Any status');
+      expect(multiSelectText('site-search-siteStatusCode')).toContain('Any status');
     });
     expect(screen.getByTestId('site-search-siteTypeCode')).toMatchTextContent('Any site type');
-    expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Any district');
+    expect(multiSelectText('site-search-orgUnit')).toContain('Any district');
   });
 
   it('offers BCTS Business Area from its lookup, Any until chosen, and searches on it', async () => {
@@ -522,36 +529,47 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       { orgUnitNo: '1773', orgUnitCode: 'TCH', orgUnitName: 'Chinook' },
     ]);
     renderPage();
-    const area = screen.getByTestId('site-search-businessAreaOrgUnit');
-    await waitFor(() => expect(area).toMatchTextContent(/Any business area\s*TCH - Chinook/));
-    expect(area).toHaveValue('');
+    expect(multiSelectText('site-search-businessAreaOrgUnit')).toContain('Any business area');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-businessAreaOrgUnit')).toEqual([
+        'TCH - Chinook',
+      ]);
+    });
 
-    fireEvent.change(area, { target: { value: '1773' } });
+    await toggleMultiSelect('site-search-businessAreaOrgUnit', 'TCH - Chinook');
     await searchAndWait();
 
     expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(
-      expect.objectContaining({ businessAreaOrgUnit: '1773' }),
+      expect.objectContaining({ businessAreaOrgUnit: ['1773'] }),
       0,
       20,
       [],
     );
   });
 
-  it('keeps the unfiltered option valueless, so choosing it clears the filter', async () => {
-    api.getSiteStatusCodes.mockResolvedValue([{ code: 'ACT', description: 'Active' }]);
+  it('searches on every status ticked, and on none once they are unticked', async () => {
+    api.getSiteStatusCodes.mockResolvedValue([
+      { code: 'ACT', description: 'Active' },
+      { code: 'BAR', description: 'Barricaded' },
+    ]);
     renderPage();
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('ACT - Active');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-siteStatusCode')).toHaveLength(2);
     });
 
-    fireEvent.change(screen.getByTestId('site-search-siteStatusCode'), {
-      target: { value: 'ACT' },
-    });
-    fireEvent.change(screen.getByTestId('site-search-siteStatusCode'), { target: { value: '' } });
+    await toggleMultiSelect('site-search-siteStatusCode', 'ACT - Active', 'BAR - Barricaded');
     await searchAndWait();
-
     expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(
-      expect.objectContaining({ siteStatusCode: '' }),
+      expect.objectContaining({ siteStatusCode: ['ACT', 'BAR'] }),
+      0,
+      20,
+      [],
+    );
+
+    await toggleMultiSelect('site-search-siteStatusCode', 'ACT - Active', 'BAR - Barricaded');
+    await searchAndWait();
+    expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(
+      expect.objectContaining({ siteStatusCode: [] }),
       0,
       20,
       [],
@@ -568,23 +586,37 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       { orgUnitNo: '26', orgUnitCode: 'DRV', orgUnitName: 'Robson Valley' },
     ]);
     renderPage();
-    expect(screen.getByTestId('site-search-managementOrgUnit')).toMatchTextContent(
+    expect(multiSelectText('site-search-managementOrgUnit')).toContain(
       'Select a forest district first',
     );
-    // The districts have to be on the page first: a <select> silently ignores a value it has no
-    // option for, so firing the change early leaves the criterion blank and the test green for the
-    // wrong reason.
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('DPG - Prince George');
+    expect(multiSelectDisabled('site-search-managementOrgUnit')).toBe(true);
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-orgUnit')).toEqual(['DPG - Prince George']);
     });
 
-    fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
+    await toggleMultiSelect('site-search-orgUnit', 'DPG - Prince George');
 
     await waitFor(() => {
-      expect(screen.getByTestId('site-search-managementOrgUnit')).toMatchTextContent(
-        'Any management area',
-      );
+      expect(multiSelectText('site-search-managementOrgUnit')).toContain('Any management area');
     });
+  });
+
+  it('shows what is picked in place of "Any …", which would contradict the picks', async () => {
+    api.getForestDistricts.mockResolvedValue([
+      { orgUnitNo: '18', orgUnitCode: 'DPG', orgUnitName: 'Prince George' },
+      { orgUnitNo: '21', orgUnitCode: 'DKA', orgUnitName: 'Thompson Rivers' },
+    ]);
+    renderPage();
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-orgUnit')).toHaveLength(2);
+    });
+
+    await toggleMultiSelect('site-search-orgUnit', 'DPG - Prince George', 'DKA - Thompson Rivers');
+
+    expect(multiSelectText('site-search-orgUnit')).toContain(
+      'DPG - Prince George, DKA - Thompson Rivers',
+    );
+    expect(multiSelectText('site-search-orgUnit')).not.toContain('Any district');
   });
 
   it('labels an option "CODE - Description"', async () => {
@@ -596,10 +628,10 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     ]);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('ACT - Active');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-siteStatusCode')).toEqual(['ACT - Active']);
     });
-    expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('DPG - Prince George');
+    expect(await multiSelectOptions('site-search-orgUnit')).toEqual(['DPG - Prince George']);
   });
 
   it('still submits the org unit number, not its code', async () => {
@@ -609,15 +641,15 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       { orgUnitNo: '18', orgUnitCode: 'DPG', orgUnitName: 'Prince George' },
     ]);
     renderPage();
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('DPG - Prince George');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-orgUnit')).toEqual(['DPG - Prince George']);
     });
 
-    fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
+    await toggleMultiSelect('site-search-orgUnit', 'DPG - Prince George');
     await searchAndWait();
 
     expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(
-      expect.objectContaining({ orgUnit: '18' }),
+      expect.objectContaining({ orgUnit: ['18'] }),
       0,
       20,
       [],
@@ -654,15 +686,15 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
         'From the inspection lookup',
       );
     });
-    expect(screen.getByTestId('site-search-specialAccessCode')).toMatchTextContent(
-      'From the access lookup',
-    );
+    expect(await multiSelectOptions('site-search-specialAccessCode')).toEqual([
+      'ACC - From the access lookup',
+    ]);
     expect(screen.getByTestId('site-search-siteTypeCode')).toMatchTextContent(
       'From the type lookup',
     );
-    expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent(
-      'From the district lookup',
-    );
+    expect(await multiSelectOptions('site-search-orgUnit')).toEqual([
+      'DPG - From the district lookup',
+    ]);
   });
 
   it('leaves Management Area empty until a district is chosen', async () => {
@@ -671,37 +703,13 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
     ]);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Prince George');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-orgUnit')).toEqual(['DPG - Prince George']);
     });
     expect(api.getManagementAreas).not.toHaveBeenCalled();
   });
 
-  it('loads the management areas of the district that was picked', async () => {
-    api.getForestDistricts.mockResolvedValue([
-      { orgUnitNo: '18', orgUnitCode: 'DPG', orgUnitName: 'Prince George' },
-    ]);
-    api.getManagementAreas.mockResolvedValue([
-      { orgUnitNo: '26', orgUnitCode: 'DRV', orgUnitName: 'Robson Valley' },
-    ]);
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Prince George');
-    });
-
-    fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-managementOrgUnit')).toMatchTextContent(
-        'Robson Valley',
-      );
-    });
-    expect(api.getManagementAreas).toHaveBeenCalledWith('18');
-  });
-
-  it('clears the chosen management area when the district changes', async () => {
-    // The areas belong to the old district. Keeping the selection would submit a filter that is
-    // not in the list the user can now see — and they would have no way to tell it was applied.
+  it('loads the management areas of every district picked, together', async () => {
     api.getForestDistricts.mockResolvedValue([
       { orgUnitNo: '18', orgUnitCode: 'DPG', orgUnitName: 'Prince George' },
       { orgUnitNo: '21', orgUnitCode: 'DKA', orgUnitName: 'Thompson Rivers' },
@@ -710,35 +718,73 @@ describe('SiteSearchPage — the dropdowns come from the server', () => {
       { orgUnitNo: '26', orgUnitCode: 'DRV', orgUnitName: 'Robson Valley' },
     ]);
     renderPage();
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-orgUnit')).toMatchTextContent('Prince George');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-orgUnit')).toHaveLength(2);
     });
-    fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '18' } });
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-managementOrgUnit')).toMatchTextContent(
-        'Robson Valley',
-      );
-    });
-    fireEvent.change(screen.getByTestId('site-search-managementOrgUnit'), {
-      target: { value: '26' },
-    });
-    expect(screen.getByTestId('site-search-managementOrgUnit')).toHaveValue('26');
 
-    fireEvent.change(screen.getByTestId('site-search-orgUnit'), { target: { value: '21' } });
+    await toggleMultiSelect('site-search-orgUnit', 'DPG - Prince George');
+    await waitFor(() => expect(api.getManagementAreas).toHaveBeenCalledWith('18'));
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-managementOrgUnit')).toEqual([
+        'DRV - Robson Valley',
+      ]);
+    });
 
-    expect(screen.getByTestId('site-search-managementOrgUnit')).toHaveValue('');
+    // Sorted, so the order districts are picked in does not split the cache.
+    await toggleMultiSelect('site-search-orgUnit', 'DKA - Thompson Rivers');
+    await waitFor(() => expect(api.getManagementAreas).toHaveBeenCalledWith('18,21'));
+  });
+
+  it('keeps the areas picked when a district is added, and clears them when one is removed', async () => {
+    // Removing a district may remove the district an area belongs to. Keeping the area would
+    // submit a filter the user can no longer see in the list.
+    api.getForestDistricts.mockResolvedValue([
+      { orgUnitNo: '18', orgUnitCode: 'DPG', orgUnitName: 'Prince George' },
+      { orgUnitNo: '21', orgUnitCode: 'DKA', orgUnitName: 'Thompson Rivers' },
+    ]);
+    api.getManagementAreas.mockResolvedValue([
+      { orgUnitNo: '26', orgUnitCode: 'DRV', orgUnitName: 'Robson Valley' },
+    ]);
+    renderPage();
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-orgUnit')).toHaveLength(2);
+    });
+    await toggleMultiSelect('site-search-orgUnit', 'DPG - Prince George');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-managementOrgUnit')).toEqual([
+        'DRV - Robson Valley',
+      ]);
+    });
+    await toggleMultiSelect('site-search-managementOrgUnit', 'DRV - Robson Valley');
+
+    await toggleMultiSelect('site-search-orgUnit', 'DKA - Thompson Rivers');
+    await waitFor(async () => {
+      expect(await multiSelectSelected('site-search-managementOrgUnit')).toEqual([
+        'DRV - Robson Valley',
+      ]);
+    });
+
+    await toggleMultiSelect('site-search-orgUnit', 'DPG - Prince George');
+    await searchAndWait();
+    expect(siteSearchApi.searchSites).toHaveBeenLastCalledWith(
+      expect.objectContaining({ orgUnit: ['21'], managementOrgUnit: [] }),
+      0,
+      20,
+      [],
+    );
   });
 });
 
 describe('SiteSearchPage — the Status list comes from the server', () => {
-  it('fills the Status select with what the endpoint returned', async () => {
+  it('fills the Status list with what the endpoint returned', async () => {
     api.getSiteStatusCodes.mockResolvedValue(statuses);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('Active');
+    await waitFor(async () => {
+      const options = await multiSelectOptions('site-search-siteStatusCode');
+      expect(options.join(' ')).toContain('Active');
+      expect(options.join(' ')).toContain('Decommissioned');
     });
-    expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('Decommissioned');
   });
 
   it('keeps the display order the server sent, rather than sorting', async () => {
@@ -751,25 +797,22 @@ describe('SiteSearchPage — the Status list comes from the server', () => {
     ]);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent(
-        'Zed, shown first',
-      );
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-siteStatusCode')).toEqual([
+        'Z - Zed, shown first',
+        'A - Ay, shown second',
+      ]);
     });
-    const options = Array.from(
-      screen.getByTestId('site-search-siteStatusCode').querySelectorAll('option'),
-    ).map((option) => option.value);
-    expect(options).toEqual(['', 'Z', 'A']);
   });
 
-  it('keeps the blank first option, which means "do not filter on status"', async () => {
+  it('starts with nothing ticked, which means "do not filter on status"', async () => {
     api.getSiteStatusCodes.mockResolvedValue(statuses);
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('site-search-siteStatusCode')).toMatchTextContent('Active');
+    await waitFor(async () => {
+      expect(await multiSelectOptions('site-search-siteStatusCode')).not.toHaveLength(0);
     });
-    expect(screen.getByTestId('site-search-siteStatusCode')).toHaveValue('');
+    expect(await multiSelectSelected('site-search-siteStatusCode')).toEqual([]);
   });
 
   it('still lets the user search when the lookup fails', async () => {

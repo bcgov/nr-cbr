@@ -1,9 +1,17 @@
 import { Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
+import MultiCodeSelect from '@/components/core/MultiCodeSelect';
+
 import { DAY, MONTH, type Calendar } from './calendar';
 import CalendarRangeField from './CalendarRangeField';
 
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
+
+import {
+  codeOptions,
+  orgUnitOptions,
+  type MultiCodeOption,
+} from '@/components/core/MultiCodeSelect/options';
 
 /** "PB - Permanent Bridge"; a missing half degrades to the other rather than "PB - undefined". */
 const label = (code: string | null, description: string | null): string =>
@@ -122,6 +130,46 @@ export const criteriaFields = <C extends object>({
   );
 
   /**
+   * A filter that takes several values — the dropdowns highlighted in the UAT "CBR Pick list".
+   * Nothing ticked is any. The long org-unit lists get a type-to-filter box.
+   */
+  const multiSelect = (
+    // Any field by name, as the other builders take: the criteria types say which are lists.
+    field: Field,
+    labelText: string,
+    anyText: string,
+    options: readonly MultiCodeOption[],
+    { filterable = false, disabled = codeTablesLoading } = {},
+  ) => (
+    <MultiCodeSelect
+      id={`${id}-${field}`}
+      titleText={labelText}
+      placeholder={anyText}
+      options={options}
+      selected={criteria[field] as string[]}
+      onChange={(values) => onChange(field, values as C[Field])}
+      filterable={filterable}
+      disabled={disabled}
+    />
+  );
+
+  /** A code table as a multi-select, each code as "PB - Permanent Bridge". */
+  const codeMultiSelect = (
+    field: Field,
+    labelText: string,
+    anyText: string,
+    options: CodeOption[],
+  ) => multiSelect(field, labelText, anyText, codeOptions(options));
+
+  /** Org units as a multi-select with a type-to-filter box — the lists are long. */
+  const orgUnitMultiSelect = (
+    field: Field,
+    labelText: string,
+    anyText: string,
+    options: OrgUnitOption[],
+  ) => multiSelect(field, labelText, anyText, orgUnitOptions(options), { filterable: true });
+
+  /**
    * A "from – to" pair, as on Structure Search: the legend names the pair and the boxes carry
    * hidden labels and a placeholder.
    */
@@ -208,5 +256,17 @@ export const criteriaFields = <C extends object>({
   const dateRange = (from: Field, to: Field, legend: string, disabled?: boolean) =>
     calendarRange(DAY, from, to, legend, disabled);
 
-  return { text, select, codeSelect, orgUnitSelect, range, monthRange, dateRange, toggle };
+  return {
+    text,
+    select,
+    codeSelect,
+    orgUnitSelect,
+    multiSelect,
+    codeMultiSelect,
+    orgUnitMultiSelect,
+    range,
+    monthRange,
+    dateRange,
+    toggle,
+  };
 };

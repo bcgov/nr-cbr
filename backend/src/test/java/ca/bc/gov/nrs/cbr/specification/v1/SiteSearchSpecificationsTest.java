@@ -206,6 +206,30 @@ class SiteSearchSpecificationsTest {
       assertThat(search(SiteSearchCriteria.builder().siteStatusCode("ACT").build()))
           .containsExactly("SITE-1");
     }
+
+    @Test
+    @DisplayName("several statuses, comma-separated as a multi-select sends them, match any of them")
+    void severalStatusesMatchAny() {
+      givenSupportingRows();
+      persist(completeSite("SITE-1").crossingSiteStatusCode("ACT").build());
+      persist(completeSite("SITE-2").crossingSiteStatusCode("DEC").build());
+      persist(completeSite("SITE-3").crossingSiteStatusCode("INACT").build());
+
+      assertThat(search(SiteSearchCriteria.builder().siteStatusCode("ACT, DEC,").build()))
+          .containsExactlyInAnyOrder("SITE-1", "SITE-2");
+    }
+
+    @Test
+    @DisplayName("several districts match any of them; a non-number among them is ignored")
+    void severalDistrictsMatchAny() {
+      givenSupportingRows();
+      persist(completeSite("SITE-1").orgUnitNo(18L).build());
+      persist(completeSite("SITE-2").orgUnitNo(21L).build());
+      persist(completeSite("SITE-3").orgUnitNo(26L).build());
+
+      assertThat(search(SiteSearchCriteria.builder().orgUnit("18,21,x").build()))
+          .containsExactlyInAnyOrder("SITE-1", "SITE-2");
+    }
   }
 
   @Nested
