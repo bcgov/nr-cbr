@@ -289,8 +289,9 @@ describe('InspectionDetailPage', () => {
   });
 
   it("shows what it lacks as the structure page does: a notice, each tab's count and list", async () => {
-    // Poor without its comment; the present water width blank. Guardrail, unanswered, is not
-    // required — legacy never requires an answer.
+    // Poor without its comment. Guardrail, unanswered, is not required — legacy never requires an
+    // answer. The present water width is blank, and not listed: the measurements are optional
+    // (UAT, "CBR Test Changes", 2026-11).
     inspectionApi.getInspection.mockResolvedValue(
       inspection({
         items: [
@@ -311,19 +312,17 @@ describe('InspectionDetailPage', () => {
     // The Condition tab's count once the questions have loaded.
     await waitFor(() =>
       expect(screen.getByTestId('inspection-outstanding-summary')).toMatchTextContent(
-        /2 required items outstanding across 2 tabs/,
+        /1 required item outstanding across 1 tab/,
       ),
     );
     expect(screen.getByRole('img', { name: 'Condition: 1 item outstanding' })).toBeInTheDocument();
     expect(
-      screen.getByRole('img', { name: 'Hydraulic Hazards: 1 item outstanding' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('img', { name: /Hydraulic Hazards: \d+ items? outstanding/ }),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('inspection-condition-outstanding')).toMatchTextContent(
       /Approaches\s*Approach condition — comment/,
     );
-    expect(screen.getByTestId('inspection-hazards-outstanding')).toMatchTextContent(
-      /Estimated Present Water Level Width/,
-    );
+    expect(screen.queryByTestId('inspection-hazards-outstanding')).not.toBeInTheDocument();
     expect(screen.queryByTestId('inspection-inspection-outstanding')).not.toBeInTheDocument();
   });
 
@@ -769,23 +768,26 @@ describe('InspectionDetailPage', () => {
       await waitFor(() => expect(screen.getByTestId('hazards-edit')).toBeInTheDocument());
     });
 
-    it('will not blank a saved measurement, and needs all three past In Progress', async () => {
+    it('requires none of the measurements, even Submitted, and lets a saved one be blanked', async () => {
+      // UAT, "CBR Test Changes", 2026-11: legacy required all three past In Progress.
       inspectionApi.getInspection.mockResolvedValue(
         inspection({ status: { code: 'SUB', description: 'Submitted' } }),
       );
       await openHazards();
 
       await userEvent.click(screen.getByTestId('hazards-edit'));
+      const card = screen.getByTestId('inspection-section-hazards');
+      expect(card).not.toMatchTextContent(/\*/);
       await userEvent.clear(screen.getByTestId('hazard-presentWaterDepth'));
       await userEvent.click(screen.getByTestId('hazards-save'));
 
-      const card = screen.getByTestId('inspection-section-hazards');
-      expect(card).toMatchTextContent(/Estimated Present Water Level Depth is required\./);
-      expect(card).toMatchTextContent(/Estimated Present Water Level Width is required\./);
-      expect(inspectionApi.updateInspectionHazards).not.toHaveBeenCalled();
-
-      await userEvent.click(screen.getByTestId('hazards-cancel'));
-      expect(screen.getByTestId('hazards-edit')).toBeInTheDocument();
+      expect(card).not.toMatchTextContent(/is required/);
+      await waitFor(() =>
+        expect(inspectionApi.updateInspectionHazards).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ presentWaterDepth: null, presentWaterWidth: null }),
+        ),
+      );
     });
 
     it('offers no Edit once Reviewed, as legacy disables its page', async () => {
@@ -1088,6 +1090,8 @@ describe('InspectionDetailPage', () => {
           .getAllByRole('option')
           .map((option) => option.getAttribute('value')),
       ).toEqual(['', 'INSP', 'OTHR']);
+      // The comment is offered whatever the reason, required for Other alone (UAT, 2026-11).
+      const comment = within(dialog).getByTestId('review-reasonComment');
 
       await userEvent.click(within(dialog).getByTestId('review-accept'));
       expect(dialog).toMatchTextContent(/Choose a reason that fits the change in load rating\./);
@@ -1098,7 +1102,7 @@ describe('InspectionDetailPage', () => {
       });
       await userEvent.click(within(dialog).getByTestId('review-accept'));
       expect(dialog).toMatchTextContent(/Load Rating Reason Comment is required for Other\./);
-      await userEvent.type(within(dialog).getByTestId('review-reasonComment'), 'Re-rated.');
+      await userEvent.type(comment, 'Re-rated.');
       await userEvent.click(within(dialog).getByTestId('review-loadRatingReviewRequired'));
       await userEvent.click(within(dialog).getByTestId('review-accept'));
 

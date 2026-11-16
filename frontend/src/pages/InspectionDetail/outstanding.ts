@@ -139,9 +139,10 @@ const conditionOutstanding = (
  * (`cbr-inspection-page.local.md` §8):
  *
  * <ul>
- *   <li>past In Progress — Submitted, Reviewed, … — Date of Inspection, Inspector Name, Inspection
- *       Company Name and the three water measurements are required (legacy's page marks the
- *       measurements "Required field."); In Progress, they may all wait;
+ *   <li>past In Progress — Submitted, Reviewed, … — Date of Inspection, Inspector Name and
+ *       Inspection Company Name are required; In Progress, they may wait;
+ *   <li>the three water measurements are never required (UAT, "CBR Test Changes", 2026-11) —
+ *       legacy required them past In Progress — so Hydraulic Hazards lists nothing;
  *   <li>at any status, a Poor or Unrated answer needs a comment, and a comment needs an answer.
  * </ul>
  *
@@ -167,15 +168,10 @@ export const outstandingOf = (
     ['Inspector Name', inspection.inspectorName],
     ['Inspection Company Name', inspection.inspectorCompanyName],
   ]);
-  const measurements = missing([
-    ['Estimated Present Water Level Depth', inspection.hazards.presentWaterDepth],
-    ['Estimated Present Water Level Width', inspection.hazards.presentWaterWidth],
-    ['Estimated High Water Level Clearance', inspection.hazards.highWaterClearance],
-  ]);
   return {
     inspection: required.length > 0 ? [{ title: 'Inspection', items: required }] : [],
     condition: form ? conditionOutstanding(inspection, form) : [],
-    hazards: measurements.length > 0 ? [{ title: 'Hydraulic Hazards', items: measurements }] : [],
+    hazards: [],
   };
 };
 

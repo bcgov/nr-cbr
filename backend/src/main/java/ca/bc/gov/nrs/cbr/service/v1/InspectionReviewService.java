@@ -142,7 +142,8 @@ public class InspectionReviewService {
     LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
     StructureInspectionReviewerEntity reviewer = reviewer(user, now);
     String reason = trimmed(request.reasonCode());
-    String reasonComment = OTHER_REASON.equals(reason) ? trimmed(request.reasonComment()) : null;
+    // Kept with any reason, not Other's alone (UAT, "CBR Test Changes", 2026-11).
+    String reasonComment = trimmed(request.reasonComment());
     StructureLoadRatingEntity rating = loadRatings
         .findByInspectionIdIn(List.of(inspectionId)).stream()
         .findFirst()
@@ -324,7 +325,10 @@ public class InspectionReviewService {
     }
   }
 
-  /** A listed reason that fits the change, when any does — legacy's dialog's list — and Other's words. */
+  /**
+   * A listed reason that fits the change, when any does — legacy's dialog's list — and its words:
+   * required for Other, optional for the rest, never longer than the column.
+   */
   private void validateReason(Map<String, String> errors, InspectionReviewRequest request,
       Long structureId, long rating) {
     Set<String> fitting = fittingReasons(deltaOf(rating, structureId));
@@ -337,14 +341,16 @@ public class InspectionReviewService {
     }
     if (!fitting.contains(reason)) {
       errors.put(REASON, "Load Rating Reason does not fit this change of load rating.");
-    } else if (OTHER_REASON.equals(reason)) {
-      String comment = trimmed(request.reasonComment());
-      if (comment == null) {
+      return;
+    }
+    String comment = trimmed(request.reasonComment());
+    if (comment == null) {
+      if (OTHER_REASON.equals(reason)) {
         errors.put(REASON_COMMENT, "Load Rating Reason Comment is required for Other.");
-      } else {
-        InspectionCreateValidator.tooLong(errors, REASON_COMMENT, "Load Rating Reason Comment",
-            comment, TEXT_MAX);
       }
+    } else {
+      InspectionCreateValidator.tooLong(errors, REASON_COMMENT, "Load Rating Reason Comment",
+          comment, TEXT_MAX);
     }
   }
 

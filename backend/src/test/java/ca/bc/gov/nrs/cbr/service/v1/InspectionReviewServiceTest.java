@@ -126,7 +126,7 @@ class InspectionReviewServiceTest {
   void reviews() {
     inspection(41L, "SUB", "ROUT");
 
-    service.review(41L, review(40L, "INSP", "ignored"));
+    service.review(41L, review(40L, "INSP", "  Seen at the inspection.  "));
     verify(audit).afterCommit(41L);
 
     StructureInspectionEntity inspection = found(StructureInspectionEntity.class, 41L);
@@ -138,8 +138,8 @@ class InspectionReviewServiceTest {
         StructureLoadRatingEntity.class).getSingleResult();
     assertThat(rating.getLoadRating()).isEqualByComparingTo(BigDecimal.valueOf(40));
     assertThat(rating.getReasonCode()).isEqualTo("INSP");
-    // Words are kept with Other only.
-    assertThat(rating.getReasonComment()).isNull();
+    // Words are kept with any reason, not Other's alone (UAT, 2026-11).
+    assertThat(rating.getReasonComment()).isEqualTo("Seen at the inspection.");
     assertThat(rating.getSiteAtTimeOfLoadRating()).isEqualTo("S1");
 
     CrossingStructureEntity structure = found(CrossingStructureEntity.class, 7L);
@@ -187,6 +187,9 @@ class InspectionReviewServiceTest {
     assertThat(refused(41L, review(40L, "HIST", null))).containsKey("reasonCode");
     assertThat(refused(41L, review(40L, "OTHR", " "))).containsOnly(
         Map.entry("reasonComment", "Load Rating Reason Comment is required for Other."));
+    // Any reason's words are held to the column.
+    assertThat(refused(41L, review(40L, "INSP", "x".repeat(4001)))).containsOnlyKeys(
+        "reasonComment");
 
     service.review(41L, review(40L, "OTHR", "Re-rated"));
     assertThat(entityManager.createQuery(

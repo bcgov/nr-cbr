@@ -96,6 +96,12 @@ describe('reviewErrorsOf', () => {
     expect(reviewErrorsOf(values({ reasonCode: 'OTHR' }), offered, true)).toEqual({
       reasonComment: 'Load Rating Reason Comment is required for Other.',
     });
+    // Any other reason's words are optional, but held to the column.
+    expect(reviewErrorsOf(values({ reasonCode: 'INSP' }), offered, true)).toEqual({});
+    expect(
+      reviewErrorsOf(values({ reasonCode: 'INSP', reasonComment: 'x'.repeat(4001) }), offered, true)
+        .reasonComment,
+    ).toMatch(/4000/);
     expect(reviewErrorsOf(values({ reasonCode: '' }), [], true)).toEqual({});
   });
 });

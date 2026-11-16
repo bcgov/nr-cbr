@@ -9,7 +9,7 @@ import java.time.LocalDate;
  *                                 to 999999
  * @param reasonCode               {@code STRCTRE_LOAD_RATING_RSN_CODE}, one that fits the change
  *                                 from the structure's current rating
- * @param reasonComment            the reason's words — required for Other, kept only with it
+ * @param reasonComment            the reason's words — required for Other, optional for the rest
  * @param nextRoutineDate          the next planned routine inspection; a routine inspection's only
  * @param routineFrequencyYears    years between routine inspections, 1 to 6
  * @param loadRatingReviewRequired the structure's Load Rating Review Required

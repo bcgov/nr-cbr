@@ -129,6 +129,7 @@ const fillBridge = async () => {
     expect(screen.getByTestId('bridge-superstructureTypeCode')).not.toBeDisabled(),
   );
   set('bridge-totalBridgeLength', '24');
+  set('bridge-deckWidth-choice', 'OTHER');
   set('bridge-deckWidth', '4.3');
   set('bridge-superstructureTypeCode', 'STL');
   set('bridge-deckTypeCode', 'TIM');
@@ -138,10 +139,7 @@ const fillBridge = async () => {
   set('bridge-rightAbutmentCode', 'CON');
 };
 
-const openTab = (key: string) => userEvent.click(screen.getByTestId(`add-structure-tab-${key}`));
-
 const addSpan = async (length: string) => {
-  await openTab('spans-and-piers');
   await userEvent.click(screen.getByTestId('add-structure-span-add'));
   const dialog = await screen.findByTestId('span-dialog');
   await userEvent.type(within(dialog).getByTestId('span-length'), length);
@@ -230,6 +228,21 @@ describe('AddStructurePage', () => {
     );
   });
 
+  it('saves a standard deck width chosen from the list', async () => {
+    await renderPage();
+    await fillBridge();
+    set('bridge-deckWidth-choice', '4.88');
+    await addSpan('12');
+
+    await userEvent.click(screen.getByTestId('add-structure-save'));
+
+    await waitFor(() =>
+      expect(api.createStructure).toHaveBeenCalledWith(
+        expect.objectContaining({ bridge: expect.objectContaining({ deckWidth: 4.88 }) }),
+      ),
+    );
+  });
+
   it('shows what the server refuses beside its field', async () => {
     api.createStructure.mockRejectedValue({
       body: {
@@ -250,26 +263,49 @@ describe('AddStructurePage', () => {
     expect(form).toMatchTextContent('Deck Width can be at most 99999.99 metres.');
   });
 
+  it('shows every card on one Details tab, the spans and piers after the bridge', async () => {
+    await renderPage();
+    set('add-structure-type', 'PB');
+
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent?.trim())).toEqual([
+      expect.stringMatching(/^Details/),
+    ]);
+    const cards = Array.from(
+      screen.getByTestId('add-structure-panel-details').querySelectorAll('h2, h3, h4'),
+    ).map((heading) => heading.textContent?.trim());
+    expect(cards).toEqual([
+      'Structure and site',
+      'Structure',
+      'Bridge',
+      'Spans',
+      'Piers',
+      'Load Rating Details',
+      'Replacement Details',
+      'Inspection Schedule',
+      'Comment',
+    ]);
+  });
+
   it("shows what is outstanding from the start, nr-frep's pattern, and turns it red when refused", async () => {
     await renderPage();
     set('add-structure-type', 'PB');
 
     const summary = screen.getByTestId('add-structure-outstanding-summary');
-    expect(summary).toMatchTextContent(/required items outstanding across 3 tabs/);
-    expect(screen.getByTestId('add-structure-information-outstanding')).toMatchTextContent(
-      /Structure and site\s*Structure # is required\./,
-    );
-    expect(screen.getByTestId('add-structure-spans-and-piers-outstanding')).toMatchTextContent(
-      /Spans\s*At least one span is required\./,
+    expect(summary).toMatchTextContent(/\d+ required items outstanding/);
+    expect(summary).not.toMatchTextContent(/across/);
+    // One list, in the order the cards are shown.
+    const list = screen.getByTestId('add-structure-details-outstanding');
+    expect(list).toMatchTextContent(
+      /Structure and site\s*Structure # is required\..*Spans\s*At least one span is required\./,
     );
     expect(
-      screen.getByRole('img', { name: 'Spans & Piers: 1 item outstanding' }),
+      screen.getByRole('img', { name: /^Details: \d+ items outstanding$/ }),
     ).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('add-structure-save'));
     expect(summary).toMatchTextContent(/Structure not saved/);
     expect(
-      screen.getByRole('img', { name: 'Spans & Piers: 1 item outstanding, blocking save' }),
+      screen.getByRole('img', { name: /^Details: \d+ items outstanding, blocking save$/ }),
     ).toBeInTheDocument();
   });
 
