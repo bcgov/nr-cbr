@@ -13,7 +13,6 @@ import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.struct.v1.HazardsUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionCommentRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionUpdateRequest;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
