@@ -38,7 +38,8 @@ type Props = FieldsProps<LoadRatingValues> & {
 };
 
 /**
- * Load Rating Details' four fields, for the card's edit and for Add Structure.
+ * Load Rating Details' four fields, for the card's edit and for Add Structure. Design Vehicle
+ * Configuration comes before the design rating it sets (UAT, "CBR Test Changes", 2026-11).
  *
  * <p>As legacy, by role: Level 1 changes Load Rating Review Required alone; Level 2 the posting
  * signs, design vehicle and a typed design rating too; the Other vehicle's words a P.Eng only — a
@@ -62,6 +63,56 @@ const LoadRatingFields: FC<Props> = ({
   return (
     <div className="structure-detail__fields">
       {leading}
+      {/* The vehicle first: it decides whether the design rating below is set or typed. */}
+      {level2 ? (
+        <Select
+          id="load-rating-vehicle"
+          data-testid="load-rating-vehicle"
+          labelText="Design Vehicle Configuration"
+          value={values.designVehicleCode}
+          disabled={codes.isLoading}
+          invalid={Boolean(shown.designVehicleCode)}
+          invalidText={shown.designVehicleCode}
+          onChange={(event) => change('designVehicleCode', event.target.value)}
+          onBlur={() => leave('designVehicleCode')}
+        >
+          <SelectItem value="" text="None" />
+          {vehicles.map((option) => (
+            <SelectItem key={option.code} value={option.code} text={option.description} />
+          ))}
+        </Select>
+      ) : (
+        <ReadOnlyField
+          label="Design Vehicle Configuration"
+          value={stored.designVehicle ? describe(stored.designVehicle) : null}
+        />
+      )}
+      {design.other &&
+        (isPeng ? (
+          <FieldWithCounter used={byteLength(values.designVehicleComment)} limit={TEXT_MAX}>
+            <TextArea
+              id="load-rating-vehicle-comment"
+              data-testid="load-rating-vehicle-comment"
+              labelText={requiredLabel('If Other, please specify', true)}
+              rows={4}
+              value={values.designVehicleComment}
+              invalid={Boolean(shown.designVehicleComment)}
+              invalidText={shown.designVehicleComment}
+              onChange={(event) => change('designVehicleComment', event.target.value)}
+              onBlur={() => leave('designVehicleComment')}
+            />
+          </FieldWithCounter>
+        ) : (
+          // A P.Eng's words, as legacy: shown, and their absence refused on Save.
+          <div>
+            <ReadOnlyField label="If Other, please specify" value={values.designVehicleComment} />
+            {shown.designVehicleComment && (
+              <p className="structure-detail__upload-error" role="alert">
+                {shown.designVehicleComment} Only a P.Eng can enter them.
+              </p>
+            )}
+          </div>
+        ))}
       {/* Set from the vehicle when it fixes one; typed, at Level 2, when it does not. */}
       {!design.typed || !level2 ? (
         <ReadOnlyField
@@ -117,55 +168,6 @@ const LoadRatingFields: FC<Props> = ({
         <RadioButton id="load-rating-review-yes" labelText="Yes" value="Y" />
         <RadioButton id="load-rating-review-no" labelText="No" value="N" />
       </RadioButtonGroup>
-      {level2 ? (
-        <Select
-          id="load-rating-vehicle"
-          data-testid="load-rating-vehicle"
-          labelText="Design Vehicle Configuration"
-          value={values.designVehicleCode}
-          disabled={codes.isLoading}
-          invalid={Boolean(shown.designVehicleCode)}
-          invalidText={shown.designVehicleCode}
-          onChange={(event) => change('designVehicleCode', event.target.value)}
-          onBlur={() => leave('designVehicleCode')}
-        >
-          <SelectItem value="" text="None" />
-          {vehicles.map((option) => (
-            <SelectItem key={option.code} value={option.code} text={option.description} />
-          ))}
-        </Select>
-      ) : (
-        <ReadOnlyField
-          label="Design Vehicle Configuration"
-          value={stored.designVehicle ? describe(stored.designVehicle) : null}
-        />
-      )}
-      {design.other &&
-        (isPeng ? (
-          <FieldWithCounter used={byteLength(values.designVehicleComment)} limit={TEXT_MAX}>
-            <TextArea
-              id="load-rating-vehicle-comment"
-              data-testid="load-rating-vehicle-comment"
-              labelText={requiredLabel('If Other, please specify', true)}
-              rows={4}
-              value={values.designVehicleComment}
-              invalid={Boolean(shown.designVehicleComment)}
-              invalidText={shown.designVehicleComment}
-              onChange={(event) => change('designVehicleComment', event.target.value)}
-              onBlur={() => leave('designVehicleComment')}
-            />
-          </FieldWithCounter>
-        ) : (
-          // A P.Eng's words, as legacy: shown, and their absence refused on Save.
-          <div>
-            <ReadOnlyField label="If Other, please specify" value={values.designVehicleComment} />
-            {shown.designVehicleComment && (
-              <p className="structure-detail__upload-error" role="alert">
-                {shown.designVehicleComment} Only a P.Eng can enter them.
-              </p>
-            )}
-          </div>
-        ))}
     </div>
   );
 };

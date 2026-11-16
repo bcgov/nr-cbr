@@ -111,23 +111,27 @@ class InspectionEditServiceHazardsTest {
   }
 
   @Test
-  @DisplayName("lets the measurements wait while In Progress, until one has been saved")
-  void inProgress() {
-    inspection(41L, "PRO", new BigDecimal("2"));
+  @DisplayName("needs none of the measurements, even Submitted, and lets a saved one be blanked")
+  void optional() {
+    // UAT, "CBR Test Changes", 2026-11: legacy required all three past In Progress.
+    inspection(41L, "SUB", new BigDecimal("2"));
 
-    service.updateHazards(41L, new HazardsUpdateRequest(new BigDecimal("2"), null, null, null, null,
-        null, null, null, null));
-    assertThat(refused(41L, hazards(null, null, null))).containsOnly(
-        Map.entry("presentWaterDepth", "Estimated Present Water Level Depth is required."));
+    service.updateHazards(41L, hazards(null, null, null));
+    entityManager.flush();
+    entityManager.clear();
+
+    StructureInspectionEntity stored = entityManager.find(StructureInspectionEntity.class, 41L);
+    assertThat(stored.getChannelPwlDepth()).isNull();
+    assertThat(stored.getChannelPwlWidth()).isNull();
+    assertThat(stored.getChannelHwlClearance()).isNull();
   }
 
   @Test
-  @DisplayName("needs all three past In Progress, in metres to one decimal, and a short comment")
+  @DisplayName("takes the measurements in metres to one decimal, and a short comment")
   void rules() {
     inspection(41L, "SUB", null);
 
-    assertThat(refused(41L, hazards(null, "1.25", "100000"))).containsOnly(
-        Map.entry("presentWaterDepth", "Estimated Present Water Level Depth is required."),
+    assertThat(refused(41L, hazards("1", "1.25", "100000"))).containsOnly(
         Map.entry("presentWaterWidth", "Estimated Present Water Level Width must be metres "
             + "from 0 to 99999.9, with 1 decimal place at most."),
         Map.entry("highWaterClearance", "Estimated High Water Level Clearance must be metres "

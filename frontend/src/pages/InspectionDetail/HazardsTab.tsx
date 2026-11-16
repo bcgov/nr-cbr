@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { HazardFields } from '@/pages/NewInspection/InspectionFields';
 
-import { LABELS, requiredMeasurementsOf, valuesOf, type Measurement } from './hazardsRules';
+import { valuesOf } from './hazardsRules';
 import { HazardsCard } from './InspectionViews';
 
 import type { InspectionDetailResponse } from './inspectionDetail';
@@ -32,14 +32,9 @@ const HazardsEditor: FC<{ inspection: InspectionDetailResponse; onDone: () => vo
   const [values, setValues] = useState<HazardValues>(() => valuesOf(inspection));
   const update = useUpdateInspectionHazards(inspection.id);
   const { display } = useNotification();
-  const required = requiredMeasurementsOf(inspection);
-
+  // The measurements are optional at any status (UAT, "CBR Test Changes", 2026-11): only their
+  // format is checked. Legacy required them past In Progress.
   const errors: Record<string, string | undefined> = { ...hazardErrorsOf(values) };
-  for (const field of Object.keys(LABELS) as Measurement[]) {
-    if (required[field] && !values[field].trim()) {
-      errors[field] = `${LABELS[field]} is required.`;
-    }
-  }
   const form = useFieldErrors<string>(errors, update.fieldErrors);
 
   const save = () => {
@@ -80,7 +75,6 @@ const HazardsEditor: FC<{ inspection: InspectionDetailResponse; onDone: () => vo
       values={values}
       shown={form.shown}
       warnings={hazardWarningsOf(values)}
-      required={required}
       change={(field, value) => {
         setValues((current) => ({ ...current, [field]: value }));
         form.change(field);

@@ -97,10 +97,11 @@ export const reviewErrorsOf = (
   } else if (!offered.some((reason) => reason.code === values.reasonCode)) {
     errors.reasonCode = 'Choose a reason that fits the change in load rating.';
   }
-  if (values.reasonCode === OTHER_REASON) {
-    errors.reasonComment = values.reasonComment.trim()
-      ? overLimitError(values.reasonComment, REASON_TEXT_MAX) || undefined
-      : 'Load Rating Reason Comment is required for Other.';
+  // Any reason may have words (UAT, "CBR Test Changes", 2026-11); Other must.
+  if (values.reasonCode === OTHER_REASON && !values.reasonComment.trim()) {
+    errors.reasonComment = 'Load Rating Reason Comment is required for Other.';
+  } else {
+    errors.reasonComment = overLimitError(values.reasonComment, REASON_TEXT_MAX) || undefined;
   }
   if (!values.routineFrequencyYears) {
     errors.routineFrequencyYears = 'Routine Inspection Frequency is required.';

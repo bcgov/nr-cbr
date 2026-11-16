@@ -284,6 +284,11 @@ const LoadRatingCard: FC<Props> = ({
             label="Current Load Rating GVW (tonnes)"
             value={number(loadRating.currentRating)}
           />
+          <CodeWithOther
+            label="Design Vehicle Configuration"
+            value={loadRating.designVehicle}
+            comment={loadRating.designVehicleComment}
+          />
           <ReadOnlyField
             label="Original Design Load Rating GVW (tonnes)"
             value={number(loadRating.designLoadRating)}
@@ -295,11 +300,6 @@ const LoadRatingCard: FC<Props> = ({
           <ReadOnlyField
             label="Load Rating Review Required"
             value={yesNo(loadRating.reviewRequired)}
-          />
-          <CodeWithOther
-            label="Design Vehicle Configuration"
-            value={loadRating.designVehicle}
-            comment={loadRating.designVehicleComment}
           />
         </div>
       )}

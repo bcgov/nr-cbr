@@ -186,22 +186,21 @@ type Measurement = 'presentWaterDepth' | 'presentWaterWidth' | 'highWaterClearan
  * The Hydraulic Hazards tab: the channel's three measurements, legacy's five hazards and their
  * comments. Legacy's range warnings show as typed and never stop the save.
  *
- * <p>Add Inspection's, and the inspection page's once Edit is pressed — which marks the
- * measurements it requires and puts its Cancel and Save under the fields.
+ * <p>Add Inspection's, and the inspection page's once Edit is pressed — which puts its Cancel and
+ * Save under the fields. The measurements are optional at any status (UAT, "CBR Test Changes",
+ * 2026-11), so none carries an asterisk.
  */
 export const HazardFields: FC<
   FieldProps<HazardValues> & {
-    /** The measurements required now: a red asterisk on each. */
-    required?: Partial<Record<Measurement, boolean>>;
     /** The form's own actions, under the fields — the inspection page's Cancel and Save. */
     actions?: ReactNode;
   }
-> = ({ values, shown, warnings = {}, change, leave, required = {}, actions }) => {
+> = ({ values, shown, warnings = {}, change, leave, actions }) => {
   const metres = (field: Measurement, label: string) => (
     <TextInput
       id={`hazard-${field}`}
       data-testid={`hazard-${field}`}
-      labelText={requiredLabel(label, Boolean(required[field]))}
+      labelText={label}
       inputMode="decimal"
       maxLength={7}
       value={values[field]}

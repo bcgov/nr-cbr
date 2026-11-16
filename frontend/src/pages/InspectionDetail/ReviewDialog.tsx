@@ -123,7 +123,7 @@ const ReviewForm: FC<
     onAccept({
       loadRating: rating,
       reasonCode: values.reasonCode,
-      reasonComment: values.reasonCode === OTHER_REASON ? values.reasonComment : '',
+      reasonComment: values.reasonComment,
       nextRoutineDate: routine ? toIso(values.nextRoutineDate) : null,
       routineFrequencyYears: Number(values.routineFrequencyYears),
       loadRatingReviewRequired: values.loadRatingReviewRequired,
@@ -195,21 +195,23 @@ const ReviewForm: FC<
                 ))}
               </Select>
             </div>
-            {values.reasonCode === OTHER_REASON && (
-              <FieldWithCounter used={byteLength(values.reasonComment)} limit={REASON_TEXT_MAX}>
-                <TextArea
-                  id="review-reasonComment"
-                  data-testid="review-reasonComment"
-                  labelText={requiredLabel('Load Rating Reason Comment', true)}
-                  rows={3}
-                  value={values.reasonComment}
-                  invalid={Boolean(shown.reasonComment)}
-                  invalidText={shown.reasonComment}
-                  onChange={(event) => change('reasonComment', event.target.value)}
-                  onBlur={() => form.leave('reasonComment')}
-                />
-              </FieldWithCounter>
-            )}
+            {/* Always offered, required for Other alone (UAT, "CBR Test Changes", 2026-11). */}
+            <FieldWithCounter used={byteLength(values.reasonComment)} limit={REASON_TEXT_MAX}>
+              <TextArea
+                id="review-reasonComment"
+                data-testid="review-reasonComment"
+                labelText={requiredLabel(
+                  'Load Rating Reason Comment',
+                  values.reasonCode === OTHER_REASON,
+                )}
+                rows={3}
+                value={values.reasonComment}
+                invalid={Boolean(shown.reasonComment)}
+                invalidText={shown.reasonComment}
+                onChange={(event) => change('reasonComment', event.target.value)}
+                onBlur={() => form.leave('reasonComment')}
+              />
+            </FieldWithCounter>
             <Checkbox
               id="review-loadRatingReviewRequired"
               data-testid="review-loadRatingReviewRequired"

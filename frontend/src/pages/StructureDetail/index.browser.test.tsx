@@ -864,6 +864,50 @@ describe('StructureDetailPage — editing the Bridge card', () => {
     expect(form).not.toMatchTextContent('are allowed when Portable Structure is checked.');
   });
 
+  it('offers the standard deck widths, and a typed one under Other', async () => {
+    const form = await openEdit();
+
+    // The stored 4.27 is one of the standard widths: chosen, with no box to type in.
+    const choice = within(form).getByTestId('bridge-deckWidth-choice');
+    expect(choice).toHaveValue('4.27');
+    expect(Array.from((choice as HTMLSelectElement).options).map((o) => o.textContent)).toEqual([
+      'None',
+      '4.27',
+      '4.88',
+      'Other',
+    ]);
+    expect(within(form).queryByTestId('bridge-deckWidth')).not.toBeInTheDocument();
+
+    // Other starts blank, so the 4.27 chosen before is not saved by mistake.
+    await userEvent.selectOptions(choice, 'OTHER');
+    const typed = within(form).getByTestId('bridge-deckWidth');
+    expect(typed).toHaveValue('');
+    await userEvent.click(within(form).getByTestId('bridge-details-save'));
+    expect(form).toMatchTextContent('Deck Width is required.');
+    expect(api.updateBridgeDetails).not.toHaveBeenCalled();
+
+    // Typing a standard width under Other keeps the box: it does not snap back mid-word.
+    await userEvent.type(typed, '4.88');
+    expect(choice).toHaveValue('OTHER');
+    await userEvent.clear(typed);
+    await userEvent.type(typed, '5.5');
+    await userEvent.click(within(form).getByTestId('bridge-details-save'));
+
+    await vi.waitFor(() =>
+      expect(api.updateBridgeDetails).toHaveBeenCalledWith(
+        '7',
+        expect.objectContaining({ deckWidth: 5.5 }),
+      ),
+    );
+  });
+
+  it('shows a stored width that is not standard as Other, with its value', async () => {
+    const form = await openEdit({ bridge: { ...bridge().bridge!, deckWidthMetres: 5.2 } });
+
+    expect(within(form).getByTestId('bridge-deckWidth-choice')).toHaveValue('OTHER');
+    expect(within(form).getByTestId('bridge-deckWidth')).toHaveValue('5.2');
+  });
+
   it('asks for the details of an Other, as soon as the box is left', async () => {
     const form = await openEdit();
 
@@ -1129,6 +1173,23 @@ describe('StructureDetailPage — Load Rating Details', () => {
     await userEvent.click(within(card).getByTestId('load-rating-details-edit'));
     return within(card).findByTestId('load-rating-details-form');
   };
+
+  it('puts Design Vehicle Configuration before the design rating it sets', async () => {
+    authorization.canEdit = true;
+    authorization.canDelete = true;
+    const card = await openDetailsTab();
+    const order = (container: HTMLElement) => {
+      const text = container.textContent ?? '';
+      return (
+        text.indexOf('Design Vehicle Configuration') < text.indexOf('Original Design Load Rating')
+      );
+    };
+    expect(order(card)).toBe(true);
+
+    await userEvent.click(within(card).getByTestId('load-rating-details-edit'));
+    const form = await within(card).findByTestId('load-rating-details-form');
+    expect(order(form)).toBe(true);
+  });
 
   it('lets Level 1 change Load Rating Review Required alone', async () => {
     authorization.canEdit = true;
