@@ -4,6 +4,8 @@ import ca.bc.gov.nrs.cbr.model.v1.BatchJobItemStatus;
 import ca.bc.gov.nrs.cbr.repository.v1.BatchJobItemRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.BatchJobItemRepository.StatusCount;
 import ca.bc.gov.nrs.cbr.service.v1.FileCopyService;
+import ca.bc.gov.nrs.cbr.service.v1.FilePurgeService;
+import java.util.HashSet;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
@@ -56,13 +58,20 @@ public class PurgeBatchJobItemsScheduler {
       @Value("${purge.batch.job.items.jobs}") List<String> jobs,
       @Value("${purge.batch.job.items.after.days}") int afterDays,
       @Value("${scheduled.jobs.fill.file.copy.items.cron}") String fillFileCopyCron,
-      @Value("${scheduled.jobs.copy.files.cron}") String copyFilesCron) {
+      @Value("${scheduled.jobs.copy.files.cron}") String copyFilesCron,
+      @Value("${scheduled.jobs.fill.file.purge.items.cron}") String fillFilePurgeCron,
+      @Value("${scheduled.jobs.purge.files.cron}") String purgeFilesCron) {
     this.items = items;
     this.jobs = List.copyOf(jobs);
     this.afterDays = afterDays;
-    this.switchedOn = DISABLED.equals(fillFileCopyCron) && DISABLED.equals(copyFilesCron)
-        ? Set.of()
-        : Set.of(FileCopyService.JOB_NAME);
+    Set<String> on = new HashSet<>();
+    if (!DISABLED.equals(fillFileCopyCron) || !DISABLED.equals(copyFilesCron)) {
+      on.add(FileCopyService.JOB_NAME);
+    }
+    if (!DISABLED.equals(fillFilePurgeCron) || !DISABLED.equals(purgeFilesCron)) {
+      on.add(FilePurgeService.JOB_NAME);
+    }
+    this.switchedOn = Set.copyOf(on);
   }
 
   @Scheduled(cron = "${scheduled.jobs.purge.batch.job.items.cron}")

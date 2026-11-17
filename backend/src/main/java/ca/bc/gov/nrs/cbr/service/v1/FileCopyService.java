@@ -118,7 +118,7 @@ public class FileCopyService {
     return BatchJobItemStatus.DONE;
   }
 
-  private static String unquoted(String etag) {
+  static String unquoted(String etag) {
     return etag == null ? null : etag.replace("\"", "");
   }
 
@@ -127,7 +127,7 @@ public class FileCopyService {
    * ({@code AccessDenied}), a full bucket ({@code QuotaExceeded}), throttling ({@code SlowDown}) or
    * the clock ({@code RequestTimeTooSkewed}).
    */
-  private static String gatewayError(SdkException failed) {
+  static String gatewayError(SdkException failed) {
     if (failed instanceof AwsServiceException service && service.awsErrorDetails() != null) {
       return ": " + service.awsErrorDetails().errorCode() + " (HTTP " + service.statusCode()
           + ", request " + service.requestId() + ")";
@@ -141,7 +141,7 @@ public class FileCopyService {
    * copy end to end. Nothing is signed, hashed for storage or compared against an attacker's input.
    */
   @SuppressWarnings("java:S4790")
-  private static byte[] md5(byte[] content) {
+  static byte[] md5(byte[] content) {
     try {
       return MessageDigest.getInstance("MD5").digest(content);
     } catch (NoSuchAlgorithmException absent) {

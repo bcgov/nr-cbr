@@ -24,7 +24,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * Schema objects live in {@code bcgov-c/nr-mof-db}, not here.
  *
  * <p>Scheduled tasks run under ShedLock locks, after EDUC-STUDENT-ASSESSMENT-API; see the
- * {@code schedulers} package. Every task's cron defaults to {@code -}, "never".
+ * {@code schedulers} package, their crons in {@code application.yml}: the file copy's on wherever
+ * CBR is deployed and off locally, the purge's off.
  */
 @SpringBootApplication
 @EnableCaching

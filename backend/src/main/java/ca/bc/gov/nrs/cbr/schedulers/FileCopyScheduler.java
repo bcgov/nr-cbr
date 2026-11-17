@@ -10,8 +10,9 @@ import org.springframework.stereotype.Component;
  * {@code FILE_COPY}'s two steps, as EDUC-STUDENT-ASSESSMENT-API's {@code EventTaskScheduler}: each
  * on a cron, under a ShedLock lock so that one pod at a time runs it, delegating at once.
  *
- * <p>Both crons default to {@code -}, Spring's "never": the copy is switched on by setting them
- * with {@code oc set env}, not in the deployment template, so the next deploy switches it off.
+ * <p>Both crons are set in {@code application.yml}, so the copy runs wherever CBR is deployed —
+ * not locally — until they are put back to {@code -}, Spring's "never", once its gate has passed.
+ * An env var of {@code -} stops it in one environment.
  *
  * <p>DELETE-AFTER-FILE-MIGRATION.
  */

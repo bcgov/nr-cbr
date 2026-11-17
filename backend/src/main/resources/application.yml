@@ -26,12 +26,13 @@ server:
 spring:
   application:
     name: cbr-backend
-  # The scheduled tasks (schedulers package) — the file copy's two and the purge — run side by side;
+  # The scheduled tasks (schedulers package) — the file copy's two, the file purge's two and the
+  # work-item purge — run side by side;
   # Boot's default scheduler has one thread.
   task:
     scheduling:
       pool:
-        size: 3
+        size: 5
   servlet:
     multipart:
       # Inspection photos and as-built drawings. file-size-threshold stays at its 0 default so every
@@ -264,28 +265,57 @@ logging:
 
 # ── Scheduled jobs ────────────────────────────────────────────────────────────
 # After EDUC-STUDENT-ASSESSMENT-API: each task a cron and its ShedLock lock times, one pod at a time
-# (locks in THE.CBR_SHEDLOCK); work items in THE.CBR_BATCH_JOB_ITEM. Every cron defaults to "-",
-# Spring's "never": switch a task on with `oc set env`, not in the deployment template, so the next
-# deploy switches it off again. ("${X:-}" is the env var X, else "-".)
+# (locks in THE.CBR_SHEDLOCK); work items in THE.CBR_BATCH_JOB_ITEM. A cron of "-" is Spring's
+# "never"; an env var of the same name overrides each one. ("${X:-}" is the env var X, else "-".)
 
 # FILE_COPY — the attachments' BLOBs to the object store (DELETE-AFTER-FILE-MIGRATION).
-# The fill lists new files and logs progress and the gate (grep "FILE_COPY"); e.g. 0 */15 * * * *.
-scheduled.jobs.fill.file.copy.items.cron: "${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON:-}"
+# ON in every deployed environment: its crons are set here, in the repo, so the run is reviewed and
+# survives redeploys. Remove the two crons (back to "-") once the gate has passed — the log line
+# "FILE_COPY GATE: PASS" — and with them this code. Off locally (the local profile, at the end).
+# To stop it in one environment without a deploy: oc set env deploy/<backend>
+# SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON=- SCHEDULED_JOBS_COPY_FILES_CRON=-
+# The fill lists new files and logs progress and the gate (grep "FILE_COPY"), every 15 minutes.
+scheduled.jobs.fill.file.copy.items.cron: "${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON:0 */15 * * * *}"
 scheduled.jobs.fill.file.copy.items.cron.lockAtLeastFor: ${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON_LOCK_AT_LEAST_FOR:1m}
 scheduled.jobs.fill.file.copy.items.cron.lockAtMostFor: ${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON_LOCK_AT_MOST_FOR:10m}
-# The copy hands READY files to the copy executor; e.g. 0/2 * * * * * with locks 1700ms / 1900ms.
-scheduled.jobs.copy.files.cron: "${SCHEDULED_JOBS_COPY_FILES_CRON:-}"
+# The copy hands READY files to the copy executor every 2 seconds, with locks 1700ms / 1900ms.
+scheduled.jobs.copy.files.cron: "${SCHEDULED_JOBS_COPY_FILES_CRON:0/2 * * * * *}"
 scheduled.jobs.copy.files.cron.lockAtLeastFor: ${SCHEDULED_JOBS_COPY_FILES_CRON_LOCK_AT_LEAST_FOR:1700ms}
 scheduled.jobs.copy.files.cron.lockAtMostFor: ${SCHEDULED_JOBS_COPY_FILES_CRON_LOCK_AT_MOST_FOR:1900ms}
 # Files in flight per pod at most, and copied at once (each holds one file of 10 MB at most).
 number.files.process.copy: ${NUMBER_OF_FILES_TO_PROCESS_COPY:200}
 threads.file.copy: ${THREADS_FILE_COPY:4}
 
+# FILE_PURGE — empties the attachments' BLOBs once their copies are proved (DELETE-AFTER-FILE-MIGRATION).
+# Cannot be undone: after it the object store holds the only copy. OFF ("-") until someone switches
+# it on in one environment with oc set env. Its fill lists nothing until FILE_COPY's gate would pass,
+# then only files FILE_COPY has DONE; each file's MD5 is checked against its object's ETag, its row
+# locked, before its BLOB is emptied. Logs progress and the gate (grep "FILE_PURGE").
+# Suggested when on: fill 0 */15 * * * *, purge 0/2 * * * * *.
+scheduled.jobs.fill.file.purge.items.cron: "${SCHEDULED_JOBS_FILL_FILE_PURGE_ITEMS_CRON:-}"
+scheduled.jobs.fill.file.purge.items.cron.lockAtLeastFor: ${SCHEDULED_JOBS_FILL_FILE_PURGE_ITEMS_CRON_LOCK_AT_LEAST_FOR:1m}
+scheduled.jobs.fill.file.purge.items.cron.lockAtMostFor: ${SCHEDULED_JOBS_FILL_FILE_PURGE_ITEMS_CRON_LOCK_AT_MOST_FOR:10m}
+scheduled.jobs.purge.files.cron: "${SCHEDULED_JOBS_PURGE_FILES_CRON:-}"
+scheduled.jobs.purge.files.cron.lockAtLeastFor: ${SCHEDULED_JOBS_PURGE_FILES_CRON_LOCK_AT_LEAST_FOR:1700ms}
+scheduled.jobs.purge.files.cron.lockAtMostFor: ${SCHEDULED_JOBS_PURGE_FILES_CRON_LOCK_AT_MOST_FOR:1900ms}
+# Files in flight per pod at most, and purged at once — each holds one file of 10 MB at most and a
+# DB connection (of Hikari's 10) while it is checked.
+number.files.process.purge: ${NUMBER_OF_FILES_TO_PROCESS_PURGE:100}
+threads.file.purge: ${THREADS_FILE_PURGE:2}
+
 # Purge of finished jobs' work items (PurgeBatchJobItemsScheduler); e.g. 0 0 2 * * *. Only the jobs
 # listed, once switched off, with no READY or ERROR rows, and unchanged for after.days. Listing a
-# job is the decision that its rows are no longer needed: FILE_COPY only after FILE_PURGE is filled.
+# job is the decision that its rows are no longer needed: FILE_COPY only after FILE_PURGE is filled,
+# FILE_PURGE after its gate. (This purge deletes work items; FILE_PURGE empties BLOBs.)
 scheduled.jobs.purge.batch.job.items.cron: "${SCHEDULED_JOBS_PURGE_BATCH_JOB_ITEMS_CRON:-}"
 scheduled.jobs.purge.batch.job.items.cron.lockAtLeastFor: ${SCHEDULED_JOBS_PURGE_BATCH_JOB_ITEMS_CRON_LOCK_AT_LEAST_FOR:1m}
 scheduled.jobs.purge.batch.job.items.cron.lockAtMostFor: ${SCHEDULED_JOBS_PURGE_BATCH_JOB_ITEMS_CRON_LOCK_AT_MOST_FOR:30m}
 purge.batch.job.items.jobs: ${PURGE_BATCH_JOB_ITEMS_JOBS:}
 purge.batch.job.items.after.days: ${PURGE_BATCH_JOB_ITEMS_AFTER_DAYS:30}
+
+---
+# Local runs (SPRING_PROFILES_ACTIVE=local) never copy files: a developer's machine is not where the
+# migration runs, and the local profile may point at a shared database and bucket.
+spring.config.activate.on-profile: local
+scheduled.jobs.fill.file.copy.items.cron: "${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON:-}"
+scheduled.jobs.copy.files.cron: "${SCHEDULED_JOBS_COPY_FILES_CRON:-}"

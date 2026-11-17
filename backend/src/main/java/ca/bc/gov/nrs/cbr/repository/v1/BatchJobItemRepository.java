@@ -108,4 +108,28 @@ public interface BatchJobItemRepository
                             AND i.STATUS = 'DONE')""",
       nativeQuery = true)
   long countFilesNotCopied();
+
+  /**
+   * {@code FILE_PURGE}'s fill: a {@code READY} item for every file {@code FILE_COPY} has
+   * {@code DONE} and that has no purge item yet — so only a file whose copy was proved is ever
+   * emptied. DELETE-AFTER-FILE-MIGRATION.
+   */
+  @Transactional
+  @Modifying
+  @Query(value = """
+      INSERT INTO THE.CBR_BATCH_JOB_ITEM (JOB_NAME, ITEM_ID, STATUS, UPDATE_TIMESTAMP)
+      SELECT 'FILE_PURGE', c.ITEM_ID, 'READY', LOCALTIMESTAMP
+        FROM THE.CBR_BATCH_JOB_ITEM c
+       WHERE c.JOB_NAME = 'FILE_COPY' AND c.STATUS = 'DONE'
+         AND NOT EXISTS (SELECT 1 FROM THE.CBR_BATCH_JOB_ITEM p
+                          WHERE p.JOB_NAME = 'FILE_PURGE' AND p.ITEM_ID = c.ITEM_ID)""",
+      nativeQuery = true)
+  int insertFilePurgeItems();
+
+  /**
+   * {@code FILE_PURGE}'s gate: files whose BLOB still holds bytes. DELETE-AFTER-FILE-MIGRATION.
+   */
+  @Query(value = "SELECT COUNT(*) FROM THE.CROSSING_STRUCTURE_FILE f "
+      + "WHERE DBMS_LOB.GETLENGTH(f.STRUCTURE_FILE) > 0", nativeQuery = true)
+  long countFilesWithBytes();
 }

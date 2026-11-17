@@ -32,4 +32,21 @@ public class AsyncConfiguration {
     executor.setQueueCapacity(numberOfFilesToProcess);
     return executor;
   }
+
+  /**
+   * {@code FilePurgeService.purgeFile}: {@code threads.file.purge} files at once, each holding one
+   * file (10 MB at most) in memory and a DB connection — its row locked — while its MD5 is checked
+   * against the object store. The queue holds what the scheduler hands out per firing, capped at
+   * {@code number.files.process.purge} in flight. DELETE-AFTER-FILE-MIGRATION.
+   */
+  @Bean(name = "filePurgeTaskExecutor")
+  public Executor filePurgeTaskExecutor(@Value("${threads.file.purge}") int threads,
+      @Value("${number.files.process.purge}") int numberOfFilesToProcess) {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setThreadNamePrefix("async-file-purge-executor-");
+    executor.setCorePoolSize(threads);
+    executor.setMaxPoolSize(threads);
+    executor.setQueueCapacity(numberOfFilesToProcess);
+    return executor;
+  }
 }

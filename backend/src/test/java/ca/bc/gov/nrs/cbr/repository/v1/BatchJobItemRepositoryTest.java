@@ -16,8 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 /**
- * The work-item queries against H2 — the JPQL, and the two native {@code FILE_COPY} statements
- * with {@code DBMS_LOB.GETLENGTH} aliased in {@code schema.sql}.
+ * The work-item queries against H2 — the JPQL, and the native {@code FILE_COPY} and
+ * {@code FILE_PURGE} statements with {@code DBMS_LOB.GETLENGTH} aliased in {@code schema.sql}.
  */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
 class BatchJobItemRepositoryTest {
@@ -115,6 +115,38 @@ class BatchJobItemRepositoryTest {
 
     // 2 is in error, 4 was never listed; 3 has nothing to copy.
     assertThat(repository.countFilesNotCopied()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("lists for the purge only the files the copy has DONE, each once")
+  void insertsFilePurgeItems() {
+    LocalDateTime now = LocalDateTime.now();
+    givenItem(JOB, 1, DONE, now);
+    givenItem(JOB, 2, ERROR, now);
+    givenItem(JOB, 3, READY, now);
+    givenItem(JOB, 4, DONE, now);
+    givenItem("OTHER", 5, DONE, now);
+
+    assertThat(repository.insertFilePurgeItems()).isEqualTo(2);
+    assertThat(statusOf("FILE_PURGE", 1)).isEqualTo(READY);
+    assertThat(statusOf("FILE_PURGE", 4)).isEqualTo(READY);
+    assertThat(repository.findById(new BatchJobItemEntity.Key("FILE_PURGE", 2L))).isEmpty();
+    // Listed already: not again, even once purged.
+    repository.updateStatus("FILE_PURGE", 1, DONE, now);
+    assertThat(repository.insertFilePurgeItems()).isZero();
+
+    repository.updateStatus(JOB, 3, DONE, now);
+    assertThat(repository.insertFilePurgeItems()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("counts the files whose BLOB still holds bytes")
+  void countsFilesWithBytes() {
+    givenFile(1, new byte[] {1});
+    givenFile(2, new byte[0]);
+    givenFile(3, new byte[] {3, 3});
+
+    assertThat(repository.countFilesWithBytes()).isEqualTo(2);
   }
 
   @Test

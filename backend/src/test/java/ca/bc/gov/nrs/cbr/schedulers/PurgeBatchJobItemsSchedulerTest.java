@@ -46,7 +46,7 @@ class PurgeBatchJobItemsSchedulerTest {
   }
 
   private PurgeBatchJobItemsScheduler purge(List<String> jobs) {
-    return new PurgeBatchJobItemsScheduler(items, jobs, 30, OFF, OFF);
+    return new PurgeBatchJobItemsScheduler(items, jobs, 30, OFF, OFF, OFF, OFF);
   }
 
   @Test
@@ -102,10 +102,27 @@ class PurgeBatchJobItemsSchedulerTest {
     givenRows("FILE_COPY", 2, BatchJobItemStatus.DONE, 40);
 
     assertThat(new PurgeBatchJobItemsScheduler(items, List.of("FILE_COPY"), 30, OFF,
-        "0/2 * * * * *").purge()).containsEntry("FILE_COPY", "skipped, still switched on");
+        "0/2 * * * * *", OFF, OFF).purge())
+        .containsEntry("FILE_COPY", "skipped, still switched on");
     assertThat(new PurgeBatchJobItemsScheduler(items, List.of("FILE_COPY"), 30,
-        "0 */15 * * * *", OFF).purge()).containsEntry("FILE_COPY", "skipped, still switched on");
+        "0 */15 * * * *", OFF, OFF, OFF).purge())
+        .containsEntry("FILE_COPY", "skipped, still switched on");
     assertThat(rows("FILE_COPY")).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("leaves FILE_PURGE while either of its crons is set, whatever FILE_COPY's are")
+  void keepsRunningPurge() {
+    givenRows("FILE_PURGE", 2, BatchJobItemStatus.DONE, 40);
+
+    assertThat(new PurgeBatchJobItemsScheduler(items, List.of("FILE_PURGE"), 30, OFF, OFF, OFF,
+        "0/2 * * * * *").purge()).containsEntry("FILE_PURGE", "skipped, still switched on");
+    assertThat(new PurgeBatchJobItemsScheduler(items, List.of("FILE_PURGE"), 30, OFF, OFF,
+        "0 */15 * * * *", OFF).purge()).containsEntry("FILE_PURGE", "skipped, still switched on");
+    // FILE_COPY on does not keep FILE_PURGE's rows.
+    assertThat(new PurgeBatchJobItemsScheduler(items, List.of("FILE_PURGE"), 30,
+        "0 */15 * * * *", "0/2 * * * * *", OFF, OFF).purge())
+        .containsEntry("FILE_PURGE", "2 rows deleted");
   }
 
   @Test
