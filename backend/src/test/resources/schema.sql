@@ -6,3 +6,8 @@ CREATE SCHEMA IF NOT EXISTS THE;
 
 -- Oracle's EMPTY_BLOB(), which CrossingStructureFileRepository.insertEmpty calls natively.
 CREATE ALIAS IF NOT EXISTS EMPTY_BLOB FOR 'ca.bc.gov.nrs.cbr.support.H2Functions.emptyBlob';
+
+-- Oracle's DBMS_LOB.GETLENGTH, which the FILE_COPY fill and gate (BatchJobItemRepository) select on.
+CREATE SCHEMA IF NOT EXISTS DBMS_LOB;
+CREATE ALIAS IF NOT EXISTS DBMS_LOB.GETLENGTH FOR 'ca.bc.gov.nrs.cbr.support.H2Functions.lobLength';
+

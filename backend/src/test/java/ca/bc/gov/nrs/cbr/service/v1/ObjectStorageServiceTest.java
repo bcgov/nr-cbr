@@ -13,7 +13,9 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -142,6 +144,25 @@ class ObjectStorageServiceTest {
             || name.equalsIgnoreCase("x-amz-sdk-checksum-algorithm")
             || name.equalsIgnoreCase("x-amz-trailer"));
     assertThat(put.headers().getFirst("x-amz-content-sha256")).doesNotEndWith("-TRAILER");
+  }
+
+  @Test
+  @DisplayName("puts the file with its MD5 for the gateway to check, and returns the ETag")
+  void putsWithMd5() throws Exception {
+    answer(200, "");
+    byte[] content = "JFIF bridge deck".getBytes(StandardCharsets.UTF_8);
+    byte[] md5 = MessageDigest.getInstance("MD5").digest(content);
+
+    String etag = storage.putObjectWithMd5("docs/7", "image/jpeg", content, md5);
+
+    Received put = only();
+    assertThat(put.path()).isEqualTo("/cbr-bucket/docs/7");
+    assertThat(unchunked(put)).isEqualTo(content);
+    assertThat(put.headers().getFirst("Content-MD5"))
+        .isEqualTo(Base64.getEncoder().encodeToString(md5));
+    assertThat(put.headers().keySet()).noneMatch(name ->
+        name.toLowerCase().startsWith("x-amz-checksum"));
+    assertThat(etag).isEqualTo("\"etag\"");
   }
 
   @Test

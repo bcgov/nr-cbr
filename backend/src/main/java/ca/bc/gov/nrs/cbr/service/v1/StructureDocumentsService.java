@@ -20,6 +20,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.DocumentUpdateRequest;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDetailResponse.CodeValue;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureDocumentsResponse.Document;
+import ca.bc.gov.nrs.cbr.util.DocumentMediaTypes;
 import jakarta.persistence.EntityManager;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -34,13 +35,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.http.MediaTypeFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -539,11 +538,6 @@ public class StructureDocumentsService {
   }
 
   private static MediaType mediaType(CrossingStructureFileDetailEntity detail) {
-    return MediaTypeFactory.getMediaType(detail.getFilename())
-        .or(() -> detail.getEfileExtensionCode() == null
-            ? Optional.<MediaType>empty()
-            : MediaTypeFactory.getMediaType("file." + detail.getEfileExtensionCode()))
-        .map(type -> new MediaType(type.getType(), type.getSubtype()))
-        .orElse(MediaType.APPLICATION_OCTET_STREAM);
+    return DocumentMediaTypes.of(detail.getFilename(), detail.getEfileExtensionCode());
   }
 }

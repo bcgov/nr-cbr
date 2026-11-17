@@ -13,4 +13,9 @@ public final class H2Functions {
   public static byte[] emptyBlob() {
     return new byte[0];
   }
+
+  /** Oracle's {@code DBMS_LOB.GETLENGTH}: the BLOB's length in bytes, null for a null BLOB. */
+  public static Long lobLength(byte[] lob) {
+    return lob == null ? null : (long) lob.length;
+  }
 }
