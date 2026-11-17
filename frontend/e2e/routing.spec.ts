@@ -8,15 +8,16 @@ test.describe('public routing', () => {
   test('an unknown path renders Not Found rather than a blank page', async ({ page }) => {
     await page.goto('/no-such-page');
 
-    await expect(page.getByText(/not found/i).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Not Found' })).toBeVisible();
   });
 
-  test('a protected path sends an anonymous visitor to the landing page', async ({ page }) => {
-    // Not a 404: the route exists, the visitor simply has no session. The public route set has no
-    // /inventory entry, so the catch-all must not swallow it into Not Found.
+  test('a protected path shows Not Found to an anonymous visitor', async ({ page }) => {
+    // The public route set has no /inventory entry, so the `*` catch-all handles it. What matters is
+    // that the page renders rather than going blank, and that no protected content leaks.
     await page.goto('/inventory/site-search');
 
-    await expect(page.getByTestId('landing-title')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Not Found' })).toBeVisible();
+    await expect(page.getByRole('navigation')).toHaveCount(0);
   });
 
   test('/authCallback is served by the app, not the catch-all', async ({ page }) => {

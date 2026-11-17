@@ -3,25 +3,18 @@ import { defineConfig, devices } from '@playwright/test';
 import { baseURL } from './e2e/utils';
 
 /**
- * Playwright E2E config — runs against deployed DEV by default.
+ * Playwright E2E config.
  *
- * Auth flow:
- *   1. `npm run e2e:login` runs the `setup` project headed, parks at the IDIR
- *      login page, and saves cookies + localStorage to e2e/.auth/user.json
- *      once you successfully sign in.
- *   2. All other projects start from that storageState so each test boots
- *      already-authenticated.
- *
- * Override the target with E2E_BASE_URL (e.g. http://localhost:3000 for local).
+ * Targets E2E_BASE_URL (or BASE_URL), defaulting to http://localhost:3000 — start `npm run dev`
+ * first, or point it at a deployed host. The suite covers unauthenticated surfaces only; see the
+ * note on `projects` below.
  */
 export default defineConfig({
   timeout: 180_000,
   testDir: './e2e',
-  // Serial execution. We share one Cognito refresh token via storageState
-  // across runs; parallel workers race that refresh and intermittently leave
-  // some contexts stuck on the white `<Loading>` overlay. Bump back up later
-  // once we have a way to mint per-worker auth (or if we move to a mock
-  // strategy that doesn't touch Cognito at all).
+  // Serial execution. Kept for when a signed-in session is shared via storageState: parallel
+  // workers would race the one Keycloak refresh token and leave some contexts stuck on the
+  // `<Loading>` overlay. The unauthenticated suite would run in parallel today.
   workers: 1,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
@@ -33,12 +26,11 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
 
-  // The usual shape is a `setup` project (e2e/auth.setup.ts) that signs in through IDIR with
-  // E2E_IDIR_USER / E2E_IDIR_PASSWORD and saves the session to STORAGE_STATE, then makes the main
-  // project depend on it. That is the right shape for CBR too, but it cannot run until CBR has a
-  // FAM/Cognito client — so the suite currently covers only unauthenticated surfaces. To restore
-  // it: add e2e/auth.setup.ts, re-add the `setup` project below, and set
-  // `storageState: STORAGE_STATE` plus `dependencies: ['setup']` on chromium.
+  // Signed-in screens are not covered yet. The usual shape is a `setup` project (e2e/auth.setup.ts)
+  // that signs in through the BC Gov Keycloak realm with E2E_IDIR_USER / E2E_IDIR_PASSWORD, saves
+  // the session to STORAGE_STATE, and is a dependency of the main project. To add it: write
+  // e2e/auth.setup.ts, add the `setup` project below, and set `storageState: STORAGE_STATE` plus
+  // `dependencies: ['setup']` on chromium.
   projects: [
     {
       name: 'chromium',

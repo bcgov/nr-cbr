@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /**
  * The unauthenticated landing page — everything reachable without a session.
@@ -8,9 +8,9 @@ import { expect, test } from '@playwright/test';
  * `VITE_KEYCLOAK_URL` throws "No authority or metadataUrl configured" the moment a login button is
  * pressed), and that the router serves the public route set to an anonymous visitor.
  *
- * <p>Sign-in itself is not exercised — see the note in playwright.config.ts about the `setup`
- * project. The assertions below stop at the redirect to the realm, which is the last thing under
- * this application's control.
+ * <p>Sign-in itself is not exercised — see the note in playwright.config.ts. The assertions below
+ * stop at the authorization request to the realm, which is the last thing under this
+ * application's control.
  */
 test.describe('landing page', () => {
   test.beforeEach(async ({ page }) => {
@@ -24,8 +24,6 @@ test.describe('landing page', () => {
   });
 
   test('offers both identity providers', async ({ page }) => {
-    // Business BCeID is selected on the CSS integration but pending approval, so its hint currently
-    // falls through to IDIR. The button is still offered — it starts working with no code change.
     await expect(page.getByTestId('landing-button__idir')).toBeVisible();
     await expect(page.getByTestId('landing-button__bceid')).toBeVisible();
   });
@@ -54,10 +52,17 @@ test.describe('landing page', () => {
   });
 
   test('"Request access" names the roles a person can ask for', async ({ page }) => {
-    await page.getByTestId('landing-request-access').click();
+    // The link is only rendered when VITE_ACCESS_REQUEST_EMAIL is configured. Deployed environments
+    // set it from the ACCESS_REQUEST_EMAIL GitHub variable; a local .env usually leaves it blank.
+    await expect(page.getByTestId('landing-title')).toBeVisible();
+    const link = page.getByTestId('landing-request-access');
+    test.skip((await link.count()) === 0, 'VITE_ACCESS_REQUEST_EMAIL is not set on this target');
+
+    await link.click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('link')).toHaveAttribute('href', /^mailto:.+@.+/);
     // CBR has no region or client scoping, so the role is the only thing to choose — and the
     // requester is not the person who provisions it, hence business names rather than CBR_* strings.
     await expect(dialog).toContainText('Read only');
@@ -67,20 +72,46 @@ test.describe('landing page', () => {
     await expect(dialog).toContainText('Administrator');
   });
 
-  test('signing in redirects to the BC Gov realm with the IDIR broker hint', async ({ page }) => {
-    // The end of what this app controls. Also the cheapest possible check that the Keycloak client
-    // is configured: with VITE_KEYCLOAK_URL unset, oidc-client-ts throws before any navigation.
-    await page.getByTestId('landing-button__idir').click();
+  /**
+   * Waits for the authorization request to the BC Gov realm and returns its URL.
+   *
+   * <p>The request is asserted on rather than the page URL: with a `kc_idp_hint` Keycloak forwards
+   * straight on to the identity provider (Azure AD for IDIR), so the browser never settles on
+   * loginproxy. Also the cheapest check that the Keycloak client is configured: with
+   * VITE_KEYCLOAK_URL unset, oidc-client-ts throws before any navigation.
+   */
+  const signInRequest = async (page: Page, button: string): Promise<URL> => {
+    const request = page.waitForRequest(
+      (req) =>
+        req.isNavigationRequest() &&
+        /loginproxy\.gov\.bc\.ca\/.*\/protocol\/openid-connect\/auth/.test(req.url()),
+      { timeout: 15_000 },
+    );
+    await page.getByTestId(button).click();
+    return new URL((await request).url());
+  };
 
-    await page.waitForURL(/loginproxy\.gov\.bc\.ca/, { timeout: 15_000 });
+  test('signing in with IDIR goes to the BC Gov realm with the IDIR broker hint', async ({
+    page,
+  }) => {
+    const url = await signInRequest(page, 'landing-button__idir');
 
-    const url = new URL(page.url());
-    expect(url.pathname).toContain('/protocol/openid-connect/auth');
     expect(url.searchParams.get('response_type')).toBe('code');
     // PKCE, public client, no secret.
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     // azureidir, not idir: the integration selects IDIR - MFA, which federates via Azure AD.
     expect(url.searchParams.get('kc_idp_hint')).toBe('azureidir');
+    expect(url.searchParams.get('redirect_uri')).toContain('/authCallback');
+  });
+
+  test('signing in with Business BCeID goes to the BC Gov realm with the BCeID broker hint', async ({
+    page,
+  }) => {
+    const url = await signInRequest(page, 'landing-button__bceid');
+
+    expect(url.searchParams.get('response_type')).toBe('code');
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(url.searchParams.get('kc_idp_hint')).toBe('bceidbusiness');
     expect(url.searchParams.get('redirect_uri')).toContain('/authCallback');
   });
 });
