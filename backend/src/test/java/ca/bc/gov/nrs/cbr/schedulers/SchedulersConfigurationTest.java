@@ -25,8 +25,8 @@ import org.springframework.scheduling.config.ScheduledTaskHolder;
 
 /**
  * The schedulers against the real {@code application.yml}: every placeholder in their annotations
- * resolves; deployed, the file copy's two crons are on and both purges' are off; the local profile
- * schedules nothing; and set crons schedule all five behind the ShedLock proxy.
+ * resolves; deployed, nothing is scheduled (the file copy finished, both purges off); the local
+ * profile schedules nothing; and set crons schedule all five behind the ShedLock proxy.
  */
 class SchedulersConfigurationTest {
 
@@ -82,16 +82,16 @@ class SchedulersConfigurationTest {
   }
 
   @Test
-  @DisplayName("deployed, runs the file copy's fill and copy — not the file purge, nor the "
-      + "work-item purge")
-  void fileCopyOnByDefault() {
+  @DisplayName("deployed, schedules nothing — not the file copy, the file purge nor the work-item "
+      + "purge")
+  void offByDefault() {
     context.run(started -> {
       assertThat(started).hasNotFailed();
       assertThat(started.getEnvironment().getProperty("scheduled.jobs.fill.file.copy.items.cron"))
-          .isEqualTo("0 */15 * * * *");
+          .isEqualTo("-");
       assertThat(started.getEnvironment().getProperty("scheduled.jobs.copy.files.cron"))
-          .isEqualTo("0/2 * * * * *");
-      assertThat(scheduledTasks(started)).isEqualTo(2);
+          .isEqualTo("-");
+      assertThat(scheduledTasks(started)).isZero();
     });
   }
 

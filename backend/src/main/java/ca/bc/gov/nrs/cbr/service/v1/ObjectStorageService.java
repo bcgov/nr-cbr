@@ -62,9 +62,8 @@ public class ObjectStorageService implements DisposableBean {
    * The object key for a document's file: {@code docs/<FILE_ID>}. <b>The single definition</b> —
    * the upload, the download, the deletes and the BLOB migration all resolve their key here.
    *
-   * <p>They must agree exactly, and a disagreement would not look like a bug: while downloads fall
-   * back to the BLOB for a missing object, a migration writing to a key the download never reads
-   * passes every check and orphans every object, until the fallback is removed.
+   * <p>They must agree exactly: a migration writing to a key the download never reads would pass
+   * its own checks and leave every old file unopenable.
    */
   public static String fileKey(long fileId) {
     return FILE_PREFIX + fileId;
@@ -102,8 +101,7 @@ public class ObjectStorageService implements DisposableBean {
   }
 
   /**
-   * The object's bytes, or empty when there is none — the download's one round trip, with the BLOB
-   * to fall back to while files are being migrated.
+   * The object's bytes, or empty when there is none — the download's one round trip.
    */
   public Optional<byte[]> getObjectBytesIfPresent(String key) {
     try {
