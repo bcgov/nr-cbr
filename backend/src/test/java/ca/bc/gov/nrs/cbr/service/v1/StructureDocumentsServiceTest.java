@@ -114,7 +114,10 @@ class StructureDocumentsServiceTest {
         .inspectionId(id).crossingStructureId(structureId).inspectionDate(date).build());
   }
 
-  /** A document and its bytes; its id, from the sequence, is returned. */
+  /**
+   * A migrated document: its rows, with its bytes in the BLOB and in the bucket; its id, from the
+   * sequence, is returned.
+   */
   private long givenDocument(long structureId, Long inspectionId, String filename,
       LocalDateTime created) {
     CrossingStructureFileDetailEntity detail = CrossingStructureFileDetailEntity.builder()
@@ -125,6 +128,7 @@ class StructureDocumentsServiceTest {
     entityManager.persist(detail);
     entityManager.persist(CrossingStructureFileEntity.builder()
         .fileId(detail.getFileId()).structureFile(("bytes of " + filename).getBytes()).build());
+    bucket.put("docs/" + detail.getFileId(), ("bytes of " + filename).getBytes());
     return detail.getFileId();
   }
 
@@ -392,31 +396,27 @@ class StructureDocumentsServiceTest {
   }
 
   @Test
-  @DisplayName("reads a file from the bucket before its BLOB, and the BLOB only when there is none")
-  void readsTheBucketFirst() {
-    long migrated = givenDocument(7L, null, "deck.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
-    long notYet = givenDocument(7L, null, "pier.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
-    bucket.put("docs/" + migrated, "bytes from the bucket".getBytes());
+  @DisplayName("reads a file from the bucket, not its BLOB")
+  void readsTheBucket() {
+    long id = givenDocument(7L, null, "deck.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
+    bucket.put("docs/" + id, "bytes from the bucket".getBytes());
     documents(7L);
 
-    assertThat(new String(service.file(7L, migrated).content()))
-        .isEqualTo("bytes from the bucket");
-    assertThat(new String(service.file(7L, notYet).content())).isEqualTo("bytes of pier.jpg");
+    assertThat(new String(service.file(7L, id).content())).isEqualTo("bytes from the bucket");
   }
 
   @Test
-  @DisplayName("finds no file when neither the bucket nor the BLOB has it")
-  void neitherHasIt() {
+  @DisplayName("finds no file when the bucket has no object for it, even with bytes in its BLOB")
+  void noObject() {
     long id = givenDocument(7L, null, "deck.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
-    entityManager.flush();
-    files.deleteByFileIdIn(List.of(id));
-    files.insertEmpty(id);
+    bucket.remove("docs/" + id);
+    documents(7L);
 
     assertThatThrownBy(() -> service.file(7L, id)).isInstanceOf(DocumentNotFoundException.class);
   }
 
   @Test
-  @DisplayName("lets the bucket failing through, rather than read it as a file not yet migrated")
+  @DisplayName("lets the bucket failing through, rather than read it as a missing file")
   void bucketFails() {
     long id = givenDocument(7L, null, "deck.jpg", LocalDateTime.of(2020, 1, 1, 0, 0));
     documents(7L);

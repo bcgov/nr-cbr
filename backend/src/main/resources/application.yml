@@ -269,17 +269,17 @@ logging:
 # "never"; an env var of the same name overrides each one. ("${X:-}" is the env var X, else "-".)
 
 # FILE_COPY — the attachments' BLOBs to the object store (DELETE-AFTER-FILE-MIGRATION).
-# ON in every deployed environment: its crons are set here, in the repo, so the run is reviewed and
-# survives redeploys. Remove the two crons (back to "-") once the gate has passed — the log line
-# "FILE_COPY GATE: PASS" — and with them this code. Off locally (the local profile, at the end).
-# To stop it in one environment without a deploy: oc set env deploy/<backend>
-# SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON=- SCHEDULED_JOBS_COPY_FILES_CRON=-
-# The fill lists new files and logs progress and the gate (grep "FILE_COPY"), every 15 minutes.
-scheduled.jobs.fill.file.copy.items.cron: "${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON:0 */15 * * * *}"
+# OFF ("-") since 2026-11-17: the gate passed in DEV (751 files) and TEST (897). To run it again —
+# a top-up of files legacy added since, or PROD — set the two crons here (fill 0 */15 * * * *,
+# copy 0/2 * * * * *) so the run is reviewed and survives redeploys, or in one environment with
+# oc set env deploy/<backend> SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON='0 */15 * * * *'
+# SCHEDULED_JOBS_COPY_FILES_CRON='0/2 * * * * *'. Off locally either way (the local profile, at the end).
+# The fill lists new files and logs progress and the gate (grep "FILE_COPY").
+scheduled.jobs.fill.file.copy.items.cron: "${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON:-}"
 scheduled.jobs.fill.file.copy.items.cron.lockAtLeastFor: ${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON_LOCK_AT_LEAST_FOR:1m}
 scheduled.jobs.fill.file.copy.items.cron.lockAtMostFor: ${SCHEDULED_JOBS_FILL_FILE_COPY_ITEMS_CRON_LOCK_AT_MOST_FOR:10m}
-# The copy hands READY files to the copy executor every 2 seconds, with locks 1700ms / 1900ms.
-scheduled.jobs.copy.files.cron: "${SCHEDULED_JOBS_COPY_FILES_CRON:0/2 * * * * *}"
+# The copy hands READY files to the copy executor (when on, every 2 seconds, locks 1700ms / 1900ms).
+scheduled.jobs.copy.files.cron: "${SCHEDULED_JOBS_COPY_FILES_CRON:-}"
 scheduled.jobs.copy.files.cron.lockAtLeastFor: ${SCHEDULED_JOBS_COPY_FILES_CRON_LOCK_AT_LEAST_FOR:1700ms}
 scheduled.jobs.copy.files.cron.lockAtMostFor: ${SCHEDULED_JOBS_COPY_FILES_CRON_LOCK_AT_MOST_FOR:1900ms}
 # Files in flight per pod at most, and copied at once (each holds one file of 10 MB at most).

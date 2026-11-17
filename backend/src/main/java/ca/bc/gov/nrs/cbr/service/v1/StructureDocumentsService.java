@@ -5,7 +5,6 @@ import ca.bc.gov.nrs.cbr.exception.DocumentNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.FieldValidationException;
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileDetailEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileEntity;
 import ca.bc.gov.nrs.cbr.model.v1.FileAttachmentTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingStructureFileDetailRepository;
@@ -50,9 +49,9 @@ import software.amazon.awssdk.core.exception.SdkException;
  * {@code documentTab.jsp} fed by {@code FIND_FILE_DTLS_BY_STRCTRE} — and the file behind each.
  *
  * <p>Lists, opens, adds, edits and deletes them. Oracle holds what each document is and whose; its
- * file is in the object store at {@link ObjectStorageService#fileKey}. Files added before the move
- * are still in {@code CROSSING_STRUCTURE_FILE}'s BLOB until they are migrated, and are read from
- * there when the bucket has no object for them.
+ * file is in the object store at {@link ObjectStorageService#fileKey}, and only there: files added
+ * before the move are copied into it by the {@code FILE_COPY} job, and their BLOBs are never read
+ * here.
  */
 @Service
 public class StructureDocumentsService {
@@ -230,16 +229,16 @@ public class StructureDocumentsService {
   }
 
   /**
-   * One file's bytes, found only through the structure it belongs to: from the object store, or —
-   * for a file added before the move and not yet migrated — from its BLOB.
+   * One file's bytes, found only through the structure it belongs to, from the object store alone.
    *
-   * <p>Only a missing object falls back to the BLOB; the store failing otherwise is an error, not
-   * an empty file.
+   * <p>A missing object is a document not found; the store failing otherwise is an error, not a
+   * missing file.
    *
    * <p>The type is read from the file's name, then its extension code; legacy sent its MIME type
    * code, a ten-character code rather than a media type.
    *
-   * @throws DocumentNotFoundException if the structure has no such document, or its bytes are gone
+   * @throws DocumentNotFoundException if the structure has no such document, or the store has no
+   *     object for it
    */
   @Transactional(readOnly = true)
   public DocumentFile file(long structureId, long fileId) {
@@ -247,11 +246,8 @@ public class StructureDocumentsService {
         .filter(found -> Objects.equals(found.getCrossingStructureId(), structureId))
         .orElseThrow(() -> new DocumentNotFoundException(structureId, fileId));
     byte[] content = storage.getObjectBytesIfPresent(ObjectStorageService.fileKey(fileId))
-        .or(() -> files.findById(fileId)
-            .map(CrossingStructureFileEntity::getStructureFile)
-            .filter(blob -> blob.length > 0))
         .orElseThrow(() -> {
-          log.warn("Document {} of structure {} has no object and no BLOB", fileId, structureId);
+          log.warn("Document {} of structure {} has no object", fileId, structureId);
           return new DocumentNotFoundException(structureId, fileId);
         });
 
