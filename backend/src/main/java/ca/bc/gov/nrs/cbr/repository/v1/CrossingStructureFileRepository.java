@@ -1,8 +1,11 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureFileEntity;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -31,4 +34,25 @@ public interface CrossingStructureFileRepository
   @Query(value = "INSERT INTO THE.CROSSING_STRUCTURE_FILE (FILE_ID, STRUCTURE_FILE) "
       + "VALUES (:fileId, EMPTY_BLOB())", nativeQuery = true)
   void insertEmpty(@Param("fileId") long fileId);
+
+  /**
+   * The file, its row locked until the transaction ends ({@code SELECT … FOR UPDATE}) — so its
+   * bytes cannot change between {@code FILE_PURGE} checking them against the object store and
+   * emptying them. DELETE-AFTER-FILE-MIGRATION.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT file FROM CrossingStructureFileEntity file WHERE file.fileId = :fileId")
+  Optional<CrossingStructureFileEntity> findLockedByFileId(@Param("fileId") long fileId);
+
+  /**
+   * Empties the file's bytes, keeping its row — {@code FILE_PURGE}, once the object store's copy is
+   * proved the same. Native, for Oracle's {@code EMPTY_BLOB()}, as {@link #insertEmpty}.
+   * DELETE-AFTER-FILE-MIGRATION.
+   *
+   * @return the rows emptied: 1, or 0 when the file is gone
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(value = "UPDATE THE.CROSSING_STRUCTURE_FILE SET STRUCTURE_FILE = EMPTY_BLOB() "
+      + "WHERE FILE_ID = :fileId", nativeQuery = true)
+  int emptyFile(@Param("fileId") long fileId);
 }
