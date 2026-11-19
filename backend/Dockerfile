@@ -6,7 +6,17 @@ COPY src src
 RUN mvn package -DskipTests
 RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 
-FROM eclipse-temurin:21.0.9_10-jdk-alpine-3.23
+# 21.0.12 or later: earlier JDKs carry time-zone rules from before B.C. stayed on UTC−7
+# (2026-11-01), so America/Vancouver would fall back to UTC−8 and every Pacific timestamp would be an
+# hour behind. TZ only names the zone; the rules come from this JDK.
+FROM eclipse-temurin:21.0.13_9-jdk-alpine-3.23
+
+# OpenShift runs the container as a random UID with no home directory (HOME=/) and a read-only root
+# filesystem, so when a PDF report draws text, fontconfig finds no writable cache directory and logs
+# "Fontconfig error: No writable cache directories" on every font load. Point HOME and the cache at
+# /tmp — the writable emptyDir in openshift.deploy.yml — so it caches in /tmp/.cache/fontconfig.
+ENV HOME=/tmp \
+    XDG_CACHE_HOME=/tmp/.cache
 
 RUN adduser -D -s /bin/sh spring
 RUN mkdir -p /logs
