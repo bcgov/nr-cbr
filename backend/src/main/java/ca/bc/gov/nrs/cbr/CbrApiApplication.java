@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr;
 
 import static org.springframework.data.web.config.EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO;
 
+import ca.bc.gov.nrs.cbr.configuration.OracleTlsCompatibility;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
@@ -41,6 +42,7 @@ public class CbrApiApplication extends SpringBootServletInitializer {
   }
 
   public static void main(String[] args) {
+    OracleTlsCompatibility.allowRsaKeyExchange();
     SpringApplication.run(CbrApiApplication.class, args);
   }
 
