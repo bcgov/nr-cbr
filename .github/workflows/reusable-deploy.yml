@@ -102,6 +102,19 @@ on:
           CBR's CSS API account secret (CSS_API_CLIENT_SECRET), for the Reviewed By list. Optional:
           unset, the list is empty.
         required: false
+      keycloak_sa_client_id:
+        description: |
+          Keycloak admin service-account client id (needs realm-management 'manage-clients') in the
+          KEYCLOAK_SA_ISSUER_URI realm. Used to create/sync the CBR backend's own service account
+          for the LRM Ops API. Optional: unset, that step is skipped and the LRM Ops client is
+          inactive.
+        required: false
+      keycloak_sa_client_secret:
+        description: Keycloak admin service-account client secret
+        required: false
+      lrmops_api_base_url:
+        description: LRM Ops API base URL for this environment (LRMOPS_API_BASE_URL).
+        required: false
 
     outputs:
       triggered:
@@ -136,9 +149,45 @@ jobs:
       OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.object_storage_access_key }}
       OBJECT_STORAGE_SECRET_KEY: ${{ secrets.object_storage_secret_key }}
       CSS_API_CLIENT_SECRET: ${{ secrets.css_api_client_secret }}
+      # Job-level so the step `if:` below can read it (a step's own `env` isn't available to that
+      # step's `if`).
+      KC_SA_CLIENT_ID: ${{ secrets.keycloak_sa_client_id }}
     steps:
+      # The deployer action checks out internally, but the Keycloak script runs before it, so check
+      # out here to make ./.github/scripts available.
+      - uses: actions/checkout@v7
+
+      # Idempotently create the CBR backend's service-account client (nr-cbr-backend) and assign
+      # the LRM Ops API's scope. Skipped when the admin service-account credentials aren't
+      # configured, so those deploys are unaffected. The resulting client id/secret are masked
+      # step outputs for the deploy step below.
+      #
+      # NOTE THE REALM. This runs against KEYCLOAK_SA_ISSUER_URI (the realm the LRM Ops API
+      # validates tokens against and where its scopes live), NOT KEYCLOAK_ISSUER_URI, the standard
+      # realm CBR's users sign in through. The script derives the realm from whatever issuer it is
+      # given, so pointing it at the wrong one silently creates the client in the wrong realm and
+      # every call is then refused (401).
+      - name: Ensure Keycloak service account
+        id: keycloak_sa
+        if: ${{ env.KC_SA_CLIENT_ID != '' }}
+        env:
+          KEYCLOAK_ISSUER_URI: ${{ vars.KEYCLOAK_SA_ISSUER_URI }}
+          KC_SA_CLIENT_SECRET: ${{ secrets.keycloak_sa_client_secret }}
+        run: ./.github/scripts/ensure-keycloak-service-account.sh
+
       - uses: bcgov/action-deployer-openshift@e2d60eb9cacceb89c3b97d8dcf0a2c460eea5eab # v4.2.3
         id: deploy
+        # The service-account secret is a step OUTPUT (from keycloak_sa), so it can't sit in the
+        # job-level env; set it here and reference "$LRMOPS_API_CLIENT_SECRET" in parameters —
+        # single bash expansion, same reasoning as DATABASE_PASSWORD above. Empty when the
+        # keycloak_sa step is skipped; the client is then inactive.
+        #
+        # The token URL is derived from KEYCLOAK_SA_ISSUER_URI, not KEYCLOAK_ISSUER_URI: the backend
+        # presents these credentials to the service-account client created above.
+        env:
+          LRMOPS_API_CLIENT_SECRET: ${{ steps.keycloak_sa.outputs.client_secret }}
+          LRMOPS_API_BASE_URL: ${{ secrets.lrmops_api_base_url }}
+          LRMOPS_API_TOKEN_URL: ${{ vars.KEYCLOAK_SA_ISSUER_URI != '' && format('{0}/protocol/openid-connect/token', vars.KEYCLOAK_SA_ISSUER_URI) || '' }}
         with:
           file: backend/openshift.deploy.yml
           oc_namespace: ${{ secrets.oc_namespace }}
@@ -175,6 +224,10 @@ jobs:
             -p CSS_API_CLIENT_SECRET="$CSS_API_CLIENT_SECRET"
             -p CSS_API_INTEGRATION_ID="${{ vars.CSS_API_INTEGRATION_ID }}"
             -p CSS_API_ENVIRONMENT="${{ vars.CSS_API_ENVIRONMENT }}"
+            -p LRMOPS_API_BASE_URL="$LRMOPS_API_BASE_URL"
+            -p LRMOPS_API_TOKEN_URL="$LRMOPS_API_TOKEN_URL"
+            -p LRMOPS_API_CLIENT_ID="${{ steps.keycloak_sa.outputs.client_id }}"
+            -p LRMOPS_API_CLIENT_SECRET="$LRMOPS_API_CLIENT_SECRET"
           triggers: ${{ inputs.triggers }}
 
   frontend:
