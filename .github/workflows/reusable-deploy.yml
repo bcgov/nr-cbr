@@ -112,9 +112,6 @@ on:
       keycloak_sa_client_secret:
         description: Keycloak admin service-account client secret
         required: false
-      lrmops_api_base_url:
-        description: LRM Ops API base URL for this environment (LRMOPS_API_BASE_URL).
-        required: false
 
     outputs:
       triggered:
@@ -186,7 +183,8 @@ jobs:
         # presents these credentials to the service-account client created above.
         env:
           LRMOPS_API_CLIENT_SECRET: ${{ steps.keycloak_sa.outputs.client_secret }}
-          LRMOPS_API_BASE_URL: ${{ secrets.lrmops_api_base_url }}
+          # A variable, not a secret: a URL is not sensitive.
+          LRMOPS_API_BASE_URL: ${{ vars.LRMOPS_API_BASE_URL }}
           LRMOPS_API_TOKEN_URL: ${{ vars.KEYCLOAK_SA_ISSUER_URI != '' && format('{0}/protocol/openid-connect/token', vars.KEYCLOAK_SA_ISSUER_URI) || '' }}
         with:
           file: backend/openshift.deploy.yml

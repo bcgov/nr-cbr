@@ -93,7 +93,6 @@ jobs:
       css_api_client_secret: ${{ secrets.css_api_client_secret }}
       keycloak_sa_client_id: ${{ secrets.keycloak_sa_client_id }}
       keycloak_sa_client_secret: ${{ secrets.keycloak_sa_client_secret }}
-      lrmops_api_base_url: ${{ secrets.lrmops_api_base_url }}
     with:
       environment: dev
       target: ${{ github.event.number }}
