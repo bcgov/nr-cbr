@@ -206,27 +206,6 @@ ca:
           # shared across BC Gov applications, so issuer + signature alone do not prove a token was
           # minted for CBR. Differs per environment, hence configuration rather than a constant.
           client-id: ${KEYCLOAK_CLIENT_ID}
-        # nr-user-lookup-api — the shared BC Gov IDIR directory. Replaces the FAM identity-lookup
-        # integration: FAM still administers the CBR roles, it is just no longer the directory.
-        # Calls authenticate with CBR's OWN client_credentials service account, not the caller's
-        # token, because that is what nr-user-lookup-api validates.
-        #
-        # Nothing in CBR calls it yet: inspection-reviewer administration, its intended first
-        # consumer, was replaced by a FAM role, read from CSS (css-api below).
-        #
-        # Set all of token-url / client-id / client-secret, or none — a partial trio fails fast at
-        # startup. Unset means an unauthenticated client and an empty directory, which is how PR
-        # previews run.
-        user-lookup:
-          base-url: ${USER_LOOKUP_BASE_URL:}
-          token-url: ${USER_LOOKUP_TOKEN_URL:}
-          client-id: ${USER_LOOKUP_CLIENT_ID:}
-          client-secret: ${USER_LOOKUP_CLIENT_SECRET:}
-          # Optional — the scopes are DEFAULT client scopes on the service account, so normally
-          # left blank.
-          scope: ${USER_LOOKUP_SCOPE:}
-          connect-timeout: 15s
-          read-timeout: 30s
         # The CSS API over CBR's own integration (Common Hosted Single Sign-On). FAM grants CBR's roles
         # as client roles there, so this is where Inspection Search's Reviewed By list comes from:
         # everyone holding CBR_INSPECTION_REVIEWER. Calls authenticate as CBR's CSS API account
@@ -244,6 +223,21 @@ ca:
           environment: ${CSS_API_ENVIRONMENT:}
           connect-timeout: 5s
           read-timeout: 15s
+        # The LRM Ops API: LRMOPS road data from TFM. Calls authenticate as CBR's own
+        # client_credentials service account (nr-cbr-backend), which CI creates in the realm the
+        # API validates tokens against (KEYCLOAK_SA_ISSUER_URI, not the standard realm) and gives
+        # the lrmops:roads:read scope.
+        #
+        # Set all of token-url / client-id / client-secret, or none — a partial trio fails fast at
+        # startup. Unset, the client is inactive, which is how PR previews run.
+        lrmops-api:
+          base-url: ${LRMOPS_API_BASE_URL:}
+          token-url: ${LRMOPS_API_TOKEN_URL:}
+          client-id: ${LRMOPS_API_CLIENT_ID:}
+          client-secret: ${LRMOPS_API_CLIENT_SECRET:}
+          connect-timeout: 5s
+          # Above the API's own 30s query timeout, so its error arrives rather than ours.
+          read-timeout: 35s
         user-directory:
           default-page-size: 25
         frontend:

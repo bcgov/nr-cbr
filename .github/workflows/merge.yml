@@ -53,6 +53,8 @@ jobs:
       clamav_host: ${{ secrets.clamav_host }}
       css_api_client_id: ${{ secrets.css_api_client_id }}
       css_api_client_secret: ${{ secrets.css_api_client_secret }}
+      keycloak_sa_client_id: ${{ secrets.keycloak_sa_client_id }}
+      keycloak_sa_client_secret: ${{ secrets.keycloak_sa_client_secret }}
     with:
       environment: test
       target: test
@@ -121,6 +123,9 @@ jobs:
   #     KEYCLOAK_ISSUER_URI / KEYCLOAK_CLIENT_ID point at the PROD realm.
   #   - The Oracle credentials on the `prod` Environment reach the PROD
   #     database, not TEST.
+  #   - KEYCLOAK_SA_ISSUER_URI / KEYCLOAK_SA_CLIENT_ID / KEYCLOAK_SA_CLIENT_SECRET
+  #     on `prod` point at the PROD realm the LRM Ops API validates against, and
+  #     LRMOPS_API_BASE_URL at the PROD LRM Ops API.
   #
   # deploy-prod:
   #   name: PROD Deploys (${{ needs.init.outputs.pr }})
@@ -145,6 +150,8 @@ jobs:
   #     clamav_host: ${{ secrets.clamav_host }}
   #     css_api_client_id: ${{ secrets.css_api_client_id }}
   #     css_api_client_secret: ${{ secrets.css_api_client_secret }}
+  #     keycloak_sa_client_id: ${{ secrets.keycloak_sa_client_id }}
+  #     keycloak_sa_client_secret: ${{ secrets.keycloak_sa_client_secret }}
   #   with:
   #     environment: prod
   #     target: prod
