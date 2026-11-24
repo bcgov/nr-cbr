@@ -146,7 +146,7 @@ beforeEach(() => {
           forestFileId: 'R00123',
           roadSectionId: '01',
           forestServiceRoad: 'Bowron FSR',
-          orgUnitNo: 18,
+          districts: [{ orgUnitNo: 18, code: 'DPG' }],
         })
       : Promise.reject(new Error('No road section was found.')),
   );
@@ -476,13 +476,13 @@ describe('SiteDetailPage — the road, while editing', () => {
   });
 
   it('does not rewrite the stored district just by being viewed', async () => {
-    // The road's region is not the stored district here. Reading the site must show what is
+    // The road's district is not the stored district here. Reading the site must show what is
     // stored; only an edit lets the road write the district.
     roadApi.getRoadSection.mockResolvedValue({
       forestFileId: 'R00123',
       roadSectionId: '01',
       forestServiceRoad: 'Bowron FSR',
-      orgUnitNo: 99,
+      districts: [{ orgUnitNo: 99, code: 'DXX' }],
     });
     await renderPage();
 

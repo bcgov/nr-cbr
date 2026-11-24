@@ -1,4 +1,23 @@
 @use 'sass:map';
+@use 'sass:string';
+
+/* BC Sans is the one typeface, everywhere: page text, labels, inputs, tables, header and side nav.
+   Carbon writes its font stacks straight into its CSS (no custom property to override), so the
+   stacks are configured here, before anything else loads @carbon/type. Mono and serif get the same
+   stack: Carbon uses mono for the date picker input and code, and nothing is to render in another
+   typeface. The faces are loaded in main.tsx from @bcgov/bc-sans.
+
+   BC Sans has light, regular and bold only, so Carbon's semibold (600) renders bold. Expected; no
+   adjustment. */
+$bc-sans: string.unquote("'BC Sans', 'Noto Sans', Verdana, Arial, sans-serif");
+
+@use '@carbon/type/scss/font-family' with (
+  $font-families: (
+    'sans': $bc-sans,
+    'mono': $bc-sans,
+    'serif': $bc-sans,
+  )
+);
 
 @use './variables' as variables;
 
@@ -10,8 +29,8 @@
    "didn't resolve at build time, it will remain unchanged to be resolved at runtime".
 
    Turning the emission off rather than repointing it, because the fonts were never being served:
-   this application is BC Gov, not IBM, and its font stack is BCSans with a Verdana/Arial fallback
-   (see the header rule below). Nothing rendered in Plex before this change either — the faces
+   this application is BC Gov, not IBM, and its font is BC Sans (configured above). Nothing
+   rendered in Plex before this change either — the faces
    simply failed to load — so this removes ~40 failed requests and the console noise and alters
    nothing on screen.
 
@@ -21,6 +40,7 @@
 @use '@carbon/styles/scss/config' with (
   $css--font-face: false
 );
+@use '@carbon/react/scss/type';
 
 @use '@carbon/react/scss/themes';
 @use '@carbon/react/scss/theme' with (
@@ -612,8 +632,8 @@ nav.#{variables.$bcgov-prefix}--side-nav--expanded {
 
 a.#{variables.$bcgov-prefix}--header__name {
   // previously was .#{variables.$bcgov-prefix}--header-site-name
-  font-family: 'BCSans', 'Noto Sans', Verdana, Arial, sans-serif;
-  font-size: 0.875rem;
+  @include type.type-style('body-compact-01');
+
   font-weight: 700;
   color: #f3f3f5;
   padding-left: 2rem;
@@ -686,4 +706,40 @@ div:has(.#{variables.$bcgov-prefix}--header) ~ .#{variables.$bcgov-prefix}--cont
 // underneath it is what we hide.
 .cds--icon-tooltip > .cds--popover {
   display: none;
+}
+
+/* ------------------ Text sizes -------------------
+   Field labels at label-02 and text content at body-02 / body-compact-02: one step above Carbon's
+   defaults, because people in usability testing found the defaults hard to read and browser zoom
+   leaves the work with them. Helper text stays at helper-text-01, quieter than its label.
+
+   Anything DataTable renders keeps Carbon's sizes: larger text no longer fits its row heights.
+   None of the rules below reach into a table — DataTable sets its own type on cells and headers,
+   and the table toolbar search is deliberately not in the input list.
+-------------------------------------------------- */
+.cds--label {
+  @include type.type-style('label-02');
+}
+
+.cds--text-input,
+.cds--text-area,
+.cds--select-input,
+.cds--date-picker__input,
+.cds--number input[type='number'],
+.cds--list-box__label,
+.cds--list-box__menu-item__option,
+.cds--radio-button__label-text,
+.cds--checkbox-label-text {
+  @include type.type-style('body-compact-02');
+}
+
+// Dialog text is page text, not table text.
+.cds--modal-content {
+  @include type.type-style('body-02');
+}
+
+// Pagination sits under a table and belongs to it visually: its page and page-size selects keep
+// Carbon's size, as the table does.
+.cds--pagination .cds--select-input {
+  @include type.type-style('body-compact-01');
 }

@@ -18,7 +18,8 @@ type Props = {
 };
 
 /**
- * A date box with its calendar, typed as legacy's `yyyy/mm/dd`.
+ * A date box with its calendar, typed as legacy's `yyyy/mm/dd`. The caller's label carries the
+ * format — "Date of Inspection (yyyy/mm/dd)" — as every date field's does.
  *
  * <p>Only a whole date (or none) goes back to the picker: flatpickr parses the value it is handed,
  * and handing it each half-typed keystroke would rewrite the box under the user's cursor.
@@ -51,7 +52,6 @@ const DateField: FC<Props> = ({
         // One span, because Carbon lays a date picker's label out as flex: an asterisk on its own
         // would be a flex item, lifted off the text's baseline.
         labelText={<span>{labelText}</span>}
-        placeholder="yyyy/mm/dd"
         disabled={disabled}
         invalid={Boolean(invalidText)}
         invalidText={invalidText}

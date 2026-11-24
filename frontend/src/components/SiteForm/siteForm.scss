@@ -13,7 +13,8 @@
 // buying a blank line per row against a case that does not arise — and putting this form 16px out
 // of step with every other one. `layout.browser.test.tsx` asserts that stays true: add a label long
 // enough to wrap and it fails there rather than the alignment quietly going.
-$label-block-size: 1rem;
+// One line of `label-02`, the size field labels take (styles/_overrides.scss, Text sizes).
+$label-block-size: 1.125rem;
 
 .site-form__form {
   margin-block-end: 0;
@@ -80,12 +81,24 @@ $label-block-size: 1rem;
   // the last one. It was written as `:last-child` and quietly became the lookup button when that
   // was added beside it — so "Br." grew to the width of a full field and the button took a
   // six-rem box it had no use for.
+  // "Project File ID#" on one line. Every label here reserves one line (see $label-block-size), so a
+  // wrapped one pushes its box below Br.'s; at 16px text the four-column layout gets narrow enough
+  // for that. `nowrap` makes the label's width this item's minimum (a flex item's `min-width: auto`),
+  // so the box shrinks no further than its label; Br. narrows instead (below).
+  // Basis 0: it takes what Br.'s 8rem leaves, so Br. keeps its width until this is down to its label.
   > :first-child {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+
+    .#{vars.$bcgov-prefix}--label {
+      white-space: nowrap;
+    }
   }
 
+  // 8rem: about ten characters of 16px text — "42-A80-A12" whole, where 6rem cut it at seven.
+  // Shrinkable: where the column is too narrow for both, Br. gives way rather than pushing the
+  // lookup button into the next field.
   > :nth-child(2) {
-    flex: 0 0 6rem;
+    flex: 0 1 8rem;
     // A flex item is `min-width: auto` by default, so it will not shrink below the intrinsic width
     // of what is inside it — and Carbon's text input has a wide one. Without this the basis above
     // is ignored and "Br." renders as wide as the field beside it.
@@ -111,8 +124,8 @@ $label-block-size: 1rem;
     flex: 0 0 auto;
     align-items: flex-start;
     align-self: flex-start;
-    // A label's height above the boxes: Carbon's `label-01` line plus the margin under it.
-    padding-block-start: calc(#{$spacing-03} + 1rem);
+    // A label's height above the boxes: one `label-02` line plus the margin Carbon leaves under it.
+    padding-block-start: calc(#{$spacing-03} + #{$label-block-size});
     // The row's gap, plus the inset Carbon leaves inside a text input's wrapper, comes to twice
     // the gap between the two fields — so the button reads as adrift of the pair it belongs to.
     // Pulled back by one gap. Measured, not guessed: see layout.browser.test.tsx.
@@ -222,7 +235,7 @@ $label-block-size: 1rem;
   display: flex;
   align-items: center;
   min-block-size: 2.5rem;
-  @include type.type-style('body-01');
+  @include type.type-style('body-02');
 }
 
 // A fixed basis, not `flex: 1`. Ten digits is the widest value any of these holds, and 7rem fits it
@@ -270,4 +283,41 @@ $label-block-size: 1rem;
   // A flex item will not shrink below the intrinsic width of what is inside it, and Carbon's text
   // input has a wide one — without this the basis above is ignored.
   min-inline-size: 0;
+}
+
+// Forest District when the road lies in several districts: the chosen value read-only, with the
+// button that opens the pop-up to choose it, a line saying why, and the field's error in red.
+.site-form__road-district {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-02;
+}
+
+.site-form__road-district-value {
+  display: flex;
+  align-items: flex-end;
+  gap: $spacing-04;
+  justify-content: space-between;
+}
+
+.site-form__road-district-help {
+  @include type.type-style('helper-text-01');
+
+  color: var(--cds-text-secondary);
+}
+
+.site-form__road-district-error {
+  @include type.type-style('helper-text-01');
+
+  color: var(--cds-text-error);
+}
+
+// The help line's link: a text link on a button element, sized to the line.
+.site-form__road-district-link {
+  @include type.type-style('helper-text-01');
+
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
 }

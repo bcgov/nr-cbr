@@ -41,7 +41,7 @@ const AuthCallbackPage = () => {
   if (failed) {
     return (
       <div className="auth-callback__error" role="alert">
-        <h1>Sign-in could not be completed</h1>
+        <h1 className="auth-callback__title">Sign-in could not be completed</h1>
         <p>Please return to the home page and try signing in again.</p>
         <a href="/">Return to CBR</a>
       </div>

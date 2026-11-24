@@ -1,3 +1,4 @@
+@use '@carbon/react/scss/type';
 // Session-timeout warning modal. A bespoke alertdialog (not Carbon's Modal)
 // because the spec forbids every dismiss affordance Carbon's Modal ships
 // with — no X, no ESC, no backdrop-close — and wants a focus trap with
@@ -27,9 +28,8 @@
 
 .session-timeout__title {
   margin: 0 0 1rem;
-  font-size: 1.25rem;
-  font-weight: 400;
-  line-height: 1.4;
+  // heading-03, as Carbon sets a modal's heading: a dialog's title.
+  @include type.type-style('heading-03');
 }
 
 .session-timeout__body p {

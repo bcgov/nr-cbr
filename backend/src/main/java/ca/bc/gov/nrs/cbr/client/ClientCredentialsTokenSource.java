@@ -19,7 +19,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Encapsulates the OAuth2 {@code client_credentials} exchange used to
- * authenticate outbound calls — to nr-user-lookup-api and to the CSS API. Owns its own
+ * authenticate outbound calls — to the LRM Ops API and to the CSS API. Owns its own
  * {@link RestClient} (pointed at the Keycloak token endpoint), the
  * Basic-auth header derived from client_id/client_secret, and the form
  * body. Returned tokens are short-lived JWTs; this source caches them
@@ -31,7 +31,7 @@ public final class ClientCredentialsTokenSource {
   private static final Logger LOG = LoggerFactory.getLogger(ClientCredentialsTokenSource.class);
 
   private final RestClient http;
-  /** Which client this authenticates, for the logs: {@code user-lookup}, {@code css-api}. */
+  /** Which client this authenticates, for the logs: {@code lrmops-api}, {@code css-api}. */
   private final String name;
   private final String tokenUrl;
   private final String clientId;
@@ -55,21 +55,12 @@ public final class ClientCredentialsTokenSource {
   }
 
   /**
+   * A source for the client {@code name}, whose settings are the environment variables named
+   * after it: {@code css-api}, {@code CSS_API_*}.
+   *
    * @return a configured source when all three of token-url / client-id /
    *     client-secret are non-blank; {@code null} when client-credentials auth
    *     wasn't requested at all (lets the caller fall back to unauthenticated).
-   */
-  public static ClientCredentialsTokenSource fromProps(
-      String tokenUrl, String clientId, String clientSecret, String scope,
-      Duration connectTimeout, Duration readTimeout) {
-    return fromProps("user-lookup", tokenUrl, clientId, clientSecret, scope,
-        connectTimeout, readTimeout);
-  }
-
-  /**
-   * As {@link #fromProps(String, String, String, String, Duration, Duration)}, for the client
-   * {@code name}, whose settings are the environment variables named after it: {@code css-api},
-   * {@code CSS_API_*}.
    */
   public static ClientCredentialsTokenSource fromProps(
       String name, String tokenUrl, String clientId, String clientSecret,

@@ -122,7 +122,7 @@ describe('InspectionsConductedPage', () => {
     for (const label of MULTI_SELECT_LABELS) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    expect(screen.getByText('Inspection Date')).toBeInTheDocument();
+    expect(screen.getByText('Inspection Date (yyyy/mm)')).toBeInTheDocument();
     for (const toggle of [
       'Close Proximity Inspection Required?',
       'Most Recent Inspections Only?',

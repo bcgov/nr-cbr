@@ -117,10 +117,14 @@ describe('InspectionsDuePage', () => {
     async (variant) => {
       renderPage(variant);
 
-      await waitFor(async () =>
-        expect(await multiSelectOptions(`${ID[variant]}-structureTypeClassCode`)).toEqual([
-          'PB - Permanent Bridge',
-        ]),
+      // Each try opens and closes the list with real clicks, so under a loaded full run the
+      // default 1s can expire before the code table has loaded.
+      await waitFor(
+        async () =>
+          expect(await multiSelectOptions(`${ID[variant]}-structureTypeClassCode`)).toEqual([
+            'PB - Permanent Bridge',
+          ]),
+        { timeout: 5000 },
       );
       for (const label of SHARED_LABELS) {
         expect(
@@ -130,7 +134,7 @@ describe('InspectionsDuePage', () => {
       for (const label of MULTI_SELECT_LABELS) {
         expect(screen.getByText(label)).toBeInTheDocument();
       }
-      expect(screen.getByText('Next Planned Inspection Date')).toBeInTheDocument();
+      expect(screen.getByText('Next Planned Inspection Date (yyyy/mm/dd)')).toBeInTheDocument();
       expect(screen.getByText('No Next Planned Inspection Date')).toBeInTheDocument();
       expect(screen.queryByLabelText('Structure #')).not.toBeInTheDocument();
       expect(screen.queryByText(/^Area/)).not.toBeInTheDocument();

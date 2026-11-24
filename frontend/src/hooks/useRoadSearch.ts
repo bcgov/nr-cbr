@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import type { RoadSearchCriteria, RoadSearchResult, RoadSort } from '@/services/road.service';
 import type { PagedResponse } from '@/types/api';
+import type { CodeOption } from '@/types/configuration';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 import API from '@/services/APIs';
@@ -37,4 +38,17 @@ export const useRoadSearch = (
     // Keeps the current page on screen while the next one loads, rather than collapsing the table
     // to "No roads found." between pages — which reads as a search that found nothing.
     placeholderData: keepPreviousData,
+  });
+
+export const ROAD_TENURE_TYPES_QUERY_KEY = 'road-tenure-types';
+
+/**
+ * LRMOPS's road tenure types, for the Road Search dialog's Tenure Type dropdown — a short list
+ * that changes about as often as a code table, so fetched once a session.
+ */
+export const useRoadTenureTypes = (): UseQueryResult<CodeOption[]> =>
+  useQuery({
+    queryKey: [ROAD_TENURE_TYPES_QUERY_KEY],
+    queryFn: () => API.road.getTenureTypes(),
+    staleTime: Infinity,
   });

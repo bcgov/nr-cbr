@@ -20,3 +20,9 @@
   align-items: center;
   padding: 1rem;
 }
+
+// The panel's title, as a dialog's: heading-03. An h2 — the panel sits beside the page's h1, not
+// under one of its sections.
+.right-title-section__heading {
+  @include type.type-style('heading-03');
+}

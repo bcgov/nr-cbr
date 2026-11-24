@@ -170,8 +170,9 @@ const StructureSearchCriteriaForm: FC<Props> = ({
   );
 
   /**
-   * A "from – to" pair, as on Site Search: the legend names the pair and the boxes carry hidden
-   * labels and a placeholder. Kilometres hold `999999.99` at most; a year is four digits.
+   * A "from – to" pair, as on Site Search: the legend names the pair, and the boxes carry hidden
+   * labels and "From" / "To" placeholders. Kilometres hold `999999.99` at most; a year is four
+   * digits.
    */
   const range = (
     from: keyof Criteria,
@@ -184,7 +185,7 @@ const StructureSearchCriteriaForm: FC<Props> = ({
         ? text(field, `${labelText} ${end}`, 4, {
             inputMode: 'numeric',
             hideLabel: true,
-            placeholder: `${end} yyyy`,
+            placeholder: end,
           })
         : text(field, `${labelText} ${end}`, 9, {
             inputMode: 'decimal',

@@ -158,7 +158,7 @@ beforeEach(() => {
     forestFileId: 'R00123',
     roadSectionId: '01',
     forestServiceRoad: 'Bowron FSR',
-    orgUnitNo: 18,
+    districts: [{ orgUnitNo: 18, code: 'DPG' }],
   });
 });
 
@@ -614,7 +614,7 @@ describe('AddSitePage — the site type', () => {
             forestFileId: 'R00123',
             roadSectionId: '01',
             forestServiceRoad: 'Bowron FSR',
-            orgUnitNo: 18,
+            districts: [{ orgUnitNo: 18, code: 'DPG' }],
           })
         : Promise.reject(new Error('No road section was found.')),
     );
@@ -631,13 +631,13 @@ describe('AddSitePage — the site type', () => {
     });
   });
 
-  it("does not keep the previous road's district for a road with no region", async () => {
+  it("does not keep the previous road's district for a road with no district", async () => {
     roadApi.getRoadSection.mockImplementation((file: string) =>
       Promise.resolve({
         forestFileId: file,
         roadSectionId: '01',
         forestServiceRoad: file === 'R00123' ? 'Bowron FSR' : 'Deadman Spur',
-        orgUnitNo: file === 'R00123' ? 18 : null,
+        districts: file === 'R00123' ? [{ orgUnitNo: 18, code: 'DPG' }] : [],
       }),
     );
     await renderPage();
@@ -650,6 +650,124 @@ describe('AddSitePage — the site type', () => {
 
     expect(await screen.findByText('Deadman Spur')).toBeInTheDocument();
     expect(screen.queryByText('DPG - Prince George')).not.toBeInTheDocument();
+  });
+
+  it('chooses the district of a road that crosses a boundary in a pop-up', async () => {
+    // Business, 2026-11-23: one district fills in; two or more, the user chooses — in a pop-up
+    // that shows the road, the length in each district and the location entered, with Forest
+    // District read-only on the form.
+    roadApi.getRoadSection.mockResolvedValue({
+      forestFileId: 'R07571',
+      roadSectionId: 'AA',
+      forestServiceRoad: 'Big Creek FSR',
+      tenureType: 'FSR',
+      clientName: 'ACME LTD',
+      districts: [
+        { orgUnitNo: 18, code: 'DPG', lengthMetres: 1200 },
+        { orgUnitNo: 19, code: 'DMH', lengthMetres: null },
+      ],
+    });
+    api.getManagementAreas.mockImplementation((district: string) =>
+      Promise.resolve(
+        district === '19'
+          ? [{ orgUnitNo: '1901', orgUnitCode: 'MA1', orgUnitName: 'Area One' }]
+          : [],
+      ),
+    );
+    await renderPage();
+    type('crossingSiteTypeCode', 'CRS');
+    type('forestFileId', 'R07571');
+    type('roadSectionId', 'AA');
+
+    // Opens by itself; on the form both fields are read-only, not chosen yet.
+    const modal = await screen.findByTestId('road-district-modal');
+    expect(screen.getByTestId('site-form-orgUnitNo-choice')).toBeInTheDocument();
+    expect(screen.queryByTestId('site-form-orgUnitNo')).not.toBeInTheDocument();
+    expect(screen.getByText('Not chosen')).toBeInTheDocument();
+    expect(within(modal).getByText(/lies in 2 districts/)).toBeInTheDocument();
+    expect(within(modal).getByText('ACME LTD')).toBeInTheDocument();
+    expect(within(modal).getByText('1.20 km of this section')).toBeInTheDocument();
+    // No coordinates on the form yet, so no location section.
+    expect(within(modal).queryByText('Site location entered')).not.toBeInTheDocument();
+    // The list's name for the one it knows, the road's code for the one it does not.
+    expect(within(modal).getByRole('radio', { name: /DPG - Prince George/ })).not.toBeChecked();
+    expect(within(modal).queryByText('Management Area')).not.toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole('radio', { name: /DMH/ }));
+    fireEvent.click(within(modal).getByTestId('road-district-confirm'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('road-district-modal')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Org unit 19')).toBeInTheDocument();
+    // The Management Area is picked on the form, from the chosen district's areas.
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'MA1 - Area One' })).toBeInTheDocument();
+    });
+    type('managementOrgUnitNo', '1901');
+    expect(field('managementOrgUnitNo')).toHaveValue('1901');
+  });
+
+  it('stays closed once cancelled, reopens from the link, and opens again for another road', async () => {
+    // AA lies in DPG and DMH; AB in DMH and DQU, so a DPG chosen for AA does not carry over.
+    roadApi.getRoadSection.mockImplementation((file: string, section: string) =>
+      Promise.resolve({
+        forestFileId: file,
+        roadSectionId: section,
+        forestServiceRoad: 'Big Creek FSR',
+        districts:
+          section === 'AA'
+            ? [
+                { orgUnitNo: 18, code: 'DPG' },
+                { orgUnitNo: 19, code: 'DMH' },
+              ]
+            : [
+                { orgUnitNo: 19, code: 'DMH' },
+                { orgUnitNo: 50, code: 'DQU' },
+              ],
+      }),
+    );
+    await renderPage();
+    type('crossingSiteTypeCode', 'CRS');
+    type('forestFileId', 'R07571');
+    type('roadSectionId', 'AA');
+
+    const modal = await screen.findByTestId('road-district-modal');
+    fireEvent.click(within(modal).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('road-district-modal')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Not chosen')).toBeInTheDocument();
+
+    // Reopened from the field's link.
+    fireEvent.click(screen.getByTestId('site-form-choose-district'));
+    const reopened = await screen.findByTestId('road-district-modal');
+    fireEvent.click(within(reopened).getByRole('radio', { name: /DPG/ }));
+    fireEvent.click(within(reopened).getByTestId('road-district-confirm'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('road-district-modal')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('site-form-choose-district')).toHaveTextContent('Change district');
+
+    // Another such road, with no district of it chosen, opens it by itself again.
+    type('roadSectionId', 'AB');
+
+    expect(await screen.findByTestId('road-district-modal')).toBeInTheDocument();
+  });
+
+  it('lets the user pick any district, and says so, when the road lookup is unavailable', async () => {
+    roadApi.getRoadSection.mockRejectedValue(
+      Object.assign(new Error('Service Unavailable'), { status: 503 }),
+    );
+    await renderPage();
+    type('crossingSiteTypeCode', 'CRS');
+    type('forestFileId', 'R00123');
+    type('roadSectionId', '01');
+
+    // Red, as an error — not amber — beside the field and in the list of what is left.
+    await waitFor(() => expect(field('forestFileId')).toHaveAttribute('aria-invalid', 'true'));
+    expect(screen.getAllByText('Road lookup is unavailable right now.').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('site-form-orgUnitNo')).toBeInTheDocument();
+    expect(screen.queryByText('No road matches this Project File ID# and Br.')).toBeNull();
   });
 
   it("keeps a storage site's own district when it never had a road", async () => {
@@ -675,6 +793,28 @@ describe('AddSitePage — the site type', () => {
     type('crossingSiteTypeCode', 'STRG');
 
     expect(screen.getByTestId('site-form-orgUnitNo')).toBeInTheDocument();
+  });
+
+  it('does not look a recreation site up in LRMOPS, even with a Br.', async () => {
+    await renderPage();
+    type('crossingSiteTypeCode', 'REC');
+    type('forestFileId', 'R07571');
+    type('roadSectionId', 'AA');
+
+    await waitFor(() => {
+      expect(api.getRecreationDistricts).toHaveBeenCalledWith('R07571');
+    });
+    expect(roadApi.getRoadSection).not.toHaveBeenCalled();
+  });
+
+  it('shows Recreation District as a dash when the project file names none', async () => {
+    api.getRecreationDistricts.mockResolvedValue([]);
+    await renderPage();
+    type('crossingSiteTypeCode', 'REC');
+    type('forestFileId', 'TEST-DATA');
+
+    await waitFor(() => expect(isReadOnlyCell('Recreation District')).toBe(true));
+    expect(screen.queryByTestId('site-form-orgUnitNo')).not.toBeInTheDocument();
   });
 
   it("narrows a recreation site's districts to its project file", async () => {
@@ -716,10 +856,14 @@ describe('AddSitePage — the site type', () => {
   it('calls it a Recreation District for a recreation site, on the same column', async () => {
     // Legacy re-renders the whole page through redisplay() to achieve this; the column it writes
     // to is ORG_UNIT_NO either way, so only the label changes.
+    api.getRecreationDistricts.mockResolvedValue([
+      { orgUnitNo: '77', orgUnitCode: 'RDCK', orgUnitName: 'Cariboo Recreation' },
+    ]);
     await renderPage();
     type('crossingSiteTypeCode', 'REC');
+    type('forestFileId', 'REC0001');
 
-    expect(screen.getByLabelText(/^Recreation District/)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Recreation District/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Forest District/)).not.toBeInTheDocument();
   });
 
@@ -818,7 +962,6 @@ describe('AddSitePage — the site type', () => {
     await renderPage();
     await fillRequired();
     type('crossingSiteTypeCode', 'REC');
-    type('orgUnitNo', '');
 
     save();
 
@@ -834,7 +977,7 @@ describe('AddSitePage — the site type', () => {
             forestFileId: 'R00123',
             roadSectionId: '01',
             forestServiceRoad: 'Bowron FSR',
-            orgUnitNo: 18,
+            districts: [{ orgUnitNo: 18, code: 'DPG' }],
           })
         : Promise.reject(new Error('No road section was found.')),
     );
@@ -866,7 +1009,7 @@ describe('AddSitePage — the site type', () => {
             forestFileId: 'R00123',
             roadSectionId: '01',
             forestServiceRoad: 'Bowron FSR',
-            orgUnitNo: 18,
+            districts: [{ orgUnitNo: 18, code: 'DPG' }],
           })
         : Promise.reject(new Error('No road section was found.')),
     );
@@ -892,7 +1035,7 @@ describe('AddSitePage — the site type', () => {
       forestFileId: 'R00123',
       roadSectionId: '01',
       forestServiceRoad: 'Bowron FSR',
-      orgUnitNo: null,
+      districts: [],
     });
     await renderPage();
     type('crossingSiteTypeCode', 'CRS');

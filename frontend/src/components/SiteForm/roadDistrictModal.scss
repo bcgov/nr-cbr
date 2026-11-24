@@ -1,0 +1,81 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as type;
+@use '@carbon/react/scss/breakpoint' as *;
+
+// As wide as the app's other dialogs on a large screen, so the districts sit side by side.
+.road-district-modal .cds--modal-container {
+  @include breakpoint(lg) {
+    inline-size: 60%;
+  }
+}
+
+.road-district-modal__intro {
+  margin-block-end: $spacing-05;
+}
+
+.road-district-modal__heading {
+  // A section inside a dialog: the ladder moves down one, so heading-compact-02.
+  @include type.type-style('heading-compact-02');
+
+  margin-block: $spacing-06 $spacing-04;
+}
+
+// Label/value pairs, as many to a row as fit.
+.road-district-modal__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: $spacing-05 $spacing-07;
+}
+
+// The read-only labels as the other dialogs show them: Carbon's input label, not bold.
+.road-district-modal .read-only-field {
+  gap: $spacing-02;
+}
+
+.road-district-modal .read-only-field__label {
+  @include type.type-style('label-02');
+
+  font-weight: 400;
+  color: var(--cds-text-secondary);
+}
+
+// The districts on one row, each an equal share of it; one under the other on a narrow screen.
+.road-district-modal__choices {
+  margin-block: $spacing-07 $spacing-06;
+}
+
+.road-district-modal__choices fieldset.cds--radio-button-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $spacing-05;
+
+  @media (max-width: 671px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.road-district-modal__choices fieldset.cds--radio-button-group > legend {
+  grid-column: 1 / -1;
+}
+
+.road-district-modal__choices .cds--radio-button-wrapper {
+  margin-inline-end: 0;
+}
+
+.road-district-modal__choice {
+  display: flex;
+  flex-direction: column;
+}
+
+.road-district-modal__length {
+  @include type.type-style('helper-text-01');
+
+  color: var(--cds-text-secondary);
+}
+
+.road-district-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-05;
+  margin-block-start: $spacing-07;
+}

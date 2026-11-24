@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
 # Ensure a confidential service-account client exists in the target Keycloak
-# realm for the CBR backend's callouts to the nr-user-lookup-api, with the
-# user-lookup client scopes assigned so its client_credentials token carries
-# the SCOPE_* authorities that API enforces.
+# realm for the CBR backend's callouts to other NR APIs (today the LRM Ops API),
+# with their client scopes assigned so its client_credentials token carries the
+# SCOPE_* authorities those APIs enforce.
 #
 # Idempotent:
 #   - creates the client only if it's missing (existing client left untouched);
 #   - assigns each required scope as a DEFAULT client scope (PUT is a no-op when
 #     already assigned) so the service-account token always includes them.
 #
-# The scopes themselves are NOT created here — nr-user-lookup-api owns them
-# (see its .github/scripts/ensure-keycloak-scopes.sh). This script only wires
+# The scopes themselves are NOT created here — each API creates its own at its
+# deploy (its .github/scripts/ensure-keycloak-scopes.sh). This script only wires
 # our client to the scopes that already exist in the shared realm; it errors if
 # a required scope is absent.
 #
@@ -32,8 +32,7 @@
 # (`client_id`, `client_secret`) so the deploy step can feed them to the backend.
 #
 # Keep SCOPES in sync with the endpoints the CBR backend actually calls
-# (UserLookupClient: idir-users/search + idir-account-detail). CBR does no
-# Business BCeID lookups, so that scope is deliberately not requested.
+# (LrmopsApiClient: road search + road section, both lrmops:roads:read).
 # Every `echo "::error::…"` below deliberately goes to STDOUT, not stderr.
 #
 # These are GitHub Actions *workflow commands*, not ordinary diagnostics — the runner parses them
@@ -57,8 +56,7 @@ set -euo pipefail
 CBR_CLIENT_ID="${CBR_CLIENT_ID:-nr-cbr-backend}"
 
 SCOPES=(
-  "user-lookup:idir:search"
-  "user-lookup:idir:read"
+  "lrmops:roads:read"
 )
 
 issuer="${KEYCLOAK_ISSUER_URI%/}"
@@ -83,6 +81,8 @@ if [[ -z "${token}" ]]; then
   exit 1
 fi
 
+# Realm-admin (manage-clients) token: mask it like the client secret below.
+echo "::add-mask::${token}"
 auth=(-H "Authorization: Bearer ${token}")
 
 # --- ensure the client exists ----------------------------------------------
@@ -95,8 +95,8 @@ else
   echo "+ creating client: ${CBR_CLIENT_ID}"
   body="$(jq -n --arg id "${CBR_CLIENT_ID}" '{
     clientId: $id,
-    name: "NR CBR backend (user-lookup callouts)",
-    description: "Service account for the CBR backend → nr-user-lookup-api. Managed by nr-cbr CI.",
+    name: "NR CBR backend (API callouts)",
+    description: "Service account for the CBR backend → other NR APIs (LRM Ops API). Managed by nr-cbr CI.",
     protocol: "openid-connect",
     publicClient: false,
     serviceAccountsEnabled: true,
@@ -131,7 +131,7 @@ all_scopes="$(curl -sS "${auth[@]}" "${scopes_url}")"
 for scope in "${SCOPES[@]}"; do
   scope_id="$(jq -r --arg n "${scope}" '.[] | select(.name == $n) | .id' <<< "${all_scopes}")"
   if [[ -z "${scope_id}" ]]; then
-    echo "::error::Client scope '${scope}' does not exist in realm '${realm}'. It must be created first (nr-user-lookup-api owns scope creation)."
+    echo "::error::Client scope '${scope}' does not exist in realm '${realm}'. It must be created first (the API that owns it creates it at its deploy)."
     exit 1
   fi
 

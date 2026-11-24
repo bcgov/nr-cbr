@@ -1,3 +1,5 @@
+import type { RoadDistrict } from '@/services/road.service';
+
 /**
  * The Add Site form, field for field with the legacy `site.jsp`.
  *
@@ -57,16 +59,32 @@ export const SITE_TYPE = {
   STORAGE: 'STRG',
 } as const;
 
+/** What the site form knows about the road its Project File ID# and Br. name — see `useSiteRoad`. */
+export type RoadDistrictState = {
+  /** The pair names a road LRMOPS has. */
+  roadResolved: boolean;
+  /** The Forest Districts that road lies in. */
+  roadDistricts?: RoadDistrict[];
+  /** LRMOPS could not be asked, so whether there is a road is unknown. */
+  roadUnavailable?: boolean;
+};
+
 /**
  * True when the road settles the district and the user may not change it.
  *
- * <p>Never for a recreation site, which chooses from a list the file narrows. Otherwise whenever
- * the road resolves — and for everything except a storage site, even when it does not: legacy
- * leaves a crossing's district disabled and blank until a road is given, because a crossing
- * without a road has no district to record.
+ * <p>Never for a recreation site, which chooses from a list the file narrows. Never when the road
+ * lies in two or more districts — the user picks one of them (business, 2026-11-23) — nor when the
+ * road lookup is unavailable, so the district is left for the user to pick.
+ *
+ * <p>Otherwise whenever the road resolves, and for everything except a storage site even when it
+ * does not: legacy leaves a crossing's district disabled and blank until a road is given, because a
+ * crossing without a road has no district to record.
  */
-export const isDistrictFromRoad = (siteTypeCode: string, roadResolved: boolean): boolean =>
-  siteTypeCode !== SITE_TYPE.RECREATION && (roadResolved || siteTypeCode !== SITE_TYPE.STORAGE);
+export const isDistrictFromRoad = (siteTypeCode: string, road: RoadDistrictState): boolean => {
+  if (siteTypeCode === SITE_TYPE.RECREATION || road.roadUnavailable) return false;
+  if (road.roadResolved) return (road.roadDistricts?.length ?? 0) < 2;
+  return siteTypeCode !== SITE_TYPE.STORAGE;
+};
 
 /** Inspection statuses. Only two exist, and every cross-field rule is about which one applies. */
 export const INSPECTION_STATUS = {

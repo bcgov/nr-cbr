@@ -351,7 +351,7 @@ const RepairDialog: FC<Props> = ({ structureId, inspectionId, repair, onClose })
           <>
             <DateField
               id="repair-completed-date"
-              labelText={requiredLabel('Repair Completed Date', completed)}
+              labelText={requiredLabel('Repair Completed Date (yyyy/mm/dd)', completed)}
               value={values.completedDate}
               disabled={!completed}
               invalidText={shown.completedDate}

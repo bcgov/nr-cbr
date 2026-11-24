@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+// BC Sans faces (light, regular, bold) — the family the Carbon font stack names (see _overrides.scss).
+import '@bcgov/bc-sans/css/BC_Sans.css';
 import '@/styles/index.scss';
 import App from '@/App.tsx';
 import { AuthProvider } from '@/context/auth/AuthProvider';

@@ -117,11 +117,11 @@ public class SiteValidator {
    * @param siteIdTaken   whether a site already exists with this number — passed in rather than
    *                      looked up here so the validator owns no transaction and stays a pure
    *                      function of its inputs and the code tables
-   * @param roadSegmentId the segment the road resolves to, or null when it resolves to none. Same
+   * @param roadCheck     what the LRM Ops API said about the Project File ID# and Br. Same
    *                      reasoning: the lookup belongs to the caller, the rule belongs here
    * @throws SiteValidationException if anything fails
    */
-  public void validate(SiteCreateRequest request, boolean siteIdTaken, Long roadSegmentId) {
+  public void validate(SiteCreateRequest request, boolean siteIdTaken, RoadCheck roadCheck) {
     Map<String, String> errors = new LinkedHashMap<>();
     String type = trimmed(request.crossingSiteTypeCode());
 
@@ -133,7 +133,7 @@ public class SiteValidator {
     checkCodes(request, errors);
     checkOrgUnits(request, errors);
     checkInspectionAgreesWithStatus(request, type, errors);
-    checkRoadResolves(request, type, roadSegmentId, errors);
+    checkRoadResolves(roadCheck, errors);
 
     if (!errors.isEmpty()) {
       throw new SiteValidationException(errors);
@@ -347,28 +347,25 @@ public class SiteValidator {
   }
 
   /**
-   * The road named by Project File ID# and Br. must be a road that exists.
+   * The road named by Project File ID# and Br. must be a road LRMOPS has.
    *
-   * <p>Legacy states this as a rule about the hidden Road Segment field — {@code Site.validate}
-   * raises it when the segment is null while the two visible boxes are filled — but what it is
-   * really testing is that the section the user named has at least one segment. The message lands
-   * on Project File ID#, as legacy's does, because that is the box they can act on.
+   * <p>The message lands on Project File ID#, as legacy's does, because that is the box the user can
+   * act on. Retired roads count (business, 2026-11-23); a section with no road segment counts too,
+   * as LRMOPS has no segments.
    *
-   * <p>Not for a recreation site: its Project File ID# names a recreation project rather than a
-   * road file, and legacy skips the whole block for {@code REC}.
+   * <p>Not for a recreation site, whose Project File ID# names a recreation project, nor when either
+   * box is empty — already reported as required ({@link RoadCheck#NOT_APPLICABLE}).
    *
-   * <p>Only when both boxes are filled. Either one empty has already been reported as required, and
-   * saying "this road does not exist" about a road half named would be noise.
+   * <p><b>Refused, not let through, when the check could not run</b> (business, 2026-11-23): a
+   * save while the LRM Ops API is unavailable would store a road nobody checked. Any crossing save
+   * is refused then, even one keeping the stored road; the form keeps what was entered.
    */
-  private void checkRoadResolves(
-      SiteCreateRequest request, String type, Long roadSegmentId, Map<String, String> errors) {
-    if (RECREATION.equals(type) || roadSegmentId != null) {
-      return;
-    }
-    if (StringUtils.hasText(request.forestFileId())
-        && StringUtils.hasText(request.roadSectionId())) {
+  private void checkRoadResolves(RoadCheck roadCheck, Map<String, String> errors) {
+    if (roadCheck == RoadCheck.NOT_FOUND) {
+      errors.putIfAbsent(FOREST_FILE_ID, "No road matches this Project File ID# and Br.");
+    } else if (roadCheck == RoadCheck.UNAVAILABLE) {
       errors.putIfAbsent(
-          FOREST_FILE_ID, "No road matches this Project File ID# and Br.");
+          FOREST_FILE_ID, "Road check is unavailable right now. Try saving again shortly.");
     }
   }
 

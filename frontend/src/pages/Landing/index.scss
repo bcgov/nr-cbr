@@ -122,7 +122,7 @@
   &__note {
     margin: 0.5rem 0 0;
     color: var(--cds-text-primary);
-    font-size: 0.875rem;
+    @include type.type-style('body-compact-02');
   }
 }
 

@@ -24,7 +24,7 @@
 }
 
 .structure-detail .read-only-field__label {
-  font-size: 0.8125rem;
+  @include type.type-style('label-02');
   font-weight: 600;
   color: var(--cds-text-primary);
 }
@@ -155,7 +155,7 @@ $page-bottom: 2rem;
 
 // A line under a card's header saying why its action is not available yet.
 .structure-detail__card-note {
-  @include type.type-style('body-compact-01');
+  @include type.type-style('body-compact-02');
 
   margin: (-$spacing-03) 0 $spacing-05;
   color: var(--cds-text-secondary);
@@ -167,9 +167,8 @@ $page-bottom: 2rem;
   align-items: center;
   gap: $spacing-03;
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 400;
-  line-height: 1.4;
+  // A section directly inside the page: heading-03 on the ladder.
+  @include type.type-style('heading-03');
 
   svg {
     flex: 0 0 auto;
@@ -182,7 +181,7 @@ $page-bottom: 2rem;
 // Sits on the grey pane above the cards; the panel's gap spaces it.
 
 .structure-detail__outstanding-toggle {
-  @include type.type-style('body-compact-01');
+  @include type.type-style('body-compact-02');
 
   display: inline-flex;
   align-items: center;
@@ -221,14 +220,14 @@ $page-bottom: 2rem;
 }
 
 .structure-detail__outstanding-title {
-  @include type.type-style('body-compact-01');
+  @include type.type-style('body-compact-02');
 
   font-weight: 600;
   margin-block-end: 0.125rem;
 }
 
 .structure-detail__outstanding-list {
-  @include type.type-style('body-compact-01');
+  @include type.type-style('body-compact-02');
 
   padding-inline-start: 1.125rem;
   list-style: disc;
@@ -241,7 +240,7 @@ $page-bottom: 2rem;
 
 .structure-detail__empty,
 .structure-detail__note {
-  @include type.type-style('body-compact-01');
+  @include type.type-style('body-compact-02');
 
   color: var(--cds-text-secondary);
 }
@@ -422,9 +421,12 @@ $page-bottom: 2rem;
   }
 }
 
-// "Files", bold over its helper line.
+// "Files", over its helper line: a field label, so label-02 — kept bold, as Carbon's file uploader
+// sets its own.
 .structure-detail__upload-label {
-  @include type.type-style('heading-compact-01');
+  @include type.type-style('label-02');
+
+  font-weight: 600;
 
   display: block;
   margin-block-end: $spacing-02;
@@ -526,7 +528,7 @@ $page-bottom: 2rem;
 }
 
 .structure-detail__upload-name {
-  @include type.type-style('body-compact-01');
+  @include type.type-style('body-compact-02');
 
   flex: 1 1 auto;
   min-inline-size: 0;
@@ -625,7 +627,7 @@ $page-bottom: 2rem;
 }
 
 .structure-detail__unit {
-  @include type.type-style('body-compact-01');
+  @include type.type-style('body-compact-02');
 
   // The box's height, so the unit sits level with its text.
   display: flex;
@@ -656,7 +658,7 @@ $page-bottom: 2rem;
 
 .structure-detail .structure-detail__monitor-dialog .read-only-field__label,
 .structure-detail .structure-detail__repair-dialog .read-only-field__label {
-  @include type.type-style('label-01');
+  @include type.type-style('label-02');
 
   font-weight: 400;
   color: var(--cds-text-secondary);
@@ -766,11 +768,18 @@ $page-bottom: 2rem;
 }
 
 .structure-detail__replaces-self {
-  font-size: 0.875rem;
+  // Level with the text in the box beside it, which is body-compact-02.
+  @include type.type-style('body-compact-02');
+
+  line-height: 2.5rem;
 }
 
 .structure-detail__replaces-word {
   padding-block-start: $spacing-06;
+  // The sentence's middle word, the size of the values either side of it.
+  @include type.type-style('body-compact-02');
+
+  line-height: 2.5rem;
 }
 
 // The same space above the buttons as below them: 2.5rem each. Carbon pads the content 3rem below and

@@ -292,7 +292,7 @@ const ReviewForm: FC<
             {routine ? (
               <DateField
                 id="review-nextRoutineDate"
-                labelText={requiredLabel('Next Planned Inspection Date', true)}
+                labelText={requiredLabel('Next Planned Inspection Date (yyyy/mm/dd)', true)}
                 value={values.nextRoutineDate}
                 invalidText={shown.nextRoutineDate}
                 onChange={(value) => change('nextRoutineDate', value)}

@@ -39,7 +39,8 @@
     line-height: 1.4;
 
     p:not(.user-name) {
-      font-size: 0.85rem;
+      // Header chrome, as the side nav: Carbon's size, not the page text's.
+      @include type.type-style('body-compact-01');
       white-space: nowrap;
     }
   }

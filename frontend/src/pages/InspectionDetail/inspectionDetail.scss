@@ -1,3 +1,4 @@
+@use '@carbon/react/scss/type';
 @use '@carbon/react/scss/spacing' as *;
 
 // Free text — the comments — as written, its line breaks kept.
@@ -10,8 +11,8 @@
 // A heading inside a card, above a part of it: Comments, Status History.
 .inspection-detail__subheading {
   margin: $spacing-07 0 $spacing-04;
-  font-size: 1rem;
-  font-weight: 600;
+  // A sub-section inside a card (or a section inside a dialog): heading-compact-02 on the ladder.
+  @include type.type-style('heading-compact-02');
 }
 
 // An answer's comment on the Condition tab, as written.

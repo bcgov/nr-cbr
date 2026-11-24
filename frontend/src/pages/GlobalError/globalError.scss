@@ -1,3 +1,4 @@
+@use '@carbon/react/scss/type';
 @use '@carbon/react/scss/spacing' as *;
 
 .global-error__actions {
@@ -15,6 +16,6 @@
   background: var(--cds-layer-01);
   border: 1px solid var(--cds-border-subtle-01);
   border-radius: 0.25rem;
-  font-size: 0.75rem;
-  line-height: 1.4;
+  // A stack trace: code-01 (in BC Sans, as every family is — see styles/_overrides.scss).
+  @include type.type-style('code-01');
 }

@@ -22,9 +22,10 @@ type Props = {
 };
 
 /**
- * A "from – to" pair of months or days — a calendar each, or typed. The placeholder is short,
- * because the pair shares one grid cell; the dash between the boxes reads "from – to", and their
- * hidden labels say which is which.
+ * A "from – to" pair of months or days — a calendar each, or typed. The legend carries the format,
+ * "Inspection Date (yyyy/mm)", as every date field's label does; the boxes' labels are hidden
+ * ("Inspection Date From" for a screen reader) and "From" / "To" are their placeholders, with a dash
+ * between.
  *
  * <p>Each calendar is handed only a value it can read: Carbon pushes `value` into flatpickr on
  * every change, and flatpickr blanks the box when it cannot parse it, which would erase "2026/0"
@@ -55,7 +56,7 @@ const CalendarRangeField: FC<Props> = ({
     }
   }
 
-  const picker = (which: End, id: string, label: string, error?: string) => (
+  const picker = (which: End, id: string, label: string, end: string, error?: string) => (
     <DatePicker
       datePickerType="single"
       dateFormat={calendar.format}
@@ -70,7 +71,7 @@ const CalendarRangeField: FC<Props> = ({
         data-testid={id}
         labelText={label}
         hideLabel
-        placeholder={calendar.placeholder}
+        placeholder={end}
         pattern={calendar.pattern}
         disabled={disabled}
         invalid={Boolean(error)}
@@ -86,13 +87,13 @@ const CalendarRangeField: FC<Props> = ({
 
   return (
     <fieldset className="report-criteria__range report-criteria__calendar-range">
-      <legend className="cds--label">{legend}</legend>
+      <legend className="cds--label">{`${legend} (${calendar.hint})`}</legend>
       <div className="report-criteria__range-inputs">
-        {picker('start', startId, `${legend} From`, startError)}
+        {picker('start', startId, `${legend} From`, 'From', startError)}
         <span aria-hidden="true" className="report-criteria__range-dash">
           –
         </span>
-        {picker('end', endId, `${legend} To`, endError)}
+        {picker('end', endId, `${legend} To`, 'To', endError)}
       </div>
     </fieldset>
   );

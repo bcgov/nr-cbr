@@ -4,17 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import RoadSearchModal from './index';
 
-const roadApi = vi.hoisted(() => ({ searchRoads: vi.fn() }));
-const clientApi = vi.hoisted(() => ({ searchClients: vi.fn() }));
-vi.mock('@/services/APIs', () => ({ default: { road: roadApi, client: clientApi } }));
+const roadApi = vi.hoisted(() => ({ searchRoads: vi.fn(), getTenureTypes: vi.fn() }));
+vi.mock('@/services/APIs', () => ({ default: { road: roadApi } }));
 
 const bowron = {
   forestServiceRoad: 'Bowron FSR',
   forestFileId: 'R00123',
   roadSectionId: '01',
-  tenureType: 'B40',
+  tenureType: 'FSR',
   clientName: 'CANFOR CORPORATION',
-  clientNumber: '00001012',
 };
 
 /** One page as the server answers it: these rows, out of `total` matches. */
@@ -55,90 +53,67 @@ beforeEach(() => {
   onClose.mockReset();
   roadApi.searchRoads.mockReset();
   roadApi.searchRoads.mockResolvedValue(paged([bowron]));
-  clientApi.searchClients.mockReset();
-  clientApi.searchClients.mockResolvedValue([]);
+  roadApi.getTenureTypes.mockReset();
+  roadApi.getTenureTypes.mockResolvedValue([
+    { code: 'FSR', description: 'Forest Service Road' },
+    { code: 'RP', description: 'Road Permit' },
+  ]);
 });
 
 describe('RoadSearchModal', () => {
-  it('offers every criterion the legacy dialog does', () => {
+  it('offers every criterion', () => {
     renderModal();
 
-    for (const name of ['forestServiceRoad', 'forestFileId', 'roadSectionId', 'tenureType']) {
+    for (const name of [
+      'forestServiceRoad',
+      'forestFileId',
+      'roadSectionId',
+      'tenureType',
+      'clientName',
+    ]) {
       expect(screen.getByTestId(`road-search-${name}`)).toBeInTheDocument();
     }
-    // One lookup where legacy has separate Client Name and Client # boxes, as the Designated
-    // Maintainer field does — it searches on either.
-    expect(screen.getByRole('combobox', { name: /^Client/ })).toBeInTheDocument();
   });
 
-  it('offers only the clients that hold a road file', async () => {
-    // A different set from the site maintainers the other combo box offers: a company may hold a
-    // road file and maintain no site, and the two are reached through different tables.
+  it("offers LRMOPS's tenure types, with their descriptions", async () => {
     renderModal();
 
-    fireEvent.change(screen.getByRole('combobox', { name: /^Client/ }), {
-      target: { value: 'canfor' },
-    });
-
-    await waitFor(() => {
-      expect(clientApi.searchClients).toHaveBeenCalledWith('canfor', 'ROAD_FILE_HOLDERS');
-    });
+    expect(
+      await screen.findByRole('option', { name: 'FSR - Forest Service Road' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'RP - Road Permit' })).toBeInTheDocument();
   });
 
-  it('narrows to one client number once a suggestion is picked', async () => {
-    clientApi.searchClients.mockResolvedValue([
-      {
-        clientNumber: '00001012',
-        clientLocnCode: null,
-        clientName: 'CANFOR CORPORATION',
-        clientLocnName: null,
-        city: null,
-      },
-    ]);
+  it('searches on the client name as typed — LRMOPS records no client number', async () => {
     renderModal();
-    fireEvent.change(screen.getByRole('combobox', { name: /^Client/ }), {
-      target: { value: 'canfor' },
-    });
+    criterion('clientName', 'canfor');
 
-    fireEvent.click(await screen.findByText(/CANFOR CORPORATION/));
     search();
 
     await waitFor(() => {
       expect(roadApi.searchRoads).toHaveBeenCalledWith(
-        expect.objectContaining({ clientNumber: '00001012', clientName: '' }),
+        expect.objectContaining({ clientName: 'canfor' }),
         0,
         15,
       );
     });
+    expect(roadApi.searchRoads.mock.calls[0][0]).not.toHaveProperty('clientNumber');
   });
 
-  it('still searches on the name when the term resolves to nothing', async () => {
-    // Several distinct clients are called Canfor, and no single pick covers them — this is what
-    // the plain text box gave and a combo box would otherwise take away.
+  it('says the road lookup is unavailable when LRMOPS cannot be asked', async () => {
+    roadApi.searchRoads.mockRejectedValue(
+      Object.assign(new Error('Service Unavailable'), { status: 503 }),
+    );
     renderModal();
 
-    fireEvent.change(screen.getByRole('combobox', { name: /^Client/ }), {
-      target: { value: 'canfor' },
-    });
     search();
 
-    await waitFor(() => {
-      expect(roadApi.searchRoads).toHaveBeenCalledWith(
-        expect.objectContaining({ clientName: 'canfor', clientNumber: '' }),
-        0,
-        15,
-      );
-    });
-  });
-
-  it('spells out the tenure type codes, which nothing in the database decodes', () => {
-    renderModal();
-
-    expect(screen.getByText(/B01 = RP, B40 = FSR/)).toBeInTheDocument();
+    expect(await screen.findByText('Road lookup is unavailable right now.')).toBeInTheDocument();
+    expect(screen.getByTestId('road-search-error')).toBeInTheDocument();
   });
 
   it('searches nothing until asked', async () => {
-    // Six partial matches over every road section in the province. A keystroke-driven search
+    // Partial matches over every road section in LRMOPS. A keystroke-driven search
     // would run the widest possible query the most often, which is why legacy has a button too.
     renderModal();
 
@@ -152,13 +127,14 @@ describe('RoadSearchModal', () => {
   it('sends what was asked when Search is pressed', async () => {
     renderModal();
     criterion('forestServiceRoad', 'bowron');
-    criterion('tenureType', 'B40');
+    await screen.findByRole('option', { name: 'FSR - Forest Service Road' });
+    criterion('tenureType', 'FSR');
 
     search();
 
     await waitFor(() => {
       expect(roadApi.searchRoads).toHaveBeenCalledWith(
-        expect.objectContaining({ forestServiceRoad: 'bowron', tenureType: 'B40' }),
+        expect.objectContaining({ forestServiceRoad: 'bowron', tenureType: 'FSR' }),
         0,
         15,
       );

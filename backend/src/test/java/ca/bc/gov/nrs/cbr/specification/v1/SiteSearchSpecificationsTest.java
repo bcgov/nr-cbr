@@ -432,6 +432,15 @@ class SiteSearchSpecificationsTest {
       assertThat(search(incomplete())).containsExactly("CRS-NO-ROAD");
     }
 
+    @Test
+    @DisplayName("a crossing with no road segment is not incomplete, LRMOPS having none")
+    void incompleteIgnoresTheRoadSegment() {
+      givenSupportingRows();
+      persist(completeSite("NO-SEGMENT").crossingSiteTypeCode("CRS").roadSegmentId(null).build());
+
+      assertThat(search(incomplete())).isEmpty();
+    }
+
     private SiteSearchCriteria incomplete() {
       return SiteSearchCriteria.builder().incomplete(true).build();
     }

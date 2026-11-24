@@ -4,6 +4,8 @@ import {
   DataTableSkeleton,
   Pagination,
   InlineNotification,
+  Select,
+  SelectItem,
   Table,
   TableBody,
   TableCell,
@@ -14,7 +16,6 @@ import {
 } from '@carbon/react';
 import { useCallback, useState, type FC, type KeyboardEvent } from 'react';
 
-import ClientCombo from '@/components/core/ClientCombo';
 import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 import { Modal } from '@/components/Modal';
 
@@ -24,12 +25,14 @@ import type {
   RoadSort,
   RoadSortColumn,
 } from '@/services/road.service';
-import type { ClientSuggestion } from '@/types/client';
 
-import { useRoadSearch } from '@/hooks/useRoadSearch';
-import { EMPTY_ROAD_CRITERIA } from '@/services/road.service';
+import { useRoadSearch, useRoadTenureTypes } from '@/hooks/useRoadSearch';
+import {
+  EMPTY_ROAD_CRITERIA,
+  isRoadLookupUnavailable,
+  ROAD_LOOKUP_UNAVAILABLE,
+} from '@/services/road.service';
 import { apiErrorMessage } from '@/utils/apiError';
-import { clientLabel } from '@/utils/clientSearch';
 
 import './index.scss';
 
@@ -45,14 +48,16 @@ const ROADS_PER_PAGE = 15;
 /** The server bounds a page at two hundred rows, so nothing above that is worth offering. */
 const ROAD_PAGE_SIZES = [15, 50, 100];
 
-/** The six columns, in legacy's order — each sorts by its header. */
+/**
+ * The five columns, in legacy's order — each sorts by its header. No Client #: LRMOPS records the
+ * tenure holder's name only.
+ */
 const COLUMNS: { column: RoadSortColumn; label: string }[] = [
   { column: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
   { column: 'PROJECT_FILE', label: 'Project File ID#' },
   { column: 'BRANCH', label: 'Br.' },
   { column: 'TENURE_TYPE', label: 'Tenure Type' },
   { column: 'CLIENT_NAME', label: 'Client Name' },
-  { column: 'CLIENT_NUMBER', label: 'Client #' },
 ];
 
 type Props = {
@@ -73,8 +78,8 @@ type Props = {
  * what a dialog should do — one that reopens holding the last search answers a question the user
  * has not asked, against a form that has moved on since.
  *
- * <p><b>Searched on demand, not as the user types.</b> The criteria are six partial matches over a
- * view of every road section in the province; a keystroke-driven search would run the widest
+ * <p><b>Searched on demand, not as the user types.</b> The criteria are partial matches over every
+ * road section in LRMOPS; a keystroke-driven search would run the widest
  * possible query most often. Legacy has a Search button for the same reason, and this keeps it.
  *
  * <p><b>Paged on the server</b>, as Site Search and Inspection Search are. Legacy stops at two
@@ -83,8 +88,7 @@ type Props = {
  */
 const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
   const [criteria, setCriteria] = useState<RoadSearchCriteria>(EMPTY_ROAD_CRITERIA);
-  /** The label of the client picked from the lookup, so the field survives a re-render. */
-  const [clientLabelText, setClientLabelText] = useState('');
+  const tenureTypes = useRoadTenureTypes();
   /** One-based, as Carbon's Pagination counts. */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(ROADS_PER_PAGE);
@@ -108,30 +112,6 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
       setCriteria((current) => ({ ...current, [field]: value })),
     [],
   );
-
-  /**
-   * A client was picked: narrow to that one, and drop any name the user had typed. Both would
-   * otherwise apply, and the number is the more precise of the two.
-   */
-  const selectClient = useCallback((client: ClientSuggestion | null) => {
-    setClientLabelText(client ? clientLabel(client) : '');
-    setCriteria((current) => ({
-      ...current,
-      clientNumber: client?.clientNumber ?? '',
-      clientName: '',
-    }));
-  }, []);
-
-  /**
-   * Typed text that is not a pick still searches, on the name.
-   *
-   * <p>This is what the plain text box gave and a combo box would otherwise take away: several
-   * distinct clients are called Canfor, and no single pick covers them.
-   */
-  const typeClient = useCallback((term: string) => {
-    setClientLabelText('');
-    setCriteria((current) => ({ ...current, clientName: term, clientNumber: '' }));
-  }, []);
 
   const text = (field: keyof RoadSearchCriteria, labelText: string, maxLength: number) => (
     <TextInput
@@ -172,34 +152,34 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
             {text('forestFileId', 'Project File ID#', 10)}
             {text('roadSectionId', 'Br.', 30)}
           </div>
-          {/* Legacy prints this key beside the box, because the view carries the code and nothing
-              in the database decodes it. */}
-          <TextInput
+          {/* LRMOPS's road tenure types, with their descriptions (business, 2026-11-23) — where
+              legacy printed a key to four FTA codes beside a text box. */}
+          <Select
             id="road-search-tenureType"
             data-testid="road-search-tenureType"
             labelText="Tenure Type"
-            helperText="B01 = RP, B40 = FSR, S01 = SUP-F, S02 = SUP-NF"
-            maxLength={10}
+            disabled={tenureTypes.isPending}
+            invalid={tenureTypes.isError}
+            invalidText={
+              isRoadLookupUnavailable(tenureTypes.error)
+                ? ROAD_LOOKUP_UNAVAILABLE
+                : 'The tenure types could not be loaded.'
+            }
             value={criteria.tenureType}
             onChange={(event) => update('tenureType', event.target.value)}
-          />
-          {/* One lookup where legacy has two boxes, as the Designated Maintainer field does — and
-              scoped to the clients that actually hold a road file, which is a different set from
-              the site maintainers that field offers.
-
-              A pick narrows to one client number. A term that resolves to nothing still searches,
-              on the name, so "canfor" keeps returning the roads of every Canfor entity — the
-              broader search the plain text box used to give. */}
-          <ClientCombo
-            id="road-search-client"
-            titleText="Client"
-            scope="ROAD_FILE_HOLDERS"
-            placeholder="Search for a client"
-            helperText="Name or client number of the company holding the road file"
-            selectedLabel={clientLabelText}
-            onSelect={selectClient}
-            onTermChange={typeClient}
-          />
+          >
+            <SelectItem value="" text="Any" />
+            {(tenureTypes.data ?? []).map((type) => (
+              <SelectItem
+                key={type.code}
+                value={type.code}
+                text={type.description ? `${type.code} - ${type.description}` : type.code}
+              />
+            ))}
+          </Select>
+          {/* A name, partial match: LRMOPS records the tenure holder's name and no client number,
+              so there is nothing for a client lookup to pick. */}
+          {text('clientName', 'Client Name', 60)}
           <div className="road-search__actions">
             <Button kind="tertiary" type="button" onClick={onClose}>
               Cancel
@@ -223,7 +203,11 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
           lowContrast
           hideCloseButton
           title="The search could not be run"
-          subtitle={apiErrorMessage(results.error, 'Try again, or narrow the criteria.')}
+          subtitle={
+            isRoadLookupUnavailable(results.error)
+              ? ROAD_LOOKUP_UNAVAILABLE
+              : apiErrorMessage(results.error, 'Try again, or narrow the criteria.')
+          }
           data-testid="road-search-error"
         />
       )}
@@ -233,7 +217,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
           role="progressbar"
           aria-label="Searching"
           data-testid="road-search-loading"
-          columnCount={6}
+          columnCount={5}
           rowCount={4}
           showHeader={false}
           showToolbar={false}
@@ -270,7 +254,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6}>No roads found.</TableCell>
+                  <TableCell colSpan={5}>No roads found.</TableCell>
                 </TableRow>
               ) : (
                 rows.map((road) => (
@@ -311,7 +295,6 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
                     <TableCell>{road.roadSectionId}</TableCell>
                     <TableCell>{road.tenureType}</TableCell>
                     <TableCell>{road.clientName}</TableCell>
-                    <TableCell>{road.clientNumber}</TableCell>
                   </TableRow>
                 ))
               )}

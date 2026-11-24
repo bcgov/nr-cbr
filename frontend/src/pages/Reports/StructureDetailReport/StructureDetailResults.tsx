@@ -84,9 +84,9 @@ const StructureDetailResults: FC<Props> = ({
         data-testid="structure-detail-report-results"
       >
         <div className="cds--data-table-header">
-          <h4 className="cds--data-table-header__title" id="structure-detail-report-results-title">
+          <h2 className="cds--data-table-header__title" id="structure-detail-report-results-title">
             Structures — {totalItems} match{totalItems === 1 ? '' : 'es'}
-          </h4>
+          </h2>
         </div>
         <Table useZebraStyles size="lg" aria-labelledby="structure-detail-report-results-title">
           <TableHead>
