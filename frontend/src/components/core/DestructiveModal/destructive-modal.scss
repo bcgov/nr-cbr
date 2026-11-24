@@ -1,11 +1,11 @@
+@use '@carbon/react/scss/type';
 .destructive-modal {
   &__message {
     margin: 0;
     padding: 0.5rem 0;
     color: var(--cds-text-primary, #161616);
-    font-size: var(--cds-body-long-01-font-size, 0.875rem);
-    line-height: var(--cds-body-long-01-line-height, 1.42857);
-    letter-spacing: var(--cds-body-long-01-letter-spacing, 0.16px);
+    // Dialog text is page text: body-02.
+    @include type.type-style('body-02');
   }
 
   /* Bottom-right, the way every other confirm-then-act dialog in the app closes: the eye lands on

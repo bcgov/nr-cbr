@@ -240,11 +240,7 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
    *       would then refuse to submit with no message anywhere on the page.
    * </ul>
    */
-  const monthPicker = (
-    field: 'inspectionDateStart' | 'inspectionDateEnd',
-    labelText: string,
-    placeholder: string,
-  ) => (
+  const monthPicker = (field: 'inspectionDateStart' | 'inspectionDateEnd', labelText: string) => (
     <DatePicker
       datePickerType="single"
       dateFormat={MONTH_FORMAT}
@@ -260,7 +256,7 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
         data-testid={`inspection-search-${field}`}
         labelText={labelText}
         hideLabel
-        placeholder={placeholder}
+        placeholder={labelText}
         pattern="\d{4}/\d{1,2}"
         invalid={field in errors}
         invalidText={errors[field]}
@@ -275,7 +271,7 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
    *
    * <p>Month-granular, because that is what the criterion is — legacy parses both bounds with
    * `SimpleDateFormat("yyyy/MM")`, and the label has said `(yyyy/mm)` for as long as the screen has
-   * existed. The calendar underneath still offers days, because Carbon builds flatpickr without its
+   * existed — as every date field's label in the app now carries its format. The calendar underneath still offers days, because Carbon builds flatpickr without its
    * month-select plugin and does not expose the plugin list; picking any day in January gives
    * `2026/01`, which is the month the search uses. Legacy had the same mismatch — a calendar popup
    * formatted `yyyy/MM`, so the day it collected was discarded too.
@@ -289,11 +285,11 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
     <fieldset className="inspection-search__range inspection-search__span-2">
       <legend className="cds--label">Inspection Date (yyyy/mm)</legend>
       <div className="inspection-search__range-inputs">
-        {monthPicker('inspectionDateStart', 'From', 'From: 2026/01')}
+        {monthPicker('inspectionDateStart', 'From')}
         <span aria-hidden="true" className="inspection-search__range-dash">
           –
         </span>
-        {monthPicker('inspectionDateEnd', 'To', 'To: 2026/12')}
+        {monthPicker('inspectionDateEnd', 'To')}
       </div>
     </fieldset>
   );

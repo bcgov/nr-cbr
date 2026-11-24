@@ -349,7 +349,7 @@ const UploadDocumentsDialog: FC<Props> = ({ structureId, inspectionId, onClose }
               </Select>
               <DateField
                 id={`upload-created-${row.key}`}
-                labelText={requiredLabel('Photo/Doc Created', true)}
+                labelText={requiredLabel('Photo/Doc Created (yyyy/mm/dd)', true)}
                 value={row.createdDate}
                 invalidText={shown.createdDate}
                 onChange={(value) => change(row.key, 'createdDate', value)}

@@ -240,12 +240,10 @@ const SiteSearchCriteriaForm: FC<Props> = ({
    * the first half and left the second half empty, so the "To" box ended just past the column
    * boundary and lined up with nothing on the rows above or below.
    *
-   * <p>"From" and "To" are `hideLabel`, so they name the boxes for a screen reader without taking a
-   * second row of label above them. Visible, they pushed these inputs a label-height below every
-   * other field on the row — the legend occupies the row that a plain field's label does, and the
-   * From/To labels then sat underneath it. Legacy has no such labels either: one `Kilometres:`, two
-   * boxes, a hyphen. The placeholder carries the same hint back visually, inside the box, where it
-   * costs no height.
+   * <p>"From" and "To" are `hideLabel`, so they name the boxes for a screen reader ("Kilometres,
+   * From") without a second row of label above them, which pushed these inputs a label-height below
+   * every other field on the row. The placeholder carries the same words visually, inside the box;
+   * once a value is typed, the left-then-right order and the dash between say which is which.
    */
   const range = (from: keyof Criteria, to: keyof Criteria, labelText: string) => (
     <fieldset className="site-search__range">

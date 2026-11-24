@@ -1,5 +1,6 @@
 @use './mixins';
 @use './overrides';
+@use '@carbon/react/scss/type';
 @use './variables' as variables;
 @use './default-grid';
 
@@ -95,4 +96,9 @@
     inline-size: 100% !important;
     max-inline-size: 100% !important;
   }
+}
+
+// The sign-in error stands in for a page, so its title takes the page title's rung: heading-05.
+.auth-callback__title {
+  @include type.type-style('heading-05');
 }

@@ -270,7 +270,7 @@ const InspectionEditor: FC<{
           <>
             <DateField
               id="inspection-edit-date"
-              labelText={requiredLabel('Date of Inspection', required.inspectionDate)}
+              labelText={requiredLabel('Date of Inspection (yyyy/mm/dd)', required.inspectionDate)}
               value={values.inspectionDate}
               invalidText={shown.inspectionDate}
               onChange={(value) => change('inspectionDate', value)}

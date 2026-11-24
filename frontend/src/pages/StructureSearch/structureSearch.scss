@@ -53,6 +53,8 @@
 }
 
 .structure-search__range-dash {
+  // On the first input row: a line box the height of Carbon's field, rather than an offset
+  // measured from the labels above.
   block-size: 2.5rem;
   line-height: 2.5rem;
 }

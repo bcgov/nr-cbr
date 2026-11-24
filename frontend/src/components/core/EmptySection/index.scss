@@ -25,7 +25,8 @@
 }
 
 .empty-section-title {
-  @include type.type-style('heading-02');
+  // Not a heading (a div) — an empty state's title, set as Carbon's empty states set theirs.
+  @include type.type-style('heading-compact-02');
 }
 
 .empty-section-subtitle {

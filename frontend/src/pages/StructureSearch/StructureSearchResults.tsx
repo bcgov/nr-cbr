@@ -138,9 +138,9 @@ const StructureSearchResults: FC<Props> = ({
         {/* Carbon's own header classes, rendered here rather than through `title` because its
             header has no slot for actions beside the title. */}
         <div className="cds--data-table-header structure-search__results-header">
-          <h4 className="cds--data-table-header__title" id="structure-search-results-title">
+          <h2 className="cds--data-table-header__title" id="structure-search-results-title">
             Structures — {matches}
-          </h4>
+          </h2>
           {selectable && (
             <div className="structure-search__bulk-actions">
               {canDelete && (

@@ -86,10 +86,8 @@
 }
 
 .site-search__range-dash {
-  // Centred on the first input row by matching Carbon's own field height, rather than by an offset
-  // measured from the labels above it. An offset has to be re-derived whenever anything about the
-  // labels changes — which is exactly what went wrong when the "From" / "To" labels were hidden —
-  // and it silently drifts instead of failing. A line box the height of the field cannot.
+  // On the first input row: a line box the height of Carbon's field, rather than an offset
+  // measured from the labels above.
   block-size: 2.5rem;
   line-height: 2.5rem;
 }

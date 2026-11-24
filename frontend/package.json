@@ -30,6 +30,7 @@
     "guides:build": "node scripts/build-guides.mjs"
   },
   "dependencies": {
+    "@bcgov/bc-sans": "^2.1.2",
     "@carbon/icons-react": "^11.64.0",
     "@carbon/pictograms-react": "^11.83.0",
     "@carbon/react": "^1.88.0",

@@ -84,9 +84,9 @@ const LandingPage: FC = () => {
               {APP_NAME}
             </h1>
 
-            <h2 data-testid="landing-subtitle" className="landing-subtitle">
+            <p data-testid="landing-subtitle" className="landing-subtitle">
               {APP_FULL_NAME}
-            </h2>
+            </p>
 
             {offlineSignOut && (
               <InlineNotification

@@ -170,8 +170,8 @@ export const criteriaFields = <C extends object>({
   ) => multiSelect(field, labelText, anyText, orgUnitOptions(options), { filterable: true });
 
   /**
-   * A "from – to" pair, as on Structure Search: the legend names the pair and the boxes carry
-   * hidden labels and a placeholder.
+   * A "from – to" pair, as on Structure Search: the legend names the pair, and the boxes carry
+   * hidden labels and "From" / "To" placeholders.
    */
   const range = (
     from: Field,
@@ -180,26 +180,14 @@ export const criteriaFields = <C extends object>({
     kind: 'kilometres' | 'year' | 'millimetres',
   ) => {
     const box = (field: Field, end: 'From' | 'To') => {
-      const common = { hideLabel: true } as const;
+      const common = { hideLabel: true, placeholder: end } as const;
       if (kind === 'year') {
-        return text(field, `${labelText} ${end}`, 4, {
-          ...common,
-          inputMode: 'numeric',
-          placeholder: `${end} yyyy`,
-        });
+        return text(field, `${labelText} ${end}`, 4, { ...common, inputMode: 'numeric' });
       }
       if (kind === 'millimetres') {
-        return text(field, `${labelText} ${end}`, 6, {
-          ...common,
-          inputMode: 'numeric',
-          placeholder: end,
-        });
+        return text(field, `${labelText} ${end}`, 6, { ...common, inputMode: 'numeric' });
       }
-      return text(field, `${labelText} ${end}`, 9, {
-        ...common,
-        inputMode: 'decimal',
-        placeholder: end,
-      });
+      return text(field, `${labelText} ${end}`, 9, { ...common, inputMode: 'decimal' });
     };
     return (
       <fieldset className="report-criteria__range">

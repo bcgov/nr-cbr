@@ -14,7 +14,8 @@
 }
 
 .road-district-modal__heading {
-  @include type.type-style('heading-compact-01');
+  // A section inside a dialog: the ladder moves down one, so heading-compact-02.
+  @include type.type-style('heading-compact-02');
 
   margin-block: $spacing-06 $spacing-04;
 }
@@ -32,7 +33,7 @@
 }
 
 .road-district-modal .read-only-field__label {
-  @include type.type-style('label-01');
+  @include type.type-style('label-02');
 
   font-weight: 400;
   color: var(--cds-text-secondary);
