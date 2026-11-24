@@ -1,20 +1,20 @@
 import { Search as SearchIcon } from '@carbon/icons-react';
 import { Button, Checkbox, Select, SelectItem, TextArea, TextInput } from '@carbon/react';
-import { useState } from 'react';
 
 import FieldWithCounter from '@/components/core/FieldWithCounter';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
 import { requiredLabel } from '@/utils/requiredLabel';
 
-import RoadDistrictModal from './RoadDistrictModal';
+import RoadDistrictField from './RoadDistrictField';
 import { isDistrictFromRoad, SITE_TEXT_LIMITS, SITE_TYPE, type SiteFormValues } from './types';
 
 import './siteForm.scss';
 
+import type { EnteredLocation } from './RoadDistrictModal';
 import type { SiteErrors } from './validation';
 import type { RoadDistrict, RoadSectionResponse } from '@/services/road.service';
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
-import type { FC, FocusEvent, SubmitEventHandler } from 'react';
+import type { FC, FocusEvent, ReactNode, SubmitEventHandler } from 'react';
 
 import { byteLength } from '@/utils/textLimits';
 
@@ -223,24 +223,12 @@ const districtText = (districts: OrgUnitOption[], orgUnitNo: string): string => 
 /** No road districts, the same array every render. */
 const NO_ROAD_DISTRICTS: RoadDistrict[] = [];
 
-/**
- * The districts a road crossing a district boundary lies in, as options: the list's entry for each,
- * or the road's own code where the list lacks it, so every one of them can still be picked.
- */
-const roadDistrictOptions = (
-  districts: OrgUnitOption[],
-  roadDistricts: RoadDistrict[],
-): OrgUnitOption[] =>
-  roadDistricts
-    .filter((district) => district.orgUnitNo !== null)
-    .map(
-      (district) =>
-        findUnit(districts, String(district.orgUnitNo)) ?? {
-          orgUnitNo: String(district.orgUnitNo),
-          orgUnitCode: district.code ?? `Org unit ${district.orgUnitNo}`,
-          orgUnitName: '',
-        },
-    );
+/** The coordinates on the form as the district pop-up shows them; blank parts when none. */
+const enteredLocation = (values: SiteFormValues): EnteredLocation => ({
+  longitude: dms(values.longitudeDegrees, values.longitudeMinutes, values.longitudeSeconds, true),
+  latitude: dms(values.latitudeDegrees, values.latitudeMinutes, values.latitudeSeconds),
+  utm: utm(values),
+});
 
 /** A stored org unit as a read-only value: its name, or the raw number if the list lacks it. */
 const orgUnitText = (options: OrgUnitOption[], orgUnitNo: string): string => {
@@ -318,31 +306,15 @@ const SiteForm: FC<Props> = ({
     isRecreation && !recreationDistrictsLoading && recreationDistricts.length === 0;
   /**
    * The road crosses a district boundary, so the user picks which of its districts the site is in
-   * (business, 2026-11-23) — as radio buttons, every choice in view with what it means, rather
-   * than a dropdown hiding two options.
+   * (business, 2026-11-23), in a pop-up — see `RoadDistrictField`.
    */
-  const roadDistrictChoices =
-    !isRecreation && roadResolved && !roadUnavailable && roadDistricts.length >= 2
-      ? roadDistrictOptions(codeTables.forestDistricts, roadDistricts)
-      : null;
-  /** Forest District is set in the pop-up, not on the form. */
-  const districtInPopUp = roadDistrictChoices !== null && isEditable('orgUnitNo');
-  /**
-   * The pop-up opens by itself while such a road is on the form and none of its districts is
-   * chosen — unless the user cancelled it for this road. Derived, not set in an effect: entering a
-   * different road opens it again, choosing a district closes it.
-   */
-  const roadKey = roadSection ? `${roadSection.forestFileId}/${roadSection.roadSectionId}` : '';
-  const [dismissedRoad, setDismissedRoad] = useState<string | null>(null);
-  const districtChosen = (roadDistrictChoices ?? []).some(
-    (unit) => String(unit.orgUnitNo) === values.orgUnitNo,
-  );
-  /** Opened again from the field's link, after a cancel or to change a choice. */
-  const [reopened, setReopened] = useState(false);
-  const choosingDistrict =
-    districtInPopUp &&
-    Boolean(roadSection) &&
-    (reopened || (!districtChosen && dismissedRoad !== roadKey));
+  const districtInPopUp =
+    !isRecreation &&
+    roadResolved &&
+    !roadUnavailable &&
+    roadDistricts.length >= 2 &&
+    roadSection !== undefined &&
+    isEditable('orgUnitNo');
   const waitingForFile = isRecreation && values.forestFileId.trim() === '';
   const districtBlank = waitingForFile ? 'Enter a Project File ID# first' : 'Select a district';
 
@@ -544,71 +516,115 @@ const SiteForm: FC<Props> = ({
       </fieldset>
     );
 
-  return (
-    <>
-      <form id={FORM_ID} onSubmit={submit} data-testid="site-form" className="site-form__form">
-        <div className="site-form__fields">
-          {text('siteId', 'Site #', 14, {
-            required: true,
-            // `CROSSING_SITE_ID` is a natural key people read off a sign and type in, and it is
-            // stored and matched exactly — so a lower-case entry is a different site from the one
-            // the user meant. Legacy folds it for the same reason.
-            uppercase: true,
-          })}
-          {codeSelect(
-            'crossingSiteStatusCode',
-            'Status',
-            'Select a status',
-            codeTables.siteStatusCodes,
-            true,
-          )}
-          {codeSelect(
-            'crossingSiteTypeCode',
-            'Site Type',
-            'Select a site type',
-            codeTables.siteTypeCodes,
-            true,
-          )}
-          {codeSelect(
-            'structureInspectionStatusCode',
-            'Inspection Status',
-            'Select an inspection status',
-            codeTables.structureInspectionStatusCodes,
-            true,
-          )}
+  /**
+   * The Forest District (or Recreation District) control — one of four, in this order:
+   * read-only where the road decides it; the pop-up's field where the road lies in several
+   * districts; "—" for a recreation site whose project names none; otherwise a dropdown.
+   */
+  const districtField = (): ReactNode => {
+    if (districtIsDerived) {
+      return <ReadOnlyField label="Forest District" value={derivedDistrict} />;
+    }
+    if (districtInPopUp && roadSection) {
+      return (
+        <RoadDistrictField
+          road={roadSection}
+          districtText={districtText(codeTables.forestDistricts, values.orgUnitNo)}
+          orgUnitNo={values.orgUnitNo}
+          forestDistricts={codeTables.forestDistricts}
+          location={enteredLocation(values)}
+          error={errors.orgUnitNo}
+          onChoose={(orgUnitNo) => {
+            // Changing the district clears the Management Area, picked next on the form.
+            onChange('orgUnitNo', orgUnitNo);
+            onSettle('orgUnitNo');
+          }}
+        />
+      );
+    }
+    if (noRecreationDistricts && isEditable('orgUnitNo')) {
+      return (
+        <ReadOnlyField
+          label="Recreation District"
+          value={districtText(recreationDistricts, values.orgUnitNo)}
+        />
+      );
+    }
+    return orgUnitSelect(
+      'orgUnitNo',
+      districtLabel,
+      districtBlank,
+      districtOptions,
+      codeTablesLoading || (isRecreation && recreationDistrictsLoading),
+      // A recreation site is identified by its project, not by a district's road network.
+      !isRecreation,
+    );
+  };
 
-          {/* Two halves of one identifier, on one line — as on the legacy form, and as on Site
+  return (
+    <form id={FORM_ID} onSubmit={submit} data-testid="site-form" className="site-form__form">
+      <div className="site-form__fields">
+        {text('siteId', 'Site #', 14, {
+          required: true,
+          // `CROSSING_SITE_ID` is a natural key people read off a sign and type in, and it is
+          // stored and matched exactly — so a lower-case entry is a different site from the one
+          // the user meant. Legacy folds it for the same reason.
+          uppercase: true,
+        })}
+        {codeSelect(
+          'crossingSiteStatusCode',
+          'Status',
+          'Select a status',
+          codeTables.siteStatusCodes,
+          true,
+        )}
+        {codeSelect(
+          'crossingSiteTypeCode',
+          'Site Type',
+          'Select a site type',
+          codeTables.siteTypeCodes,
+          true,
+        )}
+        {codeSelect(
+          'structureInspectionStatusCode',
+          'Inspection Status',
+          'Select an inspection status',
+          codeTables.structureInspectionStatusCodes,
+          true,
+        )}
+
+        {/* Two halves of one identifier, on one line — as on the legacy form, and as on Site
             Search. */}
-          <div className="site-form__paired">
-            {text('forestFileId', 'Project File ID#', 10, { required: true })}
-            {/* Not for a recreation site: no rule in legacy enforces it and `site.jsp:661` hides
+        <div className="site-form__paired">
+          {text('forestFileId', 'Project File ID#', 10, { required: true })}
+          {/* Not for a recreation site: no rule in legacy enforces it and `site.jsp:661` hides
               its error div there, so a "Br." — a branch of a road — is asked for only where
               there is a road. */}
-            {text('roadSectionId', 'Br.', 30, { required: !isRecreation })}
-            {/* The magnifying glass legacy puts beside these two boxes, opening its road search.
+          {text('roadSectionId', 'Br.', 30, { required: !isRecreation })}
+          {/* The magnifying glass legacy puts beside these two boxes, opening its road search.
               Offered only while they can be changed — on a read-only page there is nothing for a
               chosen road to be written into. Not for a recreation site either: `site.jsp:657`
               wraps the icon in `crossingSiteTypeCode != 'REC'`, since its file id names a
               recreation project rather than a road. */}
-            {onFindRoad && !isRecreation && isEditable('forestFileId') && (
-              <div className="site-form__find-road">
-                <Button
-                  kind="ghost"
-                  size="md"
-                  hasIconOnly
-                  renderIcon={SearchIcon}
-                  iconDescription="Find a road"
-                  data-testid="site-form-find-road"
-                  onClick={onFindRoad}
-                />
-              </div>
-            )}
-          </div>
+          {onFindRoad && !isRecreation && isEditable('forestFileId') && (
+            <div className="site-form__find-road">
+              <Button
+                kind="ghost"
+                size="md"
+                hasIconOnly
+                renderIcon={SearchIcon}
+                iconDescription="Find a road"
+                data-testid="site-form-find-road"
+                onClick={onFindRoad}
+              />
+            </div>
+          )}
+        </div>
 
-          {/* Same column either way — a recreation site records its district in ORG_UNIT_NO like any
+        {/* Same column either way — a recreation site records its district in ORG_UNIT_NO like any
             other. Only the label changes, because for a recreation site the district is the one
             administering the site rather than the road. */}
-          {/* Who owns the Forest District, straight from legacy.
+        {/* Who owns the Forest District, straight from legacy.
             
             A crossing is on a road and the road knows its district, so choosing a road chooses the
             district — `SiteAction` overwrites `orgUnitNo` from the road and `setValidateResponse`
@@ -623,62 +639,15 @@ const SiteForm: FC<Props> = ({
             Read-only rather than a disabled select where the road decides it: the value is
             information, and a greyed-out dropdown invites a click that can do nothing. It also
             shows the value when the district list does not contain it — see `districtText`. */}
-          {districtIsDerived ? (
-            <ReadOnlyField label="Forest District" value={derivedDistrict} />
-          ) : districtInPopUp ? (
-            <div className="site-form__road-district" data-testid="site-form-orgUnitNo-choice">
-              <div className="site-form__road-district-value">
-                <ReadOnlyField
-                  label="Forest District"
-                  value={districtText(codeTables.forestDistricts, values.orgUnitNo)}
-                  emptyText="Not chosen"
-                />
-              </div>
-              <span className="site-form__road-district-help">
-                This road section lies in {roadDistricts.length} districts.{' '}
-                {/* A link, not a button: the pop-up opens by itself, this only reopens it. */}
-                <button
-                  type="button"
-                  className="cds--link site-form__road-district-link"
-                  data-testid="site-form-choose-district"
-                  onClick={() => setReopened(true)}
-                >
-                  {districtChosen ? 'Change district' : 'Choose district'}
-                </button>
-              </span>
-              {errors.orgUnitNo && (
-                <span
-                  className="site-form__road-district-error"
-                  data-testid="site-form-orgUnitNo-error"
-                >
-                  {errors.orgUnitNo}
-                </span>
-              )}
-            </div>
-          ) : noRecreationDistricts && isEditable('orgUnitNo') ? (
-            <ReadOnlyField
-              label="Recreation District"
-              value={districtText(recreationDistricts, values.orgUnitNo)}
-            />
-          ) : (
-            orgUnitSelect(
-              'orgUnitNo',
-              districtLabel,
-              districtBlank,
-              districtOptions,
-              codeTablesLoading || (isRecreation && recreationDistrictsLoading),
-              // A recreation site is identified by its project, not by a district's road network.
-              !isRecreation,
-            )
-          )}
+        {districtField()}
 
-          {/* Read, never chosen. Legacy disables the client number and location code for every role
+        {/* Read, never chosen. Legacy disables the client number and location code for every role
             and never calls the lookup that would fill them (`site.jsp:734-740`, `778-784`;
             `showClientSearch()` at 529 is dead). The value arrives from LRMOPS, through
             `UPDATE_CROSSING_SITE_FROM_LRM`, so there is no editable branch here. */}
-          <ReadOnlyField label="Designated Maintainer" value={values.maintainerLabel} />
+        <ReadOnlyField label="Designated Maintainer" value={values.maintainerLabel} />
 
-          {/* Absent on a recreation site, as it is on legacy's form — the whole row sits inside
+        {/* Absent on a recreation site, as it is on legacy's form — the whole row sits inside
             `<c:if test="${SiteForm.crossingSiteTypeCode != 'REC'}">`. A management area is a former
             *forest* district, so there is nothing for a recreation site to pick: the list is built
             from the district in `orgUnitNo`, and on a recreation site that holds a recreation
@@ -686,21 +655,21 @@ const SiteForm: FC<Props> = ({
 
             Enabled whenever it is shown, which is also legacy: the road that disables Forest
             District leaves this one alone, and the page's disable script never names it. */}
-          {!isRecreation &&
-            orgUnitSelect(
-              'managementOrgUnitNo',
-              'Management Area',
-              values.orgUnitNo === '' ? 'Select a district first' : 'No management area',
-              codeTables.managementAreas,
-              codeTablesLoading || managementAreasLoading,
-            )}
+        {!isRecreation &&
+          orgUnitSelect(
+            'managementOrgUnitNo',
+            'Management Area',
+            values.orgUnitNo === '' ? 'Select a district first' : 'No management area',
+            codeTables.managementAreas,
+            codeTablesLoading || managementAreasLoading,
+          )}
 
-          {/* Derived, not entered — and disabled on the legacy form too, for every role. It is read
+        {/* Derived, not entered — and disabled on the legacy form too, for every role. It is read
             back from the road record that Project File ID# and Br. identify, so it is bound to
             nothing here: it holds no value the form would submit, and giving it one of the real
             field names would put a second control on that field's id. The road lookup is not
             ported yet, so it says so rather than sitting blank with no explanation. */}
-          {/* Read from the road record, never typed — legacy disables this box for every role and
+        {/* Read from the road record, never typed — legacy disables this box for every role and
             fills it from its own `getRoadDetails()` call. A value rather than a disabled input in
             both modes: there is nothing here to interact with, and a greyed-out box invites a
             click that does nothing.
@@ -708,27 +677,27 @@ const SiteForm: FC<Props> = ({
             The em dash covers three cases that look alike and are not: the pair is incomplete, the
             pair names no section, or the section has no name upstream. The form cannot tell them
             apart and neither could legacy, which blanked the field for all three. */}
-          <ReadOnlyField
-            label={isRecreation ? 'Project Name' : 'Forest Service Road'}
-            value={forestServiceRoad}
-            emptyText={forestServiceRoadLoading ? 'Looking up\u2026' : '\u2014'}
-          />
+        <ReadOnlyField
+          label={isRecreation ? 'Project Name' : 'Forest Service Road'}
+          value={forestServiceRoad}
+          emptyText={forestServiceRoadLoading ? 'Looking up\u2026' : '\u2014'}
+        />
 
-          {orgUnitSelect(
-            'businessAreaOrgUnitNo',
-            'BCTS BA Responsible',
-            'No business area',
-            codeTables.businessAreas,
-          )}
+        {orgUnitSelect(
+          'businessAreaOrgUnitNo',
+          'BCTS BA Responsible',
+          'No business area',
+          codeTables.businessAreas,
+        )}
 
-          {codeSelect(
-            'specialAccessRqmtCode',
-            'Special Access Requirements',
-            'No requirement',
-            codeTables.specialAccessCodes,
-          )}
-          {text('crossingName', 'Crossing Name', 255, { required: !isStorage })}
-          {/* The three narrow cells, in one column between them rather than one each.
+        {codeSelect(
+          'specialAccessRqmtCode',
+          'Special Access Requirements',
+          'No requirement',
+          codeTables.specialAccessCodes,
+        )}
+        {text('crossingName', 'Crossing Name', 255, { required: !isStorage })}
+        {/* The three narrow cells, in one column between them rather than one each.
 
             Kilometres and User Kilometres are two measurements of the same thing — the distance
             from the point of commencement, and the distance posted on the sign — and reading one
@@ -740,135 +709,106 @@ const SiteForm: FC<Props> = ({
             digits ahead of the point and two behind, so "999999.99" — nine characters — is the
             longest value that can be stored. The tenth character legacy allows is one the database
             would refuse, which is why `KILOMETRE` in validation.ts is the narrower rule. */}
-          <div className="site-form__narrow-group">
-            {text('pointOfCommencementDistance', 'Kilometres', 10, { required: !isStorage })}
-            {text('userKm', 'User Kilometres', 10)}
-          </div>
-          {/* A cell of its own, so it sits in the next column — under BCTS BA Responsible — rather
+        <div className="site-form__narrow-group">
+          {text('pointOfCommencementDistance', 'Kilometres', 10, { required: !isStorage })}
+          {text('userKm', 'User Kilometres', 10)}
+        </div>
+        {/* A cell of its own, so it sits in the next column — under BCTS BA Responsible — rather
             than trailing the two kilometre boxes. */}
-          {/* Disabled, as it is in every branch of the legacy form — including for a Level 2 user.
+        {/* Disabled, as it is in every branch of the legacy form — including for a Level 2 user.
             Capital Road is set by the road data, not on this screen. */}
-          {/* Never editable on this screen, in legacy or here — it is set from the road record. In a
+        {/* Never editable on this screen, in legacy or here — it is set from the road record. In a
             read-only page it reads as a word rather than as a permanently greyed-out tick box. */}
-          {!isEditable('capitalRoad') ? (
-            <ReadOnlyField label="Capital Road" value={capitalRoadText} />
-          ) : (
-            <div className="site-form__checkbox">
-              {/* An empty label, not a margin — the same device the road lookup button uses. A
+        {!isEditable('capitalRoad') ? (
+          <ReadOnlyField label="Capital Road" value={capitalRoadText} />
+        ) : (
+          <div className="site-form__checkbox">
+            {/* An empty label, not a margin — the same device the road lookup button uses. A
                 checkbox carries its text beside the box rather than above it, so without this it
                 starts where every other field's *label* starts and sits a line above the controls
                 it shares a row with. Reserving whatever a label currently reserves keeps the two
                 in step if that ever changes; a hard offset would silently stop matching. */}
-              <span className="cds--label" aria-hidden="true" />
-              <Checkbox
-                id="site-form-capitalRoad"
-                data-testid="site-form-capitalRoad"
-                labelText="Capital Road"
-                checked={values.capitalRoad}
-                disabled
-                onChange={(_event, { checked }) => onChange('capitalRoad', checked)}
-              />
-            </div>
-          )}
+            <span className="cds--label" aria-hidden="true" />
+            <Checkbox
+              id="site-form-capitalRoad"
+              data-testid="site-form-capitalRoad"
+              labelText="Capital Road"
+              checked={values.capitalRoad}
+              disabled
+              onChange={(_event, { checked }) => onChange('capitalRoad', checked)}
+            />
+          </div>
+        )}
 
-          {/* No heading above these. "Coordinates" named a group whose three members already say
+        {/* No heading above these. "Coordinates" named a group whose three members already say
             what they are, so it only added a line between the user and the boxes. */}
-          {/* Side by side, because they are one point: a reader checks a pair of coordinates
+        {/* Side by side, because they are one point: a reader checks a pair of coordinates
             against each other, and splitting them across two rows puts the second where the eye
             has to go looking for it. UTM keeps its own row below — it says the same thing a
             different way rather than completing this. */}
-          {/* Read as three ordinary cells, entered as three groups of boxes.
+        {/* Read as three ordinary cells, entered as three groups of boxes.
             A value needs no more room than the text of it, so read-only they take one grid column
             each like every other field and sit on one row. Editable they need nine inputs between
             them, which no single column holds — so longitude and latitude share a full-width row
             and UTM takes another. */}
-          {coordinatesAreValues ? (
-            <>
-              <ReadOnlyField
-                label="Longitude"
-                // Signed, because the stored value is. Legacy's minus sits outside its `<c:choose>`,
-                // so it shows whether the boxes are editable or not.
-                value={dms(
-                  values.longitudeDegrees,
-                  values.longitudeMinutes,
-                  values.longitudeSeconds,
-                  true,
-                )}
-              />
-              <ReadOnlyField
-                label="Latitude"
-                value={dms(values.latitudeDegrees, values.latitudeMinutes, values.latitudeSeconds)}
-              />
-              <ReadOnlyField label="UTM" value={utm(values)} />
-            </>
-          ) : (
-            <>
-              <div className="site-form__coordinate-pair">
-                {coordinate(
-                  // Legacy's label, with legacy's minus sign beside the boxes rather than a word in
-                  // the label standing in for it.
-                  'Longitude',
-                  'longitudeDegrees',
-                  'longitudeMinutes',
-                  'longitudeSeconds',
-                  true,
-                )}
-                {coordinate('Latitude', 'latitudeDegrees', 'latitudeMinutes', 'latitudeSeconds')}
-              </div>
-              <fieldset className="site-form__group">
-                <legend className="cds--label">UTM</legend>
-                <div className="site-form__parts">
-                  {text('utmZone', 'Zone', 2, { placeholder: 'Zone', hideLabel: true })}
-                  {text('utmEasting', 'Easting', 10, { placeholder: 'Easting', hideLabel: true })}
-                  {text('utmNorthing', 'Northing', 10, {
-                    placeholder: 'Northing',
-                    hideLabel: true,
-                  })}
-                </div>
-              </fieldset>
-            </>
-          )}
-
-          {!withoutDetails && (
-            <SiteDetailsField
-              values={values}
-              errors={errors}
-              onChange={onChange}
-              onSettle={onSettle}
-              isEditable={isEditable}
+        {coordinatesAreValues ? (
+          <>
+            <ReadOnlyField
+              label="Longitude"
+              // Signed, because the stored value is. Legacy's minus sits outside its `<c:choose>`,
+              // so it shows whether the boxes are editable or not.
+              value={dms(
+                values.longitudeDegrees,
+                values.longitudeMinutes,
+                values.longitudeSeconds,
+                true,
+              )}
             />
-          )}
-        </div>
-      </form>
-      {/* Outside the form, so its buttons can never submit it. */}
-      {choosingDistrict && roadSection && (
-        <RoadDistrictModal
-          road={roadSection}
-          forestDistricts={codeTables.forestDistricts}
-          location={{
-            longitude: dms(
-              values.longitudeDegrees,
-              values.longitudeMinutes,
-              values.longitudeSeconds,
-              true,
-            ),
-            latitude: dms(values.latitudeDegrees, values.latitudeMinutes, values.latitudeSeconds),
-            utm: utm(values),
-          }}
-          orgUnitNo={values.orgUnitNo}
-          onClose={() => {
-            setDismissedRoad(roadKey);
-            setReopened(false);
-          }}
-          onConfirm={(orgUnitNo) => {
-            // Changing the district clears the Management Area, picked next on the form.
-            onChange('orgUnitNo', orgUnitNo);
-            onSettle('orgUnitNo');
-            setReopened(false);
-          }}
-        />
-      )}
-    </>
+            <ReadOnlyField
+              label="Latitude"
+              value={dms(values.latitudeDegrees, values.latitudeMinutes, values.latitudeSeconds)}
+            />
+            <ReadOnlyField label="UTM" value={utm(values)} />
+          </>
+        ) : (
+          <>
+            <div className="site-form__coordinate-pair">
+              {coordinate(
+                // Legacy's label, with legacy's minus sign beside the boxes rather than a word in
+                // the label standing in for it.
+                'Longitude',
+                'longitudeDegrees',
+                'longitudeMinutes',
+                'longitudeSeconds',
+                true,
+              )}
+              {coordinate('Latitude', 'latitudeDegrees', 'latitudeMinutes', 'latitudeSeconds')}
+            </div>
+            <fieldset className="site-form__group">
+              <legend className="cds--label">UTM</legend>
+              <div className="site-form__parts">
+                {text('utmZone', 'Zone', 2, { placeholder: 'Zone', hideLabel: true })}
+                {text('utmEasting', 'Easting', 10, { placeholder: 'Easting', hideLabel: true })}
+                {text('utmNorthing', 'Northing', 10, {
+                  placeholder: 'Northing',
+                  hideLabel: true,
+                })}
+              </div>
+            </fieldset>
+          </>
+        )}
+
+        {!withoutDetails && (
+          <SiteDetailsField
+            values={values}
+            errors={errors}
+            onChange={onChange}
+            onSettle={onSettle}
+            isEditable={isEditable}
+          />
+        )}
+      </div>
+    </form>
   );
 };
 

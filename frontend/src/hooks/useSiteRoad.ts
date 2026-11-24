@@ -86,9 +86,9 @@ export const useSiteRoad = (
 
     const hasRoad = Boolean(road.data);
     if (hasRoad && roadDistricts.length >= 2) {
-      const choices = roadDistricts.map((district) => String(district.orgUnitNo));
+      const choices = new Set(roadDistricts.map((district) => String(district.orgUnitNo)));
       setSite((current) =>
-        choices.includes(current.orgUnitNo)
+        choices.has(current.orgUnitNo)
           ? current
           : { ...current, orgUnitNo: '', managementOrgUnitNo: '' },
       );
