@@ -52,6 +52,10 @@ class SiteServiceTest {
   @MockitoBean
   private ca.bc.gov.nrs.cbr.security.LoggedUserHelper loggedUser;
 
+  /** Reads and deletes ask LRMOPS nothing; the save's road check is SiteCreateTest's. */
+  @MockitoBean
+  private RoadSectionService roads;
+
   @Autowired
   private CrossingSiteRepository sites;
 

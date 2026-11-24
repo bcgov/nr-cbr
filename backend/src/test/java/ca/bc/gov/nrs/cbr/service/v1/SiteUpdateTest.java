@@ -2,8 +2,11 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient;
 import ca.bc.gov.nrs.cbr.exception.SiteNotFoundException;
 import ca.bc.gov.nrs.cbr.exception.SiteValidationException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
@@ -24,16 +27,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.client.HttpServerErrorException;
 
 /**
  * Editing a site — {@link SiteService#update}.
  *
- * <p>Against the database, as the create is: the rules are foreign keys and a derived road segment,
+ * <p>Against the database, as the create is: the rules are foreign keys and the stored road segment,
  * and a mocked repository would only assert what it was told.
  */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import({SiteService.class, SiteValidator.class})
+@Import({SiteService.class, SiteValidator.class, RoadSectionService.class})
 class SiteUpdateTest {
 
   private static final String SITE = "BOWRON-001";
@@ -51,12 +56,16 @@ class SiteUpdateTest {
   @MockitoBean
   private LoggedUserHelper loggedUser;
 
+  @MockitoBean
+  private LrmopsApiClient lrmops;
+
   @BeforeEach
   void setUp() {
     entityManager.createQuery("DELETE FROM CrossingStructureEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CrossingSiteEntity").executeUpdate();
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\EDITOR");
     SiteTestFixtures.givenCodeTables(entityManager);
+    SiteTestFixtures.givenRoads(lrmops);
     givenStoredSite(site -> { });
   }
 
@@ -204,13 +213,32 @@ class SiteUpdateTest {
     }
 
     @Test
-    @DisplayName("derives the road segment again, as the section's lowest")
-    void rederivesTheSegment() {
-      // Stored as 77; the section's segments are 42 and 77, and legacy's hidden select re-posts
-      // the first on every save.
-      save(edit -> { });
+    @DisplayName("keeps the stored road segment when the road is unchanged")
+    void keepsTheSegmentForTheSameRoad() {
+      save(edit -> edit.forestFileId = " r00123 ");
 
-      assertThat(stored().getRoadSegmentId()).isEqualTo(42L);
+      assertThat(stored().getRoadSegmentId()).isEqualTo(77L);
+    }
+
+    @Test
+    @DisplayName("clears the road segment when the road changes, LRMOPS having none to derive")
+    void clearsTheSegmentForANewRoad() {
+      save(edit -> edit.roadSectionId = "02");
+
+      CrossingSiteEntity site = stored();
+      assertThat(site.getRoadSectionId()).isEqualTo("02");
+      assertThat(site.getRoadSegmentId()).isNull();
+    }
+
+    @Test
+    @DisplayName("refuses the save when LRMOPS can't be asked, even keeping the stored road")
+    void refusesWhenTheRoadCheckIsUnavailable() {
+      // doThrow, not when(): calling the stubbed method would run the fixture's answer.
+      doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY)).when(lrmops).getRoadSection(any(), any());
+
+      assertThat(refusedWith(edit -> { }))
+          .containsEntry("forestFileId",
+              "Road check is unavailable right now. Try saving again shortly.");
     }
 
     @Test
@@ -221,8 +249,8 @@ class SiteUpdateTest {
     }
 
     @Test
-    @DisplayName("refuses a pair whose section has no road segment")
-    void refusesARoadWithNoSegment() {
+    @DisplayName("refuses a Project File ID# and Br. that name no road")
+    void refusesAnUnknownRoad() {
       assertThat(refusedWith(edit -> edit.roadSectionId = "99"))
           .containsEntry("forestFileId", "No road matches this Project File ID# and Br.");
     }

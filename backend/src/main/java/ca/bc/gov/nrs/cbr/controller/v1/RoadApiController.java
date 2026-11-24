@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.RoadApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.RoadSectionService;
+import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
@@ -39,5 +40,10 @@ public class RoadApiController implements RoadApiEndpoint {
   public ResponseEntity<RoadSectionResponse> getRoadSection(
       String forestFileId, String roadSectionId) {
     return ResponseEntity.ok(roadSectionService.find(forestFileId, roadSectionId));
+  }
+
+  @Override
+  public ResponseEntity<List<CodeOptionResponse>> getTenureTypes() {
+    return ResponseEntity.ok(roadSectionService.tenureTypes());
   }
 }

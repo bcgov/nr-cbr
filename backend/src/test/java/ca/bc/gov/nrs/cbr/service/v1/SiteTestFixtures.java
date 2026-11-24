@@ -1,7 +1,12 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient;
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.District;
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSection;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSegmentEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteTypeCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
@@ -9,10 +14,16 @@ import ca.bc.gov.nrs.cbr.model.v1.SpecialAccessRequirementCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionStatusCodeEntity;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * The reference rows a valid site points at, shared by the create and update tests — both save
  * through the same validator, so both need the same code tables and the same road.
+ *
+ * <p>The road comes from LRMOPS, through a mocked {@link LrmopsApiClient}: {@code R00123} / Br.
+ * {@code 01} is a road (and so is Br. {@code 02}); anything else is not.
  */
 final class SiteTestFixtures {
 
@@ -65,21 +76,22 @@ final class SiteTestFixtures {
             .orgUnitType("D").effectiveDate(from).expiryDate(until).build());
       }
     }
-    // The road the valid request names, with two segments so "the first one" means something.
-    // Persisted out of order on purpose: legacy's ORDER BY ROAD_SEGMENT_ID is what decides, not
-    // insertion order, and a fixture that agreed with both would not tell them apart.
-    givenRoadSegment(entityManager, "R00123", "01", 77L);
-    givenRoadSegment(entityManager, "R00123", "01", 42L);
     entityManager.flush();
   }
 
-  static void givenRoadSegment(
-      EntityManager entityManager, String forestFileId, String roadSectionId, long roadSegmentId) {
-    entityManager.persist(CbrRoadSegmentEntity.builder()
-        .forestFileId(forestFileId)
-        .roadSectionId(roadSectionId)
-        .roadSegmentId(roadSegmentId)
-        .roadResponsibilityTypeCode("MOF")
-        .build());
+  /** The roads LRMOPS has, as {@code roadId/sectionId}. */
+  private static final Set<String> ROADS = Set.of("R00123/01", "R00123/02");
+
+  /** LRMOPS, answering for {@link #ROADS} and nothing else. */
+  static void givenRoads(LrmopsApiClient lrmops) {
+    lenient().when(lrmops.isConfigured()).thenReturn(true);
+    lenient().when(lrmops.getRoadSection(any(), any())).thenAnswer(call -> {
+      String roadId = call.getArgument(0);
+      String sectionId = call.getArgument(1);
+      return ROADS.contains(roadId.trim().toUpperCase() + "/" + sectionId.trim().toUpperCase())
+          ? Optional.of(new RoadSection(roadId, sectionId, "BOWRON FSR", "FSR", false,
+              List.of(new District(18L, "DPG")), null, null))
+          : Optional.empty();
+    });
   }
 }

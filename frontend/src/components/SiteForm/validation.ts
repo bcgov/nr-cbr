@@ -5,9 +5,11 @@ import {
   SITE_TEXT_LIMITS,
   SITE_TYPE,
   UNINSPECTABLE_STATUSES,
+  type RoadDistrictState,
   type SiteFormValues,
 } from './types';
 
+import { ROAD_LOOKUP_UNAVAILABLE } from '@/services/road.service';
 import { overLimitError } from '@/utils/textLimits';
 import { isNumberInProgress, type ValidationMode } from '@/utils/validation';
 
@@ -415,7 +417,7 @@ export const savedSiteConflicts = (
  *
  * <p>Forest District is then a read-only value with nowhere to put a message, and a Save refused
  * over an error nobody can see is a button that does nothing. Two causes, and the more useful
- * sentence wins: no road at all, or a road with no district (a null `FOREST_REGION`). Neither
+ * sentence wins: no road at all, or a road LRMOPS records no district for. Neither
  * overrides a complaint Project File ID# already has of its own, such as being blank.
  *
  * @param road what `useSiteRoad` knows about the pair
@@ -423,10 +425,16 @@ export const savedSiteConflicts = (
 export const withRoadErrors = (
   errors: SiteErrors,
   siteTypeCode: string,
-  road: { roadResolved: boolean; noRoad: boolean },
+  road: RoadDistrictState & { noRoad: boolean },
 ): SiteErrors => {
+  // Red, beside Project File ID#: LRMOPS could not be asked, so the road is unchecked and the
+  // server will refuse the save (business, 2026-11-23). Save still goes to the server, so pressing
+  // it again is how the user retries.
+  if (road.roadUnavailable) {
+    return { ...errors, forestFileId: errors.forestFileId ?? ROAD_LOOKUP_UNAVAILABLE };
+  }
   const { orgUnitNo: districtError, ...rest } = errors;
-  const fromRoad = isDistrictFromRoad(siteTypeCode, road.roadResolved);
+  const fromRoad = isDistrictFromRoad(siteTypeCode, road);
   if (!fromRoad || (!road.noRoad && districtError === undefined)) return errors;
 
   const message = road.noRoad

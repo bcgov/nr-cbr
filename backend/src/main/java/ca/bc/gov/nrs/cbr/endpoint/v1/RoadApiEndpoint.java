@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
@@ -16,8 +17,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * HTTP contract for the road-section lookup. Implemented by
- * {@link ca.bc.gov.nrs.cbr.controller.v1.RoadApiController}.
+ * HTTP contract for the road-section lookup, answered from LRMOPS through the LRM Ops API.
+ * Implemented by {@link ca.bc.gov.nrs.cbr.controller.v1.RoadApiController}.
+ *
+ * <p><b>503 when the API cannot answer</b> (down, timing out, refusing CBR's token, or not
+ * configured): the form says "Road lookup is unavailable right now." beside the field, rather than
+ * treating it as "no such road".
  *
  * <p>Separate from {@link ConfigurationApiEndpoint} for the same reason {@link ClientApiEndpoint}
  * is: everything there is a bounded code table fetched once and cached for a session, where this
@@ -37,12 +42,12 @@ public interface RoadApiEndpoint {
    *
    * <p><b>Server-side paging, as Site Search and Inspection Search have.</b> Legacy caps the dialog
    * at two hundred roads and says so on screen when it fills; paging instead puts every match in
-   * reach and lets the dialog say how many there are.
+   * reach and lets the dialog say how many there are. Retired roads are listed like any other.
    *
    * <p><b>Sorted by a column</b> when {@code sortBy} names one ({@link RoadSortColumn}),
-   * {@code sortDirection} {@code ASC} or {@code DESC}; legacy's order — road name, file, branch —
-   * otherwise, which also breaks ties. On the server, so it orders every match rather than the page
-   * on screen. An unknown value is a 400.
+   * {@code sortDirection} {@code ASC} or {@code DESC}; road name, file, branch otherwise, which also
+   * breaks ties. On the server, so it orders every match rather than the page on screen. An unknown
+   * value is a 400.
    *
    * <p><b>By several columns</b> when {@code sortBy} repeats, each with its {@code sortDirection}
    * in the same order ({@code HeaderSort}): the first decides, and each next breaks the ties before
@@ -68,15 +73,26 @@ public interface RoadApiEndpoint {
    * text — a path segment would have to be encoded and decoded correctly by every caller for a
    * value that may contain a slash.
    *
-   * <p>404 when the view holds no such section, or the section has no road segment — legacy calls
-   * that pair invalid, and the save refuses it. Either is the ordinary answer while the user is
-   * still typing either half — and the only answer in an environment provisioned from nr-mof-db,
-   * where the materialized view is stubbed. Add Site reports it on Project File ID# once both
-   * halves are in, as legacy does, rather than as an error of the request.
+   * <p>404 when LRMOPS has no such section — the ordinary answer while the user is still typing
+   * either half. Add Site reports it on Project File ID# once both halves are in, as legacy does,
+   * rather than as an error of the request.
+   *
+   * <p>{@code districts} lists every Forest District the section lies in: one, which the form fills
+   * in; two or more, and the user picks one of them (business, 2026-11-23).
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping
   ResponseEntity<RoadSectionResponse> getRoadSection(
       @RequestParam(name = "forestFileId", defaultValue = "") String forestFileId,
       @RequestParam(name = "roadSectionId", defaultValue = "") String roadSectionId);
+
+  /**
+   * LRMOPS's road tenure types ({@code FSR}, {@code RP}, …) with their descriptions, for the Road
+   * Search dialog's Tenure Type dropdown.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}, as the search it filters.
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/tenure-types")
+  ResponseEntity<List<CodeOptionResponse>> getTenureTypes();
 }

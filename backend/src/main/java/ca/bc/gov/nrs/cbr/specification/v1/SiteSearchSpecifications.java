@@ -63,7 +63,6 @@ public final class SiteSearchSpecifications {
   private static final String CROSSING_NAME = "crossingName";
   private static final String FOREST_FILE_ID = "forestFileId";
   private static final String ROAD_SECTION_ID = "roadSectionId";
-  private static final String ROAD_SEGMENT_ID = "roadSegmentId";
   private static final String SITE_STATUS_CODE = "crossingSiteStatusCode";
   private static final String INSPECTION_STATUS_CODE = "structureInspectionStatusCode";
   private static final String SITE_TYPE_CODE = "crossingSiteTypeCode";
@@ -249,7 +248,8 @@ public final class SiteSearchSpecifications {
     Predicate crossingSpecific = builder.and(
         builder.equal(root.get(SITE_TYPE_CODE), CROSSING),
         builder.or(
-            root.get(ROAD_SEGMENT_ID).isNull(),
+            // No ROAD_SEGMENT_ID: LRMOPS has no road segments, so sites saved since the move to
+            // it store none (decided 2026-11-23) — flagging that would mark every new crossing.
             root.get(FOREST_FILE_ID).isNull(),
             root.get(ROAD_SECTION_ID).isNull(),
             root.get(CROSSING_NAME).isNull(),

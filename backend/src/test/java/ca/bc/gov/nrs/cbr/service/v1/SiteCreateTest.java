@@ -1,8 +1,13 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient;
 import ca.bc.gov.nrs.cbr.exception.SiteValidationException;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteRepository;
@@ -21,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.client.ResourceAccessException;
 
 /**
  * Creating a site: what the server stores, and everything it refuses.
@@ -30,7 +36,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * exactly the bug this catches, and a mocked repository cannot tell you about it.
  */
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import({SiteService.class, SiteValidator.class})
+@Import({SiteService.class, SiteValidator.class, RoadSectionService.class})
 class SiteCreateTest {
 
   @Autowired
@@ -45,11 +51,15 @@ class SiteCreateTest {
   @MockitoBean
   private LoggedUserHelper loggedUser;
 
+  @MockitoBean
+  private LrmopsApiClient lrmops;
+
   @BeforeEach
   void setUp() {
     entityManager.createQuery("DELETE FROM CrossingSiteEntity").executeUpdate();
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\JSMITH");
     SiteTestFixtures.givenCodeTables(entityManager);
+    SiteTestFixtures.givenRoads(lrmops);
   }
 
   /**
@@ -170,15 +180,28 @@ class SiteCreateTest {
     }
 
     @Test
-    @DisplayName("stores the section's first segment, as the hidden select posts back")
-    void derivesTheRoadSegment() {
-      // Nobody picks this. Legacy's Road Segment control is a <select> in two visibility:hidden
-      // cells, and with no blank option the browser posts whichever the ordering put first.
+    @DisplayName("stores no road segment, LRMOPS having none")
+    void storesNoRoadSegment() {
       service.create(valid());
       entityManager.flush();
       entityManager.clear();
 
-      assertThat(sites.findById("BOWRON-001").orElseThrow().getRoadSegmentId()).isEqualTo(42L);
+      assertThat(sites.findById("BOWRON-001").orElseThrow().getRoadSegmentId()).isNull();
+    }
+
+    @Test
+    @DisplayName("does not ask LRMOPS about a recreation site's project number")
+    void doesNotCheckARecreationSitesRoad() {
+      service.create(site(draft -> {
+        draft.siteId = "REC-003";
+        draft.crossingSiteTypeCode = "REC";
+        draft.structureInspectionStatusCode = "DNI";
+        draft.orgUnitNo = null;
+        draft.managementOrgUnitNo = null;
+        draft.roadSectionId = "99";
+      }));
+
+      verify(lrmops, never()).getRoadSection(any(), any());
     }
 
     @Test
@@ -208,25 +231,6 @@ class SiteCreateTest {
       }));
 
       assertThat(created.siteId()).isEqualTo("REC-001");
-    }
-
-    @Test
-    @DisplayName("leaves a recreation site's segment null, having no road to take one from")
-    void storesNoSegmentForARecreationSite() {
-      // Its Project File ID# names a recreation project, not a road file — so looking a segment up
-      // from it would be asking the wrong table a question about the wrong number.
-      service.create(site(draft -> {
-        draft.siteId = "REC-002";
-        draft.crossingSiteTypeCode = "REC";
-        draft.structureInspectionStatusCode = "DNI";
-        draft.orgUnitNo = null;
-        draft.managementOrgUnitNo = null;
-        draft.roadSectionId = null;
-      }));
-      entityManager.flush();
-      entityManager.clear();
-
-      assertThat(sites.findById("REC-002").orElseThrow().getRoadSegmentId()).isNull();
     }
   }
 
@@ -400,10 +404,30 @@ class SiteCreateTest {
     @Test
     @DisplayName("refuses a Project File ID# and Br. that name no road")
     void refusesAnUnresolvableRoad() {
-      // Legacy states this as a rule about the hidden segment field, but what it tests is that the
-      // section exists. The message lands on Project File ID#, which is the box the user can act on.
+      // The message lands on Project File ID#, which is the box the user can act on.
       assertThat(refusedWith(draft -> draft.roadSectionId = "99"))
           .containsEntry("forestFileId", "No road matches this Project File ID# and Br.");
+    }
+
+    @Test
+    @DisplayName("refuses the save when LRMOPS can't be asked, rather than store an unchecked road")
+    void refusesWhenTheRoadCheckIsUnavailable() {
+      // doThrow, not when(): calling the stubbed method would run the fixture's answer.
+      doThrow(new ResourceAccessException("connect timed out")).when(lrmops).getRoadSection(any(), any());
+
+      assertThat(refusedWith(draft -> { }))
+          .containsEntry("forestFileId",
+              "Road check is unavailable right now. Try saving again shortly.");
+    }
+
+    @Test
+    @DisplayName("refuses the save when the LRMOPS client is not configured")
+    void refusesWhenTheRoadClientIsNotConfigured() {
+      when(lrmops.isConfigured()).thenReturn(false);
+
+      assertThat(refusedWith(draft -> { }))
+          .containsEntry("forestFileId",
+              "Road check is unavailable right now. Try saving again shortly.");
     }
 
     @Test

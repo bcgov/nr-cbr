@@ -117,10 +117,14 @@ describe('InspectionsDuePage', () => {
     async (variant) => {
       renderPage(variant);
 
-      await waitFor(async () =>
-        expect(await multiSelectOptions(`${ID[variant]}-structureTypeClassCode`)).toEqual([
-          'PB - Permanent Bridge',
-        ]),
+      // Each try opens and closes the list with real clicks, so under a loaded full run the
+      // default 1s can expire before the code table has loaded.
+      await waitFor(
+        async () =>
+          expect(await multiSelectOptions(`${ID[variant]}-structureTypeClassCode`)).toEqual([
+            'PB - Permanent Bridge',
+          ]),
+        { timeout: 5000 },
       );
       for (const label of SHARED_LABELS) {
         expect(

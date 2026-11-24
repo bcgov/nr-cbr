@@ -1,17 +1,18 @@
 package ca.bc.gov.nrs.cbr.struct.v1;
 
 /**
- * One row of the road search — a road section, and whoever holds its file.
+ * One row of the road search: a road section from LRMOPS.
  *
- * <p>The six columns legacy's dialog shows, in its order. {@code clientName} and
- * {@code clientNumber} are null for a file nobody holds: the joins that reach them are outer ones,
- * because a road is still a road without a tenure holder and withholding it would hide the very
- * section the user is looking for.
+ * @param forestServiceRoad the section's name; may be null
+ * @param forestFileId      "Project File ID#": LRMOPS's road id
+ * @param roadSectionId     "Br.": LRMOPS's section id
+ * @param tenureType        LRMOPS's road tenure type as stored — {@code RP-RETIRE} for a retired
+ *                          road permit, as the Tenure Type dropdown lists it
+ * @param clientName        the tenure holder's name; null when LRMOPS has none
  */
 public record RoadSearchResult(
     String forestServiceRoad,
     String forestFileId,
     String roadSectionId,
     String tenureType,
-    String clientName,
-    String clientNumber) {}
+    String clientName) {}

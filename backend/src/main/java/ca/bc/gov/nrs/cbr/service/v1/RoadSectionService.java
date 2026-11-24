@@ -1,279 +1,221 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient;
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadPage;
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSection;
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSort;
+import ca.bc.gov.nrs.cbr.exception.RoadLookupUnavailableException;
 import ca.bc.gov.nrs.cbr.exception.RoadSectionNotFoundException;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
-import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSectionRepository;
-import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSegmentRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionResponse.RoadDistrict;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSortColumn;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.InvalidDataAccessResourceUsageException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClientException;
 
 /**
- * The road section behind "Forest Service Road" on the site form.
+ * Roads for the site form, from LRMOPS through the LRM Ops API ({@link LrmopsApiClient}).
  *
- * <p>Replaces the {@code showSite.do?actionMapping=road} call {@code site.jsp} makes whenever
- * Project File ID# or Br. changes. <b>Narrower than that call</b>, which also returns the road's
- * responsibility and the org unit it sits in — and overwrites the form's Forest District with the
- * latter before disabling it. Only the name is answered here; making the district derived is a
- * change to what the form means, not to what it displays.
+ * <p>Three callers: the Road Search dialog ({@link #search}), the Forest Service Road lookup as
+ * Project File ID# and Br. are typed ({@link #find}), and the site save's road check
+ * ({@link #check}). The tenure type dropdown reads {@link #tenureTypes}.
+ *
+ * <p><b>When the API cannot answer</b> — down, timing out, refusing CBR's token, or not configured
+ * in this environment — the lookups throw {@link RoadLookupUnavailableException} (503), which the
+ * form shows as "Road lookup is unavailable right now.", and {@link #check} answers
+ * {@link RoadCheck#UNAVAILABLE}, which refuses the save. Never mistaken for "no such road".
+ *
+ * <p>No database access: CBR's own road copies ({@code CBR_ROAD_SECTION_VW},
+ * {@code CBR_ROAD_SEGMENT_VW}) are no longer read here. The view still supplies the road name
+ * shown on the search and report screens, through {@code CrossingSiteEntity}.
  */
 @Service
 public class RoadSectionService {
 
-  /**
-   * Guards against a caller asking for the whole view in one page — the same bound Site Search
-   * puts on its pages.
-   *
-   * <p>Legacy caps the dialog itself at two hundred roads ({@code ROWNUM <= 200}, and "Search
-   * returned 200 or more records, 200 shown" when it fills). CBR pages instead, so every match is
-   * reachable and the total is the true one; the bound here is on one page, not on the answer.
-   */
-  private static final int MAX_PAGE_SIZE = 200;
-
-  /** The dialog's own page size, for a caller that does not say. */
-  private static final int DEFAULT_PAGE_SIZE = 15;
-
-  private static final String WILDCARD = "%";
-
   private static final Logger log = LoggerFactory.getLogger(RoadSectionService.class);
 
+  /** The one site type with no road. */
+  private static final String RECREATION_SITE = "REC";
+
+  /** How LRMOPS marks a retired road's tenure type, e.g. {@code RP-RETIRE}. */
+  private static final String RETIRED_SUFFIX = "-RETIRE";
+
   /**
-   * Whether {@code FOREST_FILE_CLIENT} can be read, once it is known.
-   *
-   * <p><b>CBR is not granted that table.</b> Thirty-odd other application roles are, and legacy's
-   * own road search joins it — CBR never asked, because legacy runs as a different database user.
-   * Until the grant lands, the join that names the tenure holder fails with {@code ORA-00942} and
-   * took the whole dialog with it: a search that works on four of its six criteria was answering
-   * none of them.
-   *
-   * <p>Discovered rather than configured, and remembered for the life of the process. A flag would
-   * have to be set correctly in every environment and unset again once the grant arrives; this
-   * corrects itself on the next restart after it does, in either direction.
+   * The Tenure Type dropdown's order (business, 2026-11-23): each type followed by its retired
+   * variant. A code LRMOPS adds later goes after these, alphabetically.
    */
-  private volatile Boolean tenureHolderReadable;
+  static final List<String> TENURE_TYPE_ORDER = List.of(
+      "FSR", "FSR-RETIRE", "RP", "RP-RETIRE", "SUP", "SUP-RETIRE", "NSR", "CP", "OTH");
 
-  private final CbrRoadSectionRepository roadSections;
+  private final LrmopsApiClient lrmops;
 
-  private final CbrRoadSegmentRepository roadSegments;
-
-  public RoadSectionService(
-      CbrRoadSectionRepository roadSections, CbrRoadSegmentRepository roadSegments) {
-    this.roadSections = roadSections;
-    this.roadSegments = roadSegments;
+  public RoadSectionService(LrmopsApiClient lrmops) {
+    this.lrmops = lrmops;
   }
 
   /**
-   * Roads matching whatever the dialog was given.
+   * Roads matching whatever the dialog was given, sorted by the columns the user chose — road
+   * name, Project File ID# and Br. breaking their ties (the API's own order).
    *
-   * <p>Every criterion is an unanchored, case-insensitive contains — the {@code Search.LIKE}
-   * treatment CBR gives text criteria everywhere. A blank one is dropped rather than matched
-   * against the empty string, so all six blank returns the first page of everything, which is what
-   * legacy's dialog does when submitted empty.
+   * <p>Paging and the page size bound are the API's: zero-based, at most 200 a page.
    *
-   * <p><b>Deliberately not {@code @Transactional}</b>, unlike everything else in this package, and
-   * the fallback below is why. A failed statement marks its transaction rollback-only, so
-   * recovering inside one buys nothing: the second query runs, and then the commit fails with
-   * {@code UnexpectedRollbackException} — a less legible error than the one being handled. Without
-   * an outer transaction each repository call gets its own, the failed one rolls back alone, and
-   * the fallback starts clean.
-   *
-   * @param pageNumber zero-based
-   * @param pageSize   rows per page, capped at {@value #MAX_PAGE_SIZE}
-   */
-  public PagedResponse<RoadSearchResult> search(
-      RoadSearchCriteria criteria, int pageNumber, int pageSize) {
-    return search(criteria, pageNumber, pageSize, List.of());
-  }
-
-  /**
-   * The same search, sorted by the columns the user chose — legacy's order breaking their ties.
-   *
-   * @param sort       the columns the user sorted by, first deciding; none for legacy's order
+   * @throws RoadLookupUnavailableException if the API cannot answer
    */
   public PagedResponse<RoadSearchResult> search(RoadSearchCriteria criteria, int pageNumber,
       int pageSize, List<HeaderSort<RoadSortColumn>> sort) {
-    int number = Math.max(pageNumber, 0);
-    int size = boundedPageSize(pageSize);
+    RoadPage page = call(() -> lrmops.searchRoads(
+        new LrmopsApiClient.RoadSearchCriteria(
+            criteria.forestServiceRoad(),
+            criteria.forestFileId(),
+            criteria.roadSectionId(),
+            criteria.tenureType(),
+            criteria.clientName()),
+        Math.max(pageNumber, 0),
+        pageSize,
+        sort.stream()
+            .map(header -> new RoadSort(column(header.column()), header.direction().name()))
+            .toList()));
 
-    if (Boolean.FALSE.equals(tenureHolderReadable)) {
-      return withoutTenureHolder(criteria, PageRequest.of(number, size,
-          order(sort, false)));
-    }
-    Pageable limit = PageRequest.of(number, size, order(sort, true));
-
-    try {
-      Page<RoadSearchResult> roads = roadSections.search(
-          contains(criteria.forestServiceRoad()),
-          contains(criteria.forestFileId()),
-          contains(criteria.roadSectionId()),
-          contains(criteria.tenureType()),
-          contains(criteria.clientName()),
-          contains(criteria.clientNumber()),
-          limit);
-      tenureHolderReadable = true;
-      return paged(roads);
-    } catch (InvalidDataAccessResourceUsageException missingGrant) {
-      // The only thing in that query this application is not granted. Caught here rather than
-      // guarded by a probe on every search: once the grant lands this branch is never taken again,
-      // and until it does it is taken once per process.
-      tenureHolderReadable = false;
-      log.warn("Road search cannot read FOREST_FILE_CLIENT, so roads will be listed without their "
-          + "tenure holder. Grant SELECT on THE.FOREST_FILE_CLIENT to the application role to "
-          + "restore the client name, the client number and the two criteria that match on them.",
-          missingGrant);
-      return withoutTenureHolder(criteria, PageRequest.of(number, size,
-          order(sort, false)));
-    }
+    return new PagedResponse<>(
+        page.content().stream()
+            .map(road -> new RoadSearchResult(
+                road.roadName(),
+                road.roadId(),
+                road.sectionId(),
+                storedTenureType(road.tenureType(), road.retired()),
+                road.clientName()))
+            .toList(),
+        page.totalElements(),
+        page.totalPages(),
+        page.pageNumber(),
+        page.pageSize());
   }
 
   /**
-   * The page's order: the columns the user sorted by, each breaking the ties of the one before,
-   * then legacy's — road name, file, branch. With the tenure holder, the client number closes it,
-   * so a road held by two clients lists its two rows the same way every time and the order is total
-   * across pages.
-   *
-   * <p>Without the holder ({@code withClient} false) the client columns do not exist, so sorting by
-   * either is legacy's order alone. Selected columns only, as the {@code DISTINCT} requires.
+   * The tenure type as LRMOPS stores it — {@code RP-RETIRE} for a retired road permit — so the
+   * results column reads as the Tenure Type dropdown, which lists the retired variants to filter
+   * on. The API returns the base type and a {@code retired} flag.
    */
-  private static Sort order(List<HeaderSort<RoadSortColumn>> sort, boolean withClient) {
-    Sort legacy = JpaSort.unsafe(Sort.Direction.ASC,
-        "road.roadSectName", "road.forestFileId", "road.roadSectionId");
-    if (withClient) {
-      legacy = legacy.and(JpaSort.unsafe(Sort.Direction.ASC, "client.clientNumber"));
-    }
-    Sort chosen = Sort.unsorted();
-    for (HeaderSort<RoadSortColumn> header : sort) {
-      String key = key(header.column(), withClient);
-      // A client column without the holder is left to legacy's order.
-      if (key != null) {
-        chosen = chosen.and(JpaSort.unsafe(header.direction(), key));
-      }
-    }
-    return chosen.and(legacy);
+  private static String storedTenureType(String tenureType, boolean retired) {
+    return tenureType != null && retired ? tenureType + RETIRED_SUFFIX : tenureType;
   }
 
-  /** What a column sorts on — a selected column, as the {@code DISTINCT} requires. */
-  private static String key(RoadSortColumn column, boolean withClient) {
+  /** The API's name for a dialog column. */
+  private static String column(RoadSortColumn column) {
     return switch (column) {
-      case FOREST_SERVICE_ROAD -> "road.roadSectName";
-      case PROJECT_FILE -> "road.forestFileId";
-      case BRANCH -> "road.roadSectionId";
-      case TENURE_TYPE -> "road.fileTypeCode";
-      case CLIENT_NAME -> withClient ? "client.clientName" : null;
-      case CLIENT_NUMBER -> withClient ? "client.clientNumber" : null;
+      case FOREST_SERVICE_ROAD -> "ROAD_NAME";
+      case PROJECT_FILE -> "ROAD_ID";
+      case BRANCH -> "SECTION_ID";
+      case TENURE_TYPE -> "TENURE_TYPE";
+      case CLIENT_NAME -> "CLIENT_NAME";
     };
   }
 
   /**
-   * The fallback on its own, so it can be exercised without provoking a real missing grant.
+   * One road section, by the pair a site records, with the districts it lies in.
    *
-   * <p>Package-private rather than public: it is the same answer {@link #search} gives once it has
-   * learned the table cannot be read, and no caller should be choosing it.
+   * <p>Retired roads are answered like any other (business, 2026-11-23). A section with no road
+   * segment is a road too: LRMOPS has no segments.
+   *
+   * @throws RoadSectionNotFoundException if either half is blank or LRMOPS has no such section —
+   *     the ordinary answer while the user is still typing
+   * @throws RoadLookupUnavailableException if the API cannot answer
    */
-  PagedResponse<RoadSearchResult> searchWithoutTenureHolder(RoadSearchCriteria criteria,
-      int pageNumber, int pageSize, List<HeaderSort<RoadSortColumn>> sort) {
-    return withoutTenureHolder(criteria, PageRequest.of(Math.max(pageNumber, 0),
-        boundedPageSize(pageSize), order(sort, false)));
-  }
-
-  /**
-   * The search with the client left out — and with the two client criteria left out too.
-   *
-   * <p>Dropping them rather than failing is the honest half of the trade: a criterion that cannot
-   * be applied must not silently narrow nothing, so a user who typed a client name gets every road
-   * rather than an empty list that reads as "no such road".
-   */
-  private PagedResponse<RoadSearchResult> withoutTenureHolder(
-      RoadSearchCriteria criteria, Pageable limit) {
-    return paged(roadSections.searchWithoutClient(
-        contains(criteria.forestServiceRoad()),
-        contains(criteria.forestFileId()),
-        contains(criteria.roadSectionId()),
-        contains(criteria.tenureType()),
-        limit));
-  }
-
-  private static PagedResponse<RoadSearchResult> paged(Page<RoadSearchResult> page) {
-    return new PagedResponse<>(
-        page.getContent(),
-        page.getTotalElements(),
-        page.getTotalPages(),
-        page.getNumber(),
-        page.getSize());
-  }
-
-  private static int boundedPageSize(int requested) {
-    if (requested < 1) {
-      return DEFAULT_PAGE_SIZE;
-    }
-    return Math.min(requested, MAX_PAGE_SIZE);
-  }
-
-  /**
-   * A criterion as the query wants it, or null when the user left it blank.
-   *
-   * <p>Null rather than {@code "%%"}: the query reads null as "no such criterion" and drops the
-   * predicate entirely, where a wildcard pair would still exclude every row whose column is null —
-   * a road with no name would vanish from a search that named no road.
-   */
-  private static String contains(String value) {
-    return StringUtils.hasText(value)
-        ? WILDCARD + value.trim().toUpperCase(Locale.ROOT) + WILDCARD
-        : null;
-  }
-
-  /**
-   * One road section, by the pair a site records — provided it has a road segment.
-   *
-   * <p><b>A section with no segment is no road here.</b> A site stores a segment, and the save
-   * refuses a pair that resolves to none (see {@code SiteValidator.checkRoadResolves}). Legacy
-   * behaves the same way before the save: it fills in the road name and the district only once
-   * its hidden segment list has an entry ({@code site.jsp:341}), and otherwise blanks the name and
-   * reports "Project File ID#/Br. is invalid." Answering with the section's name regardless showed a
-   * road and a district for a pair the save would then refuse. Asked through the same method the
-   * save uses, so the two cannot disagree about which pairs are roads.
-   *
-   * @throws RoadSectionNotFoundException if the view holds no such section, or the section has no
-   *                                      segment — the ordinary answer while the user is still
-   *                                      typing either half
-   */
-  @Transactional(readOnly = true)
   public RoadSectionResponse find(String forestFileId, String roadSectionId) {
     if (!StringUtils.hasText(forestFileId) || !StringUtils.hasText(roadSectionId)) {
       throw new RoadSectionNotFoundException(forestFileId, roadSectionId);
     }
-
-    CbrRoadSectionEntity section = roadSections
-        .findById(new CbrRoadSectionEntity.Key(forestFileId.trim(), roadSectionId.trim()))
+    RoadSection section = lookUp(forestFileId, roadSectionId)
         .orElseThrow(() -> new RoadSectionNotFoundException(forestFileId, roadSectionId));
 
-    if (roadSegments
-        .findFirstByForestFileIdAndRoadSectionIdOrderByRoadSegmentIdAsc(
-            forestFileId.trim(), roadSectionId.trim())
-        .isEmpty()) {
-      throw new RoadSectionNotFoundException(forestFileId, roadSectionId);
-    }
-
     return new RoadSectionResponse(
-        section.getForestFileId(),
-        section.getRoadSectionId(),
-        section.getRoadSectName(),
-        section.getForestRegion());
+        section.roadId(),
+        section.sectionId(),
+        section.roadName(),
+        storedTenureType(section.tenureType(), section.retired()),
+        section.clientName(),
+        section.districts().stream()
+            .map(district -> new RoadDistrict(
+                district.orgUnitNo(), district.code(), district.lengthMetres()))
+            .toList());
+  }
+
+  /**
+   * The save's road check: whether LRMOPS has the section a site names.
+   *
+   * <p>{@link RoadCheck#NOT_APPLICABLE} for a recreation site, whose Project File ID# names a
+   * recreation project, and when either half is blank (already reported as required). Never
+   * throws for the API being unavailable: that is {@link RoadCheck#UNAVAILABLE}, and the
+   * validator refuses the save with a message beside Project File ID#.
+   */
+  public RoadCheck check(String siteTypeCode, String forestFileId, String roadSectionId) {
+    if (RECREATION_SITE.equals(siteTypeCode == null ? null : siteTypeCode.trim())
+        || !StringUtils.hasText(forestFileId) || !StringUtils.hasText(roadSectionId)) {
+      return RoadCheck.NOT_APPLICABLE;
+    }
+    try {
+      return lookUp(forestFileId, roadSectionId).isPresent()
+          ? RoadCheck.FOUND
+          : RoadCheck.NOT_FOUND;
+    } catch (RoadLookupUnavailableException unavailable) {
+      return RoadCheck.UNAVAILABLE;
+    }
+  }
+
+  /**
+   * LRMOPS's road tenure types, retired variants included, for the Road Search dialog's Tenure
+   * Type dropdown — in {@link #TENURE_TYPE_ORDER}. A code with no letter or digit (LRMOPS's
+   * {@code !}, "Geometry only") is left out, as the API already does.
+   *
+   * @throws RoadLookupUnavailableException if the API cannot answer
+   */
+  public List<CodeOptionResponse> tenureTypes() {
+    return call(lrmops::getRoadTenureTypes).stream()
+        .filter(type -> type.code() != null
+            && type.code().chars().anyMatch(Character::isLetterOrDigit))
+        .map(type -> new CodeOptionResponse(type.code().trim(), type.description()))
+        .sorted(Comparator
+            .comparingInt((CodeOptionResponse type) -> rank(type.code()))
+            .thenComparing(CodeOptionResponse::code))
+        .toList();
+  }
+
+  /** A code's place in {@link #TENURE_TYPE_ORDER}; after all of them when it is not listed. */
+  private static int rank(String code) {
+    int index = TENURE_TYPE_ORDER.indexOf(code.toUpperCase(Locale.ROOT));
+    return index < 0 ? TENURE_TYPE_ORDER.size() : index;
+  }
+
+  private Optional<RoadSection> lookUp(String forestFileId, String roadSectionId) {
+    return call(() -> lrmops.getRoadSection(forestFileId, roadSectionId));
+  }
+
+  /**
+   * One API call, with every way it can fail to answer turned into
+   * {@link RoadLookupUnavailableException}. Not configured counts: the call would go out without a
+   * token, or nowhere.
+   */
+  private <T> T call(Supplier<T> request) {
+    if (!lrmops.isConfigured()) {
+      throw new RoadLookupUnavailableException(null);
+    }
+    try {
+      return request.get();
+    } catch (RestClientException ex) {
+      log.warn("LRM Ops API call failed: {}", ex.getMessage());
+      throw new RoadLookupUnavailableException(ex);
+    }
   }
 }

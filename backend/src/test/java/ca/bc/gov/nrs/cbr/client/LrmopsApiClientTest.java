@@ -12,6 +12,7 @@ import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadPage;
 import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSection;
 import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSort;
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.TenureType;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -116,6 +117,20 @@ class LrmopsApiClientTest {
   }
 
   @Test
+  void tenureTypesAreListed() {
+    server.expect(requestTo("http://lrmops.test/api/v1/road-tenure-types"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(withSuccess("""
+            [{"code":"FSR","description":"Forest Service Road"},
+             {"code":"RP","description":"Road Permit"}]
+            """, MediaType.APPLICATION_JSON));
+
+    assertThat(client.getRoadTenureTypes()).containsExactly(
+        new TenureType("FSR", "Forest Service Road"), new TenureType("RP", "Road Permit"));
+    server.verify();
+  }
+
+  @Test
   void withoutAServiceAccountTheClientIsInactive() {
     LrmopsApiClient unset = new LrmopsApiClient("https://lrmops.test", "", "", "",
         Duration.ofSeconds(1), Duration.ofSeconds(1));
@@ -128,8 +143,9 @@ class LrmopsApiClientTest {
 
   @Test
   void aPartialServiceAccountFailsFast() {
+    Duration second = Duration.ofSeconds(1);
     assertThatThrownBy(() -> new LrmopsApiClient("https://lrmops.test", "https://kc.test/token",
-        "nr-cbr-backend", "", Duration.ofSeconds(1), Duration.ofSeconds(1)))
+        "nr-cbr-backend", "", second, second))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("LRMOPS_API_CLIENT_SECRET");
   }

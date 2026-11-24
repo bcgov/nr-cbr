@@ -5,13 +5,16 @@ import FieldWithCounter from '@/components/core/FieldWithCounter';
 import ReadOnlyField from '@/components/core/ReadOnlyField';
 import { requiredLabel } from '@/utils/requiredLabel';
 
+import RoadDistrictField from './RoadDistrictField';
 import { isDistrictFromRoad, SITE_TEXT_LIMITS, SITE_TYPE, type SiteFormValues } from './types';
 
 import './siteForm.scss';
 
+import type { EnteredLocation } from './RoadDistrictModal';
 import type { SiteErrors } from './validation';
+import type { RoadDistrict, RoadSectionResponse } from '@/services/road.service';
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
-import type { FC, FocusEvent, SubmitEventHandler } from 'react';
+import type { FC, FocusEvent, ReactNode, SubmitEventHandler } from 'react';
 
 import { byteLength } from '@/utils/textLimits';
 
@@ -45,6 +48,8 @@ type Props = {
   codeTables: SiteCodeTables;
   codeTablesLoading?: boolean;
   managementAreasLoading?: boolean;
+  /** True while a recreation site's districts are being looked up from its project file. */
+  recreationDistrictsLoading?: boolean;
   onChange: <K extends keyof SiteFormValues>(field: K, value: SiteFormValues[K]) => void;
   /**
    * A field has been left. The page uses it to decide whose errors may be shown yet — see
@@ -97,6 +102,15 @@ type Props = {
    * it only while there is no road, because a storage site may have none.
    */
   roadResolved?: boolean;
+  /**
+   * The Forest Districts that road lies in. Two or more, and the district is the user's pick from
+   * them rather than the road's (business, 2026-11-23).
+   */
+  roadDistricts?: RoadDistrict[];
+  /** The road section itself, for the district pop-up's details. */
+  roadSection?: RoadSectionResponse;
+  /** LRMOPS could not be asked about the road, so the user picks the district from all of them. */
+  roadUnavailable?: boolean;
   /**
    * Opens the road lookup. Omitted where there is nothing to look up — a read-only page — so the
    * control is absent rather than present and inert.
@@ -196,16 +210,25 @@ const findUnit = (options: OrgUnitOption[], orgUnitNo: string): OrgUnitOption | 
 /**
  * The district as it should read when the road decides it.
  *
- * <p>Falls back to the bare org unit number when the list does not contain it, which is not
- * hypothetical: legacy fills this field from the road's {@code FOREST_REGION}, and a region is
- * not one of the districts the list holds. Showing the number is worse than showing a name and
- * far better than showing nothing at all.
+ * <p>Falls back to the bare org unit number when the list does not contain it — a district LRMOPS
+ * records that CBR's list lacks. Showing the number is worse than showing a name and far better
+ * than showing nothing at all.
  */
 const districtText = (districts: OrgUnitOption[], orgUnitNo: string): string => {
   const unit = findUnit(districts, orgUnitNo);
   if (unit) return label(unit.orgUnitCode, unit.orgUnitName);
   return orgUnitNo === '' ? '' : `Org unit ${orgUnitNo}`;
 };
+
+/** No road districts, the same array every render. */
+const NO_ROAD_DISTRICTS: RoadDistrict[] = [];
+
+/** The coordinates on the form as the district pop-up shows them; blank parts when none. */
+const enteredLocation = (values: SiteFormValues): EnteredLocation => ({
+  longitude: dms(values.longitudeDegrees, values.longitudeMinutes, values.longitudeSeconds, true),
+  latitude: dms(values.latitudeDegrees, values.latitudeMinutes, values.latitudeSeconds),
+  utm: utm(values),
+});
 
 /** A stored org unit as a read-only value: its name, or the raw number if the list lacks it. */
 const orgUnitText = (options: OrgUnitOption[], orgUnitNo: string): string => {
@@ -233,6 +256,7 @@ const SiteForm: FC<Props> = ({
   codeTables,
   codeTablesLoading = false,
   managementAreasLoading = false,
+  recreationDistrictsLoading = false,
   onChange,
   onSettle,
   onSave,
@@ -240,6 +264,9 @@ const SiteForm: FC<Props> = ({
   forestServiceRoad = '',
   forestServiceRoadLoading = false,
   roadResolved = false,
+  roadDistricts = NO_ROAD_DISTRICTS,
+  roadSection,
+  roadUnavailable = false,
   onFindRoad,
   withoutDetails = false,
 }) => {
@@ -254,7 +281,11 @@ const SiteForm: FC<Props> = ({
   const coordinatesAreValues = !isEditable('longitudeDegrees');
 
   /** See `isDistrictFromRoad`. */
-  const districtIsDerived = isDistrictFromRoad(values.crossingSiteTypeCode, roadResolved);
+  const districtIsDerived = isDistrictFromRoad(values.crossingSiteTypeCode, {
+    roadResolved,
+    roadDistricts,
+    roadUnavailable,
+  });
 
   /** See `districtText`. */
   const derivedDistrict = districtText(codeTables.forestDistricts, values.orgUnitNo);
@@ -266,6 +297,24 @@ const SiteForm: FC<Props> = ({
    */
   const districtLabel = isRecreation ? 'Recreation District' : 'Forest District';
   const districtOptions = isRecreation ? recreationDistricts : codeTables.forestDistricts;
+  /**
+   * A recreation site whose project file names no recreation district — an unknown project, or none
+   * typed yet — has nothing to pick: shown as a value ("—"), as Project Name is, rather than an
+   * empty dropdown.
+   */
+  const noRecreationDistricts =
+    isRecreation && !recreationDistrictsLoading && recreationDistricts.length === 0;
+  /**
+   * The road crosses a district boundary, so the user picks which of its districts the site is in
+   * (business, 2026-11-23), in a pop-up — see `RoadDistrictField`.
+   */
+  const districtInPopUp =
+    !isRecreation &&
+    roadResolved &&
+    !roadUnavailable &&
+    roadDistricts.length >= 2 &&
+    roadSection !== undefined &&
+    isEditable('orgUnitNo');
   const waitingForFile = isRecreation && values.forestFileId.trim() === '';
   const districtBlank = waitingForFile ? 'Enter a Project File ID# first' : 'Select a district';
 
@@ -467,6 +516,51 @@ const SiteForm: FC<Props> = ({
       </fieldset>
     );
 
+  /**
+   * The Forest District (or Recreation District) control — one of four, in this order:
+   * read-only where the road decides it; the pop-up's field where the road lies in several
+   * districts; "—" for a recreation site whose project names none; otherwise a dropdown.
+   */
+  const districtField = (): ReactNode => {
+    if (districtIsDerived) {
+      return <ReadOnlyField label="Forest District" value={derivedDistrict} />;
+    }
+    if (districtInPopUp && roadSection) {
+      return (
+        <RoadDistrictField
+          road={roadSection}
+          districtText={districtText(codeTables.forestDistricts, values.orgUnitNo)}
+          orgUnitNo={values.orgUnitNo}
+          forestDistricts={codeTables.forestDistricts}
+          location={enteredLocation(values)}
+          error={errors.orgUnitNo}
+          onChoose={(orgUnitNo) => {
+            // Changing the district clears the Management Area, picked next on the form.
+            onChange('orgUnitNo', orgUnitNo);
+            onSettle('orgUnitNo');
+          }}
+        />
+      );
+    }
+    if (noRecreationDistricts && isEditable('orgUnitNo')) {
+      return (
+        <ReadOnlyField
+          label="Recreation District"
+          value={districtText(recreationDistricts, values.orgUnitNo)}
+        />
+      );
+    }
+    return orgUnitSelect(
+      'orgUnitNo',
+      districtLabel,
+      districtBlank,
+      districtOptions,
+      codeTablesLoading || (isRecreation && recreationDistrictsLoading),
+      // A recreation site is identified by its project, not by a district's road network.
+      !isRecreation,
+    );
+  };
+
   return (
     <form id={FORM_ID} onSubmit={submit} data-testid="site-form" className="site-form__form">
       <div className="site-form__fields">
@@ -538,22 +632,14 @@ const SiteForm: FC<Props> = ({
             the list to the districts it is cross-referenced to. A storage site keeps the choice
             only while it has no road, because it may never have one.
 
+            Two changes since LRMOPS (business, 2026-11-23): a road crossing a district boundary
+            has its district chosen in a pop-up, shown read-only here; and an
+            unavailable road lookup lets the user pick any district from the list.
+
             Read-only rather than a disabled select where the road decides it: the value is
             information, and a greyed-out dropdown invites a click that can do nothing. It also
-            shows the value when the district list does not contain it — see `districtLabel`. */}
-        {districtIsDerived ? (
-          <ReadOnlyField label="Forest District" value={derivedDistrict} />
-        ) : (
-          orgUnitSelect(
-            'orgUnitNo',
-            districtLabel,
-            districtBlank,
-            districtOptions,
-            codeTablesLoading,
-            // A recreation site is identified by its project, not by a district's road network.
-            !isRecreation,
-          )
-        )}
+            shows the value when the district list does not contain it — see `districtText`. */}
+        {districtField()}
 
         {/* Read, never chosen. Legacy disables the client number and location code for every role
             and never calls the lookup that would fill them (`site.jsp:734-740`, `778-784`;

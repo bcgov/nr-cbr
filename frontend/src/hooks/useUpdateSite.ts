@@ -18,8 +18,8 @@ export type UpdateSiteResult = UseMutationResult<void, unknown, SiteUpdateReques
  *
  * <p>On success the site is read again, and every search result with it: the road's name, the
  * maintainer and the search rows all come from the server, and an echo of what was sent would miss
- * whatever the server kept or derived — a Level 1 save stores Site Details alone, and the road
- * segment is worked out afresh.
+ * whatever the server kept or derived — a Level 1 save stores Site Details alone, and a changed
+ * road clears the stored road segment.
  *
  * <p>Refusals come back as field messages, as they do for a new site; see `useCreateSite`.
  */
