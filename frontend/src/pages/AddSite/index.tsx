@@ -469,6 +469,7 @@ const AddSitePage: FC = () => {
                         codeTables={codeTables}
                         codeTablesLoading={referenceData.isLoading}
                         managementAreasLoading={managementAreas.isFetching}
+                        recreationDistrictsLoading={recreationDistricts.isFetching}
                         onChange={update}
                         onSettle={markSettled}
                         onSave={save}
@@ -476,6 +477,9 @@ const AddSitePage: FC = () => {
                         forestServiceRoad={road.forestServiceRoad}
                         forestServiceRoadLoading={road.forestServiceRoadLoading}
                         roadResolved={road.roadResolved}
+                        roadDistricts={road.roadDistricts}
+                        roadSection={road.roadSection}
+                        roadUnavailable={road.roadUnavailable}
                         isEditable={isEditableOnCreate}
                         withoutDetails
                       />

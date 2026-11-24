@@ -2,9 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import ca.bc.gov.nrs.cbr.exception.SiteInUseException;
 import ca.bc.gov.nrs.cbr.exception.SiteNotFoundException;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSegmentEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
-import ca.bc.gov.nrs.cbr.repository.v1.CbrRoadSegmentRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.ClientLocationRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CloseProximityInspectionRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteRepository;
@@ -38,15 +36,13 @@ public class SiteService {
 
   private static final String ACTIVE = "Y";
 
-  /** The one site type with no road, so no segment to derive. */
-  private static final String RECREATION_SITE = "REC";
   private static final String ARCHIVED = "N";
 
   private final CrossingSiteRepository crossingSiteRepository;
   private final CrossingStructureRepository crossingStructureRepository;
   private final CloseProximityInspectionRepository closeProximityInspectionRepository;
   private final ClientLocationRepository clientLocations;
-  private final CbrRoadSegmentRepository roadSegments;
+  private final RoadSectionService roads;
   private final SiteValidator validator;
   private final LoggedUserHelper loggedUser;
 
@@ -55,14 +51,14 @@ public class SiteService {
       CrossingStructureRepository crossingStructureRepository,
       CloseProximityInspectionRepository closeProximityInspectionRepository,
       ClientLocationRepository clientLocations,
-      CbrRoadSegmentRepository roadSegments,
+      RoadSectionService roads,
       SiteValidator validator,
       LoggedUserHelper loggedUser) {
     this.crossingSiteRepository = crossingSiteRepository;
     this.crossingStructureRepository = crossingStructureRepository;
     this.closeProximityInspectionRepository = closeProximityInspectionRepository;
     this.clientLocations = clientLocations;
-    this.roadSegments = roadSegments;
+    this.roads = roads;
     this.validator = validator;
     this.loggedUser = loggedUser;
   }
@@ -91,8 +87,7 @@ public class SiteService {
   @Transactional
   public SiteCreatedResponse create(SiteCreateRequest request) {
     String siteId = request.siteId() == null ? "" : request.siteId().trim().toUpperCase(Locale.ROOT);
-    Long roadSegmentId = resolveRoadSegment(request);
-    validator.validate(request, crossingSiteRepository.existsById(siteId), roadSegmentId);
+    validator.validate(request, crossingSiteRepository.existsById(siteId), checkRoad(request));
 
     String user = loggedUser.getLoggedUserId();
     LocalDateTime now = LocalDateTime.now();
@@ -111,7 +106,8 @@ public class SiteService {
         .businessAreaOrgUnitNo(request.businessAreaOrgUnitNo())
         .forestFileId(blankToNull(request.forestFileId()))
         .roadSectionId(blankToNull(request.roadSectionId()))
-        .roadSegmentId(roadSegmentId)
+        // LRMOPS has no road segments (decided 2026-11-23): a new site stores none.
+        .roadSegmentId(null)
         .clientNumber(blankToNull(request.clientNumber()))
         .clientLocnCode(blankToNull(request.clientLocnCode()))
         .capitalRoadInd(request.capitalRoad() ? ACTIVE : ARCHIVED)
@@ -156,8 +152,9 @@ public class SiteService {
    * writes them — so they are kept as stored, which is what legacy's disabled inputs amounted to.
    * The map sheet columns and the entry audit pair are kept too.
    *
-   * <p><b>The road segment is derived again</b> on every save, as legacy's hidden select re-posts
-   * the section's first segment. A pair that names no segment is refused, as on create.
+   * <p><b>The road is checked with LRMOPS on every save</b> that edits the whole site, as on
+   * create; the save is refused if the check can't run. <b>The road segment</b> is kept when the road
+   * is unchanged and cleared when it changes: LRMOPS has no segments to derive a new one from.
    *
    * @throws SiteNotFoundException if no such site exists
    * @throws ca.bc.gov.nrs.cbr.exception.SiteValidationException if anything is wrong with it
@@ -217,9 +214,9 @@ public class SiteService {
         request.utmNorthing(),
         request.pointOfAccessDescription());
 
-    Long roadSegmentId = resolveRoadSegment(site);
     // Not taken: the number is the one being edited, so there is nothing for it to clash with.
-    validator.validate(site, false, roadSegmentId);
+    validator.validate(site, false, checkRoad(site));
+    Long roadSegmentId = sameRoad(stored, site) ? stored.getRoadSegmentId() : null;
 
     return stored.toBuilder()
         .crossingName(blankToNull(request.crossingName()))
@@ -241,32 +238,25 @@ public class SiteService {
         .pointOfAccessDesc(blankToNull(request.pointOfAccessDescription()));
   }
 
+  /** What LRMOPS says about the road a site names — see {@link RoadSectionService#check}. */
+  private RoadCheck checkRoad(SiteCreateRequest request) {
+    return roads.check(
+        request.crossingSiteTypeCode(), request.forestFileId(), request.roadSectionId());
+  }
+
   /**
-   * The road segment a site on this section belongs to — derived, never sent.
-   *
-   * <p><b>Legacy does not ask the user either.</b> Its Road Segment control is a {@code <select>}
-   * inside two {@code visibility:hidden} cells; the server fills it with the section's segments and
-   * the browser posts back whichever the ordering put first. Deriving it here reaches the same
-   * stored value without a field nobody can see travelling to the browser and back — and without a
-   * client being able to name a segment that belongs to a different road.
-   *
-   * <p>Null for a recreation site, whose Project File ID# names a recreation project rather than a
-   * road file, and null when either half of the pair is missing. {@link SiteValidator} turns the
-   * remaining case — a road named but not found — into a message on Project File ID#.
+   * Whether an edit keeps the stored Project File ID# and Br. — so the stored road segment still
+   * describes it. Compared trimmed and ignoring case, as LRMOPS matches them.
    */
-  private Long resolveRoadSegment(SiteCreateRequest request) {
-    if (RECREATION_SITE.equals(blankToNull(request.crossingSiteTypeCode()))) {
-      return null;
-    }
-    String forestFileId = blankToNull(request.forestFileId());
-    String roadSectionId = blankToNull(request.roadSectionId());
-    if (forestFileId == null || roadSectionId == null) {
-      return null;
-    }
-    return roadSegments
-        .findFirstByForestFileIdAndRoadSectionIdOrderByRoadSegmentIdAsc(forestFileId, roadSectionId)
-        .map(CbrRoadSegmentEntity::getRoadSegmentId)
-        .orElse(null);
+  private static boolean sameRoad(CrossingSiteEntity stored, SiteCreateRequest edited) {
+    return sameText(stored.getForestFileId(), edited.forestFileId())
+        && sameText(stored.getRoadSectionId(), edited.roadSectionId());
+  }
+
+  private static boolean sameText(String a, String b) {
+    String left = blankToNull(a);
+    String right = blankToNull(b);
+    return left == null ? right == null : left.equalsIgnoreCase(right);
   }
 
   /**

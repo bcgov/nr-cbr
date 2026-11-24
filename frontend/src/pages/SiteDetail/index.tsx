@@ -284,7 +284,7 @@ const SiteDetailPage: FC = () => {
 
   /*
    * The road's name. Read from the stored record while viewing — it comes back with the site, and
-   * does not depend on the section still having a segment. While editing, from the live lookup,
+   * does not need LRMOPS to answer. While editing, from the live lookup,
    * because the pair may have changed. A recreation site's Project Name is never stored, so it is
    * always looked up.
    */
@@ -484,6 +484,7 @@ const SiteDetailPage: FC = () => {
                           codeTables={codeTables}
                           codeTablesLoading={referenceData.isLoading}
                           managementAreasLoading={managementAreas.isFetching}
+                          recreationDistrictsLoading={recreationDistricts.isFetching}
                           isEditable={isEditable}
                           onChange={update}
                           onSettle={markSettled}
@@ -492,6 +493,9 @@ const SiteDetailPage: FC = () => {
                           forestServiceRoad={forestServiceRoad}
                           forestServiceRoadLoading={road.forestServiceRoadLoading}
                           roadResolved={road.roadResolved}
+                          roadDistricts={road.roadDistricts}
+                          roadSection={road.roadSection}
+                          roadUnavailable={road.roadUnavailable}
                         />
                         {mode === 'edit' && (
                           // The form's actions, as the structure page's cards: small, at the right,

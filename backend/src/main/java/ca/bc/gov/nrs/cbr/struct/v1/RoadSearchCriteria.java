@@ -3,19 +3,18 @@ package ca.bc.gov.nrs.cbr.struct.v1;
 import lombok.Builder;
 
 /**
- * What the road search dialog asks on, field for field with legacy's {@code road_search.jsp}.
+ * What the road search dialog asks on.
  *
- * <p>Every one is optional and every one is a partial, case-insensitive match — the same
- * {@code Search.LIKE} treatment the other CBR searches give their text criteria. All six blank is
- * a legitimate search that returns the first page of everything, which is what legacy does when
- * the dialog is submitted empty.
+ * <p>Every one is optional and every one is a partial, case-insensitive match, answered by the LRM
+ * Ops API. All blank is a legitimate search that returns the first page of everything.
+ *
+ * <p>No client number: LRMOPS records the tenure holder's name only.
  */
 @Builder
 public record RoadSearchCriteria(
     String forestServiceRoad,
     String forestFileId,
     String roadSectionId,
-    /** {@code FILE_TYPE_CODE} — B01 road permit, B40 forest service road, S01/S02 special use. */
+    /** LRMOPS's road tenure type, matched exactly: {@code FSR}, {@code FSR-RETIRE}, {@code RP}, … */
     String tenureType,
-    String clientName,
-    String clientNumber) {}
+    String clientName) {}

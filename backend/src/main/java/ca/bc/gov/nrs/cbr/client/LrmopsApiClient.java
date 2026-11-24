@@ -43,7 +43,8 @@ public class LrmopsApiClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(LrmopsApiClient.class);
 
-  private static final String ROADS_PATH = "/api/v1/roads";
+  /** The API's path prefix, as segments, appended to the configured base URL. */
+  private static final String[] API_V1 = {"api", "v1"};
 
   private final RestClient http;
   private final ClientCredentialsTokenSource clientCredentials;
@@ -75,7 +76,7 @@ public class LrmopsApiClient {
       LOG.info("lrmops-api client active (base-url={}, token-url={}, client-id={})", url,
           clientCredentials.tokenUrl(), clientCredentials.clientId());
     } else {
-      LOG.info("lrmops-api client inactive — set LRMOPS_API_BASE_URL and "
+      LOG.info("lrmops-api client inactive - set LRMOPS_API_BASE_URL and "
           + "LRMOPS_API_TOKEN_URL/CLIENT_ID/CLIENT_SECRET to enable");
     }
   }
@@ -103,7 +104,7 @@ public class LrmopsApiClient {
       List<RoadSort> sorts) {
     RoadPage page = http.get()
         .uri(uriBuilder -> {
-          uriBuilder.path(ROADS_PATH);
+          uriBuilder.pathSegment(API_V1).pathSegment("roads");
           queryParam(uriBuilder, "roadName", criteria.roadName());
           queryParam(uriBuilder, "roadId", criteria.roadId());
           queryParam(uriBuilder, "sectionId", criteria.sectionId());
@@ -135,7 +136,9 @@ public class LrmopsApiClient {
     }
     try {
       return Optional.ofNullable(http.get()
-          .uri(ROADS_PATH + "/{roadId}/sections/{sectionId}", roadId.trim(), sectionId.trim())
+          .uri(uriBuilder -> uriBuilder.pathSegment(API_V1)
+              .pathSegment("roads", roadId.trim(), "sections", sectionId.trim())
+              .build())
           .headers(this::applyAuth)
           .retrieve()
           .body(RoadSection.class));
@@ -145,6 +148,19 @@ public class LrmopsApiClient {
       }
       throw ex;
     }
+  }
+
+  /**
+   * {@code GET /api/v1/road-tenure-types}: LRMOPS's road tenure types (e.g. {@code FSR},
+   * {@code RP}) with their descriptions — what {@link RoadSearchCriteria#tenureType()} matches.
+   */
+  public List<TenureType> getRoadTenureTypes() {
+    TenureType[] types = http.get()
+        .uri(uriBuilder -> uriBuilder.pathSegment(API_V1).pathSegment("road-tenure-types").build())
+        .headers(this::applyAuth)
+        .retrieve()
+        .body(TenureType[].class);
+    return types == null ? List.of() : List.of(types);
   }
 
   // ── Internals ─────────────────────────────────────────────────────
@@ -200,9 +216,22 @@ public class LrmopsApiClient {
     }
   }
 
-  /** A district a road section lies in. */
+  /** A road tenure type and its description. */
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public record District(Long orgUnitNo, String code) {
+  public record TenureType(String code, String description) {
+  }
+
+  /**
+   * A district a road section lies in.
+   *
+   * @param lengthMetres how much of the section lies in this district, when the API says; null
+   *     until it does
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record District(Long orgUnitNo, String code, Double lengthMetres) {
+    public District(Long orgUnitNo, String code) {
+      this(orgUnitNo, code, null);
+    }
   }
 
   /** One road section's details. */
@@ -214,7 +243,8 @@ public class LrmopsApiClient {
       String tenureType,
       boolean retired,
       List<District> districts,
-      String bctsOffice) {
+      String bctsOffice,
+      String clientName) {
     public RoadSection {
       districts = districts == null ? List.of() : districts;
     }

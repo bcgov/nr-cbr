@@ -1,23 +1,36 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type { PagedResponse } from '@/types/api';
+import type { CodeOption } from '@/types/configuration';
 import type { SortOrder } from '@/utils/headerSort';
 
 import { HttpClient, type APIConfig } from '@/config/api/types';
 import { sortParams } from '@/utils/headerSort';
 
-/** One road section as `/api/v1/roads` returns it. */
+/** A Forest District a road section lies in, from LRMOPS. */
+export type RoadDistrict = {
+  /** The district's org unit number, as the site's Forest District stores it. */
+  orgUnitNo: number | null;
+  /** The district's code, e.g. `DPG`. */
+  code: string | null;
+  /** How much of the section lies in this district, in metres; null when LRMOPS's answer omits it. */
+  lengthMetres?: number | null;
+};
+
+/** One road section as `/api/v1/roads` returns it, from LRMOPS. */
 export type RoadSectionResponse = {
   forestFileId: string;
   roadSectionId: string;
   /** The section's name — "Forest Service Road" on the site form. May be null. */
   forestServiceRoad: string | null;
+  /** LRMOPS's tenure type as stored — `RP-RETIRE` for a retired road permit. May be null. */
+  tenureType?: string | null;
+  /** The tenure holder's name. May be null. */
+  clientName?: string | null;
   /**
-   * The org unit the road implies, which the site form writes into Forest District.
-   *
-   * <p>It is the road's `FOREST_REGION` — legacy maps that column to `ORG_UNIT_NO` and assigns it
-   * to the district. Carried as legacy carries it; see the backend record for the caveat.
+   * The Forest Districts the section lies in. One: the site form fills it in. Two or more (the
+   * section crosses a district boundary): the user picks one of them. May be empty.
    */
-  orgUnitNo: number | null;
+  districts: RoadDistrict[];
 };
 
 /** What the road lookup dialog asks on. Every criterion optional, every one a partial match. */
@@ -25,20 +38,19 @@ export type RoadSearchCriteria = {
   forestServiceRoad: string;
   forestFileId: string;
   roadSectionId: string;
-  /** `FILE_TYPE_CODE` — B01 road permit, B40 forest service road, S01/S02 special use. */
+  /** LRMOPS's road tenure type, matched exactly — `FSR`, `FSR-RETIRE`, `RP`, … (see `getTenureTypes`). */
   tenureType: string;
+  /** The tenure holder's name, a partial match. LRMOPS records no client number. */
   clientName: string;
-  clientNumber: string;
 };
 
-/** One row of the road search. The client is null for a file nobody holds. */
+/** One row of the road search, from LRMOPS. The client is null when LRMOPS records none. */
 export type RoadSearchResult = {
   forestServiceRoad: string | null;
   forestFileId: string;
   roadSectionId: string;
   tenureType: string | null;
   clientName: string | null;
-  clientNumber: string | null;
 };
 
 /**
@@ -47,12 +59,7 @@ export type RoadSearchResult = {
  * until a header is clicked.
  */
 export type RoadSortColumn =
-  | 'FOREST_SERVICE_ROAD'
-  | 'PROJECT_FILE'
-  | 'BRANCH'
-  | 'TENURE_TYPE'
-  | 'CLIENT_NAME'
-  | 'CLIENT_NUMBER';
+  'FOREST_SERVICE_ROAD' | 'PROJECT_FILE' | 'BRANCH' | 'TENURE_TYPE' | 'CLIENT_NAME';
 
 /** The columns the user sorted by, the first deciding. Empty is legacy's order. */
 export type RoadSort = SortOrder<RoadSortColumn>;
@@ -63,23 +70,24 @@ export const EMPTY_ROAD_CRITERIA: RoadSearchCriteria = {
   roadSectionId: '',
   tenureType: '',
   clientName: '',
-  clientNumber: '',
 };
 
+/** The message for a road lookup the LRM Ops API could not answer (a 503 from CBR's backend). */
+export const ROAD_LOOKUP_UNAVAILABLE = 'Road lookup is unavailable right now.';
+
+/** Whether a failed road call means the LRM Ops API could not answer, rather than "no road". */
+export const isRoadLookupUnavailable = (error: unknown): boolean =>
+  (error as { status?: unknown } | null)?.status === 503;
+
 /**
- * The road-section lookup behind "Forest Service Road", backed by `/api/v1/roads`.
+ * The road-section lookup behind "Forest Service Road", backed by `/api/v1/roads` — which reads
+ * LRMOPS through the LRM Ops API, and answers 503 when that cannot answer.
  */
 export class RoadService extends HttpClient {
   constructor(readonly config: APIConfig) {
     super(config);
   }
 
-  /**
-   * The road section a Project File ID# and a Br. name between them.
-   *
-   * <p>404 when there is none, which is the ordinary answer while either half is still being
-   * typed. Callers treat that as "no road yet" and show nothing.
-   */
   /**
    * One page of the roads matching the dialog's criteria, with the true total.
    *
@@ -102,6 +110,12 @@ export class RoadService extends HttpClient {
     });
   }
 
+  /**
+   * The road section a Project File ID# and a Br. name between them.
+   *
+   * <p>404 when there is none, which is the ordinary answer while either half is still being
+   * typed. Callers treat that as "no road yet" and show nothing. 503 when LRMOPS can't be asked.
+   */
   getRoadSection(
     forestFileId: string,
     roadSectionId: string,
@@ -110,6 +124,17 @@ export class RoadService extends HttpClient {
       method: 'GET',
       url: '/v1/roads',
       query: { forestFileId, roadSectionId },
+    });
+  }
+
+  /**
+   * LRMOPS's road tenure types with their descriptions, retired variants included, for the dialog's
+   * Tenure Type dropdown — already in the order to show them (FSR, FSR-RETIRE, RP, …).
+   */
+  getTenureTypes(): CancelablePromise<CodeOption[]> {
+    return this.doRequest<CodeOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/roads/tenure-types',
     });
   }
 }

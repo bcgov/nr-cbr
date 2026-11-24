@@ -271,3 +271,40 @@ $label-block-size: 1rem;
   // input has a wide one — without this the basis above is ignored.
   min-inline-size: 0;
 }
+
+// Forest District when the road lies in several districts: the chosen value read-only, with the
+// button that opens the pop-up to choose it, a line saying why, and the field's error in red.
+.site-form__road-district {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-02;
+}
+
+.site-form__road-district-value {
+  display: flex;
+  align-items: flex-end;
+  gap: $spacing-04;
+  justify-content: space-between;
+}
+
+.site-form__road-district-help {
+  @include type.type-style('helper-text-01');
+
+  color: var(--cds-text-secondary);
+}
+
+.site-form__road-district-error {
+  @include type.type-style('helper-text-01');
+
+  color: var(--cds-text-error);
+}
+
+// The help line's link: a text link on a button element, sized to the line.
+.site-form__road-district-link {
+  @include type.type-style('helper-text-01');
+
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
