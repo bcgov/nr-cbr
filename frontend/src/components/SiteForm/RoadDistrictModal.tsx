@@ -93,7 +93,7 @@ const RoadDistrictModal: FC<Props> = ({
         the one this site is in.
       </p>
 
-      <h4 className="road-district-modal__heading">Road</h4>
+      <h3 className="road-district-modal__heading">Road</h3>
       <div className="road-district-modal__details">
         <ReadOnlyField label="Project File ID#" value={road.forestFileId} />
         <ReadOnlyField label="Br." value={road.roadSectionId} />
@@ -108,7 +108,7 @@ const RoadDistrictModal: FC<Props> = ({
 
       {hasLocation && (
         <>
-          <h4 className="road-district-modal__heading">Site location entered</h4>
+          <h3 className="road-district-modal__heading">Site location entered</h3>
           <div className="road-district-modal__details">
             <ReadOnlyField label="Longitude" value={location.longitude} />
             <ReadOnlyField label="Latitude" value={location.latitude} />

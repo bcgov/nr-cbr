@@ -86,7 +86,7 @@ const CloseProximityDialog: FC<Props> = ({ structureId, onClose }) => {
       <div className="structure-detail__edit-cell">
         <DateField
           id="close-proximity-date"
-          labelText={requiredLabel('Date completed', true)}
+          labelText={requiredLabel('Date completed (yyyy/mm/dd)', true)}
           value={date}
           invalidText={shown}
           onChange={(value) => {

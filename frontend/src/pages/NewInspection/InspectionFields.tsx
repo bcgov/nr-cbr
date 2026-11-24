@@ -129,7 +129,7 @@ export const InspectionFields: FC<
             </Select>
             <DateField
               id="inspection-date"
-              labelText={requiredLabel('Date of Inspection', submitting)}
+              labelText={requiredLabel('Date of Inspection (yyyy/mm/dd)', submitting)}
               value={values.inspectionDate}
               invalidText={shown.inspectionDate}
               onChange={(value) => change('inspectionDate', value)}

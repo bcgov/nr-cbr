@@ -134,7 +134,7 @@ describe('InspectionsDuePage', () => {
       for (const label of MULTI_SELECT_LABELS) {
         expect(screen.getByText(label)).toBeInTheDocument();
       }
-      expect(screen.getByText('Next Planned Inspection Date')).toBeInTheDocument();
+      expect(screen.getByText('Next Planned Inspection Date (yyyy/mm/dd)')).toBeInTheDocument();
       expect(screen.getByText('No Next Planned Inspection Date')).toBeInTheDocument();
       expect(screen.queryByLabelText('Structure #')).not.toBeInTheDocument();
       expect(screen.queryByText(/^Area/)).not.toBeInTheDocument();

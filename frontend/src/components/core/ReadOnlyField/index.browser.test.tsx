@@ -18,13 +18,13 @@ describe('ReadOnlyField', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
-  it('sets the value in the record style — 14px, 18px lines, 0.16px tracking', () => {
-    // Carbon's body-compact-01, as plain text in a Carbon Tile is set.
+  it('sets the value as input text is set — body-compact-02: 16px, 22px lines, no tracking', () => {
+    // The team's text size: one step above Carbon's body-compact-01 (styles/_overrides.scss).
     render(<ReadOnlyField label="Site #" value="63-007" />);
     const style = getComputedStyle(screen.getByText('63-007'));
 
-    expect(style.fontSize).toBe('14px');
-    expect(parseFloat(style.lineHeight)).toBeCloseTo(18, 0);
-    expect(style.letterSpacing).toBe('0.16px');
+    expect(style.fontSize).toBe('16px');
+    expect(parseFloat(style.lineHeight)).toBeCloseTo(22, 0);
+    expect(['0px', 'normal']).toContain(style.letterSpacing);
   });
 });

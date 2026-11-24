@@ -109,9 +109,7 @@
     // `!important` beats Carbon's `__link:hover .__link-text` colour, which would paint the text dark
     // against the dark pill at the exact moment it becomes visible.
     color: $text-inverse !important;
-    font-size: 12px;
-    font-weight: 400;
-    line-height: 1rem;
+    @include type.type-style('label-01');
     opacity: 0;
     pointer-events: none;
     transform: translateY(-50%);

@@ -111,7 +111,8 @@ const ReplacementDialog: FC<Props> = ({
             {structureName}
           </p>
         </div>
-        <strong className="structure-detail__replaces-word">replaces</strong>
+        {/* Plain, not <strong>: a word of the sentence, not an emphasis a screen reader would miss. */}
+        <span className="structure-detail__replaces-word">replaces</span>
         <StructureNumberCombo
           id="replacement-replaced"
           labelText={requiredLabel('Structure #', true)}

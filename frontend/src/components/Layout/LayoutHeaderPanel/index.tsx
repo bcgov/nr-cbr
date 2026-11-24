@@ -19,7 +19,7 @@ export const LayoutHeaderPanel: FC = () => {
       expanded
     >
       <div className="right-title-section">
-        <h4>My Profile</h4>
+        <h2 className="right-title-section__heading">My Profile</h2>
         <div className="right-title-buttons">
           <IconButton kind="ghost" label="Close" onClick={closeHeaderPanel} align="bottom">
             <Close />

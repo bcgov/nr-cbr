@@ -15,15 +15,16 @@
 }
 
 .read-only-field__label {
-  @include type.type-style('label-01');
+  // label-02: a field label, the size an input's label takes (_overrides.scss, Text sizes).
+  @include type.type-style('label-02');
 
   color: var(--#{vars.$bcgov-prefix}-text-secondary);
 }
 
-// Carbon's `body-compact-01` — 14px — the style plain text in a Carbon Tile takes; a read-only page
-// set larger reads as a different application.
+// body-compact-02, the size an input's text takes (_overrides.scss, Text sizes), so a read-only
+// value reads the same as the editable one beside it.
 .read-only-field__value {
-  @include type.type-style('body-compact-01');
+  @include type.type-style('body-compact-02');
 
   // A band the height of a Carbon `md` field, with the value centred in it — so a read-only cell
   // puts its text where the input beside it puts its own, and a row of mixed cells reads as one

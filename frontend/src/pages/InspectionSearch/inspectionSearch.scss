@@ -84,9 +84,8 @@
 }
 
 .inspection-search__range-dash {
-  // Centred on the first input row by matching Carbon's own field height, rather than by an offset
-  // measured from the labels above it — an offset has to be re-derived whenever anything about the
-  // labels changes, and it drifts silently instead of failing.
+  // On the first input row: a line box the height of Carbon's field, rather than an offset
+  // measured from the labels above.
   block-size: 2.5rem;
   line-height: 2.5rem;
 }

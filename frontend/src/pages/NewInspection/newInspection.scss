@@ -1,3 +1,4 @@
+@use '@carbon/react/scss/type';
 @use '@carbon/react/scss/spacing' as *;
 
 // As Add Site's and Add Structure's: Cancel and Save at the right of the heading.
@@ -58,9 +59,8 @@
 
 .new-inspection__part-title {
   margin: 0 0 $spacing-05;
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.5;
+  // A sub-section inside a card: heading-compact-02 on the ladder.
+  @include type.type-style('heading-compact-02');
 }
 
 // A span's stringers, each a block headed "Stringer N", indented under the span.
@@ -78,8 +78,8 @@
 
 .new-inspection__stringer-title {
   margin: 0 0 $spacing-04;
-  font-size: 0.875rem;
-  font-weight: 600;
+  // Below the ladder's last rung (card > part > stringers): heading-compact-01, one step down.
+  @include type.type-style('heading-compact-01');
 }
 
 // The five hazards in a row, each as wide as its label. The card's own gap spaces the rows, so no

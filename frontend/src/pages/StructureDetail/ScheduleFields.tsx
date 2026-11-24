@@ -89,7 +89,7 @@ const ScheduleFields: FC<Props> = ({
           <div className="structure-detail__edit-cell">
             <DateField
               id="schedule-next-close-proximity"
-              labelText="Next Planned Close Proximity Inspection"
+              labelText="Next Planned Close Proximity Inspection (yyyy/mm/dd)"
               value={values.nextCloseProximityDate}
               invalidText={shown.nextCloseProximityDate}
               onChange={(value) => change('nextCloseProximityDate', value)}
@@ -102,7 +102,10 @@ const ScheduleFields: FC<Props> = ({
         <div className="structure-detail__edit-cell">
           <DateField
             id="schedule-next-routine"
-            labelText={requiredLabel('Next Planned Routine Inspection', routineRequired)}
+            labelText={requiredLabel(
+              'Next Planned Routine Inspection (yyyy/mm/dd)',
+              routineRequired,
+            )}
             value={values.nextRoutineDate}
             invalidText={shown.nextRoutineDate}
             onChange={(value) => change('nextRoutineDate', value)}
