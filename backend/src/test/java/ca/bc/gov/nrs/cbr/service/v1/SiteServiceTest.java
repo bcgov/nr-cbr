@@ -46,6 +46,10 @@ import org.springframework.web.server.ResponseStatusException;
 @Import({SiteService.class, SiteValidator.class})
 class SiteServiceTest {
 
+  /** Road names come live from LRMOPS; none unless a test says. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
   @Autowired
   private SiteService service;
 

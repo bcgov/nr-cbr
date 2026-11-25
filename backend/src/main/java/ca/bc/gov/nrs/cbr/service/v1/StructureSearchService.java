@@ -1,6 +1,5 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
@@ -12,6 +11,7 @@ import ca.bc.gov.nrs.cbr.security.LoggedUserHelper;
 import ca.bc.gov.nrs.cbr.specification.v1.StructureSearchSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
@@ -53,16 +53,19 @@ public class StructureSearchService {
   private final ClientLocationRepository clients;
   private final StructureDeleteBlockers deleteBlockers;
   private final LoggedUserHelper loggedUser;
+  private final RoadNameService roadNames;
 
   public StructureSearchService(
       CrossingStructureRepository structures,
       ClientLocationRepository clients,
       StructureDeleteBlockers deleteBlockers,
-      LoggedUserHelper loggedUser) {
+      LoggedUserHelper loggedUser,
+      RoadNameService roadNames) {
     this.structures = structures;
     this.clients = clients;
     this.deleteBlockers = deleteBlockers;
     this.loggedUser = loggedUser;
+    this.roadNames = roadNames;
   }
 
   /**
@@ -81,19 +84,27 @@ public class StructureSearchService {
   public PagedResponse<StructureSearchResult> search(
       StructureSearchCriteria criteria, int pageNumber, int pageSize,
       List<HeaderSort<StructureSortColumn>> sort) {
+    long start = System.nanoTime();
     Pageable pageable = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
+    List<RoadSectionKey> roadSections = roadNames.sectionsNamed(criteria.forestServiceRoad());
     Page<CrossingStructureEntity> page = structures.findAll(
-        StructureSearchSpecifications.matching(criteria, sort), pageable);
+        StructureSearchSpecifications.matching(criteria, sort, roadSections), pageable);
 
     Map<String, String> names = maintainerNames(page);
     Map<Long, List<String>> blockers = blockersFor(page);
+    Map<RoadSectionKey, String> roads = roadNames.namesOf(page.getContent().stream()
+        .map(CrossingStructureEntity::getSite)
+        .filter(Objects::nonNull)
+        .map(site -> RoadSectionKey.of(site.getForestFileId(), site.getRoadSectionId()))
+        .toList());
 
-    log.debug("Structure search matched {} structure(s) (page {} of {})",
-        page.getTotalElements(), pageable.getPageNumber(), page.getTotalPages());
+    log.info("Structure search matched {} structure(s) (page {} of {}), {} ms with road names",
+        page.getTotalElements(), pageable.getPageNumber(), page.getTotalPages(),
+        (System.nanoTime() - start) / 1_000_000);
 
     return new PagedResponse<>(
         page.getContent().stream()
-            .map(structure -> toResult(structure, names, blockers))
+            .map(structure -> toResult(structure, names, blockers, roads))
             .toList(),
         page.getTotalElements(),
         page.getTotalPages(),
@@ -145,7 +156,8 @@ public class StructureSearchService {
   private static StructureSearchResult toResult(
       CrossingStructureEntity structure,
       Map<String, String> names,
-      Map<Long, List<String>> blockers) {
+      Map<Long, List<String>> blockers,
+      Map<RoadSectionKey, String> roads) {
     CrossingSiteEntity site = structure.getSite();
     String clientNumber = from(site, CrossingSiteEntity::getClientNumber);
     return new StructureSearchResult(
@@ -154,7 +166,7 @@ public class StructureSearchService {
         from(site, CrossingSiteEntity::getCrossingSiteId),
         from(site, one -> from(one.getOrgUnit(), OrgUnitEntity::getOrgUnitCode)),
         from(site, one -> from(one.getOrgUnit(), OrgUnitEntity::getOrgUnitName)),
-        from(site, one -> from(one.getRoadSection(), CbrRoadSectionEntity::getRoadSectName)),
+        site == null ? null : SiteSearchService.roadName(roads, site),
         from(site, one -> text(one.getPointOfCommencementDistance())),
         from(site, CrossingSiteEntity::getCrossingName),
         from(structure.getTypeClass(), StructureTypeClassCodeEntity::getDescription),

@@ -137,6 +137,19 @@ export class RoadService extends HttpClient {
       url: '/v1/roads/tenure-types',
     });
   }
+
+  /**
+   * Road names containing `term`, those starting with it first, at most twenty: the Forest
+   * Service Road pick list on the search screens, which filter on the name picked, exactly.
+   * Empty for a term under three characters. 503 when LRMOPS can't be asked.
+   */
+  getRoadNames(term: string): CancelablePromise<string[]> {
+    return this.doRequest<string[]>(this.config, {
+      method: 'GET',
+      url: '/v1/roads/names',
+      query: { search: term },
+    });
+  }
 }
 
 /** Drops blank criteria, leaving only what the user actually asked for. */

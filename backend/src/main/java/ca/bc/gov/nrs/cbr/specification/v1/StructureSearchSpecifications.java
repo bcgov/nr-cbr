@@ -8,6 +8,7 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOr
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.integerRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.onRoadSections;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
 
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
@@ -17,6 +18,7 @@ import ca.bc.gov.nrs.cbr.model.v1.ForestServiceCulvertEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureSortColumn;
 import ca.bc.gov.nrs.cbr.util.CriteriaValues;
@@ -136,6 +138,19 @@ public final class StructureSearchSpecifications {
    */
   public static Specification<CrossingStructureEntity> matching(
       StructureSearchCriteria criteria, List<HeaderSort<StructureSortColumn>> sort) {
+    return matching(criteria, sort, null);
+  }
+
+  /**
+   * Builds the predicate, with Forest Service Road matched on road sections rather than on the
+   * name in {@code CBR_ROAD_SECTION_VW}.
+   *
+   * @param roadSections the sections LRMOPS gives the name picked ({@code RoadNameService});
+   *     null to match {@code criteria.forestServiceRoad()} against the view as before
+   */
+  public static Specification<CrossingStructureEntity> matching(
+      StructureSearchCriteria criteria, List<HeaderSort<StructureSortColumn>> sort,
+      List<RoadSectionKey> roadSections) {
     return (root, query, builder) -> {
       boolean projecting = returnsEntities(query);
       From<?, ?> site = joinOrFetch(root, SITE, JoinType.LEFT, projecting);
@@ -144,7 +159,10 @@ public final class StructureSearchSpecifications {
 
       List<Predicate> predicates = new ArrayList<>();
       structureCriteria(builder, root, criteria, predicates);
-      siteCriteria(builder, site, roadSection, criteria, predicates);
+      siteCriteria(builder, site, roadSection, criteria, roadSections == null, predicates);
+      if (roadSections != null) {
+        predicates.add(onRoadSections(builder, site, roadSections));
+      }
       bridgeAndCulvertCriteria(builder, query, root, criteria, predicates);
       maintainedBy(builder, query, site, criteria.primaryUserName()).ifPresent(predicates::add);
       if (Boolean.TRUE.equals(criteria.incomplete())) {
@@ -198,20 +216,28 @@ public final class StructureSearchSpecifications {
     }
   }
 
-  /** The criteria on the site the structure stands on now, and on its road. */
+  /**
+   * The criteria on the site the structure stands on now, and on its road.
+   *
+   * @param roadByName whether Forest Service Road is matched on the view's name; false when the
+   *     caller matches road sections instead
+   */
   private static void siteCriteria(
       CriteriaBuilder builder,
       From<?, ?> site,
       From<?, ?> roadSection,
       StructureSearchCriteria criteria,
+      boolean roadByName,
       List<Predicate> predicates) {
     contains(builder, site.get(SITE_ID), criteria.siteId()).ifPresent(predicates::add);
     contains(builder, site.get(FOREST_FILE_ID), criteria.forestFileId()).ifPresent(predicates::add);
     contains(builder, site.get(ROAD_SECTION_ID), criteria.roadSectionId())
         .ifPresent(predicates::add);
     contains(builder, site.get(CROSSING_NAME), criteria.crossingName()).ifPresent(predicates::add);
-    contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
-        .ifPresent(predicates::add);
+    if (roadByName) {
+      contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
+          .ifPresent(predicates::add);
+    }
     equalsText(builder, site.get(SITE_STATUS), criteria.siteStatusCode())
         .ifPresent(predicates::add);
     equalsText(builder, site.get(SITE_TYPE), criteria.siteTypeCode()).ifPresent(predicates::add);

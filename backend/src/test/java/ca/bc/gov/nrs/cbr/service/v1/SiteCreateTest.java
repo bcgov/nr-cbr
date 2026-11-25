@@ -39,6 +39,10 @@ import org.springframework.web.client.ResourceAccessException;
 @Import({SiteService.class, SiteValidator.class, RoadSectionService.class})
 class SiteCreateTest {
 
+  /** Road names come live from LRMOPS; none unless a test says. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
   @Autowired
   private SiteService service;
 

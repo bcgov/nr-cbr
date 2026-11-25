@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.controller.v1;
 
 import ca.bc.gov.nrs.cbr.endpoint.v1.RoadApiEndpoint;
+import ca.bc.gov.nrs.cbr.service.v1.RoadNameService;
 import ca.bc.gov.nrs.cbr.service.v1.RoadSectionService;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
@@ -22,9 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoadApiController implements RoadApiEndpoint {
 
   private final RoadSectionService roadSectionService;
+  private final RoadNameService roadNameService;
 
-  public RoadApiController(RoadSectionService roadSectionService) {
+  public RoadApiController(
+      RoadSectionService roadSectionService, RoadNameService roadNameService) {
     this.roadSectionService = roadSectionService;
+    this.roadNameService = roadNameService;
   }
 
   @Override
@@ -45,5 +49,10 @@ public class RoadApiController implements RoadApiEndpoint {
   @Override
   public ResponseEntity<List<CodeOptionResponse>> getTenureTypes() {
     return ResponseEntity.ok(roadSectionService.tenureTypes());
+  }
+
+  @Override
+  public ResponseEntity<List<String>> getRoadNames(String search) {
+    return ResponseEntity.ok(roadNameService.suggestions(search));
   }
 }

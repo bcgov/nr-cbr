@@ -1,6 +1,5 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
@@ -14,9 +13,12 @@ import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import org.slf4j.Logger;
@@ -50,9 +52,12 @@ public class InspectionSearchService {
   private static final int MAX_PAGE_SIZE = 200;
 
   private final StructureInspectionRepository structureInspectionRepository;
+  private final RoadNameService roadNames;
 
-  public InspectionSearchService(StructureInspectionRepository structureInspectionRepository) {
+  public InspectionSearchService(
+      StructureInspectionRepository structureInspectionRepository, RoadNameService roadNames) {
     this.structureInspectionRepository = structureInspectionRepository;
+    this.roadNames = roadNames;
   }
 
   /**
@@ -77,17 +82,26 @@ public class InspectionSearchService {
   public PagedResponse<InspectionSearchResult> search(
       InspectionSearchCriteria criteria, int pageNumber, int pageSize,
       List<HeaderSort<InspectionSortColumn>> sort) {
+    long start = System.nanoTime();
     Pageable pageable = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
+    List<RoadSectionKey> roadSections = roadNames.sectionsNamed(criteria.forestServiceRoad());
 
     Page<StructureInspectionEntity> results = structureInspectionRepository.findAll(
-        InspectionSearchSpecifications.matching(criteria, sort), pageable);
+        InspectionSearchSpecifications.matching(criteria, sort, roadSections), pageable);
+    Map<RoadSectionKey, String> roads = roadNames.namesOf(results.getContent().stream()
+        .map(StructureInspectionEntity::getStructure)
+        .filter(Objects::nonNull)
+        .map(CrossingStructureEntity::getSite)
+        .filter(Objects::nonNull)
+        .map(site -> RoadSectionKey.of(site.getForestFileId(), site.getRoadSectionId()))
+        .toList());
 
-    log.debug("Inspection search matched {} inspection(s) (page {} of {}, criteriaEmpty={})",
+    log.info("Inspection search matched {} inspection(s) (page {} of {}), {} ms with road names",
         results.getTotalElements(), results.getNumber(), results.getTotalPages(),
-        criteria.isEmpty());
+        (System.nanoTime() - start) / 1_000_000);
 
     return new PagedResponse<>(
-        results.getContent().stream().map(InspectionSearchService::toResult).toList(),
+        results.getContent().stream().map(inspection -> toResult(inspection, roads)).toList(),
         results.getTotalElements(),
         results.getTotalPages(),
         results.getNumber(),
@@ -109,7 +123,8 @@ public class InspectionSearchService {
    * unit, the status's code-table row — is optional, and a missing one is a blank column rather than
    * a failed page. Reading them through {@link #from} is what keeps that true.
    */
-  private static InspectionSearchResult toResult(StructureInspectionEntity inspection) {
+  private static InspectionSearchResult toResult(
+      StructureInspectionEntity inspection, Map<RoadSectionKey, String> roads) {
     CrossingStructureEntity structure = inspection.getStructure();
     CrossingSiteEntity site = structure == null ? null : structure.getSite();
     InspectionReportStatusEntity status = inspection.getCurrentStatus();
@@ -123,7 +138,7 @@ public class InspectionSearchService {
         from(structure, CrossingStructureEntity::getCrossingStructureName),
         from(site, one -> from(one.getOrgUnit(), OrgUnitEntity::getOrgUnitCode)),
         from(site, one -> from(one.getOrgUnit(), OrgUnitEntity::getOrgUnitName)),
-        from(site, one -> from(one.getRoadSection(), CbrRoadSectionEntity::getRoadSectName)),
+        site == null ? null : SiteSearchService.roadName(roads, site),
         from(site, one -> text(one.getPointOfCommencementDistance())),
         from(site, CrossingSiteEntity::getCrossingName),
         from(site, CrossingSiteEntity::getForestFileId),

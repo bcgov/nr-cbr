@@ -41,6 +41,10 @@ import org.springframework.web.client.HttpServerErrorException;
 @Import({SiteService.class, SiteValidator.class, RoadSectionService.class})
 class SiteUpdateTest {
 
+  /** Road names come live from LRMOPS; none unless a test says. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
   private static final String SITE = "BOWRON-001";
   private static final LocalDateTime ENTERED = LocalDateTime.of(2020, 1, 15, 9, 30);
 

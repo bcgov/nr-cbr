@@ -27,6 +27,8 @@ import type {
 import type { StructureLinkState } from '@/pages/StructureDetail';
 import type { FC } from 'react';
 
+import { roadNameCase } from '@/utils/roadName';
+
 type Props = {
   results: StructureSearchResult[];
   totalItems: number;
@@ -256,7 +258,7 @@ const StructureSearchResults: FC<Props> = ({
                 <TableCell>
                   {[row.orgUnitCode, row.orgUnitName].filter(Boolean).join(' — ')}
                 </TableCell>
-                <TableCell>{row.forestServiceRoad}</TableCell>
+                <TableCell>{roadNameCase(row.forestServiceRoad)}</TableCell>
                 <TableCell className="structure-search__numeric">{row.kilometres}</TableCell>
                 <TableCell>{row.crossingName}</TableCell>
                 <TableCell>{row.structureTypeClass}</TableCell>

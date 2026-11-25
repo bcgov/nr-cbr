@@ -3,6 +3,7 @@ import { Button, Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
 import ClientCombo from '@/components/core/ClientCombo';
 import MultiCodeSelect from '@/components/core/MultiCodeSelect';
+import RoadNameCombo from '@/components/core/RoadNameCombo';
 
 import { criteriaErrors } from './validation';
 
@@ -270,7 +271,12 @@ const StructureSearchCriteriaForm: FC<Props> = ({
         </div>
         {codeSelect('siteTypeCode', 'Site Type', 'Any site type', codeTables.siteTypeCodes)}
 
-        {text('forestServiceRoad', 'Forest Service Road', 20)}
+        <RoadNameCombo
+          key={resetToken}
+          id="structure-search-forestServiceRoad"
+          value={criteria.forestServiceRoad}
+          onChange={(roadName) => onChange('forestServiceRoad', roadName)}
+        />
         {range('kiloStart', 'kiloEnd', 'Kilometres', 'kilometres')}
         {text('crossingName', 'Crossing Name', 20)}
         {multiSelect(

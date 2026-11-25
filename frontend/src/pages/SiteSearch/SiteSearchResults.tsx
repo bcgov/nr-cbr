@@ -19,6 +19,7 @@ import SortableHeader, { ClearSort } from '@/components/core/SortableHeader';
 import type { SiteSearchResult, SiteSort, SiteSortColumn } from './types';
 import type { FC } from 'react';
 
+import { roadNameCase } from '@/utils/roadName';
 import { siteStatusLabel, siteStatusTagType } from '@/utils/siteStatus';
 
 type Props = {
@@ -144,7 +145,7 @@ const SiteSearchResults: FC<Props> = ({
                   <TableCell>
                     {[site.orgUnitCode, site.orgUnitName].filter(Boolean).join(' — ')}
                   </TableCell>
-                  <TableCell>{site.forestServiceRoad}</TableCell>
+                  <TableCell>{roadNameCase(site.forestServiceRoad)}</TableCell>
                   <TableCell className="site-search__numeric">
                     {site.pointOfCommencementDistance}
                   </TableCell>

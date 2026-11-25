@@ -3,6 +3,7 @@ import { Button, Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
 import ClientCombo from '@/components/core/ClientCombo';
 import MultiCodeSelect from '@/components/core/MultiCodeSelect';
+import RoadNameCombo from '@/components/core/RoadNameCombo';
 
 import { criteriaErrors } from './validation';
 
@@ -280,7 +281,12 @@ const SiteSearchCriteriaForm: FC<Props> = ({
           'Any inspection status',
           codeTables.structureInspectionStatusCodes,
         )}
-        {text('forestServiceRoad', 'Forest Service Road', 20)}
+        <RoadNameCombo
+          key={resetToken}
+          id="site-search-forestServiceRoad"
+          value={criteria.forestServiceRoad}
+          onChange={(roadName) => onChange('forestServiceRoad', roadName)}
+        />
         {/* One field where legacy had three — "Designated Maintainer Client Number", "Client
             Location Code" and "Designated Maintainer" — because a maintainer is one thing and the
             first two are halves of its key. Picking a suggestion fills both; typing a name that

@@ -1,9 +1,11 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
@@ -58,8 +60,13 @@ class StructureSearchServiceTest {
   @MockitoBean
   private LoggedUserHelper loggedUser;
 
+  @MockitoBean
+  private RoadNameService roadNames;
+
   @BeforeEach
   void setUp() {
+    // No Forest Service Road filter unless a test says otherwise (a mock's empty list matches none).
+    when(roadNames.sectionsNamed(any())).thenReturn(null);
     for (String entity : List.of("InspectionReportStatusEntity", "StructureLoadRatingEntity",
         "StructureInspectionEntity", "StructureRepairEntity", "InspectionReportStatusCodeEntity",
         "ForestServiceBridgeEntity", "ForestServiceCulvertEntity",
@@ -191,7 +198,12 @@ class StructureSearchServiceTest {
       givenStructure(1L, "ON-ROAD", "SITE-1");
       givenStructure(2L, "ELSEWHERE", "SITE-2");
 
-      assertThat(names(criteria().forestServiceRoad("bowron"))).containsExactly("ON-ROAD");
+      // The name picked becomes LRMOPS's sections for it; the site is matched on those.
+      when(roadNames.sectionsNamed("Bowron FSR"))
+          .thenReturn(List.of(RoadSectionKey.of("R00123", "01")));
+      when(roadNames.sectionsNamed("Nowhere FSR")).thenReturn(List.of());
+      assertThat(names(criteria().forestServiceRoad("Bowron FSR"))).containsExactly("ON-ROAD");
+      assertThat(names(criteria().forestServiceRoad("Nowhere FSR"))).isEmpty();
       assertThat(names(criteria().crossingName("deadman"))).containsExactly("ON-ROAD");
       assertThat(names(criteria().siteStatusCode("ACT"))).containsExactly("ON-ROAD");
       assertThat(names(criteria().siteId("site-2"))).containsExactly("ELSEWHERE");

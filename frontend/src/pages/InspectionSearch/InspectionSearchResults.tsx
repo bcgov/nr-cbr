@@ -25,6 +25,7 @@ import {
   inspectionStatusTagType,
   isOffline,
 } from '@/utils/inspectionStatus';
+import { roadNameCase } from '@/utils/roadName';
 
 type Props = {
   results: InspectionSearchResult[];
@@ -175,7 +176,7 @@ const InspectionSearchResults: FC<Props> = ({
                   <TableCell>
                     {[inspection.orgUnitCode, inspection.orgUnitName].filter(Boolean).join(' — ')}
                   </TableCell>
-                  <TableCell>{inspection.forestServiceRoad}</TableCell>
+                  <TableCell>{roadNameCase(inspection.forestServiceRoad)}</TableCell>
                   {/* The application's date format, not legacy's `yyyy/MM/dd`. This column used to
                       carry its own formatter for parity with `<fmt:formatDate>`; one format across
                       every screen is worth more than matching a table users are leaving behind.

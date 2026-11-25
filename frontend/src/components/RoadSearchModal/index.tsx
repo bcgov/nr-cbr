@@ -33,6 +33,7 @@ import {
   ROAD_LOOKUP_UNAVAILABLE,
 } from '@/services/road.service';
 import { apiErrorMessage } from '@/utils/apiError';
+import { roadNameCase } from '@/utils/roadName';
 
 import './index.scss';
 
@@ -289,7 +290,8 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
                         this has never been: picking a road fills in the form behind the dialog
                         rather than going anywhere. */}
                     <TableCell>
-                      {road.forestServiceRoad || `${road.forestFileId}-${road.roadSectionId}`}
+                      {roadNameCase(road.forestServiceRoad) ||
+                        `${road.forestFileId}-${road.roadSectionId}`}
                     </TableCell>
                     <TableCell>{road.forestFileId}</TableCell>
                     <TableCell>{road.roadSectionId}</TableCell>

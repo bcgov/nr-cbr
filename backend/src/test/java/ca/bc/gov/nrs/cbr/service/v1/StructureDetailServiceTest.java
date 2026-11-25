@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.AbutmentCodeEntity;
@@ -46,6 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * One structure, for its page. Against the database: most of the answer is joins and decodes, and
@@ -54,6 +56,10 @@ import org.springframework.context.annotation.Import;
 @DataJpaTest(properties = {"spring.jpa.hibernate.ddl-auto=create-drop"})
 @Import({StructureDetailService.class, LoadRatingService.class})
 class StructureDetailServiceTest {
+
+  /** Road names come live from LRMOPS; none unless a test says. */
+  @MockitoBean
+  private RoadNameService roadNames;
 
   private static final LocalDateTime EARLY = LocalDateTime.of(2000, 1, 1, 0, 0);
   private static final LocalDateTime LATE = LocalDateTime.of(9999, 12, 31, 0, 0);
@@ -198,7 +204,9 @@ class StructureDetailServiceTest {
       entityManager.persist(CbrOrgUnitEntity.builder()
           .orgUnitNo(26L).orgUnitCode("DCA").orgUnitName("Central Cariboo").build());
       entityManager.persist(CbrRoadSectionEntity.builder()
-          .forestFileId("6970").roadSectionId("01").roadSectName("CHILCOTIN SOUTH").build());
+          .forestFileId("6970").roadSectionId("01").roadSectName("OLD RRS NAME").build());
+      // The name shown is LRMOPS's, not the copy's.
+      when(roadNames.nameOf("6970", "01")).thenReturn("CHILCOTIN SOUTH");
       entityManager.persist(ClientPublicEntity.builder()
           .clientNumber("00001271").clientName("CANADIAN FOREST PRODUCTS LTD.").build());
       entityManager.persist(ClientLocationEntity.builder()

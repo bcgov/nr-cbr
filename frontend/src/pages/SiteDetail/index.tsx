@@ -283,8 +283,8 @@ const SiteDetailPage: FC = () => {
       : merged;
 
   /*
-   * The road's name. Read from the stored record while viewing — it comes back with the site, and
-   * does not need LRMOPS to answer. While editing, from the live lookup,
+   * The road's name. While viewing, the name that comes back with the site — LRMOPS's, looked up
+   * by the backend, so no second call. While editing, from the live lookup,
    * because the pair may have changed. A recreation site's Project Name is never stored, so it is
    * always looked up.
    */

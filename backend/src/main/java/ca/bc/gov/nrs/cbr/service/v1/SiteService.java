@@ -45,6 +45,7 @@ public class SiteService {
   private final RoadSectionService roads;
   private final SiteValidator validator;
   private final LoggedUserHelper loggedUser;
+  private final RoadNameService roadNames;
 
   public SiteService(
       CrossingSiteRepository crossingSiteRepository,
@@ -53,7 +54,8 @@ public class SiteService {
       ClientLocationRepository clientLocations,
       RoadSectionService roads,
       SiteValidator validator,
-      LoggedUserHelper loggedUser) {
+      LoggedUserHelper loggedUser,
+      RoadNameService roadNames) {
     this.crossingSiteRepository = crossingSiteRepository;
     this.crossingStructureRepository = crossingStructureRepository;
     this.closeProximityInspectionRepository = closeProximityInspectionRepository;
@@ -61,6 +63,7 @@ public class SiteService {
     this.roads = roads;
     this.validator = validator;
     this.loggedUser = loggedUser;
+    this.roadNames = roadNames;
   }
 
   /**
@@ -305,9 +308,11 @@ public class SiteService {
         site.getBusinessAreaOrgUnitNo(),
         site.getForestFileId(),
         site.getRoadSectionId(),
-        // Null whenever the road-section snapshot does not carry this pair — a stale mview, not an
-        // error. The mapping reads a dangling reference as "no road section"; so does legacy.
-        site.getRoadSection() == null ? null : site.getRoadSection().getRoadSectName(),
+        // LRMOPS's name, live. Null when LRMOPS has no such section, or can't be asked; a
+        // recreation site's Project File ID# names a recreation project, not a road.
+        "REC".equals(site.getCrossingSiteTypeCode())
+            ? null
+            : roadNames.nameOf(site.getForestFileId(), site.getRoadSectionId()),
         structureIds.size(),
         structureIds,
         site.getClientNumber(),

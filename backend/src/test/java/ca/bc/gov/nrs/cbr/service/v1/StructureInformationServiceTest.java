@@ -34,6 +34,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import({StructureInformationService.class, StructureDetailService.class, LoadRatingService.class})
 class StructureInformationServiceTest {
 
+  /** Road names come live from LRMOPS; none unless a test says. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
   @Autowired
   private StructureInformationService service;
 
