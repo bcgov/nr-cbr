@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.cbr.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -11,6 +12,7 @@ import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.District;
 import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadPage;
 import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSearchCriteria;
 import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSection;
+import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.SectionKey;
 import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.RoadSort;
 import ca.bc.gov.nrs.cbr.client.LrmopsApiClient.TenureType;
 import java.time.Duration;
@@ -148,5 +150,44 @@ class LrmopsApiClientTest {
         "nr-cbr-backend", "", second, second))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("LRMOPS_API_CLIENT_SECRET");
+  }
+
+  @Test
+  void roadNamesSendTheTermAndLimit() {
+    server.expect(requestTo("http://lrmops.test/api/v1/roads/names?search=big%20cr&limit=20"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(withSuccess("[\"BIG CREEK FSR\",\"BIG CROW RD\"]",
+            MediaType.APPLICATION_JSON));
+
+    assertThat(client.getRoadNames(" big cr ", 20)).containsExactly("BIG CREEK FSR", "BIG CROW RD");
+    server.verify();
+  }
+
+  @Test
+  void sectionsNamedSendTheName() {
+    server.expect(requestTo("http://lrmops.test/api/v1/roads/sections?roadName=BIG%20CREEK%20FSR"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(withSuccess("[{\"roadId\":\"R07571\",\"sectionId\":\"AA\"}]",
+            MediaType.APPLICATION_JSON));
+
+    assertThat(client.getRoadSectionsNamed("BIG CREEK FSR"))
+        .containsExactly(new SectionKey("R07571", "AA"));
+    server.verify();
+  }
+
+  @Test
+  void lookUpPostsTheKeys() {
+    server.expect(requestTo("http://lrmops.test/api/v1/roads/sections/lookup"))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(content().json("[{\"roadId\":\"R07571\",\"sectionId\":\"AA\"}]"))
+        .andRespond(withSuccess("""
+            [{"roadId":"R07571","sectionId":"AA","roadName":"BIG CREEK FSR","tenureType":"FSR",
+              "retired":false,"clientName":null}]
+            """, MediaType.APPLICATION_JSON));
+
+    assertThat(client.lookUpRoadSections(List.of(new SectionKey("R07571", "AA"))))
+        .singleElement()
+        .satisfies(road -> assertThat(road.roadName()).isEqualTo("BIG CREEK FSR"));
+    server.verify();
   }
 }

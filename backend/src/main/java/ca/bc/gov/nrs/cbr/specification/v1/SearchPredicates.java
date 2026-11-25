@@ -1,5 +1,6 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -14,9 +15,13 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.util.StringUtils;
 
 /**
@@ -35,6 +40,41 @@ final class SearchPredicates {
   private static final String WILDCARD = "%";
 
   private SearchPredicates() {}
+
+  /**
+   * The site is on one of these road sections — the Forest Service Road filter, once the name
+   * picked has been turned into sections by LRMOPS ({@code RoadNameService#sectionsNamed}).
+   *
+   * <p>One {@code FOREST_FILE_ID = ? AND UPPER(ROAD_SECTION_ID) IN (…)} per road, OR'd: grouped
+   * by road because a name usually covers a few sections of one road, and the file id compared as
+   * stored so an index on it can be used. Section lists are cut at Oracle's 1,000 per {@code IN}.
+   *
+   * <p>No sections matches nothing: a name LRMOPS gives no section has no sites.
+   *
+   * @param site the {@code CROSSING_SITE} the search reads
+   */
+  static Predicate onRoadSections(
+      CriteriaBuilder builder, From<?, ?> site, Collection<RoadSectionKey> sections) {
+    if (sections.isEmpty()) {
+      return builder.disjunction();
+    }
+    Map<String, List<String>> byRoad = sections.stream().collect(Collectors.groupingBy(
+        RoadSectionKey::forestFileId, LinkedHashMap::new,
+        Collectors.mapping(RoadSectionKey::roadSectionId, Collectors.toList())));
+    List<Predicate> any = new ArrayList<>();
+    Expression<String> section = builder.upper(site.get("roadSectionId"));
+    byRoad.forEach((road, ids) -> {
+      for (int from = 0; from < ids.size(); from += MAX_IN_LIST) {
+        any.add(builder.and(
+            builder.equal(site.get("forestFileId"), road),
+            section.in(ids.subList(from, Math.min(from + MAX_IN_LIST, ids.size())))));
+      }
+    });
+    return builder.or(any.toArray(new Predicate[0]));
+  }
+
+  /** Oracle's limit on the values in one {@code IN} list. */
+  private static final int MAX_IN_LIST = 1000;
 
   /**
    * Legacy's {@code Search.LIKE}: text containing the value, ignoring case.

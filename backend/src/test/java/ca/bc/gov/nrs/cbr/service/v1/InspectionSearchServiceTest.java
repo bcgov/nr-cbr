@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
@@ -20,6 +21,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -38,7 +40,8 @@ import org.springframework.data.jpa.domain.Specification;
 class InspectionSearchServiceTest {
 
   private final StructureInspectionRepository repository = mock(StructureInspectionRepository.class);
-  private final InspectionSearchService service = new InspectionSearchService(repository);
+  private final RoadNameService roadNames = mock(RoadNameService.class);
+  private final InspectionSearchService service = new InspectionSearchService(repository, roadNames);
 
   private static InspectionSearchCriteria someCriteria() {
     return InspectionSearchCriteria.builder().siteId("site-1").build();
@@ -101,6 +104,9 @@ class InspectionSearchServiceTest {
     // Four of these values arrive through three levels of association — inspection → structure →
     // site → org unit — and every one of them is a String. Crossing two over compiles.
     givenOneResult();
+    // The road name is LRMOPS's, not the view's ("Deadman FSR" on the entity).
+    when(roadNames.namesOf(List.of(RoadSectionKey.of("R00123", "01"))))
+        .thenReturn(Map.of(RoadSectionKey.of("R00123", "01"), "DEADMAN FSR"));
 
     InspectionSearchResult row =
         service.search(someCriteria(), 0, 20, List.of()).content().getFirst();
@@ -113,7 +119,7 @@ class InspectionSearchServiceTest {
     assertThat(row.structureName()).isEqualTo("BR000001");
     assertThat(row.orgUnitCode()).isEqualTo("DPG");
     assertThat(row.orgUnitName()).isEqualTo("Prince George");
-    assertThat(row.forestServiceRoad()).isEqualTo("Deadman FSR");
+    assertThat(row.forestServiceRoad()).isEqualTo("DEADMAN FSR");
     assertThat(row.pointOfCommencementDistance()).isEqualTo("12.50");
     assertThat(row.crossingName()).isEqualTo("Deadman Creek");
     assertThat(row.forestFileId()).isEqualTo("R00123");

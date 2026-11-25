@@ -107,6 +107,7 @@ public class StructureDetailService {
   private final ClientLocationRepository clientLocations;
   private final LoadRatingService loadRatingService;
   private final EntityManager entityManager;
+  private final RoadNameService roadNames;
 
   @SuppressWarnings("java:S107") // One repository per table the page reads.
   public StructureDetailService(
@@ -123,7 +124,8 @@ public class StructureDetailService {
       RecreationProjectRepository recreationProjects,
       ClientLocationRepository clientLocations,
       LoadRatingService loadRatingService,
-      EntityManager entityManager) {
+      EntityManager entityManager,
+      RoadNameService roadNames) {
     this.structures = structures;
     this.bridges = bridges;
     this.culverts = culverts;
@@ -138,6 +140,7 @@ public class StructureDetailService {
     this.clientLocations = clientLocations;
     this.loadRatingService = loadRatingService;
     this.entityManager = entityManager;
+    this.roadNames = roadNames;
   }
 
   /**
@@ -196,7 +199,8 @@ public class StructureDetailService {
             StructureInspectionStatusCodeEntity::getDescription),
         orgUnitName(site.getOrgUnitNo()),
         recreation ? null : orgUnitName(site.getManagementOrgUnitNo()),
-        site.getRoadSection() == null ? null : site.getRoadSection().getRoadSectName(),
+        // LRMOPS's name, live; null when it has none or can't be asked.
+        recreation ? null : roadNames.nameOf(site.getForestFileId(), site.getRoadSectionId()),
         recreation && site.getForestFileId() != null
             ? recreationProjects.findById(site.getForestFileId())
                 .map(RecreationProjectEntity::getProjectName).orElse(null)

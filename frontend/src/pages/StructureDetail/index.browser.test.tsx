@@ -563,7 +563,7 @@ describe('StructureDetailPage — header', () => {
     expect(valueOf('Inspection Status', header)).toBe('OK - Inspected');
     expect(valueOf('Forest District', header)).toBe('Cariboo-Chilcotin Natural Resource District');
     expect(valueOf('Management Area', header)).toBe('Central Cariboo');
-    expect(valueOf('Forest Service Road', header)).toBe('CHILCOTIN SOUTH');
+    expect(valueOf('Forest Service Road', header)).toBe('Chilcotin South');
     expect(valueOf('Project File ID#-Br.', header)).toBe('6970-01');
     expect(valueOf('Crossing Name', header)).toBe('Riske Cr');
     expect(valueOf('Kilometres', header)).toBe('0.24');
@@ -1328,7 +1328,7 @@ describe('StructureDetailPage — editing the structure and site', () => {
     // Every field stays in its place; the site's show the typed site once it is found.
     await vi.waitFor(() => expect(form).toMatchTextContent('Showing site 62-145.'));
     expect(valueOf('Crossing Name', form)).toBe('Bonaparte R');
-    expect(valueOf('Forest Service Road', form)).toBe('BONAPARTE/FROSTY');
+    expect(valueOf('Forest Service Road', form)).toBe('Bonaparte/Frosty');
     expect(within(form).queryByText('Type/Class')).not.toBeInTheDocument();
     expect(api.previewSite).toHaveBeenLastCalledWith('62-145');
     await userEvent.click(within(form).getByTestId('information-save'));

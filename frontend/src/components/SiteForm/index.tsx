@@ -16,6 +16,7 @@ import type { RoadDistrict, RoadSectionResponse } from '@/services/road.service'
 import type { CodeOption, OrgUnitOption } from '@/types/configuration';
 import type { FC, FocusEvent, ReactNode, SubmitEventHandler } from 'react';
 
+import { roadNameCase } from '@/utils/roadName';
 import { byteLength } from '@/utils/textLimits';
 
 export type SiteCodeTables = {
@@ -679,7 +680,7 @@ const SiteForm: FC<Props> = ({
             apart and neither could legacy, which blanked the field for all three. */}
         <ReadOnlyField
           label={isRecreation ? 'Project Name' : 'Forest Service Road'}
-          value={forestServiceRoad}
+          value={isRecreation ? forestServiceRoad : roadNameCase(forestServiceRoad)}
           emptyText={forestServiceRoadLoading ? 'Looking up\u2026' : '\u2014'}
         />
 

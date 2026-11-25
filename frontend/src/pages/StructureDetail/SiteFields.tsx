@@ -3,6 +3,8 @@ import ReadOnlyField from '@/components/core/ReadOnlyField';
 import type { StructureSite } from './structureResponse';
 import type { FC } from 'react';
 
+import { roadNameCase } from '@/utils/roadName';
+
 /** A recreation site, whose district and road read differently. */
 const RECREATION = 'REC';
 
@@ -19,7 +21,7 @@ const SiteFields: FC<{ site: StructureSite | null }> = ({ site }) => {
       {!recreation && <ReadOnlyField label="Management Area" value={site?.managementAreaName} />}
       <ReadOnlyField
         label={recreation ? 'Project Name' : 'Forest Service Road'}
-        value={recreation ? site?.projectName : site?.forestServiceRoad}
+        value={recreation ? site?.projectName : roadNameCase(site?.forestServiceRoad)}
       />
       <ReadOnlyField label="Project File ID#-Br." value={projectFile} />
 

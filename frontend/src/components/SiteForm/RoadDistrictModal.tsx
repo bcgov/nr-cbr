@@ -8,6 +8,7 @@ import type { RoadSectionResponse } from '@/services/road.service';
 import type { OrgUnitOption } from '@/types/configuration';
 
 import './roadDistrictModal.scss';
+import { roadNameCase } from '@/utils/roadName';
 
 /** The coordinates the user has entered on the form, as the form shows them. Blank when none. */
 export type EnteredLocation = {
@@ -97,7 +98,7 @@ const RoadDistrictModal: FC<Props> = ({
       <div className="road-district-modal__details">
         <ReadOnlyField label="Project File ID#" value={road.forestFileId} />
         <ReadOnlyField label="Br." value={road.roadSectionId} />
-        <ReadOnlyField label="Forest Service Road" value={road.forestServiceRoad} />
+        <ReadOnlyField label="Forest Service Road" value={roadNameCase(road.forestServiceRoad)} />
         <ReadOnlyField label="Tenure Type" value={road.tenureType} />
         <ReadOnlyField label="Client Name" value={road.clientName} />
       </div>

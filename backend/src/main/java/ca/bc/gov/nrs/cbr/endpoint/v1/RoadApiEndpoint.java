@@ -95,4 +95,17 @@ public interface RoadApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/tenure-types")
   ResponseEntity<List<CodeOptionResponse>> getTenureTypes();
+
+  /**
+   * Road names containing the term, those starting with it first, at most twenty: the Forest
+   * Service Road pick list on Site, Structure and Inspection Search, which filter on the name
+   * picked, exactly.
+   *
+   * <p>Gated on {@link CbrAuthorities#READ}, as the searches it serves. Empty for a term under three
+   * characters; 503 when LRMOPS cannot be reached.
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/names")
+  ResponseEntity<List<String>> getRoadNames(
+      @RequestParam(name = "search", defaultValue = "") String search);
 }

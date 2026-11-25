@@ -11,6 +11,7 @@ import {
 import { useRef } from 'react';
 
 import MultiCodeSelect from '@/components/core/MultiCodeSelect';
+import RoadNameCombo from '@/components/core/RoadNameCombo';
 
 import { criteriaErrors, isMonth } from './validation';
 
@@ -352,7 +353,11 @@ const InspectionSearchCriteriaForm: FC<Props> = ({
           {text('roadSectionId', 'Br.', 30)}
         </div>
 
-        {text('forestServiceRoad', 'Forest Service Road', 20)}
+        <RoadNameCombo
+          id="inspection-search-forestServiceRoad"
+          value={criteria.forestServiceRoad}
+          onChange={(roadName) => onChange('forestServiceRoad', roadName)}
+        />
 
         {/* Out of legacy's order, which has it below Management Area with the other two org units.
             It is moved because the date range below needs two columns and cannot fit in the one

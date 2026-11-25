@@ -5,11 +5,13 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.onRoadSections;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
 
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -109,13 +111,30 @@ public final class SiteSearchSpecifications {
    */
   public static Specification<CrossingSiteEntity> matching(
       SiteSearchCriteria criteria, List<HeaderSort<SiteSortColumn>> sort) {
+    return matching(criteria, sort, null);
+  }
+
+  /**
+   * Builds the predicate, with Forest Service Road matched on road sections rather than on the
+   * name in {@code CBR_ROAD_SECTION_VW}.
+   *
+   * @param roadSections the sections LRMOPS gives the name picked ({@code RoadNameService});
+   *     null to match {@code criteria.forestServiceRoad()} against the view as before
+   */
+  public static Specification<CrossingSiteEntity> matching(
+      SiteSearchCriteria criteria, List<HeaderSort<SiteSortColumn>> sort,
+      List<RoadSectionKey> roadSections) {
     return (root, query, builder) -> {
       List<Predicate> predicates = new ArrayList<>();
 
       scalarCriteria(builder, root, criteria, predicates);
       toggleCriteria(builder, root, criteria, predicates);
       maintainedBy(builder, query, root, criteria.primaryUserName()).ifPresent(predicates::add);
-      joinedCriteriaAndProjection(root, query, builder, criteria, predicates, sort);
+      if (roadSections != null) {
+        predicates.add(onRoadSections(builder, root, roadSections));
+      }
+      joinedCriteriaAndProjection(root, query, builder,
+          roadSections == null ? criteria.forestServiceRoad() : null, predicates, sort);
 
       return allOf(builder, predicates);
     };
@@ -206,18 +225,18 @@ public final class SiteSearchSpecifications {
       Root<CrossingSiteEntity> root,
       CriteriaQuery<?> query,
       CriteriaBuilder builder,
-      SiteSearchCriteria criteria,
+      String forestServiceRoad,
       List<Predicate> predicates,
       List<HeaderSort<SiteSortColumn>> sort) {
     boolean projecting = returnsEntities(query);
-    boolean filtering = StringUtils.hasText(criteria.forestServiceRoad());
+    boolean filtering = StringUtils.hasText(forestServiceRoad);
     if (!projecting && !filtering) {
       return;
     }
 
     From<?, ?> roadSection = joinOrFetch(root, ROAD_SECTION, JoinType.LEFT, projecting);
     if (filtering) {
-      contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
+      contains(builder, roadSection.get(ROAD_SECTION_NAME), forestServiceRoad)
           .ifPresent(predicates::add);
     }
     if (projecting) {

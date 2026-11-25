@@ -1,6 +1,5 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
@@ -8,11 +7,13 @@ import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteRepository;
 import ca.bc.gov.nrs.cbr.specification.v1.SiteSearchSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.PagedResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchResult;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSortColumn;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import org.slf4j.Logger;
@@ -51,9 +52,12 @@ public class SiteSearchService {
   private static final int MAX_PAGE_SIZE = 200;
 
   private final CrossingSiteRepository crossingSiteRepository;
+  private final RoadNameService roadNames;
 
-  public SiteSearchService(CrossingSiteRepository crossingSiteRepository) {
+  public SiteSearchService(
+      CrossingSiteRepository crossingSiteRepository, RoadNameService roadNames) {
     this.crossingSiteRepository = crossingSiteRepository;
+    this.roadNames = roadNames;
   }
 
   /**
@@ -76,16 +80,24 @@ public class SiteSearchService {
   public PagedResponse<SiteSearchResult> search(
       SiteSearchCriteria criteria, int pageNumber, int pageSize,
       List<HeaderSort<SiteSortColumn>> sort) {
+    long start = System.nanoTime();
     Pageable pageable = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
+    // Null when no road was picked: the specification then leaves the road alone.
+    List<RoadSectionKey> roadSections =
+        roadNames.sectionsNamed(criteria.forestServiceRoad()).orElse(null);
 
     Page<CrossingSiteEntity> page = crossingSiteRepository.findAll(
-        SiteSearchSpecifications.matching(criteria, sort), pageable);
+        SiteSearchSpecifications.matching(criteria, sort, roadSections), pageable);
+    Map<RoadSectionKey, String> names = roadNames.namesOf(page.getContent().stream()
+        .map(site -> RoadSectionKey.of(site.getForestFileId(), site.getRoadSectionId()))
+        .toList());
 
-    log.debug("Site search matched {} site(s) (page {} of {}, criteriaEmpty={})",
-        page.getTotalElements(), pageable.getPageNumber(), page.getTotalPages(), criteria.isEmpty());
+    log.info("Site search matched {} site(s) (page {} of {}), {} ms with road names",
+        page.getTotalElements(), pageable.getPageNumber(), page.getTotalPages(),
+        (System.nanoTime() - start) / 1_000_000);
 
     return new PagedResponse<>(
-        page.getContent().stream().map(SiteSearchService::toResult).toList(),
+        page.getContent().stream().map(site -> toResult(site, names)).toList(),
         page.getTotalElements(),
         page.getTotalPages(),
         page.getNumber(),
@@ -102,23 +114,32 @@ public class SiteSearchService {
   /**
    * Maps one site to a results row.
    *
+   * <p>The road name is LRMOPS's, looked up for the page ({@link RoadNameService#namesOf}).
+   *
    * <p>Every joined value is optional, and a site missing its status, org unit or road section is a
    * normal result rather than an error — those are precisely what an "incomplete data" search
    * returns. Reading them through {@link #from} keeps a single missing join from failing the whole
    * page, which is how the legacy left joins behave.
    */
-  private static SiteSearchResult toResult(CrossingSiteEntity site) {
+  private static SiteSearchResult toResult(
+      CrossingSiteEntity site, Map<RoadSectionKey, String> roadNames) {
     return new SiteSearchResult(
         site.getCrossingSiteId(),
         from(site.getOrgUnit(), OrgUnitEntity::getOrgUnitCode),
         from(site.getOrgUnit(), OrgUnitEntity::getOrgUnitName),
-        from(site.getRoadSection(), CbrRoadSectionEntity::getRoadSectName),
+        roadName(roadNames, site),
         text(site.getPointOfCommencementDistance()),
         site.getCrossingName(),
         site.getForestFileId(),
         site.getRoadSectionId(),
         site.getCrossingSiteStatusCode(),
         from(site.getStatus(), CrossingSiteStatusCodeEntity::getDescription));
+  }
+
+  /** The site's road name from LRMOPS; null when it has no road, or LRMOPS no name for it. */
+  static String roadName(Map<RoadSectionKey, String> roadNames, CrossingSiteEntity site) {
+    RoadSectionKey key = RoadSectionKey.of(site.getForestFileId(), site.getRoadSectionId());
+    return key == null ? null : roadNames.get(key);
   }
 
   private static <T> String from(T association, Function<T, String> value) {

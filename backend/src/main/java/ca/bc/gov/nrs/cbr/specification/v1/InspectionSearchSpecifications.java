@@ -5,12 +5,14 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.onRoadSections;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
 
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -162,6 +164,19 @@ public final class InspectionSearchSpecifications {
    */
   public static Specification<StructureInspectionEntity> matching(
       InspectionSearchCriteria criteria, List<HeaderSort<InspectionSortColumn>> sort) {
+    return matching(criteria, sort, null);
+  }
+
+  /**
+   * Builds the predicate, with Forest Service Road matched on road sections rather than on the
+   * name in {@code CBR_ROAD_SECTION_VW}.
+   *
+   * @param roadSections the sections LRMOPS gives the name picked ({@code RoadNameService});
+   *     null to match {@code criteria.forestServiceRoad()} against the view as before
+   */
+  public static Specification<StructureInspectionEntity> matching(
+      InspectionSearchCriteria criteria, List<HeaderSort<InspectionSortColumn>> sort,
+      List<RoadSectionKey> roadSections) {
     return (root, query, builder) -> {
       List<Predicate> predicates = new ArrayList<>();
 
@@ -234,8 +249,12 @@ public final class InspectionSearchSpecifications {
       From<?, ?> statusCode =
           projecting ? joinOrFetch(status, STATUS_CODE, JoinType.LEFT, true) : null;
 
-      contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
-          .ifPresent(predicates::add);
+      if (roadSections == null) {
+        contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
+            .ifPresent(predicates::add);
+      } else {
+        predicates.add(onRoadSections(builder, site, roadSections));
+      }
 
       if (Boolean.TRUE.equals(criteria.mostRecentInspections())) {
         predicates.add(mostRecentInspection(builder, query, root));

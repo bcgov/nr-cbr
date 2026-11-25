@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.net.URI;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -45,6 +46,10 @@ public class LrmopsApiClient {
 
   /** The API's path prefix, as segments, appended to the configured base URL. */
   private static final String[] API_V1 = {"api", "v1"};
+
+  /** Path segments under {@link #API_V1}. */
+  private static final String ROADS = "roads";
+  private static final String SECTIONS = "sections";
 
   private final RestClient http;
   private final ClientCredentialsTokenSource clientCredentials;
@@ -104,7 +109,7 @@ public class LrmopsApiClient {
       List<RoadSort> sorts) {
     RoadPage page = http.get()
         .uri(uriBuilder -> {
-          uriBuilder.pathSegment(API_V1).pathSegment("roads");
+          uriBuilder.pathSegment(API_V1).pathSegment(ROADS);
           queryParam(uriBuilder, "roadName", criteria.roadName());
           queryParam(uriBuilder, "roadId", criteria.roadId());
           queryParam(uriBuilder, "sectionId", criteria.sectionId());
@@ -137,7 +142,7 @@ public class LrmopsApiClient {
     try {
       return Optional.ofNullable(http.get()
           .uri(uriBuilder -> uriBuilder.pathSegment(API_V1)
-              .pathSegment("roads", roadId.trim(), "sections", sectionId.trim())
+              .pathSegment(ROADS, roadId.trim(), SECTIONS, sectionId.trim())
               .build())
           .headers(this::applyAuth)
           .retrieve()
@@ -163,6 +168,53 @@ public class LrmopsApiClient {
     return types == null ? List.of() : List.of(types);
   }
 
+  /**
+   * {@code GET /api/v1/roads/names}: road names containing {@code term}, those starting with it
+   * first, at most {@code limit}. Empty for a term under two characters.
+   */
+  public List<String> getRoadNames(String term, int limit) {
+    String[] names = http.get()
+        .uri(uriBuilder -> uriBuilder.pathSegment(API_V1).pathSegment(ROADS, "names")
+            .queryParam("search", term == null ? "" : term.trim())
+            .queryParam("limit", limit)
+            .build())
+        .headers(this::applyAuth)
+        .retrieve()
+        .body(String[].class);
+    return names == null ? List.of() : List.of(names);
+  }
+
+  /**
+   * {@code GET /api/v1/roads/sections}: every road section named exactly {@code roadName}
+   * (case-insensitive, runs of spaces counting as one).
+   */
+  public List<SectionKey> getRoadSectionsNamed(String roadName) {
+    SectionKey[] keys = http.get()
+        .uri(uriBuilder -> uriBuilder.pathSegment(API_V1).pathSegment(ROADS, SECTIONS)
+            .queryParam("roadName", roadName == null ? "" : roadName.trim())
+            .build())
+        .headers(this::applyAuth)
+        .retrieve()
+        .body(SectionKey[].class);
+    return keys == null ? List.of() : List.of(keys);
+  }
+
+  /**
+   * {@code POST /api/v1/roads/sections/lookup}: the sections asked for that LRMOPS has, with their
+   * names. At most 1,000 a call; the caller batches.
+   */
+  public List<RoadSummary> lookUpRoadSections(Collection<SectionKey> keys) {
+    RoadSummary[] found = http.post()
+        .uri(uriBuilder -> uriBuilder.pathSegment(API_V1)
+            .pathSegment(ROADS, SECTIONS, "lookup").build())
+        .headers(this::applyAuth)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(List.copyOf(keys))
+        .retrieve()
+        .body(RoadSummary[].class);
+    return found == null ? List.of() : List.of(found);
+  }
+
   // ── Internals ─────────────────────────────────────────────────────
 
   private void applyAuth(HttpHeaders headers) {
@@ -186,6 +238,11 @@ public class LrmopsApiClient {
   /** Search criteria; blank ones are left out of the request. */
   public record RoadSearchCriteria(
       String roadName, String roadId, String sectionId, String tenureType, String clientName) {
+  }
+
+  /** A road section by road id and section id, as the API takes and returns them. */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record SectionKey(String roadId, String sectionId) {
   }
 
   /** A sort column and {@code ASC}/{@code DESC}. */

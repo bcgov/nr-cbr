@@ -8,6 +8,7 @@ import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.CrossingSiteRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.SiteSearchCriteria;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -132,6 +133,14 @@ class SiteSearchSpecificationsTest {
     flushAndClear();
     return repository
         .findAll(SiteSearchSpecifications.matching(criteria), PageRequest.of(0, 50))
+        .map(CrossingSiteEntity::getCrossingSiteId)
+        .getContent();
+  }
+
+  private List<String> onSections(SiteSearchCriteria criteria, List<RoadSectionKey> sections) {
+    return repository
+        .findAll(SiteSearchSpecifications.matching(criteria, List.of(), sections),
+            PageRequest.of(0, 50))
         .map(CrossingSiteEntity::getCrossingSiteId)
         .getContent();
   }
@@ -315,6 +324,27 @@ class SiteSearchSpecificationsTest {
 
       assertThat(search(SiteSearchCriteria.builder().forestServiceRoad("Bowron").build()))
           .containsExactly("ON-BOWRON");
+    }
+
+    @Test
+    @DisplayName("Forest Service Road matches on the sections LRMOPS gives the name, when given")
+    void forestServiceRoadOnSections() {
+      givenSupportingRows();
+      persist(completeSite("ON-01").build());
+      persist(completeSite("ON-02").roadSectionId("02").build());
+      persist(completeSite("LOWER").forestFileId("R00456").roadSectionId("a 1").build());
+      persist(completeSite("OTHER").forestFileId("R99999").roadSectionId("99").build());
+      flushAndClear();
+
+      // The view's name is not consulted: "Nowhere" would match nothing there.
+      SiteSearchCriteria named = SiteSearchCriteria.builder().forestServiceRoad("Nowhere").build();
+      assertThat(onSections(named, List.of(
+          RoadSectionKey.of("R00123", "01"), RoadSectionKey.of("R00123", "02"),
+          RoadSectionKey.of("R00456", "A 1"))))
+          .containsExactlyInAnyOrder("ON-01", "ON-02", "LOWER");
+      assertThat(onSections(named, List.of(RoadSectionKey.of("R00123", "02"))))
+          .containsExactly("ON-02");
+      assertThat(onSections(named, List.of())).isEmpty();
     }
 
     @Test

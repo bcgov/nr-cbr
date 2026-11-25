@@ -1,8 +1,11 @@
 package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.OrgUnitEntity;
@@ -15,6 +18,8 @@ import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Sort;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Paging, ordering and the mapping to a results row.
@@ -40,8 +46,13 @@ class SiteSearchServiceTest {
   @Autowired
   private EntityManager entityManager;
 
+  @MockitoBean
+  private RoadNameService roadNames;
+
   @BeforeEach
   void clear() {
+    // No Forest Service Road filter unless a test says otherwise.
+    when(roadNames.sectionsNamed(any())).thenReturn(Optional.empty());
     entityManager.createQuery("DELETE FROM CrossingSiteEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CbrRoadSectionEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM OrgUnitEntity").executeUpdate();
@@ -238,11 +249,14 @@ class SiteSearchServiceTest {
         .crossingSiteId("SITE-1").orgUnitNo(18L).crossingSiteStatusCode("ACT")
         .forestFileId("R00123").roadSectionId("01").crossingName("Deadman Creek")
         .pointOfCommencementDistance(new BigDecimal("12.50")).capitalRoadInd("N").build());
+    // The name shown is LRMOPS's, not the view's.
+    when(roadNames.namesOf(List.of(RoadSectionKey.of("R00123", "01"))))
+        .thenReturn(Map.of(RoadSectionKey.of("R00123", "01"), "BOWRON FSR"));
 
     assertThat(searchAll(0, 20).content()).singleElement().satisfies(result -> {
       assertThat(result.orgUnitCode()).isEqualTo("DPG");
       assertThat(result.orgUnitName()).isEqualTo("Prince George");
-      assertThat(result.forestServiceRoad()).isEqualTo("Bowron FSR");
+      assertThat(result.forestServiceRoad()).isEqualTo("BOWRON FSR");
       // Code and description both travel: the description is the label, the code decides the
       // colour of the pill it sits in.
       assertThat(result.crossingSiteStatusCode()).isEqualTo("ACT");
