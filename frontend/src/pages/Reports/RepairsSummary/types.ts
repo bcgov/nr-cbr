@@ -4,12 +4,14 @@ import type { CodeOption } from '@/types/configuration';
 
 export type { ReportFormat } from '../types';
 
-/** The Repairs Summary's three orders — legacy's, with legacy's labels. */
-export type RepairsSummarySort = 'PROJECT_BRANCH_KM' | 'ROAD_NAME_USER_KM' | 'SITE_ID';
+/**
+ * The Repairs Summary's orders — legacy's, with legacy's labels, less Road Name, KM User: the
+ * road name is LRMOPS's, and CBR's database has none to sort on (2026-11-25).
+ */
+export type RepairsSummarySort = 'PROJECT_BRANCH_KM' | 'SITE_ID';
 
 export const SORT_OPTIONS: readonly SortOption<RepairsSummarySort>[] = [
   { value: 'PROJECT_BRANCH_KM', label: 'Project Number, Branch' },
-  { value: 'ROAD_NAME_USER_KM', label: 'Road Name, KM User' },
   { value: 'SITE_ID', label: 'Site Id' },
 ];
 

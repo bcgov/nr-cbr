@@ -84,13 +84,7 @@ export type SiteSearchResult = {
  * a search answers with until a header is clicked.
  */
 export type SiteSortColumn =
-  | 'SITE_ID'
-  | 'DISTRICT'
-  | 'FOREST_SERVICE_ROAD'
-  | 'KILOMETRES'
-  | 'CROSSING_NAME'
-  | 'PROJECT_FILE'
-  | 'STATUS';
+  'SITE_ID' | 'DISTRICT' | 'KILOMETRES' | 'CROSSING_NAME' | 'PROJECT_FILE' | 'STATUS';
 
 /** The columns the user sorted by, the first deciding. Empty is legacy's order. */
 export type SiteSort = SortOrder<SiteSortColumn>;

@@ -55,11 +55,15 @@ type Props = {
 };
 
 /** Every column sorts, on the server — the results are paged there. */
-const COLUMNS: { column: StructureSortColumn; label: string }[] = [
+/*
+ * Forest Service Road has no column to sort on: the name is LRMOPS's, looked up for the page, so
+ * the server has none to order by (2026-11-25). Its header is plain.
+ */
+const COLUMNS: { column: StructureSortColumn | null; label: string }[] = [
   { column: 'STRUCTURE_NAME', label: 'Structure #' },
   { column: 'SITE_ID', label: 'Site #' },
   { column: 'DISTRICT', label: 'District Code' },
-  { column: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
+  { column: null, label: 'Forest Service Road' },
   { column: 'KILOMETRES', label: 'KM' },
   { column: 'CROSSING_NAME', label: 'Crossing Name' },
   { column: 'TYPE_CLASS', label: 'Type/Class' },
@@ -85,7 +89,8 @@ const selectedText = (id: string, state?: Record<string, unknown>): string => {
  *
  * <p>Legacy's columns in legacy's order, with its second row — Client # and Client Name — folded
  * into one Maintainer column. Structure # opens the structure — a placeholder page for now — and
- * Site # opens the site, as it does on Site Search. Every header sorts, on the server.
+ * Site # opens the site, as it does on Site Search. Every header but Forest Service Road sorts, on
+ * the server.
  *
  * <p><b>A checkbox per row</b> for a role that may act on structures, as legacy's column is gated
  * on `/deleteStructure` or `/updateRepairResponsibility` — Level 1 and above. No select-all, as in
@@ -207,17 +212,21 @@ const StructureSearchResults: FC<Props> = ({
                   <span className="cds--visually-hidden">Select</span>
                 </TableHeader>
               )}
-              {COLUMNS.map(({ column, label }) => (
-                <SortableHeader
-                  key={column}
-                  column={column}
-                  sort={sort}
-                  onSortChange={onSortChange}
-                  data-testid={`structure-search-sort-${column}`}
-                >
-                  {label}
-                </SortableHeader>
-              ))}
+              {COLUMNS.map(({ column, label }) =>
+                column === null ? (
+                  <TableHeader key={label}>{label}</TableHeader>
+                ) : (
+                  <SortableHeader
+                    key={column}
+                    column={column}
+                    sort={sort}
+                    onSortChange={onSortChange}
+                    data-testid={`structure-search-sort-${column}`}
+                  >
+                    {label}
+                  </SortableHeader>
+                ),
+              )}
             </TableRow>
           </TableHead>
           <TableBody>

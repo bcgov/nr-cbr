@@ -44,17 +44,21 @@ type Props = {
 };
 
 /**
- * The ten sortable columns, in the legacy table's order.
+ * The results columns, in the legacy table's order; the ones that sort name their column.
  *
  * <p>District and road lead the row, ahead of the inspection's own columns: they are what a reader
  * scans down to find the crossing they are after, and the date and status are what they read once
  * they have found it. Status is last of the data columns, next to Actions: it decides whether a row
  * offers delete at all, so the two sit together rather than at opposite ends of the table.
  */
-const COLUMNS: { column: InspectionSortColumn; label: string }[] = [
+/*
+ * Forest Service Road has no column to sort on: the name is LRMOPS's, looked up for the page, so
+ * the server has none to order by (2026-11-25). Its header is plain.
+ */
+const COLUMNS: { column: InspectionSortColumn | null; label: string }[] = [
   { column: 'INSPECTION_ID', label: 'Id' },
   { column: 'DISTRICT', label: 'District Code' },
-  { column: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
+  { column: null, label: 'Forest Service Road' },
   { column: 'INSPECTION_DATE', label: 'Inspection Date' },
   { column: 'SITE_ID', label: 'Site #' },
   { column: 'STRUCTURE_NAME', label: 'Structure Name' },
@@ -79,7 +83,7 @@ const COLUMNS: { column: InspectionSortColumn; label: string }[] = [
  *       (cbr-navigation.local.md §2).
  * </ul>
  *
- * <p><b>Every header but Actions sorts</b>, in place of legacy's "Sort by" radio. On the server,
+ * <p><b>Every header but Forest Service Road and Actions sorts</b>, in place of legacy's "Sort by" radio. On the server,
  * not the page: the results are paged there, so sorting the rows on screen would order twenty
  * inspections out of thousands and call it sorted.
  */
@@ -132,17 +136,21 @@ const InspectionSearchResults: FC<Props> = ({
         <Table useZebraStyles size="lg">
           <TableHead>
             <TableRow>
-              {COLUMNS.map(({ column, label }) => (
-                <SortableHeader
-                  key={column}
-                  column={column}
-                  sort={sort}
-                  onSortChange={onSortChange}
-                  data-testid={`inspection-search-sort-${column}`}
-                >
-                  {label}
-                </SortableHeader>
-              ))}
+              {COLUMNS.map(({ column, label }) =>
+                column === null ? (
+                  <TableHeader key={label}>{label}</TableHeader>
+                ) : (
+                  <SortableHeader
+                    key={column}
+                    column={column}
+                    sort={sort}
+                    onSortChange={onSortChange}
+                    data-testid={`inspection-search-sort-${column}`}
+                  >
+                    {label}
+                  </SortableHeader>
+                ),
+              )}
               {/* "Actions", not "Delete": the column is gated on the destructive capability, but
                   naming it after its only current occupant would have to be renamed the moment a
                   second one lands. Hidden entirely when the user cannot delete, as legacy does. */}

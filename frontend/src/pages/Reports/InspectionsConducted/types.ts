@@ -13,21 +13,19 @@ export const INSPECTIONS_CONDUCTED_STATE_KEYS: Record<InspectionsConductedVarian
 };
 
 /**
- * The Summary's four orders, legacy's labels as they were. Legacy sorts Forest Service Road and
- * Project File ID# descending, though their labels do not say so; kept as legacy has them.
+ * The Summary's orders, legacy's labels as they were. Legacy sorts Project File ID# descending,
+ * though its label does not say so; kept as legacy has it. Legacy's Forest Service Road is gone:
+ * the road name is LRMOPS's, and CBR's database has none to sort on (2026-11-25).
  */
-export type InspectionsConductedSummarySort =
-  'FOREST_SERVICE_ROAD' | 'FOREST_FILE_ID' | 'USER_KM' | 'INSPECTION_DATE';
+export type InspectionsConductedSummarySort = 'FOREST_FILE_ID' | 'USER_KM' | 'INSPECTION_DATE';
 
-/** The Detail's three orders, legacy's labels. */
-export type InspectionsConductedDetailSort =
-  'PROJECT_BRANCH_USER_KM' | 'ROAD_NAME_USER_KM' | 'INSPECTION_DATE';
+/** The Detail's orders, legacy's labels — less Road Name, User KM, for the same reason. */
+export type InspectionsConductedDetailSort = 'PROJECT_BRANCH_USER_KM' | 'INSPECTION_DATE';
 
 export type InspectionsConductedSort =
   InspectionsConductedSummarySort | InspectionsConductedDetailSort;
 
 export const SUMMARY_SORT_OPTIONS: readonly SortOption<InspectionsConductedSummarySort>[] = [
-  { value: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
   { value: 'FOREST_FILE_ID', label: 'Project File ID#' },
   { value: 'USER_KM', label: 'User Km (Asc)' },
   { value: 'INSPECTION_DATE', label: 'Inspection Date (Desc)' },
@@ -35,7 +33,6 @@ export const SUMMARY_SORT_OPTIONS: readonly SortOption<InspectionsConductedSumma
 
 export const DETAIL_SORT_OPTIONS: readonly SortOption<InspectionsConductedDetailSort>[] = [
   { value: 'PROJECT_BRANCH_USER_KM', label: 'Project Number, Branch, User KM (Asc)' },
-  { value: 'ROAD_NAME_USER_KM', label: 'Road Name, User KM (Asc)' },
   { value: 'INSPECTION_DATE', label: 'Inspection Date (Desc)' },
 ];
 
@@ -96,7 +93,7 @@ const EMPTY: Omit<InspectionsConductedCriteria, 'inspectionTypeCode' | 'sortBy'>
 export const EMPTY_SUMMARY_CRITERIA: InspectionsConductedCriteria = {
   ...EMPTY,
   inspectionTypeCode: '',
-  sortBy: 'FOREST_SERVICE_ROAD',
+  sortBy: 'FOREST_FILE_ID',
 };
 
 /** Legacy's Detail defaults: Routine inspections, sorted by project, branch and user km. */

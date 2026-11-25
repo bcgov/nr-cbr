@@ -356,7 +356,8 @@ class InspectionsDueSummaryServiceTest {
     structure("ON-ALPHA", s -> s.crossingSiteId("62-003"));
 
     // 100 Mile House is district 9, Prince George 18: the number, not the name, as legacy.
-    assertThat(names(c -> c)).containsExactly("IN-100-MILE", "ON-ALPHA", "ON-BOWRON");
+    // The default is Project File ID# (legacy's Forest Service Road is gone).
+    assertThat(names(c -> c)).containsExactly("IN-100-MILE", "ON-BOWRON", "ON-ALPHA");
     assertThat(names(c -> c.sortBy(InspectionsDueSort.FOREST_FILE_ID)))
         .containsExactly("IN-100-MILE", "ON-BOWRON", "ON-ALPHA");
   }
@@ -368,11 +369,11 @@ class InspectionsDueSummaryServiceTest {
         .forestFileId("R00123").orgUnit("18").nextPlannedInspectionDateStart("2026/01/01")
         .specialEquipmentCode("NONE").closeProximity("N").structureTypeClassCode("PB").build();
 
-    assertThat(criteriaLine.of(criteria, InspectionsDueSort.FOREST_SERVICE_ROAD)).isEqualTo(
+    assertThat(criteriaLine.of(criteria, InspectionsDueSort.FOREST_FILE_ID)).isEqualTo(
         "Project File ID: R00123 Forest District: Prince George Natural Resource District"
             + " Next Planned Inspection Date: >= 2026/01/01 Special Equipment Requirements: None"
             + " Close Proximity Inspection Required: No Type/Class: Permanent Bridge"
-            + " Sort: Forest Service Road");
+            + " Sort: Project File ID#");
     assertThat(criteriaLine.of(InspectionsDueCriteria.builder().structureName("B1")
         .noNextPlannedInspectionDate(true).build(), null))
         .isEqualTo("Structure #: B1 No Next Planned Inspection Date");
@@ -404,7 +405,7 @@ class InspectionsDueSummaryServiceTest {
     }
     assertThat(all.toString().replaceAll("\\s+", " ")).contains(
         "BC Ministry of Forests, Lands, and Natural Resource Operations",
-        "Inspections Due - Summary", "IDIR\\REPORTER", "CBR004", "Sort: Forest Service Road",
+        "Inspections Due - Summary", "IDIR\\REPORTER", "CBR004", "Sort: Project File ID#",
         "Forest District: 100 Mile House", "Forest District: Prince George",
         "C1", "MC", "B1", "2026/07/15", "ENDOFCOMMENT",
         "Permanent Bridge Total: 1", "Major Culvert Total: 1",
@@ -491,7 +492,7 @@ class InspectionsDueSummaryServiceTest {
       all.append(new PdfTextExtractor(reader).getTextFromPage(page)).append('\n');
     }
     assertThat(all.toString().replaceAll("\\s+", " ")).contains(
-        "Inspections Due - Detailed Report", "CBR003", "Sort: Forest Service Road",
+        "Inspections Due - Detailed Report", "CBR003", "Sort: Project File ID#",
         "Forest District: 100 Mile House", "Forest District: Prince George",
         "Structure #: B1", "Structure #: C1", "Year Superstructure Installed:", "1998",
         "Abutments (Left/Right):", "Concrete", "# Spans:", "Steel girder",

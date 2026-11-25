@@ -45,8 +45,8 @@ public record InspectionsDueCriteria(
   /** Special Equipment Requirements "None": structures with no requirement. */
   public static final String NO_SPECIAL_EQUIPMENT = "NONE";
 
-  /** The order chosen, or legacy's default: Forest Service Road. */
+  /** The order chosen, or the default: Project File ID# (legacy's, Forest Service Road, is gone). */
   public InspectionsDueSort sortOrDefault() {
-    return sortBy == null ? InspectionsDueSort.FOREST_SERVICE_ROAD : sortBy;
+    return sortBy == null ? InspectionsDueSort.FOREST_FILE_ID : sortBy;
   }
 }

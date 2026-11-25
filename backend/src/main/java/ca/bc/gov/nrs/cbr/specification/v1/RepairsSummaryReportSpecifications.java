@@ -189,8 +189,8 @@ public final class RepairsSummaryReportSpecifications {
             repair.get(ESTIMATE),
             repair.get(DESCRIPTION)))
         .where(predicates.toArray(new Predicate[0]))
-        .orderBy(order(criteria.sortOrDefault(), builder, repair, structure, site, roadSection,
-            inspection, priorityOrder));
+        .orderBy(order(criteria.sortOrDefault(), builder, repair, structure, site, inspection,
+            priorityOrder));
   }
 
   private static void structureCriteria(
@@ -342,7 +342,6 @@ public final class RepairsSummaryReportSpecifications {
       Root<StructureRepairEntity> repair,
       Root<CrossingStructureEntity> structure,
       From<?, ?> site,
-      From<?, ?> roadSection,
       From<?, ?> inspection,
       From<?, ?> priorityOrder) {
     List<Order> order = new ArrayList<>(switch (sort) {
@@ -350,9 +349,6 @@ public final class RepairsSummaryReportSpecifications {
           builder.asc(site.get(FOREST_FILE_ID)),
           builder.asc(site.get(ROAD_SECTION_ID)),
           builder.asc(site.get(KILOMETRES)));
-      case ROAD_NAME_USER_KM -> List.of(
-          builder.asc(roadSection.get(ROAD_SECTION_NAME)),
-          builder.asc(site.get(USER_KM)));
       case SITE_ID -> List.of(builder.asc(site.get(SITE_ID)));
     });
     order.addAll(List.of(

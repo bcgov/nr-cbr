@@ -240,10 +240,11 @@ public final class InspectionSearchSpecifications {
 
       siteIdPredicate(builder, root, site, criteria).ifPresent(predicates::add);
 
-      // The road section and the org unit are read by every results row and filtered on by one
-      // criterion, so they are joined once here — fetched when projecting — and shared. LEFT on
-      // both: a site with no road section, or pointing at an org unit the table has no row for, is
-      // still a candidate for every other criterion.
+      // The org unit is read by every results row, so it is joined once here — fetched when
+      // projecting — and shared. LEFT: a site pointing at an org unit the table has no row for is
+      // still a candidate for every other criterion. CBR's road copy is neither shown nor sorted
+      // on — the name shown is LRMOPS's (2026-11-25) — but still fetched, as @NotFound(IGNORE)
+      // loads it eagerly and leaving it out costs a second select per page.
       From<?, ?> roadSection = joinOrFetch(site, ROAD_SECTION, JoinType.LEFT, projecting);
       From<?, ?> orgUnit = joinOrFetch(site, ORG_UNIT, JoinType.LEFT, projecting);
       From<?, ?> statusCode =
@@ -263,7 +264,7 @@ public final class InspectionSearchSpecifications {
         predicates.add(findChangedReviewed(builder, query, root, status));
       }
 
-      order(new Joined(root, structure, site, orgUnit, roadSection, statusCode), query, builder,
+      order(new Joined(root, structure, site, orgUnit, statusCode), query, builder,
           sort);
 
       return predicates.isEmpty()
@@ -446,7 +447,6 @@ public final class InspectionSearchSpecifications {
       From<?, ?> structure,
       From<?, ?> site,
       From<?, ?> orgUnit,
-      From<?, ?> roadSection,
       From<?, ?> statusCode) {}
 
   /**
@@ -503,8 +503,6 @@ public final class InspectionSearchSpecifications {
     return switch (column) {
       case INSPECTION_ID -> List.of(joined.root().get(INSPECTION_ID));
       case DISTRICT -> List.of(joined.orgUnit().get(ORG_UNIT_CODE));
-      case FOREST_SERVICE_ROAD ->
-          List.of(builder.upper(joined.roadSection().get(ROAD_SECTION_NAME)));
       case INSPECTION_DATE -> List.of(joined.root().get(INSPECTION_DATE));
       case SITE_ID -> List.of(builder.upper(joined.root().get(SITE_AT_TIME_OF_INSPECTION)));
       case STRUCTURE_NAME -> List.of(builder.upper(joined.structure().get(STRUCTURE_NAME)));

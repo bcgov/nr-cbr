@@ -51,8 +51,8 @@ public class InspectionsConductedSummaryService {
   /** The file's name before the date. */
   static final String FILENAME = "InspectionsConductedSummaryReport";
 
-  /** Legacy's default order: by Forest Service Road. */
-  static final InspectionsConductedSort DEFAULT_SORT = InspectionsConductedSort.FOREST_SERVICE_ROAD;
+  /** The default order: Project File ID# (legacy's, Forest Service Road, is gone — 2026-11-25). */
+  static final InspectionsConductedSort DEFAULT_SORT = InspectionsConductedSort.FOREST_FILE_ID;
 
   /** The CSV's columns: the PDF's, left to right. */
   static final List<String> CSV_COLUMNS = List.of(

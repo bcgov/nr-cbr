@@ -259,8 +259,9 @@ class InspectionsConductedSummaryServiceTest {
     inspection(b, "ROUT", LocalDate.of(2025, 1, 1), i -> i, "ACC");
     inspection(a, "ROUT", LocalDate.of(2024, 1, 1), i -> i, "ACC");
 
-    // Forest Service Road is descending, as legacy's is: Zeballos before Bowron.
-    assertThat(dates(c -> c)).containsExactly("2024/01/01", "2025/01/01", "2023/01/01");
+    // The default is Project File ID#, descending as legacy's is (its Forest Service Road default
+    // is gone: CBR no longer holds road names).
+    assertThat(dates(c -> c)).containsExactly("2025/01/01", "2023/01/01", "2024/01/01");
     assertThat(dates(c -> c.sortBy(InspectionsConductedSort.FOREST_FILE_ID)))
         .containsExactly("2025/01/01", "2023/01/01", "2024/01/01");
     assertThat(dates(c -> c.sortBy(InspectionsConductedSort.USER_KM)))
@@ -275,11 +276,11 @@ class InspectionsConductedSummaryServiceTest {
     assertThat(criteriaLine.of(InspectionsConductedCriteria.builder()
         .orgUnit("18").managementOrgUnit("26").inspectionReportStatusCode("ACC")
         .inspectionDateStart("2025/01").siteTypeCode("CRS").mostRecentInspections(true).build(),
-        InspectionsConductedSort.FOREST_SERVICE_ROAD))
+        InspectionsConductedSort.FOREST_FILE_ID))
         .isEqualTo("Forest District: Prince George Natural Resource District"
             + " Inspection Report Status: Accepted Inspection Date: >= 2025/01"
             + " Management Area: Robson Valley Most Recent Inspections Only: Yes"
-            + " Site Type: Stream crossing Sort: Forest Service Road");
+            + " Site Type: Stream crossing Sort: Project File ID#");
   }
 
   @Test
@@ -306,7 +307,7 @@ class InspectionsConductedSummaryServiceTest {
         .isGreaterThan(reader.getPageSizeWithRotation(1).getHeight());
     assertThat(new PdfTextExtractor(reader).getTextFromPage(1).replaceAll("\\s+", " ")).contains(
         "BC Ministry of Forests, Lands, and Natural Resource Operations",
-        "Inspections Conducted Report", "IDIR\\REPORTER", "CBR002", "Sort: Forest Service Road",
+        "Inspections Conducted Report", "IDIR\\REPORTER", "CBR002", "Sort: Project File ID#",
         "Routine", "2025/06/12", "Accepted", "North Rd",
         "Corporate Bridge Register (CBR)", "Disclaimer:");
   }

@@ -7,14 +7,15 @@ package ca.bc.gov.nrs.cbr.struct.v1;
  * <p>Replaces legacy's "Sort by" radio, whose two fixed orderings this screen no longer offers. Its
  * default — structure name, then the newest inspection first — is still what a search answers with
  * when no header is chosen, and it breaks every tie when one is.
+ *
+ * <p>Not Forest Service Road: the name is LRMOPS's, read live for the page, so the database has none
+ * to sort on (2026-11-25).
  */
 public enum InspectionSortColumn {
   /** Id — the inspection's own number. */
   INSPECTION_ID,
   /** District Code — the site's org unit code. */
   DISTRICT,
-  /** Forest Service Road — the road section's name. */
-  FOREST_SERVICE_ROAD,
   /** Inspection Date. */
   INSPECTION_DATE,
   /** Site # — the site the structure stood at when it was inspected. */

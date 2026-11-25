@@ -240,8 +240,8 @@ class MonitorsSummaryServiceTest {
     item(a, null, i -> i.description("A"));
 
     assertThat(descriptions(c -> c)).containsExactly("A", "B newer 1", "B newer 2", "B older");
-    assertThat(descriptions(c -> c.sortBy(MonitorsSummarySort.ROAD_NAME_STRUCTURE)))
-        .containsExactly("B newer 1", "B newer 2", "B older", "A");
+    assertThat(descriptions(c -> c.sortBy(MonitorsSummarySort.PROJECT_BRANCH_KM)))
+        .containsExactly("A", "B newer 1", "B newer 2", "B older");
   }
 
   @Test

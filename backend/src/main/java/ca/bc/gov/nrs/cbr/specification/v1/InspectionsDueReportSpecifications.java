@@ -145,7 +145,7 @@ public final class InspectionsDueReportSpecifications {
             site.get(LATITUDE),
             site.get(LONGITUDE)))
         .where(predicates.toArray(new Predicate[0]))
-        .orderBy(order(criteria.sortOrDefault(), builder, structure, site, roadSection, detailed));
+        .orderBy(order(criteria.sortOrDefault(), builder, structure, site, detailed));
   }
 
   private static void structureCriteria(
@@ -206,7 +206,6 @@ public final class InspectionsDueReportSpecifications {
       CriteriaBuilder builder,
       Root<CrossingStructureEntity> structure,
       From<?, ?> site,
-      From<?, ?> roadSection,
       boolean detailed) {
     List<Order> order = new ArrayList<>();
     order.add(builder.asc(site.get(ORG_UNIT_NO)));
@@ -214,7 +213,6 @@ public final class InspectionsDueReportSpecifications {
       order.add(builder.asc(site.get(MANAGEMENT_ORG_UNIT_NO)));
     }
     order.add(switch (sort) {
-      case FOREST_SERVICE_ROAD -> builder.asc(roadSection.get(ROAD_SECTION_NAME));
       case FOREST_FILE_ID -> builder.asc(site.get(FOREST_FILE_ID));
     });
     order.addAll(List.of(

@@ -149,7 +149,7 @@ public final class StructureInventoryReportSpecifications {
             site.get(CAPITAL_ROAD),
             roadSection.get(ROAD_SECTION_NAME)))
         .where(predicates.toArray(new Predicate[0]))
-        .orderBy(order(criteria.sortOrDefault(), root, site, roadSection, builder));
+        .orderBy(order(criteria.sortOrDefault(), root, site, builder));
   }
 
   /**
@@ -172,7 +172,7 @@ public final class StructureInventoryReportSpecifications {
 
     return query
         .where(predicates.toArray(new Predicate[0]))
-        .orderBy(order(criteria.sortOrDefault(), root, joins.site(), joins.roadSection(), builder));
+        .orderBy(order(criteria.sortOrDefault(), root, joins.site(), builder));
   }
 
   /**
@@ -409,20 +409,16 @@ public final class StructureInventoryReportSpecifications {
         condition.apply(culvert, builder));
   }
 
-  /** Legacy's four orders, ascending, then the structure's id so the order is total. */
+  /** Legacy's orders less the road name's, ascending, then the structure's id so the order is total. */
   private static List<Order> order(
       StructureInventorySort sort,
       Root<CrossingStructureEntity> root,
       From<?, ?> site,
-      From<?, ?> roadSection,
       CriteriaBuilder builder) {
     List<Order> order = new ArrayList<>(switch (sort) {
       case PROJECT_BRANCH_USER_KM -> List.of(
           builder.asc(site.get(FOREST_FILE_ID)),
           builder.asc(site.get(ROAD_SECTION_ID)),
-          builder.asc(site.get(USER_KM)));
-      case ROAD_NAME_USER_KM -> List.of(
-          builder.asc(roadSection.get(ROAD_SECTION_NAME)),
           builder.asc(site.get(USER_KM)));
       case SITE_ID -> List.of(builder.asc(site.get(SITE_ID)));
       case STRUCTURE_ID -> List.of(builder.asc(root.get(STRUCTURE_NAME)));

@@ -117,8 +117,7 @@ public final class MonitorsSummaryReportSpecifications {
             item.get(MONITORING_STATUS),
             item.get(DESCRIPTION)))
         .where(predicates.toArray(new Predicate[0]))
-        .orderBy(order(criteria.sortOrDefault(), builder, item, structure, site, roadSection,
-            inspection));
+        .orderBy(order(criteria.sortOrDefault(), builder, item, structure, site, inspection));
   }
 
   private static void siteCriteria(
@@ -178,14 +177,12 @@ public final class MonitorsSummaryReportSpecifications {
       Root<StructureMonitorItemEntity> item,
       Root<CrossingStructureEntity> structure,
       From<?, ?> site,
-      From<?, ?> roadSection,
       From<?, ?> inspection) {
     List<Order> order = new ArrayList<>(switch (sort) {
       case PROJECT_BRANCH_KM -> List.of(
           builder.asc(site.get(FOREST_FILE_ID)),
           builder.asc(site.get(ROAD_SECTION_ID)),
           builder.asc(site.get(KILOMETRES)));
-      case ROAD_NAME_STRUCTURE -> List.of(builder.asc(roadSection.get(ROAD_SECTION_NAME)));
     });
     order.addAll(List.of(
         builder.asc(structure.get(STRUCTURE_NAME)),

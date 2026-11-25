@@ -7,14 +7,15 @@ package ca.bc.gov.nrs.cbr.struct.v1;
  * <p>New in CBR: legacy's results table has fixed headers and one fixed order. That order is still
  * what a search answers with when no column is chosen, and it breaks every tie when one is — see
  * {@code SiteSearchSpecifications.fetchAndOrder}.
+ *
+ * <p>Not Forest Service Road: the name is LRMOPS's, read live for the page, so the database has none
+ * to sort on (2026-11-25).
  */
 public enum SiteSortColumn {
   /** Site #. */
   SITE_ID,
   /** District Code — the org unit's code. */
   DISTRICT,
-  /** Forest Service Road — the road section's name. */
-  FOREST_SERVICE_ROAD,
   /** KM — the point of commencement distance. */
   KILOMETRES,
   /** Crossing Name. */

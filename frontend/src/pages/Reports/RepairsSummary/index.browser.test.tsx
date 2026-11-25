@@ -174,7 +174,8 @@ describe('RepairsSummaryPage', () => {
 
     await waitFor(() => expect(byId('repairStatusCode')).toHaveValue('OUT'));
     expect(byId('sortBy-PROJECT_BRANCH_KM')).toBeChecked();
-    expect(screen.getByLabelText('Road Name, KM User')).not.toBeChecked();
+    expect(screen.getByLabelText('Site Id')).not.toBeChecked();
+    expect(screen.queryByLabelText('Road Name, KM User')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Site Id')).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'Download CSV' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();

@@ -123,7 +123,6 @@ export type StructureSortColumn =
   | 'STRUCTURE_NAME'
   | 'SITE_ID'
   | 'DISTRICT'
-  | 'FOREST_SERVICE_ROAD'
   | 'KILOMETRES'
   | 'CROSSING_NAME'
   | 'TYPE_CLASS'

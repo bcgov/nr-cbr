@@ -38,11 +38,15 @@ type Props = {
   onSortChange?: (next: SiteSort) => void;
 };
 
-/** The seven sortable columns, in the legacy table's order. */
-const COLUMNS: { column: SiteSortColumn; label: string }[] = [
+/** The results columns, in the legacy table's order; the ones that sort name their column. */
+/*
+ * Forest Service Road has no column to sort on: the name is LRMOPS's, looked up for the page, so
+ * the server has none to order by (2026-11-25). Its header is plain.
+ */
+const COLUMNS: { column: SiteSortColumn | null; label: string }[] = [
   { column: 'SITE_ID', label: 'Site #' },
   { column: 'DISTRICT', label: 'District Code' },
-  { column: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
+  { column: null, label: 'Forest Service Road' },
   { column: 'KILOMETRES', label: 'KM' },
   { column: 'CROSSING_NAME', label: 'Crossing Name' },
   { column: 'PROJECT_FILE', label: 'Project File ID#-Br.' },
@@ -57,7 +61,7 @@ const COLUMNS: { column: SiteSortColumn; label: string }[] = [
  * caller holds the privilege is the legacy rule carried forward: an action you cannot perform is
  * never rendered, not disabled (cbr-navigation.local.md §2).
  *
- * <p><b>Every header but Actions sorts</b>, which legacy's did not. On the server, not the page:
+ * <p><b>Every header but Forest Service Road and Actions sorts</b>, which legacy's did not. On the server, not the page:
  * the results are paged there, so sorting only the rows on screen would order twenty sites out of
  * thousands and call it sorted.
  */
@@ -105,17 +109,21 @@ const SiteSearchResults: FC<Props> = ({
         <Table useZebraStyles size="lg">
           <TableHead>
             <TableRow>
-              {COLUMNS.map(({ column, label }) => (
-                <SortableHeader
-                  key={column}
-                  column={column}
-                  sort={sort}
-                  onSortChange={onSortChange}
-                  data-testid={`site-search-sort-${column}`}
-                >
-                  {label}
-                </SortableHeader>
-              ))}
+              {COLUMNS.map(({ column, label }) =>
+                column === null ? (
+                  <TableHeader key={label}>{label}</TableHeader>
+                ) : (
+                  <SortableHeader
+                    key={column}
+                    column={column}
+                    sort={sort}
+                    onSortChange={onSortChange}
+                    data-testid={`site-search-sort-${column}`}
+                  >
+                    {label}
+                  </SortableHeader>
+                ),
+              )}
               {/* "Actions", not "Delete": the column is still gated on the destructive capability,
                     but naming it after its only current occupant would have to be renamed the moment
                     a second one lands. It stays hidden entirely when the user cannot delete — an

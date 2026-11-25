@@ -113,7 +113,7 @@ describe('InspectionsDuePage', () => {
   ];
 
   it.each(['summary', 'detailed'] as const)(
-    "offers the %s report legacy's criteria and its two orders, without Structure # or Area",
+    "offers the %s report legacy's criteria, without Structure #, Area or Sort By",
     async (variant) => {
       renderPage(variant);
 
@@ -138,8 +138,8 @@ describe('InspectionsDuePage', () => {
       expect(screen.getByText('No Next Planned Inspection Date')).toBeInTheDocument();
       expect(screen.queryByLabelText('Structure #')).not.toBeInTheDocument();
       expect(screen.queryByText(/^Area/)).not.toBeInTheDocument();
-      expect(byId(variant, 'sortBy-FOREST_SERVICE_ROAD')).toBeChecked();
-      expect(byId(variant, 'sortBy-FOREST_FILE_ID')).not.toBeChecked();
+      // One order left (by Project File ID#; CBR no longer holds road names), so nothing to choose.
+      expect(screen.queryByText('Sort By')).not.toBeInTheDocument();
     },
   );
 
@@ -245,7 +245,7 @@ describe('InspectionsDuePage', () => {
 
     await waitFor(() => expect(saveFile).toHaveBeenCalled());
     expect(reportApi.inspectionsDueSummary).toHaveBeenCalledWith(
-      expect.objectContaining({ forestFileId: 'R00123', sortBy: 'FOREST_SERVICE_ROAD' }),
+      expect.objectContaining({ forestFileId: 'R00123', sortBy: 'FOREST_FILE_ID' }),
       'PDF',
     );
     expect(saveFile.mock.calls[0][1]).toMatch(
