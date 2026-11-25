@@ -84,7 +84,9 @@ public class InspectionSearchService {
       List<HeaderSort<InspectionSortColumn>> sort) {
     long start = System.nanoTime();
     Pageable pageable = PageRequest.of(Math.max(pageNumber, 0), boundedPageSize(pageSize));
-    List<RoadSectionKey> roadSections = roadNames.sectionsNamed(criteria.forestServiceRoad());
+    // Null when no road was picked: the specification then leaves the road alone.
+    List<RoadSectionKey> roadSections =
+        roadNames.sectionsNamed(criteria.forestServiceRoad()).orElse(null);
 
     Page<StructureInspectionEntity> results = structureInspectionRepository.findAll(
         InspectionSearchSpecifications.matching(criteria, sort, roadSections), pageable);

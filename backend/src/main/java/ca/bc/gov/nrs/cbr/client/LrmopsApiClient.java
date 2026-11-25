@@ -47,6 +47,10 @@ public class LrmopsApiClient {
   /** The API's path prefix, as segments, appended to the configured base URL. */
   private static final String[] API_V1 = {"api", "v1"};
 
+  /** Path segments under {@link #API_V1}. */
+  private static final String ROADS = "roads";
+  private static final String SECTIONS = "sections";
+
   private final RestClient http;
   private final ClientCredentialsTokenSource clientCredentials;
   private final boolean configured;
@@ -105,7 +109,7 @@ public class LrmopsApiClient {
       List<RoadSort> sorts) {
     RoadPage page = http.get()
         .uri(uriBuilder -> {
-          uriBuilder.pathSegment(API_V1).pathSegment("roads");
+          uriBuilder.pathSegment(API_V1).pathSegment(ROADS);
           queryParam(uriBuilder, "roadName", criteria.roadName());
           queryParam(uriBuilder, "roadId", criteria.roadId());
           queryParam(uriBuilder, "sectionId", criteria.sectionId());
@@ -138,7 +142,7 @@ public class LrmopsApiClient {
     try {
       return Optional.ofNullable(http.get()
           .uri(uriBuilder -> uriBuilder.pathSegment(API_V1)
-              .pathSegment("roads", roadId.trim(), "sections", sectionId.trim())
+              .pathSegment(ROADS, roadId.trim(), SECTIONS, sectionId.trim())
               .build())
           .headers(this::applyAuth)
           .retrieve()
@@ -170,7 +174,7 @@ public class LrmopsApiClient {
    */
   public List<String> getRoadNames(String term, int limit) {
     String[] names = http.get()
-        .uri(uriBuilder -> uriBuilder.pathSegment(API_V1).pathSegment("roads", "names")
+        .uri(uriBuilder -> uriBuilder.pathSegment(API_V1).pathSegment(ROADS, "names")
             .queryParam("search", term == null ? "" : term.trim())
             .queryParam("limit", limit)
             .build())
@@ -186,7 +190,7 @@ public class LrmopsApiClient {
    */
   public List<SectionKey> getRoadSectionsNamed(String roadName) {
     SectionKey[] keys = http.get()
-        .uri(uriBuilder -> uriBuilder.pathSegment(API_V1).pathSegment("roads", "sections")
+        .uri(uriBuilder -> uriBuilder.pathSegment(API_V1).pathSegment(ROADS, SECTIONS)
             .queryParam("roadName", roadName == null ? "" : roadName.trim())
             .build())
         .headers(this::applyAuth)
@@ -202,7 +206,7 @@ public class LrmopsApiClient {
   public List<RoadSummary> lookUpRoadSections(Collection<SectionKey> keys) {
     RoadSummary[] found = http.post()
         .uri(uriBuilder -> uriBuilder.pathSegment(API_V1)
-            .pathSegment("roads", "sections", "lookup").build())
+            .pathSegment(ROADS, SECTIONS, "lookup").build())
         .headers(this::applyAuth)
         .contentType(MediaType.APPLICATION_JSON)
         .body(List.copyOf(keys))

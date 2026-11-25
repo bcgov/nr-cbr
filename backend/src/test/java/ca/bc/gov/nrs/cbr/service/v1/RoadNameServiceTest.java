@@ -47,14 +47,14 @@ class RoadNameServiceTest {
   }
 
   @Test
-  @DisplayName("the filter is null for no name, and the sections normalized for one")
+  @DisplayName("no filter for no name, and the sections normalized for one")
   void sectionsNamed() {
     when(lrmops.getRoadSectionsNamed("Big Creek FSR")).thenReturn(List.of(
         new SectionKey("R07571", "aa"), new SectionKey("R07571", "AA"), new SectionKey(null, "X")));
 
-    assertThat(service.sectionsNamed("  ")).isNull();
+    assertThat(service.sectionsNamed("  ")).isEmpty();
     assertThat(service.sectionsNamed("Big Creek FSR"))
-        .containsExactly(RoadSectionKey.of("R07571", "AA"));
+        .contains(List.of(RoadSectionKey.of("R07571", "AA")));
   }
 
   @Test

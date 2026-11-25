@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -65,8 +66,8 @@ class StructureSearchServiceTest {
 
   @BeforeEach
   void setUp() {
-    // No Forest Service Road filter unless a test says otherwise (a mock's empty list matches none).
-    when(roadNames.sectionsNamed(any())).thenReturn(null);
+    // No Forest Service Road filter unless a test says otherwise.
+    when(roadNames.sectionsNamed(any())).thenReturn(Optional.empty());
     for (String entity : List.of("InspectionReportStatusEntity", "StructureLoadRatingEntity",
         "StructureInspectionEntity", "StructureRepairEntity", "InspectionReportStatusCodeEntity",
         "ForestServiceBridgeEntity", "ForestServiceCulvertEntity",
@@ -200,8 +201,8 @@ class StructureSearchServiceTest {
 
       // The name picked becomes LRMOPS's sections for it; the site is matched on those.
       when(roadNames.sectionsNamed("Bowron FSR"))
-          .thenReturn(List.of(RoadSectionKey.of("R00123", "01")));
-      when(roadNames.sectionsNamed("Nowhere FSR")).thenReturn(List.of());
+          .thenReturn(Optional.of(List.of(RoadSectionKey.of("R00123", "01"))));
+      when(roadNames.sectionsNamed("Nowhere FSR")).thenReturn(Optional.of(List.of()));
       assertThat(names(criteria().forestServiceRoad("Bowron FSR"))).containsExactly("ON-ROAD");
       assertThat(names(criteria().forestServiceRoad("Nowhere FSR"))).isEmpty();
       assertThat(names(criteria().crossingName("deadman"))).containsExactly("ON-ROAD");

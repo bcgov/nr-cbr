@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,7 +74,7 @@ public class RoadNameService {
   }
 
   /**
-   * The road sections LRMOPS names exactly {@code roadName}, for a search filtering on it. Null
+   * The road sections LRMOPS names exactly {@code roadName}, for a search filtering on it. Empty
    * when the name is blank — no filter, as opposed to an empty list, which matches nothing.
    *
    * <p>Throws rather than answering empty when the API is down: an empty answer would read as "no
@@ -81,9 +82,9 @@ public class RoadNameService {
    *
    * @throws RoadLookupUnavailableException if the API cannot answer
    */
-  public List<RoadSectionKey> sectionsNamed(String roadName) {
+  public Optional<List<RoadSectionKey>> sectionsNamed(String roadName) {
     if (!StringUtils.hasText(roadName)) {
-      return null;
+      return Optional.empty();
     }
     long start = System.nanoTime();
     List<RoadSectionKey> keys = call(() -> lrmops.getRoadSectionsNamed(roadName)).stream()
@@ -92,7 +93,7 @@ public class RoadNameService {
         .distinct()
         .toList();
     log.info("road-name filter: {} section(s) named, {} ms", keys.size(), millisSince(start));
-    return keys;
+    return Optional.of(keys);
   }
 
   /**

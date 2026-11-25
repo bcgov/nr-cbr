@@ -18,6 +18,7 @@ import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,8 +51,8 @@ class SiteSearchServiceTest {
 
   @BeforeEach
   void clear() {
-    // No Forest Service Road filter unless a test says otherwise (a mock's empty list matches none).
-    when(roadNames.sectionsNamed(any())).thenReturn(null);
+    // No Forest Service Road filter unless a test says otherwise.
+    when(roadNames.sectionsNamed(any())).thenReturn(Optional.empty());
     entityManager.createQuery("DELETE FROM CrossingSiteEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CbrRoadSectionEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM OrgUnitEntity").executeUpdate();
