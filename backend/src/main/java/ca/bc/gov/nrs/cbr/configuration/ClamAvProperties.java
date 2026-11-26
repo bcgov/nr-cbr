@@ -7,9 +7,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /**
  * {@code cbr.clamav} — the ClamAV daemon (clamd) every uploaded document is scanned by.
  *
- * <p>The shared clamd in {@code bd657f-<env>}, which nr-frep uses too. Always on when deployed; the
- * local profile turns it off, as there is no clamd locally. There is no fail-open switch: when
- * clamd cannot answer, the upload is refused.
+ * <p>The shared clamd in {@code bd657f-<env>}, which other applications use too. Always on when
+ * deployed; the local profile turns it off, as there is no clamd locally. There is no fail-open
+ * switch: when clamd cannot answer, the upload is refused.
  *
  * @param enabled        whether uploads are scanned; off, no socket is opened at all
  * @param host           clamd's host — a cross-namespace service name,

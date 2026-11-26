@@ -11,10 +11,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * What {@code FileCopyScheduler}'s two steps do — EDUC-STUDENT-ASSESSMENT-API's
- * {@code EventTaskSchedulerAsyncService} for {@code FILE_COPY}.
+ * What {@code FileCopyScheduler}'s two steps do for {@code FILE_COPY}.
  *
- * <p><b>Handing out files.</b> As EDUC hands loaded students to NATS, this hands {@code READY}
+ * <p><b>Handing out files.</b> This hands {@code READY}
  * files to {@link FileCopyService#copyFile}, which runs on the {@code fileCopyTaskExecutor}, and
  * returns at once — see {@link ReadyItemsHandOut} for the guards against handing a file out twice.
  * {@link FileCopyService}'s check against the store makes a second hand-out cheap when it happens.

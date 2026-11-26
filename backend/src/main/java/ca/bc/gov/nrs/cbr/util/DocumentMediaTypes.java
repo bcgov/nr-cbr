@@ -9,7 +9,7 @@ import org.springframework.http.MediaTypeFactory;
  *
  * <p>Shared by the download, the upload and the BLOB copy, because the object store signs the
  * Content-Type: it has to be a real media type. Legacy's {@code FILE_MIME_TYPE_CODE} is a
- * ten-character code, and its descriptions ("JPG Graphic File") got nr-frep 403s from the gateway.
+ * ten-character code, and its descriptions ("JPG Graphic File") get 403s from the gateway.
  */
 public final class DocumentMediaTypes {
 

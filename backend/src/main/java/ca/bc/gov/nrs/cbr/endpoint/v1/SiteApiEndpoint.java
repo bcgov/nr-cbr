@@ -105,8 +105,8 @@ public interface SiteApiEndpoint {
    * sent; the one thing it does not know is the key, because the server upper-cases it. Returning
    * the stored record meant reading the row straight back to answer with what had just been said.
    *
-   * <p>The payload type rather than a {@code ResponseEntity}, which is how a create answers in
-   * EDUC-STUDENT-ASSESSMENT-API: Spring gives 200 on its own, and {@code ResponseEntity} is kept
+   * <p>The payload type rather than a {@code ResponseEntity}: Spring gives 200 on its own, and
+   * {@code ResponseEntity} is kept
    * for the replies that carry no body — {@link #deleteSite} below.
    *
    * <p><b>400 with a message per field when a rule fails.</b> Every check {@link

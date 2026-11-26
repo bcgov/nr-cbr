@@ -11,7 +11,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 /**
- * Whether an uploaded file may be stored, by clamd's verdict on it — copied from nr-frep's.
+ * Whether an uploaded file may be stored, by clamd's verdict on it.
  *
  * <p>Fail-closed, with no switch to change it: a file clamd could not check is refused as surely
  * as an infected one, so nothing unscanned is ever stored. Only files users upload are scanned;

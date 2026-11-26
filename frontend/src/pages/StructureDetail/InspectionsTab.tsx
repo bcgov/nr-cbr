@@ -298,8 +298,8 @@ const InspectionsCard: FC<{
   const rows = response?.page.content ?? [];
   const hidden = response?.beforeInstallCount ?? 0;
 
-  // As legacy, a new inspection waits until the structure is complete. The buttons stay live, as
-  // nr-frep's submit does: pressed too early, the page's outstanding banner, counts and lists turn
+  // As legacy, a new inspection waits until the structure is complete. The buttons stay live:
+  // pressed too early, the page's outstanding banner, counts and lists turn
   // red and say why, where a disabled button would say nothing.
   const addInspection = (type: 'ROUT' | 'UNP') => {
     if (!complete) {

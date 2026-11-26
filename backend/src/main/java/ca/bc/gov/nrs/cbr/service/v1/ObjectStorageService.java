@@ -26,12 +26,12 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
  *
  * <p>Oracle stays the index: {@code CROSSING_STRUCTURE_FILE_DETAIL} says what a file is and whose,
  * and the object's key is computed from its {@code FILE_ID} by {@link #fileKey}. Nothing lists the
- * bucket to find a file. Copied from nr-frep's, with one client built at startup and closed on
- * shutdown rather than one per call.
+ * bucket to find a file. One client is built at startup and closed on shutdown, rather than one
+ * per call.
  *
  * <p>Only a missing object is "not there". Any other failure — the gateway down, a bad key or
- * signature — propagates: nr-frep once read every failure as missing and served a not-yet-migrated
- * file's empty BLOB in its place.
+ * signature — propagates: reading every failure as missing would serve a not-yet-migrated file's
+ * empty BLOB in its place.
  */
 @Service
 public class ObjectStorageService implements DisposableBean {

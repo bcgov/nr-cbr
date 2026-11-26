@@ -24,7 +24,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * and writing the shared Oracle {@code THE} schema through the legacy {@code CBR_*} PL/SQL packages.
  * Schema objects live in {@code bcgov-c/nr-mof-db}, not here.
  *
- * <p>Scheduled tasks run under ShedLock locks, after EDUC-STUDENT-ASSESSMENT-API; see the
+ * <p>Scheduled tasks run under ShedLock locks; see the
  * {@code schedulers} package, their crons in {@code application.yml}. Every task's cron defaults to
  * {@code -}, "never".
  */

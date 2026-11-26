@@ -25,7 +25,7 @@ import org.hibernate.annotations.Immutable;
  * {@code FSA_CBR_READ_WRITE_ROLE}. Without {@code schema = "THE"} Hibernate resolves the table in
  * the proxy's own schema and the query fails with ORA-00942 (cbr-auth-and-roles.local.md §8).
  *
- * <p>Two deliberate departures from the EDUC-STUDENT-ASSESSMENT-API entities this follows:
+ * <p>Two deliberate departures from the usual code-table entity:
  *
  * <ul>
  *   <li><b>{@code @Immutable} rather than {@code @DynamicUpdate}.</b> CBR does not own this table

@@ -258,7 +258,7 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${spring.application.name}] [%X{X-TRACE-ID:-},${PID:-}] [%t] %logger:%L - %m%n%wEx"
 
 # ── Scheduled jobs ────────────────────────────────────────────────────────────
-# After EDUC-STUDENT-ASSESSMENT-API: each task a cron and its ShedLock lock times, one pod at a time
+# Each task a cron and its ShedLock lock times, one pod at a time
 # (locks in THE.CBR_SHEDLOCK); work items in THE.CBR_BATCH_JOB_ITEM. A cron of "-" is Spring's
 # "never"; an env var of the same name overrides each one. ("${X:-}" is the env var X, else "-".)
 

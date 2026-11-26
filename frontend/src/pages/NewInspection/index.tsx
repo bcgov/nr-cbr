@@ -136,7 +136,7 @@ const NewInspectionPage: FC = () => {
   const shown = fields.shown;
 
   /**
-   * Everything still outstanding, from the first render — nr-frep's pattern: the banner, the tab
+   * Everything still outstanding, from the first render: the banner, the tab
    * counts and each tab's list are the map of what is left, shown before any field is touched. The
    * server's refusals join them.
    */
@@ -219,7 +219,7 @@ const NewInspectionPage: FC = () => {
         </div>
       </PageTitle>
 
-      {/* nr-frep's summary above the tabs: how much is outstanding and across how many tabs —
+      {/* The summary above the tabs: how much is outstanding and across how many tabs —
           informational until a Save is refused, then red. Each message itself sits beside its
           field and in its tab's list. */}
       {outstandingTotal > 0 && (

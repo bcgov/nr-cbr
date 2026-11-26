@@ -370,7 +370,7 @@ describe('AddSitePage — validation', () => {
 });
 
 describe('AddSitePage — outstanding', () => {
-  it("shows what is outstanding from the start, nr-frep's pattern, and turns it red when refused", async () => {
+  it('shows what is outstanding from the start, and turns it red when refused', async () => {
     await renderPage();
 
     const summary = screen.getByTestId('add-site-outstanding-summary');

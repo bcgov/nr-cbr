@@ -28,8 +28,8 @@ export const number = (value: number | null | undefined): string =>
   value === null || value === undefined ? '' : String(value);
 
 /**
- * One tab's outstanding items, grouped by the section (card) they belong to — as nr-frep groups its
- * checklist's by record — in the order the server lists them.
+ * One tab's outstanding items, grouped by the section (card) they belong to, in the order the
+ * server lists them.
  */
 export type OutstandingGroup = { title: string; items: string[] };
 
