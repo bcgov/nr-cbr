@@ -78,6 +78,19 @@ class StructureInventoryReportStatementsTest {
   @MockitoBean
   private LoggedUserHelper loggedUser;
 
+  @MockitoBean
+  private ca.bc.gov.nrs.cbr.service.v1.RoadNameService roadNames;
+
+  @org.junit.jupiter.api.BeforeEach
+  void roadNames() {
+    // LRMOPS answers over HTTP, not in these statements; no names, and no query standing in.
+    org.mockito.Mockito.when(roadNames.namesOf(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(java.util.Map.of());
+    org.mockito.Mockito.when(roadNames.namesFor(org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .thenAnswer(call -> (java.util.function.Function<Object, String>) row -> null);
+  }
+
   /** Structures on sites whose road the view lacks, each a bridge of two spans, inspected. */
   private void givenStructures(int structures) {
     entityManager.persist(StructureTypeClassCodeEntity.builder()
@@ -161,6 +174,7 @@ class StructureInventoryReportStatementsTest {
     // columns, not the ninety-odd of the two tables.
     String lines = CapturingStatementInspector.lastContaining("the.crossing_structure ");
     assertThat(lines).doesNotContain("annual_inspection_req_ind", "utm_northing");
-    assertThat(CapturingStatementInspector.occurrences(lines, "cbr_road_section_vw")).isEqualTo(1);
+    // Nor CBR's road copy: the road name is LRMOPS's, looked up afterwards (2026-11-25).
+    assertThat(CapturingStatementInspector.occurrences(lines, "cbr_road_section_vw")).isZero();
   }
 }

@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
@@ -33,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -47,6 +47,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
     ReplacementStructuresCriteriaLine.class, StructureInventoryNames.class,
     StructureInventoryReportSupport.class, ReportRenderer.class})
 class ReplacementStructuresSummaryServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   private static final LocalDateTime PAST = LocalDateTime.now().minusYears(10);
   private static final LocalDateTime FUTURE = LocalDateTime.now().plusYears(10);
@@ -75,13 +81,14 @@ class ReplacementStructuresSummaryServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     when(codes.getBusinessAreas()).thenReturn(
         List.of(new OrgUnitResponse("3000", "TCC", "Cariboo-Chilcotin Business Area")));
     when(codes.getSiteStatusCodes()).thenReturn(List.of(new CodeOptionResponse("ACT", "Active")));
     when(codes.getSiteTypeCodes()).thenReturn(List.of(new CodeOptionResponse("RD", "Road")));
     for (String entity : List.of("ForestServiceBridgeEntity", "ForestServiceCulvertEntity",
-        "CrossingStructureEntity", "CrossingSiteEntity", "CbrRoadSectionEntity", "OrgUnitEntity",
+        "CrossingStructureEntity", "CrossingSiteEntity", "OrgUnitEntity",
         "CbrOrgUnitEntity", "CrossingSiteStatusCodeEntity", "ClientPublicEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
     }
@@ -111,8 +118,7 @@ class ReplacementStructuresSummaryServiceTest {
         .clientNumber("00012345").clientName("CANFOR").build());
     for (String[] road : List.of(new String[] {"01", "Bowron FSR"},
         new String[] {"02", "Aleza FSR"})) {
-      entityManager.persist(CbrRoadSectionEntity.builder()
-          .forestFileId("R00123").roadSectionId(road[0]).roadSectName(road[1]).build());
+      roads.name("R00123", road[0], road[1]);
     }
   }
 
@@ -167,10 +173,10 @@ class ReplacementStructuresSummaryServiceTest {
   }
 
   @Test
-  @DisplayName("lists a structure under each year it has, latest year first, then by road and km")
+  @DisplayName("lists a structure under each year it has, latest year first, then by km")
   void order() {
     site("62-001", s -> s);
-    site("62-002", s -> s.roadSectionId("02"));
+    site("62-002", s -> s.roadSectionId("02").pointOfCommencementDistance(new BigDecimal("5")));
     site("62-003", s -> s.pointOfCommencementDistance(new BigDecimal("3")));
     structure("B1", "62-001", s -> s.fullLogHaulReplacementYear(2030)
         .lightVehicleReplacementYear(2035).estimatedClosureYear(2040));
@@ -181,7 +187,7 @@ class ReplacementStructuresSummaryServiceTest {
     assertThat(outline(rows())).containsExactly(
         "2040 Closure B1",
         "2035 Estimated Replacement B1",
-        // Aleza FSR before Bowron FSR; within Bowron FSR, km 3 before 12.5.
+        // By km: 5 before 12.5. Not by road name — CBR no longer holds it (2026-11-25).
         "2030 Estimated Load B2",
         "2030 Estimated Load B1",
         "2030 Estimated Replacement B3");

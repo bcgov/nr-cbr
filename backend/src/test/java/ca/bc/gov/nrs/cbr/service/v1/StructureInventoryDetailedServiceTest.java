@@ -2,12 +2,13 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.model.v1.AbutmentCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.BuiltByCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
@@ -80,6 +81,9 @@ class StructureInventoryDetailedServiceTest {
   @MockitoBean
   private ConfigurationService codes;
 
+  @MockitoBean
+  private RoadNameService roadNames;
+
   private long nextId = 1;
 
   @BeforeEach
@@ -89,7 +93,7 @@ class StructureInventoryDetailedServiceTest {
         List.of(new OrgUnitResponse("18", "DPG", "Prince George Natural Resource District")));
     for (String entity : List.of("ForestServiceBridgeSpanEntity", "StructureInspectionEntity",
         "ForestServiceBridgeEntity", "ForestServiceCulvertEntity", "CrossingStructureEntity",
-        "CrossingSiteEntity", "CbrRoadSectionEntity", "OrgUnitEntity",
+        "CrossingSiteEntity", "OrgUnitEntity",
         "CrossingSiteStatusCodeEntity", "StructureTypeClassCodeEntity",
         "SuperstructureTypeCodeEntity", "DeckTypeCodeEntity", "AbutmentCodeEntity",
         "StructureCurbTypeCodeEntity", "DesignVehicleLoadCodeEntity", "BuiltByCodeEntity",
@@ -103,8 +107,9 @@ class StructureInventoryDetailedServiceTest {
     entityManager.persist(CrossingSiteStatusCodeEntity.builder()
         .crossingSiteStatusCode("ACT").description("Active").effectiveDate(PAST)
         .expiryDate(FUTURE).updateTimestamp(PAST).build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    // The name printed is LRMOPS's, not the copy's.
+    when(roadNames.namesOf(any()))
+        .thenReturn(Map.of(RoadSectionKey.of("R00123", "01"), "Bowron FSR"));
     for (String[] code : List.of(new String[] {"PB", "Permanent Bridge"},
         new String[] {"CUL", "Culvert"})) {
       entityManager.persist(StructureTypeClassCodeEntity.builder()

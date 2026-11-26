@@ -152,17 +152,40 @@ public class InspectionFormService {
    */
   @Transactional(readOnly = true)
   public Map<Long, InspectionFormResponse> forms(List<CrossingStructureEntity> listed) {
+    return formsOf(listed, null, new Catalogues());
+  }
+
+  /**
+   * The same, for a report that makes its forms a batch of structures at a time: the catalogues
+   * kept in {@code catalogues} from one batch to the next rather than read again — seven queries
+   * a type/class, which a province's six batches repeated for every type/class in each — and each
+   * structure's first bridge taken from {@code firstBridges} when the report has read them.
+   *
+   * @param firstBridges each structure's first bridge, as the report read them; null to read them
+   * @param catalogues   the report's catalogues so far, from {@link #catalogues}; added to here
+   */
+  @Transactional(readOnly = true)
+  public Map<Long, InspectionFormResponse> forms(List<CrossingStructureEntity> listed,
+      Map<Long, ForestServiceBridgeEntity> firstBridges, Catalogues catalogues) {
+    return formsOf(listed, firstBridges, catalogues);
+  }
+
+  private Map<Long, InspectionFormResponse> formsOf(List<CrossingStructureEntity> listed,
+      Map<Long, ForestServiceBridgeEntity> firstBridges, Catalogues catalogues) {
     List<Long> ids = listed.stream().map(CrossingStructureEntity::getCrossingStructureId).toList();
-    Map<Long, ForestServiceBridgeEntity> firstBridges = new HashMap<>();
+    boolean readBridges = firstBridges == null;
+    Map<Long, ForestServiceBridgeEntity> bridgeOf = readBridges ? new HashMap<>() : firstBridges;
     Map<Long, String> openBottoms = new HashMap<>();
     for (List<Long> batch : batches(ids)) {
-      bridges.findByCrossingStructureIdInOrderByForestServiceBridgeId(batch)
-          .forEach(found -> firstBridges.putIfAbsent(found.getCrossingStructureId(), found));
+      if (readBridges) {
+        bridges.findByCrossingStructureIdInOrderByForestServiceBridgeId(batch)
+            .forEach(found -> bridgeOf.putIfAbsent(found.getCrossingStructureId(), found));
+      }
       culverts.findByCrossingStructureIdInOrderByForestServiceCulvertId(batch)
           .forEach(found -> openBottoms.putIfAbsent(found.getCrossingStructureId(),
               found.getOpnBtomClvrtSubstrctreCode()));
     }
-    List<Long> bridgeIds = firstBridges.values().stream()
+    List<Long> bridgeIds = ids.stream().map(bridgeOf::get).filter(Objects::nonNull)
         .map(ForestServiceBridgeEntity::getForestServiceBridgeId).toList();
     Map<Long, List<ForestServiceBridgeSpanEntity>> spansByBridge = new HashMap<>();
     Map<Long, List<ForestServiceBridgePierEntity>> piersByBridge = new HashMap<>();
@@ -172,16 +195,15 @@ public class InspectionFormService {
       piers.findByForestServiceBridgeIdInOrderByPierNumberAsc(batch).forEach(pier -> piersByBridge
           .computeIfAbsent(pier.getForestServiceBridgeId(), id -> new ArrayList<>()).add(pier));
     }
-    Map<String, Catalogue> catalogues = new HashMap<>();
     Map<Long, InspectionFormResponse> result = new HashMap<>();
     for (CrossingStructureEntity structure : listed) {
       Long id = structure.getCrossingStructureId();
-      Optional<ForestServiceBridgeEntity> bridge = Optional.ofNullable(firstBridges.get(id));
+      Optional<ForestServiceBridgeEntity> bridge = Optional.ofNullable(bridgeOf.get(id));
       Long bridgeId = bridge.map(ForestServiceBridgeEntity::getForestServiceBridgeId).orElse(null);
       String typeClass = structure.getStructureTypeClassCode();
       Catalogue catalogue = typeClass == null
           ? catalogue(null)
-          : catalogues.computeIfAbsent(typeClass, this::catalogue);
+          : catalogues.byTypeClass.computeIfAbsent(typeClass, this::catalogue);
       result.put(id, build(id, fitOf(bridge, openBottoms.get(id)),
           spanParts(spansByBridge.getOrDefault(bridgeId, List.of())),
           pierParts(piersByBridge.getOrDefault(bridgeId, List.of())), catalogue));
@@ -234,6 +256,19 @@ public class InspectionFormService {
         .findByQuestionCodeIn(questionCodes).stream()
         .collect(Collectors.groupingBy(InspectionQuestionCriteriaEntity::getQuestionCode));
     return new Catalogue(groups, links, asked, rules, choicesFor(questionCodes));
+  }
+
+  /** An empty store of catalogues, for a report to keep across its batches ({@link #forms}). */
+  public Catalogues catalogues() {
+    return new Catalogues();
+  }
+
+  /**
+   * The catalogues a report has read, by type/class — one report's, on the thread that makes it.
+   * Not shared between reports: the questions can change between one and the next.
+   */
+  public static final class Catalogues {
+    private final Map<String, Catalogue> byTypeClass = new HashMap<>();
   }
 
   /** A type/class's groups, their questions, and each question's criteria and answers. */

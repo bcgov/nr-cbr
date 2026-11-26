@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.ReplacementStructuresCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,5 +36,6 @@ public interface ReplacementStructuresReportApiEndpoint {
   @GetMapping("/replacement-structures-summary")
   ResponseEntity<byte[]> replacementStructuresSummary(
       @Valid @ModelAttribute ReplacementStructuresCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 }

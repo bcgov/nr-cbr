@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.service.v1;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -10,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import net.sf.jasperreports.engine.JRDataSource;
 import net.sf.jasperreports.engine.JRException;
 import net.sf.jasperreports.engine.JasperCompileManager;
 import net.sf.jasperreports.engine.JasperExportManager;
@@ -28,11 +30,11 @@ import org.springframework.stereotype.Component;
  * Fills a report template with rows and produces a PDF.
  *
  * <p>The templates are {@code classpath:reports/<NAME>.jrxml}, compiled once and kept: all of them
- * on a background thread as the application starts, as EDUC's report services do, so the first
+ * on a background thread as the application starts, so the first
  * user to ask for a report does not wait a few seconds for the compiler. One asked for before its
  * turn is compiled there and then.
  *
- * <p>Unlike nr-frep's {@code ReportService}, the template carries no SQL: the rows come from the
+ * <p>The template carries no SQL: the rows come from the
  * service that built them, as maps keyed by the template's field names, so the same rows can be
  * written as a CSV and say exactly what the PDF says.
  *
@@ -103,6 +105,37 @@ public class ReportRenderer {
       return JasperExportManager.exportReportToPdf(print);
     } catch (JRException ex) {
       throw new ReportRenderingException("Could not produce the " + template + " report", ex);
+    }
+  }
+
+  /**
+   * A template filled with rows from a data source — one that loads them as Jasper asks, e.g.
+   * {@link BatchedRowSource} — to {@link #export} once filled.
+   *
+   * @throws ReportRenderingException when the template cannot be compiled or filled
+   */
+  public JasperPrint fill(String template, Map<String, Object> parameters, JRDataSource rows) {
+    try {
+      return JasperFillManager.fillReport(
+          compiled.computeIfAbsent(template, ReportRenderer::compile),
+          new HashMap<>(parameters), rows);
+    } catch (JRException ex) {
+      throw new ReportRenderingException("Could not produce the " + template + " report", ex);
+    }
+  }
+
+  /**
+   * A filled report as a PDF, written to {@code out} as it is exported rather than assembled in
+   * memory first.
+   *
+   * @throws ReportRenderingException when the report cannot be exported
+   */
+  public void export(JasperPrint print, OutputStream out) {
+    try {
+      JasperExportManager.exportReportToPdfStream(print, out);
+    } catch (JRException ex) {
+      throw new ReportRenderingException("Could not produce the " + print.getName() + " report",
+          ex);
     }
   }
 

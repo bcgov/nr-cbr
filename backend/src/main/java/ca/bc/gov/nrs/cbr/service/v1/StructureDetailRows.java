@@ -6,7 +6,6 @@ import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.AbutmentCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.BuiltByCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.DeckTypeCodeEntity;
@@ -83,6 +82,7 @@ public class StructureDetailRows {
   private final StructureCommentRepository comments;
   private final StructureReplacementXrefRepository replacements;
   private final StructureInventoryNames names;
+  private final RoadNameService roadNames;
 
   public StructureDetailRows(
       EntityManager entityManager,
@@ -90,13 +90,15 @@ public class StructureDetailRows {
       ForestServiceCulvertRepository culverts,
       StructureCommentRepository comments,
       StructureReplacementXrefRepository replacements,
-      StructureInventoryNames names) {
+      StructureInventoryNames names,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.bridges = bridges;
     this.culverts = culverts;
     this.comments = comments;
     this.replacements = replacements;
     this.names = names;
+    this.roadNames = roadNames;
   }
 
   /**
@@ -258,7 +260,7 @@ public class StructureDetailRows {
 
   /**
    * The site's road: a recreation site's project name, any other site's road section name —
-   * legacy's {@code FOREST_SERVICE_ROAD}.
+   * legacy's {@code FOREST_SERVICE_ROAD}. The road section's name is LRMOPS's (2026-11-25).
    */
   private String road(CrossingSiteEntity site) {
     if (site.getForestFileId() == null) {
@@ -269,12 +271,7 @@ public class StructureDetailRows {
           entityManager.find(RecreationProjectEntity.class, site.getForestFileId());
       return project == null ? null : project.getProjectName();
     }
-    if (site.getRoadSectionId() == null) {
-      return null;
-    }
-    CbrRoadSectionEntity section = entityManager.find(CbrRoadSectionEntity.class,
-        new CbrRoadSectionEntity.Key(site.getForestFileId(), site.getRoadSectionId()));
-    return section == null ? null : section.getRoadSectName();
+    return roadNames.nameOf(site.getForestFileId(), site.getRoadSectionId());
   }
 
   /** An org unit's name as legacy reads it, from {@code CBR_ORG_UNIT}. */

@@ -11,7 +11,7 @@ type Props = {
   testId?: string;
   /**
    * `error` once a save has been refused for these items: the line turns red with an error icon,
-   * in step with the tab counts and the banner — nr-frep's pattern. The items keep their colour.
+   * in step with the tab counts and the banner. The items keep their colour.
    */
   tone?: 'neutral' | 'error';
   /** What the red items are blocking, for screen readers: `save` by default. */
@@ -19,8 +19,7 @@ type Props = {
 };
 
 /**
- * What the structure is missing in this tab, behind a disclosure at the top of it — nr-frep's
- * pattern.
+ * What the structure is missing in this tab, behind a disclosure at the top of it.
  *
  * <p>Open by default, because it is the answer to the banner above the tabs. Collapsing it is a
  * per-visit choice. Grouped by the section (card) of the tab each field is in, so the list says

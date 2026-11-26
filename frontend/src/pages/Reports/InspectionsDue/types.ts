@@ -17,13 +17,13 @@ export const INSPECTIONS_DUE_STATE_KEYS: Record<InspectionsDueVariant, string> =
 };
 
 /**
- * The Inspections Due reports' two orders, legacy's labels — each within the forest district, then
- * by branch and kilometre, as legacy sorts them.
+ * The Inspections Due reports' order, legacy's label — within the forest district, then by branch
+ * and kilometre, as legacy sorts them. Legacy's other, Forest Service Road, is gone: the
+ * road name is LRMOPS's, and CBR's database has none to sort on (2026-11-25). One order, so the form offers no Sort By.
  */
-export type InspectionsDueSort = 'FOREST_SERVICE_ROAD' | 'FOREST_FILE_ID';
+export type InspectionsDueSort = 'FOREST_FILE_ID';
 
 export const SORT_OPTIONS: readonly SortOption<InspectionsDueSort>[] = [
-  { value: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
   { value: 'FOREST_FILE_ID', label: 'Project File ID#' },
 ];
 
@@ -95,5 +95,5 @@ export const EMPTY_CRITERIA: InspectionsDueCriteria = {
   maintainerLabel: '',
   specialAccessCode: [],
   specialEquipmentCode: '',
-  sortBy: 'FOREST_SERVICE_ROAD',
+  sortBy: 'FOREST_FILE_ID',
 };

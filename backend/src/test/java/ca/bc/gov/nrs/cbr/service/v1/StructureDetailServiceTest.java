@@ -8,7 +8,6 @@ import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.AbutmentCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.BuiltByCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientLocationEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
@@ -77,7 +76,7 @@ class StructureDetailServiceTest {
         "StructureInspectionReviewerEntity", "StructureCommentEntity",
         "StructureReplacementXrefEntity", "ForestServiceBridgeSpanEntity",
         "ForestServiceBridgeEntity", "ForestServiceCulvertEntity", "CrossingStructureEntity",
-        "CrossingSiteEntity", "CbrRoadSectionEntity", "CbrOrgUnitEntity", "OrgUnitEntity",
+        "CrossingSiteEntity", "CbrOrgUnitEntity", "OrgUnitEntity",
         "ClientLocationEntity", "ClientPublicEntity", "RecreationProjectEntity",
         "CrossingSiteStatusCodeEntity", "StructureInspectionStatusCodeEntity",
         "StructureTypeClassCodeEntity", "BuiltByCodeEntity", "AbutmentCodeEntity")) {
@@ -203,8 +202,6 @@ class StructureDetailServiceTest {
           .orgUnitNo(18L).orgUnitCode("DCC").orgUnitName("Cariboo-Chilcotin District").build());
       entityManager.persist(CbrOrgUnitEntity.builder()
           .orgUnitNo(26L).orgUnitCode("DCA").orgUnitName("Central Cariboo").build());
-      entityManager.persist(CbrRoadSectionEntity.builder()
-          .forestFileId("6970").roadSectionId("01").roadSectName("OLD RRS NAME").build());
       // The name shown is LRMOPS's, not the copy's.
       when(roadNames.nameOf("6970", "01")).thenReturn("CHILCOTIN SOUTH");
       entityManager.persist(ClientPublicEntity.builder()

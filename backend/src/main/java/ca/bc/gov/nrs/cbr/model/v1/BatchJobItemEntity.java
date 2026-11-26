@@ -17,8 +17,8 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 /**
- * {@code THE.CBR_BATCH_JOB_ITEM} — one row per item a scheduled batch job has to process, in the
- * manner of EDUC-STUDENT-ASSESSMENT-API's staged rows: a job fills its rows, the scheduler hands
+ * {@code THE.CBR_BATCH_JOB_ITEM} — one row per item a scheduled batch job has to process, as staged
+ * rows: a job fills its rows, the scheduler hands
  * out the {@code READY} ones, and each is marked {@code DONE} or {@code ERROR}.
  *
  * <p>{@code ITEM_ID}'s meaning depends on the job; for {@code FILE_COPY} it is the attachment's

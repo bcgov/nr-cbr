@@ -6,6 +6,7 @@ import ca.bc.gov.nrs.cbr.service.v1.InspectionsDueDetailedService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionsDueSummaryService;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionsDueCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,18 +32,28 @@ public class InspectionsDueReportApiController implements InspectionsDueReportAp
 
   @Override
   public ResponseEntity<byte[]> inspectionsDueSummary(
-      InspectionsDueCriteria criteria, ReportFormat format) {
+      InspectionsDueCriteria criteria, ReportFormat format, HttpServletResponse response) {
+    if (format == ReportFormat.CSV) {
+      return ReportApiController.streamed(response, target -> summary.writeCsv(criteria, target));
+    }
     return ReportApiController.download(summary.generate(criteria, format));
   }
 
   @Override
   public ResponseEntity<byte[]> inspectionsDueDetailed(
-      InspectionsDueCriteria criteria, ReportFormat format) {
+      InspectionsDueCriteria criteria, ReportFormat format, HttpServletResponse response) {
+    if (format == ReportFormat.CSV) {
+      return ReportApiController.streamed(response, target -> detailed.writeCsv(criteria, target));
+    }
     return ReportApiController.download(detailed.generate(criteria, format));
   }
 
   @Override
-  public ResponseEntity<byte[]> inspectionsBlank(InspectionsDueCriteria criteria, ReportFormat format) {
-    return ReportApiController.download(blank.generate(criteria, format));
+  public ResponseEntity<byte[]> inspectionsBlank(
+      InspectionsDueCriteria criteria, ReportFormat format, HttpServletResponse response) {
+    // Both formats streamed: a province's forms run to 81 MB as a PDF.
+    return format == ReportFormat.CSV
+        ? ReportApiController.streamed(response, target -> blank.writeCsv(criteria, target))
+        : ReportApiController.streamed(response, target -> blank.writePdf(criteria, target));
   }
 }

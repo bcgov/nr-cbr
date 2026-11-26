@@ -102,12 +102,13 @@ describe('RepairsSummaryPage', () => {
       'Site #',
       'Site Type',
       'Repair Status',
-      'Forest Service Road',
       'Project File ID#',
       'Br.',
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
+    // A pick list of LRMOPS's road names, matched exactly — as on the search screens.
+    expect(screen.getByRole('combobox', { name: /Forest Service Road/ })).toBeInTheDocument();
     // Multi-selects: their labels name a list box rather than a form control.
     for (const label of [
       'Site Status',
@@ -174,7 +175,8 @@ describe('RepairsSummaryPage', () => {
 
     await waitFor(() => expect(byId('repairStatusCode')).toHaveValue('OUT'));
     expect(byId('sortBy-PROJECT_BRANCH_KM')).toBeChecked();
-    expect(screen.getByLabelText('Road Name, KM User')).not.toBeChecked();
+    expect(screen.getByLabelText('Site Id')).not.toBeChecked();
+    expect(screen.queryByLabelText('Road Name, KM User')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Site Id')).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'Download CSV' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();

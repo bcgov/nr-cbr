@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code FILE_COPY}'s two steps, as EDUC-STUDENT-ASSESSMENT-API's {@code EventTaskScheduler}: each
+ * {@code FILE_COPY}'s two steps: each
  * on a cron, under a ShedLock lock so that one pod at a time runs it, delegating at once.
  *
  * <p>Both crons are set in {@code application.yml}, so the copy runs wherever CBR is deployed —

@@ -23,8 +23,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Deletes finished jobs' rows from {@code THE.CBR_BATCH_JOB_ITEM} — EDUC-STUDENT-ASSESSMENT-API's
- * {@code PurgeOldSagaRecordsScheduler}, with the conditions CBR's jobs need.
+ * Deletes finished jobs' rows from {@code THE.CBR_BATCH_JOB_ITEM}, with the conditions CBR's jobs
+ * need.
  *
  * <p>A job's rows go only when it is listed in {@code purge.batch.job.items.jobs} and:
  * <ul>

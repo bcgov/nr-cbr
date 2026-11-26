@@ -44,12 +44,10 @@ public final class ReplacementStructuresReportSpecifications {
   private static final String CLOSURE_YEAR = "estimatedClosureYear";
 
   private static final String SITE = "site";
-  private static final String ROAD_SECTION = "roadSection";
   private static final String ORG_UNIT = "orgUnit";
   private static final String SITE_ID = "crossingSiteId";
   private static final String FOREST_FILE_ID = "forestFileId";
   private static final String ROAD_SECTION_ID = "roadSectionId";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String KILOMETRES = "pointOfCommencementDistance";
   private static final String CROSSING_NAME = "crossingName";
   private static final String CLIENT_NUMBER = "clientNumber";
@@ -72,8 +70,8 @@ public final class ReplacementStructuresReportSpecifications {
     CriteriaQuery<ReplacementStructureLine> query =
         builder.createQuery(ReplacementStructureLine.class);
     Root<CrossingStructureEntity> structure = query.from(CrossingStructureEntity.class);
+    // No join to CBR's road copy: the road name is LRMOPS's, looked up afterwards (2026-11-25).
     From<?, ?> site = structure.join(SITE, JoinType.LEFT);
-    From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
     From<?, ?> district = site.join(ORG_UNIT, JoinType.LEFT);
 
     List<Predicate> predicates = new ArrayList<>();
@@ -105,7 +103,6 @@ public final class ReplacementStructuresReportSpecifications {
             site.get(SITE_ID),
             site.get(FOREST_FILE_ID),
             site.get(ROAD_SECTION_ID),
-            roadSection.get(ROAD_SECTION_NAME),
             site.get(KILOMETRES),
             site.get(CROSSING_NAME),
             site.get(CLIENT_NUMBER),

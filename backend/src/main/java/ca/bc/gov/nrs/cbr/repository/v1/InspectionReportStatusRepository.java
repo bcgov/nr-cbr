@@ -1,9 +1,12 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
+import jakarta.persistence.QueryHint;
 import java.util.Collection;
 import java.util.List;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -25,5 +28,6 @@ public interface InspectionReportStatusRepository
       Long inspectionId);
 
   /** Every status row of these inspections — a report's, a batch at a time. */
+  @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = ReportQueryHints.FETCH_SIZE))
   List<InspectionReportStatusEntity> findByInspectionIdIn(Collection<Long> inspectionIds);
 }

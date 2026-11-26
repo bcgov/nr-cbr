@@ -1,13 +1,10 @@
 package ca.bc.gov.nrs.cbr.model.v1;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
@@ -18,8 +15,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.hibernate.annotations.NotFound;
-import org.hibernate.annotations.NotFoundAction;
 
 /**
  * {@code THE.CROSSING_SITE} — the site a structure sits on, and what Site Search searches.
@@ -57,7 +52,7 @@ import org.hibernate.annotations.NotFoundAction;
 @Entity
 @Table(name = "CROSSING_SITE", schema = "THE")
 @Getter
-@ToString(exclude = {"status", "orgUnit", "roadSection"})
+@ToString(exclude = {"status", "orgUnit"})
 @EqualsAndHashCode(of = "crossingSiteId")
 @NoArgsConstructor
 @AllArgsConstructor
@@ -201,7 +196,7 @@ public class CrossingSiteEntity {
   private LocalDateTime updateTimestamp;
 
   /*
-   * The four joins. Each maps a column already mapped above as a scalar, so the association is
+   * The joins. Each maps a column already mapped above as a scalar, so the association is
    * read-only (`insertable`/`updatable` false) and the scalar stays the thing a write would set.
    * Filters use the scalars where they can — `orgUnitNo` rather than `orgUnit.orgUnitNo` — which
    * keeps a join out of the query entirely for most criteria.
@@ -217,33 +212,8 @@ public class CrossingSiteEntity {
   @JoinColumn(name = "ORG_UNIT_NO", insertable = false, updatable = false)
   private OrgUnitEntity orgUnit;
 
-  /**
-   * Supplies Forest Service Road, and is the only thing that criterion can match on.
-   *
-   * <p>{@code NO_CONSTRAINT} because the target is a materialized view: Oracle has no foreign key
-   * here and could not have one. Saying so keeps a generated schema — which is how the tests build
-   * their database — from inventing a constraint the real schema does not have, and then rejecting
-   * the very rows this join exists to tolerate: a site whose road section is not in the view.
-   *
-   * <p><b>{@code @NotFound(IGNORE)} follows directly from that.</b> With no constraint, a site can
-   * carry a {@code (FOREST_FILE_ID, ROAD_SECTION_ID)} pair the view does not contain — and it
-   * routinely will, because the view is a snapshot refreshed on demand over a database link, so a
-   * road section added upstream is missing here until someone refreshes it. Left to itself Hibernate
-   * builds a lazy proxy for any non-null foreign key and throws {@code EntityNotFoundException} the
-   * moment the results mapping reads it: a 500 on a search, caused by data that is merely stale.
-   * {@code IGNORE} reads a dangling reference as "no road section", which is what the legacy left
-   * join does and what the screen should show.
+  /*
+   * No road-section join. The site's road name is LRMOPS's, looked up by its Project File ID# and
+   * Br. (RoadNameService); CBR's copy, CBR_ROAD_SECTION_VW, is no longer read (2026-11-25).
    */
-  @ManyToOne(fetch = FetchType.LAZY)
-  @NotFound(action = NotFoundAction.IGNORE)
-  @JoinColumns(
-      value = {
-          @JoinColumn(name = "FOREST_FILE_ID", referencedColumnName = "FOREST_FILE_ID",
-              insertable = false, updatable = false),
-          @JoinColumn(name = "ROAD_SECTION_ID", referencedColumnName = "ROAD_SECTION_ID",
-              insertable = false, updatable = false)
-      },
-      foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
-  private CbrRoadSectionEntity roadSection;
-
 }

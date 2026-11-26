@@ -11,6 +11,7 @@ import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.yesNo
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceBridgeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceCulvertRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureValue;
 import ca.bc.gov.nrs.cbr.specification.v1.ReplacementStructureLine;
 import ca.bc.gov.nrs.cbr.specification.v1.ReplacementStructuresReportSpecifications;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -65,13 +67,15 @@ public class ReplacementStructuresRows {
   private static final String LENGTH = "#,##0.0";
   private static final String WHOLE = "#,##0";
 
-  /** Legacy's order, which its stored procedure applied. */
+  /**
+   * Legacy's order, which its stored procedure applied — less its road name, after the year:
+   * road-name sorting is gone everywhere (2026-11-25).
+   */
   private static final Comparator<Entry> ORDER = Comparator
       .comparing((Entry entry) -> entry.where().region(), nullsLast())
       .thenComparing(entry -> entry.where().district(), nullsLast())
       .thenComparing(entry -> entry.where().managementArea(), nullsLast())
       .thenComparing(Entry::sortYear, Comparator.reverseOrder())
-      .thenComparing(entry -> entry.line().roadSectionName(), nullsLast())
       .thenComparing(entry -> entry.line().kilometres(), nullsLast());
 
   /** Legacy's sections, in the order they follow one another within a year. */
@@ -97,16 +101,19 @@ public class ReplacementStructuresRows {
   private final ForestServiceBridgeRepository bridges;
   private final ForestServiceCulvertRepository culverts;
   private final StructureInventoryNames names;
+  private final RoadNameService roadNames;
 
   public ReplacementStructuresRows(
       EntityManager entityManager,
       ForestServiceBridgeRepository bridges,
       ForestServiceCulvertRepository culverts,
-      StructureInventoryNames names) {
+      StructureInventoryNames names,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.bridges = bridges;
     this.culverts = culverts;
     this.names = names;
+    this.roadNames = roadNames;
   }
 
   /** The CSV's columns: the PDF's headings, then its table's columns, in its order. */
@@ -129,7 +136,7 @@ public class ReplacementStructuresRows {
           entry.section().label,
           blankIfNull(line.structureName()),
           blankIfNull(line.siteId()),
-          blankIfNull(line.roadSectionName()),
+          blankIfNull(entry.roadName()),
           blankIfNull(line.forestFileId()),
           blankIfNull(line.roadSectionId()),
           blankIfNull(line.crossingName()),
@@ -158,7 +165,7 @@ public class ReplacementStructuresRows {
     List<ReplacementStructureLine> lines = entityManager
         .createQuery(ReplacementStructuresReportSpecifications.lines(
             entityManager.getCriteriaBuilder(), criteria))
-        .getResultList();
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS).getResultList();
     List<Long> ids = lines.stream().map(ReplacementStructureLine::structureId).toList();
     Map<Long, List<ForestServiceBridgeEntity>> bridgeRecords = grouped(ids,
         bridges::findByCrossingStructureIdInOrderByForestServiceBridgeId,
@@ -171,6 +178,9 @@ public class ReplacementStructuresRows {
         .toList());
     Map<String, String> clients = names.clientNames(
         lines.stream().map(ReplacementStructureLine::clientNumber).toList());
+    // LRMOPS's road names, for the report's distinct road sections.
+    Function<ReplacementStructureLine, String> roads = roadNames.namesFor(
+        lines, ReplacementStructureLine::forestFileId, ReplacementStructureLine::roadSectionId);
 
     List<Entry> entries = new ArrayList<>();
     for (ReplacementStructureLine line : lines) {
@@ -183,7 +193,7 @@ public class ReplacementStructuresRows {
         Integer year = section.year.apply(line);
         if (year != null && (section != Section.CLOSURE || ACTIVE.equals(line.siteStatusCode()))) {
           lengths.forEach(length -> entries.add(
-              new Entry(line, section, year, where, client, length)));
+              new Entry(line, section, year, where, client, length, roads.apply(line))));
         }
       }
     }
@@ -234,7 +244,7 @@ public class ReplacementStructuresRows {
     row.put("REPLACEMENT_FOR", entry.section().label);
     row.put("CROSSING_STRUCTURE_NAME", line.structureName());
     row.put("CROSSING_SITE_ID", line.siteId());
-    row.put("FOREST_SERVICE_ROAD", line.roadSectionName());
+    row.put("FOREST_SERVICE_ROAD", entry.roadName());
     row.put("FOREST_FILE_ID", line.forestFileId());
     row.put("ROAD_SECTION_ID", line.roadSectionId());
     row.put("CROSSING_NAME", line.crossingName());
@@ -263,7 +273,7 @@ public class ReplacementStructuresRows {
   /** One printed row: the structure, the section it is listed under, and its Total Length. */
   private record Entry(
       ReplacementStructureLine line, Section section, Integer year, Where where, String client,
-      BigDecimal totalLength) {
+      BigDecimal totalLength, String roadName) {
 
     /** Legacy's {@code SORT_YEAR}: the year, then the section's rank. */
     long sortYear() {

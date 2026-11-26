@@ -79,7 +79,7 @@ import org.springframework.util.StringUtils;
  * {@code SimpleKey} instead and cannot produce one.
  *
  * <h3>Mapping</h3>
- * By hand rather than through MapStruct, which is what the EDUC API this pattern follows uses. A
+ * By hand rather than through MapStruct. A
  * mapper earns its keep on wide structures with matching field names; here the two fields never
  * match — every code table's primary key is named after the table
  * ({@code crossingSiteStatusCode}, {@code crossingSiteTypeCode}, …) while the response field is

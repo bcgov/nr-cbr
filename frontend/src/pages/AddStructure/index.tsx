@@ -124,7 +124,7 @@ type Top = { structureName: string; siteId: string; typeClassCode: string; comme
  * card on the structure page. One tab, not the structure page's four: the business asked for the
  * whole form in one place (UAT, "CBR Test Changes", 2026-11).
  *
- * <p>What is outstanding shows from the start, nr-frep's pattern: a notice above the tab, a count
+ * <p>What is outstanding shows from the start: a notice above the tab, a count
  * on it and a list at its top — red once a Save is refused. Each message itself sits beside
  * its field once the field is left, and all of them on Save.
  *
@@ -195,7 +195,7 @@ const AddStructurePage: FC = () => {
   const shown = form.shown;
 
   /**
-   * Everything still outstanding, from the first render — nr-frep's pattern, as Add Inspection's:
+   * Everything still outstanding, from the first render, as Add Inspection's:
    * the banner, the tab's count and its list are the map of what is left, shown before any field
    * is touched. The server's refusals join them.
    */
@@ -342,7 +342,7 @@ const AddStructurePage: FC = () => {
         </Column>
       )}
 
-      {/* nr-frep's summary above the tab, as Add Inspection's: how much is outstanding —
+      {/* The summary above the tab, as Add Inspection's: how much is outstanding —
           informational until a Save is refused, then red. Each message itself sits beside its
           field and in the tab's list. */}
       {outstandingTotal > 0 && (

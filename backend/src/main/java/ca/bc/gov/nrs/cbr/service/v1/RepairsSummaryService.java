@@ -6,12 +6,14 @@ import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.forma
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.millisSince;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.plain;
 
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.service.v1.RepairsSummaryNames.Names;
 import ca.bc.gov.nrs.cbr.specification.v1.RepairsSummaryLine;
 import ca.bc.gov.nrs.cbr.specification.v1.RepairsSummaryReportSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -21,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
+import org.hibernate.jpa.HibernateHints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -68,6 +72,7 @@ public class RepairsSummaryService {
   private final StructureInventoryReportSupport support;
   private final RepairsSummaryNames names;
   private final RepairsSummaryCsv csv;
+  private final RoadNameService roadNames;
 
   public RepairsSummaryService(
       EntityManager entityManager,
@@ -75,30 +80,29 @@ public class RepairsSummaryService {
       ReportRenderer renderer,
       StructureInventoryReportSupport support,
       RepairsSummaryNames names,
-      RepairsSummaryCsv csv) {
+      RepairsSummaryCsv csv,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.inspections = inspections;
     this.renderer = renderer;
     this.support = support;
     this.names = names;
     this.csv = csv;
+    this.roadNames = roadNames;
   }
 
   /** The report, as a PDF or a CSV. */
   public ReportFile generate(RepairsSummaryCriteria criteria, ReportFormat format) {
+    if (format == ReportFormat.CSV) {
+      return ReportTarget.inMemory(target -> writeCsv(criteria, target));
+    }
     long started = System.nanoTime();
     Repairs repairs = repairs(criteria);
     String printed = support.today();
-    byte[] content = switch (format) {
-      case PDF -> {
-        Map<String, Object> parameters = support.parameters(REPORT_ID, printed);
-        parameters.put("P_SELECTED_CRITERIA", names.selectedCriteria(criteria));
-        yield renderer.pdf(TEMPLATE, parameters,
-            pdfRows(repairs).stream().<Map<String, ?>>map(row -> row).toList());
-      }
-      case CSV -> StructureInventoryReportSupport.csv(RepairsSummaryCsv.COLUMNS,
-          csv.rows(repairs.lines(), repairs.lastRoutine(), repairs.names()));
-    };
+    Map<String, Object> parameters = support.parameters(REPORT_ID, printed);
+    parameters.put("P_SELECTED_CRITERIA", names.selectedCriteria(criteria));
+    byte[] content = renderer.pdf(TEMPLATE, parameters,
+        pdfRows(repairs).stream().<Map<String, ?>>map(row -> row).toList());
     log.info("Repairs Summary: {} repairs as {} ({} bytes) in {} ms",
         repairs.lines().size(), format, content.length, millisSince(started));
     return new ReportFile(content, filename(FILENAME, printed, format), format.mediaType());
@@ -109,36 +113,64 @@ public class RepairsSummaryService {
     return pdfRows(repairs(criteria));
   }
 
+  /**
+   * The CSV, written to {@code target} as it is made rather than assembled in memory first — the
+   * download's response, or {@link ReportTarget#inMemory}. The target is opened once the rows are
+   * ready.
+   */
+  public void writeCsv(RepairsSummaryCriteria criteria, ReportTarget target) {
+    long started = System.nanoTime();
+    List<List<String>> csvRows = csvRows(criteria);
+    try (CsvStream out = StructureInventoryReportSupport.csv(target,
+        filename(FILENAME, support.today(), ReportFormat.CSV), RepairsSummaryCsv.COLUMNS)) {
+      out.rows(csvRows);
+    }
+    log.info("Repairs Summary: {} rows as CSV, streamed, in {} ms",
+        csvRows.size(), millisSince(started));
+  }
+
   /** The CSV's rows, in order, in {@link RepairsSummaryCsv#COLUMNS} order. */
   List<List<String>> csvRows(RepairsSummaryCriteria criteria) {
     Repairs repairs = repairs(criteria);
-    return csv.rows(repairs.lines(), repairs.lastRoutine(), repairs.names());
+    return csv.rows(repairs.lines(), repairs.lastRoutine(), repairs.names(), repairs.roads());
   }
 
-  /** The repairs for these criteria, with what both formats read beside them. */
+  /**
+   * The repairs for these criteria, with what both formats read beside them — the road names
+   * LRMOPS's, whose sections for the Forest Service Road picked also filter the query.
+   */
   private Repairs repairs(RepairsSummaryCriteria criteria) {
+    List<RoadSectionKey> roadSections =
+        roadNames.sectionsNamed(criteria.forestServiceRoad()).orElse(null);
     List<RepairsSummaryLine> lines = entityManager
         .createQuery(RepairsSummaryReportSpecifications.lines(
-            entityManager.getCriteriaBuilder(), criteria))
-        .getResultList();
+            entityManager.getCriteriaBuilder(), criteria, roadSections))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS).getResultList();
     List<Long> structureIds = lines.stream().map(RepairsSummaryLine::structureId).distinct().toList();
     return new Repairs(lines,
         firstOf(structureIds, inspections::findLastRoutineInspectionDatesAnyStatus),
-        names.names());
+        names.names(),
+        roadNames.namesFor(lines, RepairsSummaryLine::forestFileId,
+            RepairsSummaryLine::roadSectionId));
   }
 
   private static List<Map<String, String>> pdfRows(Repairs repairs) {
     return repairs.lines().stream()
-        .map(line -> row(line, repairs.lastRoutine().get(line.structureId()), repairs.names()))
+        .map(line -> row(line, repairs.lastRoutine().get(line.structureId()), repairs.names(),
+            repairs.roads().apply(line)))
         .toList();
   }
 
-  /** The repairs listed, each structure's last routine inspection, and the code tables' names. */
+  /**
+   * The repairs listed, each structure's last routine inspection, the code tables' names, and each
+   * repair's road name — LRMOPS's.
+   */
   private record Repairs(
-      List<RepairsSummaryLine> lines, Map<Long, LocalDate> lastRoutine, Names names) {}
+      List<RepairsSummaryLine> lines, Map<Long, LocalDate> lastRoutine, Names names,
+      Function<RepairsSummaryLine, String> roads) {}
 
   private static Map<String, String> row(
-      RepairsSummaryLine line, LocalDate lastRoutine, Names codes) {
+      RepairsSummaryLine line, LocalDate lastRoutine, Names codes, String roadName) {
     Map<String, String> row = new HashMap<>();
     row.put("CROSSING_STRUCTURE_ID", line.structureId().toString());
     row.put("CROSSING_STRUCTURE_NAME", line.structureName());
@@ -147,7 +179,7 @@ public class RepairsSummaryService {
     row.put("ROAD_SECTION_ID", line.roadSectionId());
     row.put("CROSSING_NAME", line.crossingName());
     row.put("DISTRICT", line.districtName());
-    row.put("FOREST_SERVICE_ROAD", line.roadSectionName());
+    row.put("FOREST_SERVICE_ROAD", roadName);
     row.put("USER_KM", plain(line.userKm()));
     row.put("STRUCTURE_LOAD_RATING", plain(line.currentLoadRating()));
     row.put("LONGITUDE", degreesMinutesSeconds(line.longitude()));

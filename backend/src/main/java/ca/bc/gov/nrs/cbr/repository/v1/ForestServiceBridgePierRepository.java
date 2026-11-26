@@ -1,9 +1,12 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgePierEntity;
+import jakarta.persistence.QueryHint;
 import java.util.Collection;
 import java.util.List;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.stereotype.Repository;
 
 /** {@code THE.FOREST_SERVICE_BRIDGE_PIER} — the structure page's Spans &amp; Piers tab. */
@@ -21,6 +24,7 @@ public interface ForestServiceBridgePierRepository
   boolean existsByForestServiceBridgeIdAndPierNumber(Long forestServiceBridgeId, Long pierNumber);
 
   /** These bridges' piers, each bridge's in number order — a report's. */
+  @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = ReportQueryHints.FETCH_SIZE))
   List<ForestServiceBridgePierEntity> findByForestServiceBridgeIdInOrderByPierNumberAsc(
       Collection<Long> bridgeIds);
 }

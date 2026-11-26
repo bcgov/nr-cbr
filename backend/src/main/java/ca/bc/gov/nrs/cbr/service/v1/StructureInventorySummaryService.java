@@ -9,6 +9,7 @@ import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.numbe
 
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceBridgeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceCulvertRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.specification.v1.StructureInventoryLine;
 import ca.bc.gov.nrs.cbr.specification.v1.StructureInventoryReportSpecifications;
@@ -17,8 +18,6 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -26,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
+import org.hibernate.jpa.HibernateHints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -78,6 +78,7 @@ public class StructureInventorySummaryService {
   private final ConfigurationService codes;
   private final ReportRenderer renderer;
   private final StructureInventoryReportSupport support;
+  private final RoadNameService roadNames;
 
   public StructureInventorySummaryService(
       EntityManager entityManager,
@@ -86,7 +87,8 @@ public class StructureInventorySummaryService {
       StructureInspectionRepository inspections,
       ConfigurationService codes,
       ReportRenderer renderer,
-      StructureInventoryReportSupport support) {
+      StructureInventoryReportSupport support,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.bridges = bridges;
     this.culverts = culverts;
@@ -94,19 +96,20 @@ public class StructureInventorySummaryService {
     this.codes = codes;
     this.renderer = renderer;
     this.support = support;
+    this.roadNames = roadNames;
   }
 
   /** The report, as asked for. */
   public ReportFile generate(StructureInventorySummaryCriteria criteria, ReportFormat format) {
+    if (format == ReportFormat.CSV) {
+      return ReportTarget.inMemory(target -> writeCsv(criteria, target));
+    }
     long started = System.nanoTime();
-    List<Row> rows = rows(criteria, format == ReportFormat.CSV ? dataStyle() : Style.PRINTED);
+    List<Row> rows = rows(criteria, Style.PRINTED);
     long built = System.nanoTime();
     String printed = support.today();
-    byte[] content = switch (format) {
-      case PDF -> renderer.pdf(TEMPLATE, support.parameters(criteria, REPORT_ID, printed),
-          rows.stream().<Map<String, ?>>map(Row::fields).toList());
-      case CSV -> csv(rows);
-    };
+    byte[] content = renderer.pdf(TEMPLATE, support.parameters(criteria, REPORT_ID, printed),
+        rows.stream().<Map<String, ?>>map(Row::fields).toList());
     log.info("Structure Inventory - Summary: {} rows as {} ({} bytes) — rows {} ms, {} {} ms",
         rows.size(), format, content.length, (built - started) / 1_000_000, format,
         millisSince(built));
@@ -122,12 +125,17 @@ public class StructureInventorySummaryService {
   List<Row> rows(StructureInventorySummaryCriteria criteria, Style style) {
     List<StructureInventoryLine> lines = entityManager.createQuery(
         StructureInventoryReportSpecifications.summary(
-            entityManager.getCriteriaBuilder(), criteria)).getResultList();
+            entityManager.getCriteriaBuilder(), criteria))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
+        .getResultList();
     List<Long> ids = lines.stream().map(StructureInventoryLine::crossingStructureId).toList();
     Map<Long, BigDecimal> bridgeLengths = firstOf(ids, bridges::findLengths);
     Map<Long, BigDecimal> culvertLengths = firstOf(ids, culverts::findLengths);
     Map<Long, LocalDate> lastInspected = firstOf(ids, inspections::findLastRoutineInspectionDates);
     Map<Long, String> statuses = support.latestRoutineStatuses(ids);
+    // LRMOPS's road names, for the report's distinct road sections.
+    Function<StructureInventoryLine, String> roadName = roadNames.namesFor(
+        lines, StructureInventoryLine::forestFileId, StructureInventoryLine::roadSectionId);
 
     return lines.stream().map(line -> {
       Long id = line.crossingStructureId();
@@ -139,7 +147,7 @@ public class StructureInventorySummaryService {
           blankIfNull(line.crossingSiteId()),
           blankIfNull(line.crossingStructureName()),
           projectFile(line.forestFileId(), line.roadSectionId()),
-          blankIfNull(line.roadSectName()),
+          blankIfNull(roadName.apply(line)),
           blankIfNull(line.crossingName()),
           YES.equalsIgnoreCase(line.portableStructureInd()) ? "Yes" : "No",
           line.pointOfCommencementDistance() == null ? ""
@@ -178,7 +186,7 @@ public class StructureInventorySummaryService {
 
     static final Style PRINTED = new Style(
         km -> km.setScale(2, RoundingMode.HALF_EVEN).toPlainString(),
-        length -> lengthFormat().format(length),
+        length -> StructureInventoryReportSupport.format(length, "#,##0.0"),
         StructureInventorySummaryService::typeClass,
         StructureInventoryReportSupport::blankIfNull);
 
@@ -192,8 +200,20 @@ public class StructureInventorySummaryService {
     }
   }
 
-  private static byte[] csv(List<Row> rows) {
-    return StructureInventoryReportSupport.csv(COLUMNS, rows.stream().map(Row::values).toList());
+  /**
+   * The CSV, written to {@code target} as it is made rather than assembled in memory first — the
+   * download's response, or {@link ReportTarget#inMemory}. The target is opened once the rows are
+   * ready.
+   */
+  public void writeCsv(StructureInventorySummaryCriteria criteria, ReportTarget target) {
+    long started = System.nanoTime();
+    List<List<String>> csvRows = rows(criteria, dataStyle()).stream().map(Row::values).toList();
+    try (CsvStream csv = StructureInventoryReportSupport.csv(target,
+        filename(FILENAME, support.today(), ReportFormat.CSV), COLUMNS)) {
+      csv.rows(csvRows);
+    }
+    log.info("Structure Inventory - Summary: {} rows as CSV, streamed, in {} ms",
+        csvRows.size(), millisSince(started));
   }
 
   /** "R00123-01": the project, and its branch after a dash when there is one. */
@@ -216,12 +236,6 @@ public class StructureInventorySummaryService {
     };
   }
 
-  /** Legacy's {@code #,##0.0}. Made per call: {@link DecimalFormat} is not thread-safe. */
-  private static DecimalFormat lengthFormat() {
-    DecimalFormat format = new DecimalFormat("#,##0.0", DecimalFormatSymbols.getInstance(Locale.CANADA));
-    format.setRoundingMode(RoundingMode.HALF_EVEN);
-    return format;
-  }
   /** One line of the report, every value as it prints. */
   record Row(
       String siteId,

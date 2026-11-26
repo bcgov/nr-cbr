@@ -11,7 +11,10 @@ type Props<S extends string, C extends { sortBy: S }> = {
   /** The prefix of every box's id and test id — the report's. */
   id: string;
   criteria: C;
-  /** The report's orders, for Sort By; none for a report whose order is fixed. */
+  /**
+   * The report's orders, for Sort By. None, or only one, for a report whose order is fixed: there is
+   * nothing to choose, so Sort By is left off.
+   */
   sortOptions: readonly SortOption<S>[];
   /** The form's rules applied to the current criteria. */
   errors: Partial<Record<keyof C & string, string>>;
@@ -69,7 +72,7 @@ const ReportCriteriaForm = <S extends string, C extends { sortBy: S }>({
     // month picker's `pattern` — would otherwise stop the submit with a bubble of its own instead.
     <form noValidate onSubmit={submit} data-testid={`${id}-form`} className="report-criteria__form">
       <div className="report-criteria__grid">{children(fields)}</div>
-      {sortOptions.length > 0 && (
+      {sortOptions.length > 1 && (
         <SortBy
           id={id}
           options={sortOptions}

@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * clamd over raw TCP — its own protocol, not HTTP. Copied from nr-frep's, itself nr-fspts's.
+ * clamd over raw TCP — its own protocol, not HTTP.
  *
  * <p>A scan is clamd's {@code INSTREAM}: {@code zINSTREAM\0} (the {@code z} selects
  * null-terminated framing), the file in chunks each led by its length as a 4-byte big-endian int,

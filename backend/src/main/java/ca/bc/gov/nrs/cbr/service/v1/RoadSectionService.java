@@ -38,8 +38,8 @@ import org.springframework.web.client.RestClientException;
  * {@link RoadCheck#UNAVAILABLE}, which refuses the save. Never mistaken for "no such road".
  *
  * <p>No database access: CBR's own road copies ({@code CBR_ROAD_SECTION_VW},
- * {@code CBR_ROAD_SEGMENT_VW}) are no longer read here. The view still supplies the road name
- * shown on the search and report screens, through {@code CrossingSiteEntity}.
+ * {@code CBR_ROAD_SEGMENT_VW}) are no longer read anywhere. The road names on the search, detail
+ * and report screens come from LRMOPS too, through {@link RoadNameService} (2026-11-25).
  */
 @Service
 public class RoadSectionService {

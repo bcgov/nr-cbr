@@ -7,6 +7,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.RepairsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,7 +40,8 @@ public interface ReportApiEndpoint {
   @GetMapping("/structure-inventory-summary")
   ResponseEntity<byte[]> structureInventorySummary(
       @Valid @ModelAttribute StructureInventorySummaryCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 
   /**
    * Structure Inventory – Detailed (legacy CBR007), as a PDF in legacy's layout — a block of
@@ -54,7 +56,8 @@ public interface ReportApiEndpoint {
   @GetMapping("/structure-inventory-detailed")
   ResponseEntity<byte[]> structureInventoryDetailed(
       @Valid @ModelAttribute StructureInventoryDetailedCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 
   /**
    * Structure Detail Report (legacy CBR006): the full record of one structure, as a PDF in
@@ -68,7 +71,8 @@ public interface ReportApiEndpoint {
   @GetMapping("/structure-detail/{structureId}")
   ResponseEntity<byte[]> structureDetail(
       @PathVariable("structureId") long structureId,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 
   /**
    * Repairs Summary (legacy CBR005): the repairs recorded against structures, a page per structure
@@ -81,7 +85,8 @@ public interface ReportApiEndpoint {
   @GetMapping("/repairs-summary")
   ResponseEntity<byte[]> repairsSummary(
       @Valid @ModelAttribute RepairsSummaryCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 
   /**
    * Monitors Summary (legacy CBR011): the monitoring items recorded against structures, a block
@@ -94,7 +99,8 @@ public interface ReportApiEndpoint {
   @GetMapping("/monitors-summary")
   ResponseEntity<byte[]> monitorsSummary(
       @Valid @ModelAttribute MonitorsSummaryCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 
   /**
    * Inspections Conducted – Summary (legacy CBR002): a line per inspection, as a PDF in legacy's
@@ -108,7 +114,8 @@ public interface ReportApiEndpoint {
   @GetMapping("/inspections-conducted-summary")
   ResponseEntity<byte[]> inspectionsConductedSummary(
       @Valid @ModelAttribute InspectionsConductedCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 
   /**
    * Inspections Conducted – Detail (legacy CBR001): each inspection in full, a page of its own, as
@@ -122,5 +129,6 @@ public interface ReportApiEndpoint {
   @GetMapping("/inspections-conducted-detail")
   ResponseEntity<byte[]> inspectionsConductedDetail(
       @Valid @ModelAttribute InspectionsConductedCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 }

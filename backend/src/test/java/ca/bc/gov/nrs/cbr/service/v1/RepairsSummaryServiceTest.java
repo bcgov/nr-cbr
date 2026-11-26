@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
@@ -38,6 +37,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +47,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -60,6 +62,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import({RepairsSummaryService.class, RepairsSummaryNames.class, RepairsSummaryCsv.class,
     StructureInventoryNames.class, StructureInventoryReportSupport.class, ReportRenderer.class})
 class RepairsSummaryServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   private static final LocalDateTime PAST = LocalDateTime.now().minusYears(10);
   private static final LocalDateTime FUTURE = LocalDateTime.now().plusYears(10);
@@ -82,6 +90,7 @@ class RepairsSummaryServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     when(codes.getForestDistricts()).thenReturn(
         List.of(new OrgUnitResponse("18", "DPG", "Prince George Natural Resource District")));
@@ -92,7 +101,7 @@ class RepairsSummaryServiceTest {
         new CodeOptionResponse("S", "Structural"), new CodeOptionResponse("N", "Non-structural")));
     for (String entity : List.of("StructureRepairEntity", "StructureInspectionEntity",
         "ForestServiceBridgeEntity", "CrossingStructureEntity", "CrossingSiteEntity",
-        "CbrRoadSectionEntity", "OrgUnitEntity", "CrossingSiteStatusCodeEntity",
+        "OrgUnitEntity", "CrossingSiteStatusCodeEntity",
         "RepairStatusCodeEntity",
         "RepairPriorityCodeEntity", "RepairPriorityCodeOrderEntity",
         "StructureRepairTypeCodeEntity",
@@ -105,8 +114,7 @@ class RepairsSummaryServiceTest {
     entityManager.persist(CrossingSiteStatusCodeEntity.builder()
         .crossingSiteStatusCode("ACT").description("Active").effectiveDate(PAST)
         .expiryDate(FUTURE).updateTimestamp(PAST).build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
     entityManager.persist(CrossingSiteEntity.builder()
         .crossingSiteId("62-001").crossingName("Deadman Creek")
         .pointOfCommencementDistance(new BigDecimal("12.5")).userKm(new BigDecimal("12.75"))
@@ -341,14 +349,19 @@ class RepairsSummaryServiceTest {
   }
 
   @Test
-  @DisplayName("filters by structure, site and road text, as a case-insensitive contains")
+  @DisplayName("filters by structure and site text, as a case-insensitive contains, and the road picked")
   void textCriteria() {
     long id = structure("B1234", s -> s);
     repair(id, null, r -> r);
 
-    assertThat(rows(c -> c.structureName("b12").siteId("62-").forestServiceRoad("bowron")))
+    // The road picked becomes LRMOPS's sections for it, and the sites are matched on those.
+    when(roadNames.sectionsNamed("BOWRON FSR"))
+        .thenReturn(Optional.of(List.of(RoadSectionKey.of("R00123", "01"))));
+    when(roadNames.sectionsNamed("NAZKO FSR")).thenReturn(Optional.of(List.of()));
+
+    assertThat(rows(c -> c.structureName("b12").siteId("62-").forestServiceRoad("BOWRON FSR")))
         .hasSize(1);
-    assertThat(rows(c -> c.forestServiceRoad("Nazko"))).isEmpty();
+    assertThat(rows(c -> c.forestServiceRoad("NAZKO FSR"))).isEmpty();
   }
 
   @Test

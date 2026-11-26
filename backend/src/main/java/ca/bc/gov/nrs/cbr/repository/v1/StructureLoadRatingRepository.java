@@ -1,12 +1,15 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.StructureLoadRatingEntity;
+import jakarta.persistence.QueryHint;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -69,5 +72,6 @@ public interface StructureLoadRatingRepository
       Long crossingStructureId);
 
   /** The ratings the given inspections recorded. */
+  @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = ReportQueryHints.FETCH_SIZE))
   List<StructureLoadRatingEntity> findByInspectionIdIn(Collection<Long> inspectionIds);
 }

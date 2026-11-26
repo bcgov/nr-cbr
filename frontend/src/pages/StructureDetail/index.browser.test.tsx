@@ -1444,7 +1444,7 @@ describe('StructureDetailPage — incomplete data', () => {
     );
   });
 
-  it("badges each tab with its own count, as nr-frep's tab strip", async () => {
+  it('badges each tab with its own count', async () => {
     await showing(incomplete());
 
     expect(screen.getByRole('img', { name: 'Details: 2 items outstanding' })).toBeInTheDocument();

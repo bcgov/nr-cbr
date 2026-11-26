@@ -7,7 +7,7 @@ import java.math.BigDecimal;
  * not the structure and site entities, whose ninety-odd columns a report would read only to drop.
  *
  * <p>The bridge or culvert length and the routine inspection are read beside it, a batch of
- * structures at a time.
+ * structures at a time. The road name is LRMOPS's, looked up afterwards (2026-11-25).
  */
 public record StructureInventoryLine(
     Long crossingStructureId,
@@ -22,5 +22,4 @@ public record StructureInventoryLine(
     String roadSectionId,
     String crossingName,
     BigDecimal pointOfCommencementDistance,
-    String capitalRoadInd,
-    String roadSectName) {}
+    String capitalRoadInd) {}

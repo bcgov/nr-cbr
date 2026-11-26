@@ -102,8 +102,6 @@ public final class StructureSearchSpecifications {
 
   /* Associations, and the column read through each. */
   private static final String SITE = "site";
-  private static final String ROAD_SECTION = "roadSection";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String ORG_UNIT = "orgUnit";
   private static final String ORG_UNIT_CODE = "orgUnitCode";
   private static final String TYPE_CLASS = "typeClass";
@@ -134,6 +132,8 @@ public final class StructureSearchSpecifications {
    * Builds the predicate for a set of criteria — everything matches when nothing is set — sorted by
    * a results column first when one was chosen.
    *
+   * Forest Service Road is not applied: see the overload taking road sections.
+   *
    * @param sort      the columns the user sorted by, first deciding; none for legacy's order
    */
   public static Specification<CrossingStructureEntity> matching(
@@ -142,11 +142,11 @@ public final class StructureSearchSpecifications {
   }
 
   /**
-   * Builds the predicate, with Forest Service Road matched on road sections rather than on the
-   * name in {@code CBR_ROAD_SECTION_VW}.
+   * Builds the predicate, with Forest Service Road matched on road sections: the name picked
+   * becomes the sections LRMOPS gives it ({@code RoadNameService#sectionsNamed}), resolved by the
+   * caller. {@code criteria.forestServiceRoad()} itself is not read here.
    *
-   * @param roadSections the sections LRMOPS gives the name picked ({@code RoadNameService});
-   *     null to match {@code criteria.forestServiceRoad()} against the view as before
+   * @param roadSections the sections LRMOPS gives the name picked; null when none was picked
    */
   public static Specification<CrossingStructureEntity> matching(
       StructureSearchCriteria criteria, List<HeaderSort<StructureSortColumn>> sort,
@@ -154,12 +154,11 @@ public final class StructureSearchSpecifications {
     return (root, query, builder) -> {
       boolean projecting = returnsEntities(query);
       From<?, ?> site = joinOrFetch(root, SITE, JoinType.LEFT, projecting);
-      From<?, ?> roadSection = joinOrFetch(site, ROAD_SECTION, JoinType.LEFT, projecting);
       From<?, ?> orgUnit = joinOrFetch(site, ORG_UNIT, JoinType.LEFT, projecting);
 
       List<Predicate> predicates = new ArrayList<>();
       structureCriteria(builder, root, criteria, predicates);
-      siteCriteria(builder, site, roadSection, criteria, roadSections == null, predicates);
+      siteCriteria(builder, site, criteria, predicates);
       if (roadSections != null) {
         predicates.add(onRoadSections(builder, site, roadSections));
       }
@@ -170,7 +169,7 @@ public final class StructureSearchSpecifications {
       }
 
       if (projecting) {
-        fetchAndOrder(root, site, roadSection, orgUnit, query, builder, sort);
+        fetchAndOrder(root, site, orgUnit, query, builder, sort);
       }
 
       return predicates.isEmpty()
@@ -217,27 +216,19 @@ public final class StructureSearchSpecifications {
   }
 
   /**
-   * The criteria on the site the structure stands on now, and on its road.
-   *
-   * @param roadByName whether Forest Service Road is matched on the view's name; false when the
-   *     caller matches road sections instead
+   * The criteria on the site the structure stands on now. Its road is matched by the caller's
+   * road sections, in {@code matching}.
    */
   private static void siteCriteria(
       CriteriaBuilder builder,
       From<?, ?> site,
-      From<?, ?> roadSection,
       StructureSearchCriteria criteria,
-      boolean roadByName,
       List<Predicate> predicates) {
     contains(builder, site.get(SITE_ID), criteria.siteId()).ifPresent(predicates::add);
     contains(builder, site.get(FOREST_FILE_ID), criteria.forestFileId()).ifPresent(predicates::add);
     contains(builder, site.get(ROAD_SECTION_ID), criteria.roadSectionId())
         .ifPresent(predicates::add);
     contains(builder, site.get(CROSSING_NAME), criteria.crossingName()).ifPresent(predicates::add);
-    if (roadByName) {
-      contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
-          .ifPresent(predicates::add);
-    }
     equalsText(builder, site.get(SITE_STATUS), criteria.siteStatusCode())
         .ifPresent(predicates::add);
     equalsText(builder, site.get(SITE_TYPE), criteria.siteTypeCode()).ifPresent(predicates::add);
@@ -445,7 +436,6 @@ public final class StructureSearchSpecifications {
   private static void fetchAndOrder(
       Root<CrossingStructureEntity> root,
       From<?, ?> site,
-      From<?, ?> roadSection,
       From<?, ?> orgUnit,
       CriteriaQuery<?> query,
       CriteriaBuilder builder,
@@ -454,28 +444,27 @@ public final class StructureSearchSpecifications {
     List<Order> order = new ArrayList<>();
     for (HeaderSort<StructureSortColumn> header : sort) {
       for (Expression<?> key :
-          sortKeys(header.column(), root, site, roadSection, orgUnit, typeClass, builder)) {
+          sortKeys(header.column(), root, site, orgUnit, typeClass, builder)) {
         order.add(header.descending() ? builder.desc(key) : builder.asc(key));
       }
     }
-    order.addAll(legacyOrder(root, site, roadSection, orgUnit, builder));
+    order.addAll(legacyOrder(root, site, orgUnit, builder));
     query.orderBy(order);
   }
 
   /**
-   * Legacy's order: district code, road, road section, kilometre — then the structure's own id, so
-   * the order is total and paging cannot show a row twice or skip one. Follows a chosen column,
-   * breaking its ties.
+   * Legacy's order without its road name: district code, road section, kilometre — then the
+   * structure's own id, so the order is total and paging cannot show a row twice or skip one.
+   * Follows a chosen column, breaking its ties. The road name is LRMOPS's, looked up for the page,
+   * so the database has none to sort on (2026-11-25).
    */
   private static List<Order> legacyOrder(
       Root<CrossingStructureEntity> root,
       From<?, ?> site,
-      From<?, ?> roadSection,
       From<?, ?> orgUnit,
       CriteriaBuilder builder) {
     return List.of(
         builder.asc(orgUnit.get(ORG_UNIT_CODE)),
-        builder.asc(roadSection.get(ROAD_SECTION_NAME)),
         builder.asc(site.get(ROAD_SECTION_ID)),
         builder.asc(site.get(KILOMETRES)),
         builder.asc(root.get(STRUCTURE_ID)));
@@ -489,7 +478,6 @@ public final class StructureSearchSpecifications {
       StructureSortColumn column,
       Root<CrossingStructureEntity> root,
       From<?, ?> site,
-      From<?, ?> roadSection,
       From<?, ?> orgUnit,
       From<?, ?> typeClass,
       CriteriaBuilder builder) {
@@ -497,7 +485,6 @@ public final class StructureSearchSpecifications {
       case STRUCTURE_NAME -> List.of(builder.upper(root.get(STRUCTURE_NAME)));
       case SITE_ID -> List.of(builder.upper(site.get(SITE_ID)));
       case DISTRICT -> List.of(orgUnit.get(ORG_UNIT_CODE));
-      case FOREST_SERVICE_ROAD -> List.of(builder.upper(roadSection.get(ROAD_SECTION_NAME)));
       case KILOMETRES -> List.of(site.get(KILOMETRES));
       case CROSSING_NAME -> List.of(builder.upper(site.get(CROSSING_NAME)));
       case TYPE_CLASS -> List.of(builder.upper(typeClass.get(DESCRIPTION)));

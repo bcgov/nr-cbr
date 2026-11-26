@@ -81,15 +81,11 @@ describe('MonitorsSummaryPage', () => {
         'ACT - Active',
       ]),
     );
-    for (const label of [
-      'Structure #',
-      'Site Type',
-      'Forest Service Road',
-      'Project File ID#',
-      'Br.',
-    ]) {
+    for (const label of ['Structure #', 'Site Type', 'Project File ID#', 'Br.']) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
+    // A pick list of LRMOPS's road names, matched exactly — as on the search screens.
+    expect(screen.getByRole('combobox', { name: /Forest Service Road/ })).toBeInTheDocument();
     // Multi-selects: their labels name a list box rather than a form control.
     for (const label of [
       'Site Status',
@@ -107,11 +103,11 @@ describe('MonitorsSummaryPage', () => {
     expect(api.getManagementAreas).not.toHaveBeenCalled();
   });
 
-  it("sorts by legacy's default, offers its other order, and runs as PDF or CSV", () => {
+  it('offers no Sort By, and runs as PDF or CSV', () => {
     renderPage();
 
-    expect(byId('sortBy-PROJECT_BRANCH_KM')).toBeChecked();
-    expect(screen.getByLabelText('Road Name, Structure Id')).not.toBeChecked();
+    // One order left — legacy's other was by road name, which CBR no longer holds.
+    expect(screen.queryByText('Sort By')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download CSV' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
   });
@@ -156,7 +152,6 @@ describe('MonitorsSummaryPage', () => {
     );
     type('structureName', 'B10');
     await toggleMultiSelect('monitors-summary-orgUnit', 'DPG - Prince George');
-    fireEvent.click(byId('sortBy-ROAD_NAME_STRUCTURE'));
     unmount();
 
     renderPage();
@@ -167,7 +162,6 @@ describe('MonitorsSummaryPage', () => {
       expect(multiSelectText('monitors-summary-orgUnit')).toContain('DPG - Prince George'),
     );
     expect(await multiSelectSelected('monitors-summary-orgUnit')).toEqual(['DPG - Prince George']);
-    expect(byId('sortBy-ROAD_NAME_STRUCTURE')).toBeChecked();
     const saved = JSON.parse(sessionStorage.getItem(MONITORS_SUMMARY_STATE_KEY) ?? '{}');
     expect(saved).toMatchObject({ structureName: 'B10', orgUnit: ['1'] });
     expect(saved).not.toHaveProperty('managementOrgUnit');
@@ -175,6 +169,5 @@ describe('MonitorsSummaryPage', () => {
     fireEvent.click(byId('reset'));
 
     expect(byId('structureName')).toHaveValue('');
-    expect(byId('sortBy-PROJECT_BRANCH_KM')).toBeChecked();
   });
 });

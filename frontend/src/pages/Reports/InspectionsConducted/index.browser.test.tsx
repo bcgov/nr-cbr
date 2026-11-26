@@ -135,13 +135,15 @@ describe('InspectionsConductedPage', () => {
     expect(screen.queryByText(/^Area/)).not.toBeInTheDocument();
   });
 
-  it("sorts the Summary by legacy's four orders, Forest Service Road first", () => {
+  it("sorts the Summary by legacy's orders less Forest Service Road, Project File ID# first", () => {
     renderPage('summary');
 
-    expect(byId('summary', 'sortBy-FOREST_SERVICE_ROAD')).toBeChecked();
-    for (const label of ['Project File ID#', 'User Km (Asc)', 'Inspection Date (Desc)']) {
+    expect(byId('summary', 'sortBy-FOREST_FILE_ID')).toBeChecked();
+    for (const label of ['User Km (Asc)', 'Inspection Date (Desc)']) {
       expect(screen.getByRole('radio', { name: label })).not.toBeChecked();
     }
+    // CBR no longer holds road names, so it cannot sort by them.
+    expect(screen.queryByRole('radio', { name: 'Forest Service Road' })).not.toBeInTheDocument();
   });
 
   it('asks the Detail for the inspection type, Routine unless changed, and sorts by project first', async () => {
@@ -159,7 +161,10 @@ describe('InspectionsConductedPage', () => {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(byId('detail', 'sortBy-PROJECT_BRANCH_USER_KM')).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Road Name, User KM (Asc)' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Inspection Date (Desc)' })).not.toBeChecked();
+    expect(
+      screen.queryByRole('radio', { name: 'Road Name, User KM (Asc)' }),
+    ).not.toBeInTheDocument();
   });
 
   it('rejects a month that is not yyyy/mm, beside its box, and runs nothing', async () => {
@@ -204,7 +209,7 @@ describe('InspectionsConductedPage', () => {
 
     await waitFor(() => expect(saveFile).toHaveBeenCalled());
     expect(reportApi.inspectionsConductedSummary).toHaveBeenCalledWith(
-      expect.objectContaining({ inspectorName: 'Smith', sortBy: 'FOREST_SERVICE_ROAD' }),
+      expect.objectContaining({ inspectorName: 'Smith', sortBy: 'FOREST_FILE_ID' }),
       'PDF',
     );
     expect(saveFile.mock.calls[0][1]).toMatch(

@@ -4,6 +4,7 @@ import ca.bc.gov.nrs.cbr.endpoint.v1.ReplacementStructuresReportApiEndpoint;
 import ca.bc.gov.nrs.cbr.service.v1.ReplacementStructuresSummaryService;
 import ca.bc.gov.nrs.cbr.struct.v1.ReplacementStructuresCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,7 +25,10 @@ public class ReplacementStructuresReportApiController
 
   @Override
   public ResponseEntity<byte[]> replacementStructuresSummary(
-      ReplacementStructuresCriteria criteria, ReportFormat format) {
+      ReplacementStructuresCriteria criteria, ReportFormat format, HttpServletResponse response) {
+    if (format == ReportFormat.CSV) {
+      return ReportApiController.streamed(response, target -> summary.writeCsv(criteria, target));
+    }
     return ReportApiController.download(summary.generate(criteria, format));
   }
 }

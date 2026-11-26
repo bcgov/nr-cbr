@@ -32,7 +32,6 @@ export type { InspectionReviewerOption } from '@/types/configuration';
 export type InspectionSortColumn =
   | 'INSPECTION_ID'
   | 'DISTRICT'
-  | 'FOREST_SERVICE_ROAD'
   | 'INSPECTION_DATE'
   | 'SITE_ID'
   | 'STRUCTURE_NAME'

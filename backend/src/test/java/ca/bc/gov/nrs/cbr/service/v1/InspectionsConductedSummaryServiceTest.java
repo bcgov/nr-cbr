@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
@@ -36,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -49,6 +49,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import({InspectionsConductedSummaryService.class, InspectionsConductedCriteriaLine.class,
     StructureInventoryReportSupport.class, ReportRenderer.class})
 class InspectionsConductedSummaryServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   @Autowired
   private InspectionsConductedSummaryService service;
@@ -71,6 +77,7 @@ class InspectionsConductedSummaryServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     when(codes.getInspectionTypeCodes()).thenReturn(List.of(
         new CodeOptionResponse("ROUT", "Routine"), new CodeOptionResponse("SPEC", "Special")));
@@ -84,7 +91,7 @@ class InspectionsConductedSummaryServiceTest {
         List.of(new CodeOptionResponse("CRS", "Stream crossing")));
     for (String entity : List.of("InspectionReportStatusEntity", "StructureInspectionEntity",
         "ForestServiceBridgeEntity", "CrossingStructureEntity", "CrossingSiteEntity",
-        "CbrRoadSectionEntity", "OrgUnitEntity", "InspectionReportStatusCodeEntity")) {
+        "OrgUnitEntity", "InspectionReportStatusCodeEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
     }
     for (String[] code : List.of(new String[] {"SUB", "Submitted"},
@@ -94,8 +101,7 @@ class InspectionsConductedSummaryServiceTest {
     }
     entityManager.persist(OrgUnitEntity.builder()
         .orgUnitNo(18L).orgUnitCode("DPG").orgUnitName("Prince George").build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
     entityManager.persist(CrossingSiteEntity.builder()
         .crossingSiteId("62-001").crossingName("Deadman Creek")
         .pointOfCommencementDistance(new BigDecimal("12.5")).userKm(new BigDecimal("12.75"))
@@ -249,8 +255,7 @@ class InspectionsConductedSummaryServiceTest {
   @Test
   @DisplayName("sorts in legacy's direction for the column, then by Structure # and newest first")
   void order() {
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("A00001").roadSectionId("01").roadSectName("Zeballos FSR").build());
+    roads.name("A00001", "01", "Zeballos FSR");
     entityManager.persist(CrossingSiteEntity.builder().crossingSiteId("10-001")
         .forestFileId("A00001").roadSectionId("01").userKm(BigDecimal.ONE).build());
     long b = structure("B", s -> s);
@@ -259,8 +264,9 @@ class InspectionsConductedSummaryServiceTest {
     inspection(b, "ROUT", LocalDate.of(2025, 1, 1), i -> i, "ACC");
     inspection(a, "ROUT", LocalDate.of(2024, 1, 1), i -> i, "ACC");
 
-    // Forest Service Road is descending, as legacy's is: Zeballos before Bowron.
-    assertThat(dates(c -> c)).containsExactly("2024/01/01", "2025/01/01", "2023/01/01");
+    // The default is Project File ID#, descending as legacy's is (its Forest Service Road default
+    // is gone: CBR no longer holds road names).
+    assertThat(dates(c -> c)).containsExactly("2025/01/01", "2023/01/01", "2024/01/01");
     assertThat(dates(c -> c.sortBy(InspectionsConductedSort.FOREST_FILE_ID)))
         .containsExactly("2025/01/01", "2023/01/01", "2024/01/01");
     assertThat(dates(c -> c.sortBy(InspectionsConductedSort.USER_KM)))
@@ -275,19 +281,17 @@ class InspectionsConductedSummaryServiceTest {
     assertThat(criteriaLine.of(InspectionsConductedCriteria.builder()
         .orgUnit("18").managementOrgUnit("26").inspectionReportStatusCode("ACC")
         .inspectionDateStart("2025/01").siteTypeCode("CRS").mostRecentInspections(true).build(),
-        InspectionsConductedSort.FOREST_SERVICE_ROAD))
+        InspectionsConductedSort.FOREST_FILE_ID))
         .isEqualTo("Forest District: Prince George Natural Resource District"
             + " Inspection Report Status: Accepted Inspection Date: >= 2025/01"
             + " Management Area: Robson Valley Most Recent Inspections Only: Yes"
-            + " Site Type: Stream crossing Sort: Forest Service Road");
+            + " Site Type: Stream crossing Sort: Project File ID#");
   }
 
   @Test
   @DisplayName("produces the landscape PDF, a long road name wrapped rather than cut off")
   void producesThePdf() throws Exception {
-    entityManager.persist(CbrRoadSectionEntity.builder().forestFileId("R00999").roadSectionId("01")
-        .roadSectName("Upper Fraser Mainline North Rd")
-        .build());
+    roads.name("R00999", "01", "Upper Fraser Mainline North Rd");
     entityManager.persist(CrossingSiteEntity.builder().crossingSiteId("62-009")
         .forestFileId("R00999").roadSectionId("01").build());
     long id = structure("B1", s -> s.crossingSiteId("62-009"));
@@ -306,7 +310,7 @@ class InspectionsConductedSummaryServiceTest {
         .isGreaterThan(reader.getPageSizeWithRotation(1).getHeight());
     assertThat(new PdfTextExtractor(reader).getTextFromPage(1).replaceAll("\\s+", " ")).contains(
         "BC Ministry of Forests, Lands, and Natural Resource Operations",
-        "Inspections Conducted Report", "IDIR\\REPORTER", "CBR002", "Sort: Forest Service Road",
+        "Inspections Conducted Report", "IDIR\\REPORTER", "CBR002", "Sort: Project File ID#",
         "Routine", "2025/06/12", "Accepted", "North Rd",
         "Corporate Bridge Register (CBR)", "Disclaimer:");
   }

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
@@ -29,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +38,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -51,6 +53,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import({MonitorsSummaryService.class, MonitorsSummaryCriteriaLine.class,
     StructureInventoryNames.class, StructureInventoryReportSupport.class, ReportRenderer.class})
 class MonitorsSummaryServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   private static final LocalDateTime PAST = LocalDateTime.now().minusYears(10);
   private static final LocalDateTime FUTURE = LocalDateTime.now().plusYears(10);
@@ -76,6 +84,7 @@ class MonitorsSummaryServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     when(codes.getForestDistricts()).thenReturn(
         List.of(new OrgUnitResponse("18", "DPG", "Prince George Natural Resource District")));
@@ -85,7 +94,7 @@ class MonitorsSummaryServiceTest {
     when(codes.getSiteTypeCodes()).thenReturn(
         List.of(new CodeOptionResponse("CRS", "Stream crossing")));
     for (String entity : List.of("StructureMonitorItemEntity", "StructureInspectionEntity",
-        "CrossingStructureEntity", "CrossingSiteEntity", "CbrRoadSectionEntity",
+        "CrossingStructureEntity", "CrossingSiteEntity",
         "RecreationProjectEntity", "OrgUnitEntity", "CrossingSiteStatusCodeEntity",
         "MonitoringStatusCodeEntity", "ClientPublicEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
@@ -95,8 +104,7 @@ class MonitorsSummaryServiceTest {
     entityManager.persist(CrossingSiteStatusCodeEntity.builder()
         .crossingSiteStatusCode("ACT").description("Active").effectiveDate(PAST)
         .expiryDate(FUTURE).updateTimestamp(PAST).build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
     entityManager.persist(ClientPublicEntity.builder().clientNumber("00001012")
         .clientName("CANFOR CORPORATION").build());
     entityManager.persist(CrossingSiteEntity.builder()
@@ -197,16 +205,21 @@ class MonitorsSummaryServiceTest {
   }
 
   @Test
-  @DisplayName("filters by status, structure and road text, and the site")
+  @DisplayName("filters by status, structure, the road picked, and the site")
   void criteria() {
     long id = structure("B1234", s -> s);
     item(id, null, i -> i.description("active"));
     item(id, null, i -> i.monitoringStatusCode("CLS").description("closed"));
 
+    // The road picked becomes LRMOPS's sections for it, and the sites are matched on those.
+    when(roadNames.sectionsNamed("BOWRON FSR"))
+        .thenReturn(Optional.of(List.of(RoadSectionKey.of("R00123", "01"))));
+    when(roadNames.sectionsNamed("NAZKO FSR")).thenReturn(Optional.of(List.of()));
+
     assertThat(descriptions(c -> c.monitoringStatusCode("CLS"))).containsExactly("closed");
-    assertThat(descriptions(c -> c.structureName("b12").forestServiceRoad("bowron")
+    assertThat(descriptions(c -> c.structureName("b12").forestServiceRoad("BOWRON FSR")
         .siteStatusCode("ACT").orgUnit("18"))).hasSize(2);
-    assertThat(descriptions(c -> c.forestServiceRoad("Nazko"))).isEmpty();
+    assertThat(descriptions(c -> c.forestServiceRoad("NAZKO FSR"))).isEmpty();
   }
 
   @Test
@@ -226,8 +239,7 @@ class MonitorsSummaryServiceTest {
   @Test
   @DisplayName("orders by the sort chosen, then Structure #, newest inspection, monitor number")
   void order() {
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("A00001").roadSectionId("01").roadSectName("Zeballos FSR").build());
+    roads.name("A00001", "01", "Zeballos FSR");
     entityManager.persist(CrossingSiteEntity.builder().crossingSiteId("10-001")
         .forestFileId("A00001").roadSectionId("01").build());
     long b = structure("B", s -> s);
@@ -240,8 +252,8 @@ class MonitorsSummaryServiceTest {
     item(a, null, i -> i.description("A"));
 
     assertThat(descriptions(c -> c)).containsExactly("A", "B newer 1", "B newer 2", "B older");
-    assertThat(descriptions(c -> c.sortBy(MonitorsSummarySort.ROAD_NAME_STRUCTURE)))
-        .containsExactly("B newer 1", "B newer 2", "B older", "A");
+    assertThat(descriptions(c -> c.sortBy(MonitorsSummarySort.PROJECT_BRANCH_KM)))
+        .containsExactly("A", "B newer 1", "B newer 2", "B older");
   }
 
   @Test

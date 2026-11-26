@@ -14,8 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.task.TaskRejectedException;
 
 /**
- * Hands a job's {@code READY} items to its {@code @Async} worker — EDUC-STUDENT-ASSESSMENT-API's
- * fire-and-forget, shared by {@code FILE_COPY} and {@code FILE_PURGE}. One per job per pod.
+ * Hands a job's {@code READY} items to its {@code @Async} worker, fire-and-forget, shared by
+ * {@code FILE_COPY} and {@code FILE_PURGE}. One per job per pod.
  *
  * <p>An item stays {@code READY} until its worker finishes, so a later firing would hand it out
  * again; two guards keep that rare, and each worker's own check makes it cheap when it happens:

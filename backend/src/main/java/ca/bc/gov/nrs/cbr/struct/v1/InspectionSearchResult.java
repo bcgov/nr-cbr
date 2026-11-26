@@ -19,7 +19,7 @@ package ca.bc.gov.nrs.cbr.struct.v1;
  * @param structureName                      {@code CROSSING_STRUCTURE.CROSSING_STRUCTURE_NAME}
  * @param orgUnitCode                        shown in the District Code column
  * @param orgUnitName                        the column's tooltip in legacy, a suffix here
- * @param forestServiceRoad                  {@code CBR_ROAD_SECTION_VW.ROAD_SECT_NAME}
+ * @param forestServiceRoad                  the road's name, LRMOPS's; null when it has none
  * @param pointOfCommencementDistance        the KM column
  * @param crossingName                       free-text name of the crossing, may be blank
  * @param forestFileId                       rendered with {@code roadSectionId} as "Project File ID#-Br."

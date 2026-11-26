@@ -286,7 +286,7 @@ describe('AddStructurePage', () => {
     ]);
   });
 
-  it("shows what is outstanding from the start, nr-frep's pattern, and turns it red when refused", async () => {
+  it('shows what is outstanding from the start, and turns it red when refused', async () => {
     await renderPage();
     set('add-structure-type', 'PB');
 

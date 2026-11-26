@@ -156,7 +156,7 @@ const InspectionDetailPage: FC = () => {
 
       {outstandingTotal > 0 && (
         <Column sm={4} md={8} lg={16}>
-          {/* The structure page's summary above the tabs, nr-frep's pattern: how much, across how
+          {/* The structure page's summary above the tabs: how much, across how
               many tabs; each tab lists its own. Informational — nothing is refused here. */}
           <OutstandingSummary
             total={outstandingTotal}

@@ -4,7 +4,6 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
-import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.onRoadSections;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
 
@@ -81,8 +80,6 @@ public final class SiteSearchSpecifications {
   /* The associations, and the one column read through each. */
   private static final String ORG_UNIT = "orgUnit";
   private static final String ORG_UNIT_CODE = "orgUnitCode";
-  private static final String ROAD_SECTION = "roadSection";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String CLIENT_NAME = "clientName";
   private static final String STATUS = "status";
   private static final String STATUS_DESCRIPTION = "description";
@@ -107,6 +104,8 @@ public final class SiteSearchSpecifications {
   /**
    * Builds the predicate, ordered by the column the user chose — or legacy's order when none.
    *
+   * Forest Service Road is not applied: see the overload taking road sections.
+   *
    * @param sort      the columns the user sorted by, first deciding; none for legacy's order
    */
   public static Specification<CrossingSiteEntity> matching(
@@ -115,11 +114,11 @@ public final class SiteSearchSpecifications {
   }
 
   /**
-   * Builds the predicate, with Forest Service Road matched on road sections rather than on the
-   * name in {@code CBR_ROAD_SECTION_VW}.
+   * Builds the predicate, with Forest Service Road matched on road sections: the name picked
+   * becomes the sections LRMOPS gives it ({@code RoadNameService#sectionsNamed}), resolved by the
+   * caller. {@code criteria.forestServiceRoad()} itself is not read here.
    *
-   * @param roadSections the sections LRMOPS gives the name picked ({@code RoadNameService});
-   *     null to match {@code criteria.forestServiceRoad()} against the view as before
+   * @param roadSections the sections LRMOPS gives the name picked; null when none was picked
    */
   public static Specification<CrossingSiteEntity> matching(
       SiteSearchCriteria criteria, List<HeaderSort<SiteSortColumn>> sort,
@@ -133,8 +132,9 @@ public final class SiteSearchSpecifications {
       if (roadSections != null) {
         predicates.add(onRoadSections(builder, root, roadSections));
       }
-      joinedCriteriaAndProjection(root, query, builder,
-          roadSections == null ? criteria.forestServiceRoad() : null, predicates, sort);
+      if (returnsEntities(query)) {
+        fetchAndOrder(root, query, builder, sort);
+      }
 
       return allOf(builder, predicates);
     };
@@ -203,47 +203,6 @@ public final class SiteSearchSpecifications {
     }
   }
 
-  /**
-   * The road section: filtered on by one criterion, displayed by every results row, joined once for
-   * both.
-   *
-   * <p>LEFT, so a site with no road section is still a candidate for every other criterion; the
-   * predicate then excludes it, which is what an inner join would have done anyway — but only for
-   * this criterion rather than for the whole query.
-   *
-   * <p><b>One join, not two.</b> It used to be created twice — a plain join here and a fetch in the
-   * projection — because {@code root.fetch(X)} is a new join every time and never reuses
-   * {@code root.join(X)}. That put two left joins to {@code CBR_ROAD_SECTION_VW}, a materialized
-   * view reached over a database link, in every search that filtered on Forest Service Road. The
-   * same mistake in Inspection Search cost far more, because the join it duplicated carried a
-   * correlated subquery.
-   *
-   * <p>It is joined at all only when something needs it: the projection always does, the filter
-   * does when set, and a count query that does neither leaves the view alone.
-   */
-  private static void joinedCriteriaAndProjection(
-      Root<CrossingSiteEntity> root,
-      CriteriaQuery<?> query,
-      CriteriaBuilder builder,
-      String forestServiceRoad,
-      List<Predicate> predicates,
-      List<HeaderSort<SiteSortColumn>> sort) {
-    boolean projecting = returnsEntities(query);
-    boolean filtering = StringUtils.hasText(forestServiceRoad);
-    if (!projecting && !filtering) {
-      return;
-    }
-
-    From<?, ?> roadSection = joinOrFetch(root, ROAD_SECTION, JoinType.LEFT, projecting);
-    if (filtering) {
-      contains(builder, roadSection.get(ROAD_SECTION_NAME), forestServiceRoad)
-          .ifPresent(predicates::add);
-    }
-    if (projecting) {
-      fetchAndOrder(root, roadSection, query, builder, sort);
-    }
-  }
-
   /** Every predicate that was set, or a tautology when none was — the unfiltered search. */
   private static Predicate allOf(CriteriaBuilder builder, List<Predicate> predicates) {
     return predicates.isEmpty()
@@ -283,17 +242,18 @@ public final class SiteSearchSpecifications {
   }
 
   /**
-   * Fetches what a results row displays, and applies legacy's sort: district code, then road, then
-   * road section, then kilometre.
+   * Fetches what a results row displays, and applies legacy's sort without its road name: district
+   * code, then road section, then kilometre. The road name is LRMOPS's, looked up for the page, so
+   * the database has none to sort on (2026-11-25).
    *
    * <h3>Why the sort is here and not on the {@code Pageable}</h3>
-   * Two of the four keys live on joined tables, and Spring Data resolves a sort path such as
+   * The district code lives on a joined table, and Spring Data resolves a sort path such as
    * {@code orgUnit.orgUnitCode} with an <em>inner</em> join — which would drop every site without an
    * org unit, including all the ones "Incomplete Data?" exists to find. Ordering inside the
    * specification is what lets the join type be stated.
    *
    * <h3>Why the joins are fetches</h3>
-   * Three of the four values in a results row come from associations. Left lazy, a page of twenty
+   * Two of the values in a results row come from associations. Left lazy, a page of twenty
    * sites costs twenty extra selects per association after the one that fetched the page — the
    * classic N+1, invisible in a test with three rows and very visible on a district. Fetching them
    * alongside the page makes it one query. These are all to-one, so no row is duplicated and no
@@ -309,17 +269,14 @@ public final class SiteSearchSpecifications {
    * which needs the same answer to decide whether the road section is a fetch or a plain join.
    *
    * <h3>A column the user chose comes first</h3>
-   * A header click puts that column ahead of legacy's four, which then break its ties — so sites
-   * sharing a crossing name still come out in district and road order rather than at random. The
+   * A header click puts that column ahead of legacy's keys, which then break its ties — so sites
+   * sharing a crossing name still come out in district order rather than at random. The
    * site number closes the list: it is unique, so the order is total and a site cannot appear on
    * two pages, or on none, as the user pages through. Text sorts without regard to case, which is
    * how a reader expects "Riske Cr" and "Unnamed" to fall.
-   *
-   * @param roadSection the join {@code matching} already made, reused here rather than made again
    */
   private static void fetchAndOrder(
       Root<CrossingSiteEntity> root,
-      From<?, ?> roadSection,
       CriteriaQuery<?> query,
       CriteriaBuilder builder,
       List<HeaderSort<SiteSortColumn>> sort) {
@@ -329,12 +286,12 @@ public final class SiteSearchSpecifications {
     List<Order> order = new ArrayList<>();
     for (HeaderSort<SiteSortColumn> header : sort) {
       for (Expression<?> key :
-          sortKeys(header.column(), root, orgUnit, roadSection, status, builder)) {
+          sortKeys(header.column(), root, orgUnit, status, builder)) {
         order.add(header.descending() ? builder.desc(key) : builder.asc(key));
       }
     }
+    // Legacy's order, without the road name: CBR no longer holds it (2026-11-25).
     order.add(builder.asc(orgUnit.get(ORG_UNIT_CODE)));
-    order.add(builder.asc(roadSection.get(ROAD_SECTION_NAME)));
     order.add(builder.asc(root.get(ROAD_SECTION_ID)));
     order.add(builder.asc(root.get(KILOMETRES)));
     order.add(builder.asc(root.get(SITE_ID)));
@@ -346,13 +303,11 @@ public final class SiteSearchSpecifications {
       SiteSortColumn column,
       Root<CrossingSiteEntity> root,
       From<?, ?> orgUnit,
-      From<?, ?> roadSection,
       From<?, ?> status,
       CriteriaBuilder builder) {
     return switch (column) {
       case SITE_ID -> List.of(builder.upper(root.get(SITE_ID)));
       case DISTRICT -> List.of(orgUnit.get(ORG_UNIT_CODE));
-      case FOREST_SERVICE_ROAD -> List.of(builder.upper(roadSection.get(ROAD_SECTION_NAME)));
       case KILOMETRES -> List.of(root.get(KILOMETRES));
       case CROSSING_NAME -> List.of(builder.upper(root.get(CROSSING_NAME)));
       case PROJECT_FILE -> List.of(

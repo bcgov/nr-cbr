@@ -38,7 +38,7 @@ class ReportApiEndpointTest {
   void structureInventorySummaryPath() throws NoSuchMethodException {
     Method method = ReportApiEndpoint.class.getMethod("structureInventorySummary",
         ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria.class,
-        ca.bc.gov.nrs.cbr.struct.v1.ReportFormat.class);
+        ca.bc.gov.nrs.cbr.struct.v1.ReportFormat.class, jakarta.servlet.http.HttpServletResponse.class);
 
     assertThat(method.getAnnotation(GetMapping.class).value())
         .containsExactly("/structure-inventory-summary");
@@ -48,7 +48,7 @@ class ReportApiEndpointTest {
   @DisplayName("serves the Structure Detail Report by structure id")
   void structureDetailPath() throws NoSuchMethodException {
     Method method = ReportApiEndpoint.class.getMethod("structureDetail", long.class,
-        ca.bc.gov.nrs.cbr.struct.v1.ReportFormat.class);
+        ca.bc.gov.nrs.cbr.struct.v1.ReportFormat.class, jakarta.servlet.http.HttpServletResponse.class);
 
     assertThat(method.getAnnotation(GetMapping.class).value())
         .containsExactly("/structure-detail/{structureId}");

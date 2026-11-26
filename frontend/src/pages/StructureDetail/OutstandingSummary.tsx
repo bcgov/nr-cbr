@@ -18,8 +18,8 @@ type Props = {
 };
 
 /**
- * Legacy's red "Warning: Structure data is incomplete.", as nr-frep's page-level tally above the tab
- * strip: how much is outstanding, and across how many tabs.
+ * Legacy's red "Warning: Structure data is incomplete.", as a page-level tally above the tab strip:
+ * how much is outstanding, and across how many tabs.
  *
  * <p>Informational until something is refused for it: an incomplete structure is ordinary unfinished
  * data and saves as it is. Once Add Routine / Unplanned Inspection is pressed on it, the same items

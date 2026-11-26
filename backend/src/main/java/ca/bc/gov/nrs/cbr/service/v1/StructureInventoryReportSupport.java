@@ -12,11 +12,9 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
 import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
@@ -30,12 +28,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -228,20 +225,16 @@ public class StructureInventoryReportSupport {
   }
 
   /**
-   * A CSV of these rows under this header: plain UTF-8, no byte-order mark, quoted only where a
-   * value needs it — data to sort and filter, not a page.
+   * A CSV written to {@code target} as it is made: the target opened now, for a file of this name,
+   * and the header written. Open it once the rows are ready to write, or are about to be — not
+   * before what can fail on the criteria.
    */
-  static byte[] csv(List<String> header, List<List<String>> rows) {
-    StringWriter out = new StringWriter();
-    try (CSVPrinter printer = new CSVPrinter(out,
-        CSVFormat.DEFAULT.builder().setHeader(header.toArray(String[]::new)).build())) {
-      for (List<String> row : rows) {
-        printer.printRecord(row);
-      }
+  static CsvStream csv(ReportTarget target, String filename, List<String> header) {
+    try {
+      return CsvStream.open(target.open(filename, ReportFormat.CSV.mediaType()), header);
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
-    return out.toString().getBytes(StandardCharsets.UTF_8);
   }
 
   /** "1234.6", "12.5": no grouping, no trailing zeros — what a spreadsheet reads as a number. */
@@ -274,14 +267,32 @@ public class StructureInventoryReportSupport {
     return value == null ? "" : value.toString();
   }
 
-  /** A number in one of legacy's template patterns, or blank. Made per call: not thread-safe. */
+  /**
+   * Legacy's template patterns, each compiled once into a formatter that is never used itself —
+   * only copied.
+   *
+   * <p>{@link DecimalFormat} is not thread-safe, so it cannot be shared between requests; it was
+   * made afresh for every number instead, which a province-wide report does hundreds of thousands
+   * of times — each one compiling its pattern again. A copy of the compiled one skips that, and is
+   * the caller's own. Nothing is kept per thread, so nothing outlives a request on a pooled thread.
+   */
+  private static final Map<String, DecimalFormat> FORMATS = new ConcurrentHashMap<>();
+
+  /** A number in one of legacy's template patterns, or blank. */
   static String format(BigDecimal value, String pattern) {
     if (value == null) {
       return "";
     }
-    DecimalFormat format = new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(Locale.CANADA));
-    format.setRoundingMode(RoundingMode.HALF_EVEN);
-    return format.format(value);
+    return decimalFormat(pattern).format(value);
+  }
+
+  /** A formatter of the caller's own for a pattern: Canadian symbols, half-even rounding. */
+  static DecimalFormat decimalFormat(String pattern) {
+    return (DecimalFormat) FORMATS.computeIfAbsent(pattern, key -> {
+      DecimalFormat format = new DecimalFormat(key, DecimalFormatSymbols.getInstance(Locale.CANADA));
+      format.setRoundingMode(RoundingMode.HALF_EVEN);
+      return format;
+    }).clone();
   }
 
   /** A date as the reports print it, or blank. */

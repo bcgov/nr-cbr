@@ -1,3 +1,5 @@
+import RoadNameCombo from '@/components/core/RoadNameCombo';
+
 import MaintainerFields from '../MaintainerFields';
 import ReportCriteriaForm from '../ReportCriteriaForm';
 import ReportPageLayout from '../ReportPageLayout';
@@ -108,7 +110,12 @@ const MonitorsSummaryPage: FC = () => {
               withIsNull(orgUnitOptions(codeTables.businessAreas)),
               { filterable: true },
             )}
-            {fields.text('forestServiceRoad', 'Forest Service Road', 20)}
+            {/* A pick list of LRMOPS's names, matched exactly — as on the search screens. */}
+            <RoadNameCombo
+              id={`${ID}-forestServiceRoad`}
+              value={criteria.forestServiceRoad}
+              onChange={(roadName) => updateCriteria('forestServiceRoad', roadName)}
+            />
             <div className="report-criteria__paired">
               {fields.text('forestFileId', 'Project File ID#', 10)}
               {fields.text('roadSectionId', 'Br.', 30)}

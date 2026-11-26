@@ -7,7 +7,7 @@ type Props = {
   section: string;
   /** What is counted: items outstanding (the structure page), or errors (a form's tabs). */
   kind?: 'outstanding' | 'errors';
-  /** `error` once a save has been refused for these items — nr-frep's tone. */
+  /** `error` once a save has been refused for these items. */
   tone?: 'neutral' | 'error';
   /** What the red items are blocking, for screen readers: `save` by default. */
   blocking?: string;

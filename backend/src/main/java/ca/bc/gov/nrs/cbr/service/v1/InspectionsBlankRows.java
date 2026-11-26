@@ -11,6 +11,7 @@ import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureMonitorItemEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceBridgeRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureBridgeDetail;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureMonitorItemRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairRepository;
@@ -23,6 +24,7 @@ import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse.Question;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse.Scope;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionFormResponse.Subsection;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionsDueCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -32,9 +34,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -110,6 +115,7 @@ public class InspectionsBlankRows {
   private final StructureMonitorItemRepository monitors;
   private final RepairsSummaryNames repairNames;
   private final ConfigurationService codes;
+  private final RoadNameService roadNames;
 
   public InspectionsBlankRows(
       EntityManager entityManager,
@@ -118,7 +124,8 @@ public class InspectionsBlankRows {
       StructureRepairRepository repairs,
       StructureMonitorItemRepository monitors,
       RepairsSummaryNames repairNames,
-      ConfigurationService codes) {
+      ConfigurationService codes,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.forms = forms;
     this.forestServiceBridges = forestServiceBridges;
@@ -126,6 +133,7 @@ public class InspectionsBlankRows {
     this.monitors = monitors;
     this.repairNames = repairNames;
     this.codes = codes;
+    this.roadNames = roadNames;
   }
 
   /** The CSV's columns: the structure the form is for and where it is, then the form's item. */
@@ -141,34 +149,82 @@ public class InspectionsBlankRows {
    * structure is listed.
    */
   public List<List<String>> csvRows(InspectionsDueCriteria criteria) {
-    List<Long> ids = entityManager.createQuery(InspectionsDueReportSpecifications.blankIds(
-        entityManager.getCriteriaBuilder(), criteria)).getResultList();
-    Map<Long, CrossingStructureEntity> structures = structures(ids);
-    Beside beside = beside(ids, structures);
     List<List<String>> rows = new ArrayList<>();
-    for (Long id : ids) {
-      CrossingStructureEntity structure = structures.get(id);
-      List<String> fields = structureFields(structure);
-      List<List<String>> items = items(new Form(structure, beside).lines());
-      if (items.isEmpty()) {
-        items = List.of(List.of("", "", "", "", ""));
-      }
-      for (List<String> item : items) {
-        List<String> row = new ArrayList<>(fields);
-        row.addAll(item);
-        rows.add(row);
-      }
-    }
+    csvRows(criteria, rows::add);
     return rows;
   }
 
-  private static List<String> structureFields(CrossingStructureEntity structure) {
+  /**
+   * The CSV, as {@link #csvRows} has it, written to {@code csv} as it is made: the structures a
+   * batch at a time, the session cleared after each, so a province's forms — a quarter of a
+   * million rows — are never all in memory. The road names are looked up once, for every
+   * structure, beforehand.
+   */
+  public void writeCsv(InspectionsDueCriteria criteria, CsvStream csv) {
+    csvRows(criteria, csv::row);
+  }
+
+  private void csvRows(InspectionsDueCriteria criteria, Consumer<List<String>> out) {
+    List<Long> ids = entityManager.createQuery(InspectionsDueReportSpecifications.blankIds(
+        entityManager.getCriteriaBuilder(), criteria))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
+        .getResultList();
+    Shared shared = shared(ids);
+    for (int from = 0; from < ids.size(); from += BATCH) {
+      List<Long> batch = ids.subList(from, Math.min(ids.size(), from + BATCH));
+      Map<Long, CrossingStructureEntity> structures = structures(batch);
+      Beside beside = beside(batch, structures, shared);
+      for (Long id : batch) {
+        CrossingStructureEntity structure = structures.get(id);
+        List<String> fields = structureFields(structure, beside.roads());
+        List<List<String>> items = items(new Form(structure, beside).lines());
+        if (items.isEmpty()) {
+          items = List.of(List.of("", "", "", "", ""));
+        }
+        for (List<String> item : items) {
+          List<String> row = new ArrayList<>(fields);
+          row.addAll(item);
+          out.accept(row);
+        }
+      }
+      // What this batch loaded is written; let it go before the next.
+      entityManager.clear();
+    }
+  }
+
+  /**
+   * LRMOPS's road names for these structures' sites: their distinct road sections read in one
+   * small query a batch at a time, then looked up together.
+   */
+  private Function<CrossingSiteEntity, String> roadsOf(List<Long> structureIds) {
+    List<RoadSectionKey> sections = new ArrayList<>();
+    for (int from = 0; from < structureIds.size(); from += BATCH) {
+      entityManager.createQuery("""
+              SELECT DISTINCT site.forestFileId, site.roadSectionId
+                FROM CrossingStructureEntity structure
+                JOIN structure.site site
+               WHERE structure.crossingStructureId IN :ids
+              """, Object[].class)
+          .setParameter("ids",
+              structureIds.subList(from, Math.min(structureIds.size(), from + BATCH)))
+          .getResultList()
+          .forEach(pair -> sections.add(RoadSectionKey.of((String) pair[0], (String) pair[1])));
+    }
+    Map<RoadSectionKey, String> names = roadNames.namesOf(sections);
+    return site -> {
+      RoadSectionKey key = RoadSectionKey.of(site.getForestFileId(), site.getRoadSectionId());
+      return key == null ? null : names.get(key);
+    };
+  }
+
+  private static List<String> structureFields(
+      CrossingStructureEntity structure, Function<CrossingSiteEntity, String> roads) {
     CrossingSiteEntity site = structure.getSite();
     return List.of(
         blankIfNull(structure.getCrossingStructureName()),
         blankIfNull(structure.getCrossingSiteId()),
         blankIfNull(structure.getStructureTypeClassCode()),
-        site.getRoadSection() == null ? "" : blankIfNull(site.getRoadSection().getRoadSectName()),
+        blankIfNull(roads.apply(site)),
         blankIfNull(site.getForestFileId()),
         blankIfNull(site.getRoadSectionId()),
         plain(site.getUserKm()),
@@ -209,12 +265,38 @@ public class InspectionsBlankRows {
     return items;
   }
 
-  /** The lines of every structure's form, structure by structure. */
+  /**
+   * The PDF's lines for Jasper to fill from, as {@link #rows} has them but loaded a batch of
+   * structures at a time as Jasper reaches them, the session cleared before each — so a
+   * province's forms are never all in memory. The road names are looked up once, beforehand. Fill
+   * it inside a transaction: it loads as it is read.
+   */
+  BatchedRowSource<Long> rowSource(InspectionsDueCriteria criteria) {
+    List<Long> ids = entityManager.createQuery(InspectionsDueReportSpecifications.blankIds(
+        entityManager.getCriteriaBuilder(), criteria))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
+        .getResultList();
+    Shared shared = shared(ids);
+    return new BatchedRowSource<>(ids, BATCH, batch -> {
+      // The last batch's lines are Jasper's now, as plain values; its entities can go.
+      entityManager.clear();
+      Map<Long, CrossingStructureEntity> structures = structures(batch);
+      Beside beside = beside(batch, structures, shared);
+      List<Map<String, String>> lines = new ArrayList<>();
+      for (Long id : batch) {
+        lines.addAll(new Form(structures.get(id), beside).lines());
+      }
+      return lines;
+    });
+  }
+
   public List<Map<String, String>> rows(InspectionsDueCriteria criteria) {
     List<Long> ids = entityManager.createQuery(InspectionsDueReportSpecifications.blankIds(
-        entityManager.getCriteriaBuilder(), criteria)).getResultList();
+        entityManager.getCriteriaBuilder(), criteria))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
+        .getResultList();
     Map<Long, CrossingStructureEntity> structures = structures(ids);
-    Beside beside = beside(ids, structures);
+    Beside beside = beside(ids, structures, shared(ids));
     List<Map<String, String>> lines = new ArrayList<>();
     for (Long id : ids) {
       lines.addAll(new Form(structures.get(id), beside).lines());
@@ -226,8 +308,11 @@ public class InspectionsBlankRows {
    * What every form reads beside its structure, a batch at a time: its questions, its first bridge
    * and that bridge's descriptions, its outstanding repairs and monitoring items, and the codes'
    * names — where a structure at a time made a province's forms outrun the browser's wait.
+   *
+   * @param shared what the report read once, before its batches ({@link #shared})
    */
-  private Beside beside(List<Long> ids, Map<Long, CrossingStructureEntity> structures) {
+  private Beside beside(
+      List<Long> ids, Map<Long, CrossingStructureEntity> structures, Shared shared) {
     Map<Long, ForestServiceBridgeEntity> firstBridges = new HashMap<>();
     Map<Long, StructureBridgeDetail> details = new HashMap<>();
     Map<Long, List<StructureRepairEntity>> outstandingRepairs = new HashMap<>();
@@ -253,10 +338,27 @@ public class InspectionsBlankRows {
     codes.getMonitoringStatusCodes()
         .forEach(code -> monitorStatuses.put(code.code(), code.description()));
     return new Beside(
-        forms.forms(ids.stream().map(structures::get).toList()),
+        // The first bridges just read, and the catalogues read so far: not read again.
+        forms.forms(ids.stream().map(structures::get).toList(), firstBridges,
+            shared.catalogues()),
         firstBridges, details, outstandingRepairs, outstandingMonitors,
-        repairNames.names(), monitorStatuses);
+        shared.repairNames(), monitorStatuses, shared.roads());
   }
+
+  /**
+   * What a report reads once, before its batches, rather than in each: LRMOPS's road names for
+   * every structure, the repair code tables, and a store for the form catalogues as each
+   * type/class is first met. Read per batch, the catalogues and code tables were some 200 queries
+   * for a province.
+   */
+  private Shared shared(List<Long> structureIds) {
+    return new Shared(roadsOf(structureIds), repairNames.names(), forms.catalogues());
+  }
+
+  private record Shared(
+      Function<CrossingSiteEntity, String> roads,
+      Names repairNames,
+      InspectionFormService.Catalogues catalogues) {}
 
   /** What the forms read beside their structures, by structure id. */
   private record Beside(
@@ -266,7 +368,8 @@ public class InspectionsBlankRows {
       Map<Long, List<StructureRepairEntity>> repairs,
       Map<Long, List<StructureMonitorItemEntity>> monitors,
       Names names,
-      Map<String, String> monitorStatuses) {}
+      Map<String, String> monitorStatuses,
+      Function<CrossingSiteEntity, String> roads) {}
 
   private Map<Long, CrossingStructureEntity> structures(List<Long> ids) {
     Map<Long, CrossingStructureEntity> found = new HashMap<>();
@@ -275,9 +378,9 @@ public class InspectionsBlankRows {
               SELECT structure
                 FROM CrossingStructureEntity structure
                 JOIN FETCH structure.site site
-                LEFT JOIN FETCH site.roadSection
                WHERE structure.crossingStructureId IN :ids
               """, CrossingStructureEntity.class)
+          .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
           .setParameter("ids", ids.subList(from, Math.min(ids.size(), from + BATCH)))
           .getResultList()
           .forEach(structure -> found.put(structure.getCrossingStructureId(), structure));
@@ -349,8 +452,7 @@ public class InspectionsBlankRows {
     private void general() {
       CrossingSiteEntity site = structure.getSite();
       Map<String, String> line = line(Kind.GENERAL, newSection());
-      line.put("ROAD_SECT_NAME",
-          site.getRoadSection() == null ? null : site.getRoadSection().getRoadSectName());
+      line.put("ROAD_SECT_NAME", beside.roads().apply(site));
       line.put("USER_KM", site.getUserKm() == null ? null : format(site.getUserKm(), KILOMETRES));
       line.put("FOREST_FILE_ID", site.getForestFileId());
       line.put("ROAD_SECTION_ID", site.getRoadSectionId());

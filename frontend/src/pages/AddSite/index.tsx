@@ -240,7 +240,7 @@ const AddSitePage: FC = () => {
   const errors = withRoadErrors(merged, site.crossingSiteTypeCode, road);
 
   /**
-   * Everything that would stop the save, from the first render — nr-frep's pattern, as Add
+   * Everything that would stop the save, from the first render, as Add
    * Inspection's and Add Structure's: the notice, the tab's count and its list are the map of what
    * is left, while each box's own message still waits for the box to be left, or for Save.
    */
@@ -422,7 +422,7 @@ const AddSitePage: FC = () => {
         </Column>
       )}
 
-      {/* nr-frep's summary above the tabs, as Add Inspection's and Add Structure's: how much is
+      {/* The summary above the tabs, as Add Inspection's and Add Structure's: how much is
           outstanding — informational until a Save is refused, then red. */}
       {outstanding.length > 0 && (
         <Column sm={4} md={8} lg={16}>
