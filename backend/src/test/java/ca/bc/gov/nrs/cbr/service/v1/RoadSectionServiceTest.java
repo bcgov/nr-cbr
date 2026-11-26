@@ -53,11 +53,11 @@ class RoadSectionServiceTest {
   @DisplayName("search passes the criteria and the sorts in the API's terms, and maps the rows")
   void searchMapsBothWays() {
     when(lrmops.searchRoads(any(), anyInt(), anyInt(), any())).thenReturn(new RoadPage(
-        List.of(new RoadSummary("R07571", "AA", "BIG CREEK FSR", "FSR", true, "ACME LTD")),
+        List.of(new RoadSummary("R07571", "AA", "BIG CREEK FSR", "FSR", true, List.of("DMH", "DPG"))),
         16, 2, 1, 15));
 
     PagedResponse<RoadSearchResult> page = service.search(
-        new RoadSearchCriteria("big creek", "R07571", null, "FSR", "acme"), 1, 15,
+        new RoadSearchCriteria("big creek", "R07571", null, "FSR", 18L), 1, 15,
         List.of(new HeaderSort<>(RoadSortColumn.FOREST_SERVICE_ROAD, Sort.Direction.DESC),
             new HeaderSort<>(RoadSortColumn.PROJECT_FILE, Sort.Direction.ASC)));
 
@@ -66,12 +66,12 @@ class RoadSectionServiceTest {
     verify(lrmops).searchRoads(criteria.capture(), eq(1), eq(15),
         eq(List.of(new RoadSort("ROAD_NAME", "DESC"), new RoadSort("ROAD_ID", "ASC"))));
     assertThat(criteria.getValue()).isEqualTo(
-        new LrmopsApiClient.RoadSearchCriteria("big creek", "R07571", null, "FSR", "acme"));
+        new LrmopsApiClient.RoadSearchCriteria("big creek", "R07571", null, "FSR", 18L));
 
     assertThat(page.totalElements()).isEqualTo(16);
     // Retired, so shown as LRMOPS stores it — the code the dropdown filters on.
     assertThat(page.content()).containsExactly(
-        new RoadSearchResult("BIG CREEK FSR", "R07571", "AA", "FSR-RETIRE", "ACME LTD"));
+        new RoadSearchResult("BIG CREEK FSR", "R07571", "AA", "FSR-RETIRE", List.of("DMH", "DPG")));
   }
 
   @Test

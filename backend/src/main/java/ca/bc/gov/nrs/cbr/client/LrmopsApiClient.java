@@ -114,7 +114,9 @@ public class LrmopsApiClient {
           queryParam(uriBuilder, "roadId", criteria.roadId());
           queryParam(uriBuilder, "sectionId", criteria.sectionId());
           queryParam(uriBuilder, "tenureType", criteria.tenureType());
-          queryParam(uriBuilder, "clientName", criteria.clientName());
+          if (criteria.district() != null) {
+            uriBuilder.queryParam("district", criteria.district());
+          }
           uriBuilder.queryParam("pageNumber", pageNumber);
           uriBuilder.queryParam("pageSize", pageSize);
           for (RoadSort sort : sorts == null ? List.<RoadSort>of() : sorts) {
@@ -237,7 +239,7 @@ public class LrmopsApiClient {
 
   /** Search criteria; blank ones are left out of the request. */
   public record RoadSearchCriteria(
-      String roadName, String roadId, String sectionId, String tenureType, String clientName) {
+      String roadName, String roadId, String sectionId, String tenureType, Long district) {
   }
 
   /** A road section by road id and section id, as the API takes and returns them. */
@@ -257,7 +259,10 @@ public class LrmopsApiClient {
       String roadName,
       String tenureType,
       boolean retired,
-      String clientName) {
+      List<String> districts) {
+    public RoadSummary {
+      districts = districts == null ? List.of() : districts;
+    }
   }
 
   /** A page of search results, with the total. */

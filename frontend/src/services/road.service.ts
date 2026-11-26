@@ -33,24 +33,32 @@ export type RoadSectionResponse = {
   districts: RoadDistrict[];
 };
 
-/** What the road lookup dialog asks on. Every criterion optional, every one a partial match. */
+/**
+ * What the road lookup dialog asks on. Every criterion optional; the names and ids are partial
+ * matches, the tenure type and the district exact.
+ */
 export type RoadSearchCriteria = {
   forestServiceRoad: string;
   forestFileId: string;
   roadSectionId: string;
   /** LRMOPS's road tenure type, matched exactly — `FSR`, `FSR-RETIRE`, `RP`, … (see `getTenureTypes`). */
   tenureType: string;
-  /** The tenure holder's name, a partial match. LRMOPS records no client number. */
-  clientName: string;
+  /**
+   * The Forest District's org unit number; blank for any. In place of the tenure holder's name,
+   * which LRMOPS keeps as free text that is not updated when a road changes hands (business,
+   * 2026-11-26). A section crossing a district boundary is found under each of its districts.
+   */
+  district: string;
 };
 
-/** One row of the road search, from LRMOPS. The client is null when LRMOPS records none. */
+/** One row of the road search, from LRMOPS. */
 export type RoadSearchResult = {
   forestServiceRoad: string | null;
   forestFileId: string;
   roadSectionId: string;
   tenureType: string | null;
-  clientName: string | null;
+  /** The district codes it lies in, e.g. `DPG`: usually one, two across a boundary; may be empty. */
+  districts: string[];
 };
 
 /**
@@ -59,7 +67,7 @@ export type RoadSearchResult = {
  * until a header is clicked.
  */
 export type RoadSortColumn =
-  'FOREST_SERVICE_ROAD' | 'PROJECT_FILE' | 'BRANCH' | 'TENURE_TYPE' | 'CLIENT_NAME';
+  'FOREST_SERVICE_ROAD' | 'PROJECT_FILE' | 'BRANCH' | 'TENURE_TYPE' | 'DISTRICT';
 
 /** The columns the user sorted by, the first deciding. Empty is legacy's order. */
 export type RoadSort = SortOrder<RoadSortColumn>;
@@ -69,7 +77,7 @@ export const EMPTY_ROAD_CRITERIA: RoadSearchCriteria = {
   forestFileId: '',
   roadSectionId: '',
   tenureType: '',
-  clientName: '',
+  district: '',
 };
 
 /** The message for a road lookup the LRM Ops API could not answer (a 503 from CBR's backend). */

@@ -16,6 +16,6 @@ public enum RoadSortColumn {
   BRANCH,
   /** Tenure Type. */
   TENURE_TYPE,
-  /** Client Name — the tenure holder's. */
-  CLIENT_NAME
+  /** District — by the section's first district code. */
+  DISTRICT
 }
