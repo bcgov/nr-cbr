@@ -28,6 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
@@ -267,14 +268,15 @@ public class StructureInventoryReportSupport {
   }
 
   /**
-   * The formatters of legacy's template patterns, one per pattern for each thread that formats.
+   * Legacy's template patterns, each compiled once into a formatter that is never used itself —
+   * only copied.
    *
    * <p>{@link DecimalFormat} is not thread-safe, so it cannot be shared between requests; it was
    * made afresh for every number instead, which a province-wide report does hundreds of thousands
-   * of times — each one compiling its pattern again. A thread's own copy is safe and made once.
+   * of times — each one compiling its pattern again. A copy of the compiled one skips that, and is
+   * the caller's own. Nothing is kept per thread, so nothing outlives a request on a pooled thread.
    */
-  private static final ThreadLocal<Map<String, DecimalFormat>> FORMATS =
-      ThreadLocal.withInitial(HashMap::new);
+  private static final Map<String, DecimalFormat> FORMATS = new ConcurrentHashMap<>();
 
   /** A number in one of legacy's template patterns, or blank. */
   static String format(BigDecimal value, String pattern) {
@@ -284,16 +286,13 @@ public class StructureInventoryReportSupport {
     return decimalFormat(pattern).format(value);
   }
 
-  /**
-   * This thread's formatter for a pattern: Canadian symbols, half-even rounding. Use it at once and
-   * do not keep it — it is shared with every later call on this thread.
-   */
+  /** A formatter of the caller's own for a pattern: Canadian symbols, half-even rounding. */
   static DecimalFormat decimalFormat(String pattern) {
-    return FORMATS.get().computeIfAbsent(pattern, key -> {
+    return (DecimalFormat) FORMATS.computeIfAbsent(pattern, key -> {
       DecimalFormat format = new DecimalFormat(key, DecimalFormatSymbols.getInstance(Locale.CANADA));
       format.setRoundingMode(RoundingMode.HALF_EVEN);
       return format;
-    });
+    }).clone();
   }
 
   /** A date as the reports print it, or blank. */

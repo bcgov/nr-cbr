@@ -152,7 +152,7 @@ public class InspectionFormService {
    */
   @Transactional(readOnly = true)
   public Map<Long, InspectionFormResponse> forms(List<CrossingStructureEntity> listed) {
-    return forms(listed, null, new Catalogues());
+    return formsOf(listed, null, new Catalogues());
   }
 
   /**
@@ -166,6 +166,11 @@ public class InspectionFormService {
    */
   @Transactional(readOnly = true)
   public Map<Long, InspectionFormResponse> forms(List<CrossingStructureEntity> listed,
+      Map<Long, ForestServiceBridgeEntity> firstBridges, Catalogues catalogues) {
+    return formsOf(listed, firstBridges, catalogues);
+  }
+
+  private Map<Long, InspectionFormResponse> formsOf(List<CrossingStructureEntity> listed,
       Map<Long, ForestServiceBridgeEntity> firstBridges, Catalogues catalogues) {
     List<Long> ids = listed.stream().map(CrossingStructureEntity::getCrossingStructureId).toList();
     boolean readBridges = firstBridges == null;

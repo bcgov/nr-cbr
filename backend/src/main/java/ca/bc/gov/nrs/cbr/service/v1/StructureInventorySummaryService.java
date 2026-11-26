@@ -18,7 +18,6 @@ import ca.bc.gov.nrs.cbr.struct.v1.StructureInventorySummaryCriteria;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.LinkedHashMap;

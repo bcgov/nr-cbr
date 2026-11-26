@@ -265,7 +265,6 @@ public class InspectionsBlankRows {
     return items;
   }
 
-  /** The lines of every structure's form, structure by structure. */
   /**
    * The PDF's lines for Jasper to fill from, as {@link #rows} has them but loaded a batch of
    * structures at a time as Jasper reaches them, the session cleared before each — so a

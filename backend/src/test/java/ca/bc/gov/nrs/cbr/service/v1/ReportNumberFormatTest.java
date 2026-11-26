@@ -28,10 +28,10 @@ class ReportNumberFormatTest {
   }
 
   @Test
-  @DisplayName("reuses a formatter per thread, and threads formatting at once do not mix them")
+  @DisplayName("gives each caller its own formatter, and threads formatting at once do not mix them")
   void safeAcrossThreads() throws Exception {
     assertThat(StructureInventoryReportSupport.decimalFormat("#,##0.00"))
-        .isSameAs(StructureInventoryReportSupport.decimalFormat("#,##0.00"));
+        .isNotSameAs(StructureInventoryReportSupport.decimalFormat("#,##0.00"));
 
     ExecutorService pool = Executors.newFixedThreadPool(8);
     try {

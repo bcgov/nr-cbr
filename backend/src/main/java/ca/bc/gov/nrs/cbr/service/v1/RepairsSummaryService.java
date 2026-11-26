@@ -121,9 +121,9 @@ public class RepairsSummaryService {
   public void writeCsv(RepairsSummaryCriteria criteria, ReportTarget target) {
     long started = System.nanoTime();
     List<List<String>> csvRows = csvRows(criteria);
-    try (CsvStream csv = StructureInventoryReportSupport.csv(target,
+    try (CsvStream out = StructureInventoryReportSupport.csv(target,
         filename(FILENAME, support.today(), ReportFormat.CSV), RepairsSummaryCsv.COLUMNS)) {
-      csv.rows(csvRows);
+      out.rows(csvRows);
     }
     log.info("Repairs Summary: {} rows as CSV, streamed, in {} ms",
         csvRows.size(), millisSince(started));

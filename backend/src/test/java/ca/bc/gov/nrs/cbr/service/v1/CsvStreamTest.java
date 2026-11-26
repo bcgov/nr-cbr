@@ -53,7 +53,7 @@ class CsvStreamTest {
     });
 
     assertThat(file.filename()).isEqualTo("x.csv");
-    assertThat(file.mediaType().toString()).isEqualTo("text/csv");
+    assertThat(file.mediaType()).hasToString("text/csv");
     assertThat(new String(file.content(), StandardCharsets.UTF_8)).isEqualTo("N\r\n1\r\n");
   }
 }

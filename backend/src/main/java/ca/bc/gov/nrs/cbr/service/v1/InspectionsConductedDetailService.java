@@ -66,8 +66,8 @@ public class InspectionsConductedDetailService {
   @Transactional(readOnly = true)
   public ReportFile generate(InspectionsConductedCriteria criteria, ReportFormat format) {
     return format == ReportFormat.CSV
-        ? ReportTarget.inMemory(target -> writeCsv(criteria, target))
-        : ReportTarget.inMemory(target -> writePdf(criteria, target));
+        ? ReportTarget.inMemory(target -> csv(criteria, target))
+        : ReportTarget.inMemory(target -> pdf(criteria, target));
   }
 
   /**
@@ -80,6 +80,10 @@ public class InspectionsConductedDetailService {
    */
   @Transactional(readOnly = true)
   public void writePdf(InspectionsConductedCriteria criteria, ReportTarget target) {
+    pdf(criteria, target);
+  }
+
+  private void pdf(InspectionsConductedCriteria criteria, ReportTarget target) {
     long started = System.nanoTime();
     InspectionsConductedSort sort = criteria.sortOr(DEFAULT_SORT);
     String printed = support.today();
@@ -109,6 +113,10 @@ public class InspectionsConductedDetailService {
    * ready.
    */
   public void writeCsv(InspectionsConductedCriteria criteria, ReportTarget target) {
+    csv(criteria, target);
+  }
+
+  private void csv(InspectionsConductedCriteria criteria, ReportTarget target) {
     long started = System.nanoTime();
     int count;
     try (CsvStream csv = StructureInventoryReportSupport.csv(target,
