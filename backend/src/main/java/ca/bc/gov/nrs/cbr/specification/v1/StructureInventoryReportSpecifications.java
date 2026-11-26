@@ -82,8 +82,6 @@ public final class StructureInventoryReportSpecifications {
   private static final String ORG_UNIT = "orgUnit";
   private static final String ORG_UNIT_NAME = "orgUnitName";
   private static final String SITE_ID = "crossingSiteId";
-  private static final String ROAD_SECTION = "roadSection";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String FOREST_FILE_ID = "forestFileId";
   private static final String ROAD_SECTION_ID = "roadSectionId";
   private static final String CROSSING_NAME = "crossingName";
@@ -118,16 +116,14 @@ public final class StructureInventoryReportSpecifications {
    * The lines the report lists for these criteria, in the order chosen — one statement, selecting
    * the fourteen values a line prints rather than loading the structure and its site whole.
    *
-   * <p>Joins, never fetches: nothing is loaded as an entity. That also keeps the site's road — a
-   * {@code @NotFound} association, which Hibernate would otherwise load eagerly — to a plain left
-   * join on the view.
+   * <p>Joins, never fetches: nothing is loaded as an entity. No join to CBR's road copy: the road
+   * name is LRMOPS's, looked up afterwards (2026-11-25).
    */
   public static CriteriaQuery<StructureInventoryLine> summary(
       CriteriaBuilder builder, StructureInventorySummaryCriteria criteria) {
     CriteriaQuery<StructureInventoryLine> query = builder.createQuery(StructureInventoryLine.class);
     Root<CrossingStructureEntity> root = query.from(CrossingStructureEntity.class);
     From<?, ?> site = root.join(SITE, JoinType.LEFT);
-    From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
 
     List<Predicate> predicates = sharedCriteria(builder, query, root, site, criteria);
     constructionCriteria(builder, query, root, criteria, predicates);
@@ -146,8 +142,7 @@ public final class StructureInventoryReportSpecifications {
             site.get(ROAD_SECTION_ID),
             site.get(CROSSING_NAME),
             site.get(KILOMETRES),
-            site.get(CAPITAL_ROAD),
-            roadSection.get(ROAD_SECTION_NAME)))
+            site.get(CAPITAL_ROAD)))
         .where(predicates.toArray(new Predicate[0]))
         .orderBy(order(criteria.sortOrDefault(), root, site, builder));
   }
@@ -189,8 +184,8 @@ public final class StructureInventoryReportSpecifications {
     return query.where(root.get(STRUCTURE_ID).in(structureIds));
   }
 
-  /** The site and road a Detailed line is joined to, which its order reads. */
-  private record DetailJoins(From<?, ?> site, From<?, ?> roadSection) {}
+  /** The site a Detailed line is joined to, which its order reads. */
+  private record DetailJoins(From<?, ?> site) {}
 
   /** The Detailed line's joins and its selection. */
   private static DetailJoins selectDetail(
@@ -198,8 +193,8 @@ public final class StructureInventoryReportSpecifications {
       CriteriaQuery<StructureInventoryDetailLine> query,
       Root<CrossingStructureEntity> root) {
     From<?, ?> typeClass = root.join(TYPE_CLASS, JoinType.INNER);
+    // No join to CBR's road copy: the road name is LRMOPS's, looked up afterwards (2026-11-25).
     From<?, ?> site = root.join(SITE, JoinType.LEFT);
-    From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
     From<?, ?> status = site.join(SITE_STATUS_CODE, JoinType.LEFT);
     From<?, ?> district = site.join(ORG_UNIT, JoinType.LEFT);
 
@@ -219,7 +214,6 @@ public final class StructureInventoryReportSpecifications {
         site.get(FOREST_FILE_ID),
         site.get(ROAD_SECTION_ID),
         district.get(ORG_UNIT_NAME),
-        roadSection.get(ROAD_SECTION_NAME),
         site.get(CROSSING_NAME),
         site.get(CAPITAL_ROAD),
         root.get(DESIGN_VEHICLE),
@@ -238,7 +232,7 @@ public final class StructureInventoryReportSpecifications {
         site.get(BUSINESS_AREA_ORG_UNIT_NO),
         district.get(ROLLUP_REGION_NO),
         site.get(STRUCTURE_INSPECTION_STATUS)));
-    return new DetailJoins(site, roadSection);
+    return new DetailJoins(site);
   }
 
   /** The criteria every Structure Inventory report has — always {@code ACTIVE_IND = 'Y'}. */

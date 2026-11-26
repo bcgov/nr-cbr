@@ -2,7 +2,6 @@ package ca.bc.gov.nrs.cbr.specification.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
@@ -50,7 +49,6 @@ class SiteSearchSpecificationsTest {
   @BeforeEach
   void clear() {
     entityManager.createQuery("DELETE FROM CrossingSiteEntity").executeUpdate();
-    entityManager.createQuery("DELETE FROM CbrRoadSectionEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM ClientPublicEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM OrgUnitEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CrossingSiteStatusCodeEntity").executeUpdate();
@@ -105,8 +103,6 @@ class SiteSearchSpecificationsTest {
         .orgUnitNo(21L).orgUnitCode("DKA").orgUnitName("Thompson Rivers").build());
     entityManager.persist(OrgUnitEntity.builder()
         .orgUnitNo(26L).orgUnitCode("DRV").orgUnitName("Robson Valley").build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
     entityManager.persist(ClientPublicEntity.builder()
         .clientNumber("00001012").clientName("CANFOR CORPORATION").build());
   }
@@ -316,18 +312,7 @@ class SiteSearchSpecificationsTest {
   class JoinedCriteria {
 
     @Test
-    @DisplayName("Forest Service Road matches through the road section view")
-    void forestServiceRoad() {
-      givenSupportingRows();
-      persist(completeSite("ON-BOWRON").build());
-      persist(completeSite("NO-ROAD").forestFileId("R99999").roadSectionId("99").build());
-
-      assertThat(search(SiteSearchCriteria.builder().forestServiceRoad("Bowron").build()))
-          .containsExactly("ON-BOWRON");
-    }
-
-    @Test
-    @DisplayName("Forest Service Road matches on the sections LRMOPS gives the name, when given")
+    @DisplayName("Forest Service Road matches on the sections LRMOPS gives the road picked")
     void forestServiceRoadOnSections() {
       givenSupportingRows();
       persist(completeSite("ON-01").build());
@@ -336,7 +321,7 @@ class SiteSearchSpecificationsTest {
       persist(completeSite("OTHER").forestFileId("R99999").roadSectionId("99").build());
       flushAndClear();
 
-      // The view's name is not consulted: "Nowhere" would match nothing there.
+      // The name itself is not read: the sections stand for it.
       SiteSearchCriteria named = SiteSearchCriteria.builder().forestServiceRoad("Nowhere").build();
       assertThat(onSections(named, List.of(
           RoadSectionKey.of("R00123", "01"), RoadSectionKey.of("R00123", "02"),
@@ -395,8 +380,6 @@ class SiteSearchSpecificationsTest {
       assertThat(search(SiteSearchCriteria.builder().siteId("site-1").build()))
           .containsExactly("SITE-1");
       assertThat(search(SiteSearchCriteria.builder().forestFileId("r00123").build()))
-          .containsExactly("SITE-1");
-      assertThat(search(SiteSearchCriteria.builder().forestServiceRoad("bowron").build()))
           .containsExactly("SITE-1");
     }
 
@@ -529,26 +512,22 @@ class SiteSearchSpecificationsTest {
     @DisplayName("joins each table once, whichever criteria are set")
     void joinsEachTableOnce() {
       // root.fetch(X) is a new join every time — it never reuses an earlier root.join(X). The road
-      // section was created both ways: a plain join for the Forest Service Road filter and a fetch
-      // for the projection, so filtering on that one criterion put two left joins to
-      // CBR_ROAD_SECTION_VW — a materialized view reached over a database link — in every such
-      // search. Harmless enough here to go unnoticed; the same mistake in Inspection Search
-      // duplicated a join carrying a correlated subquery and cost eighteen seconds.
+      // section was once created both ways, putting two left joins to CBR_ROAD_SECTION_VW in a
+      // search; the same mistake in Inspection Search duplicated a join carrying a correlated
+      // subquery and cost eighteen seconds. The road section is not joined at all now: its name is
+      // LRMOPS's, looked up for the page (2026-11-25).
       givenSupportingRows();
       persist(completeSite("SITE-1").build());
 
       for (SiteSearchCriteria criteria : List.of(
           SiteSearchCriteria.builder().siteId("SITE").build(),
-          SiteSearchCriteria.builder().forestServiceRoad("Bowron").build(),
-          SiteSearchCriteria.builder().primaryUserName("CANFOR").build(),
-          SiteSearchCriteria.builder().forestServiceRoad("Bowron").primaryUserName("CANFOR")
-              .build())) {
+          SiteSearchCriteria.builder().primaryUserName("CANFOR").build())) {
         String sql = sqlFor(criteria);
 
         assertThat(sql).isNotEmpty();
         assertThat(CapturingStatementInspector.occurrences(sql, "cbr_road_section_vw"))
             .as("road section, for criteria %s", criteria)
-            .isEqualTo(1);
+            .isZero();
         assertThat(CapturingStatementInspector.occurrences(sql, "the.org_unit ")).isEqualTo(1);
         assertThat(CapturingStatementInspector.occurrences(sql, "the.crossing_site ")).isEqualTo(1);
         assertThat(CapturingStatementInspector.occurrences(sql, "the.crossing_site_status_code "))
@@ -578,7 +557,6 @@ class SiteSearchSpecificationsTest {
       // Touch everything a results row renders. Anything unfetched issues its select here.
       found.forEach(site -> {
         site.getOrgUnit().getOrgUnitCode();
-        site.getRoadSection();
         site.getStatus();
       });
 

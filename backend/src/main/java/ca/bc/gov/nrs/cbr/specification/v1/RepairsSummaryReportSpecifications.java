@@ -4,6 +4,7 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.onRoadSections;
 
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
@@ -12,6 +13,7 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairTypeXrefEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairsSummaryCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.RepairsSummarySort;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -65,8 +67,6 @@ public final class RepairsSummaryReportSpecifications {
   private static final String SITE = "site";
   private static final String ORG_UNIT = "orgUnit";
   private static final String ORG_UNIT_NAME = "orgUnitName";
-  private static final String ROAD_SECTION = "roadSection";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String SITE_ID = "crossingSiteId";
   private static final String FOREST_FILE_ID = "forestFileId";
   private static final String ROAD_SECTION_ID = "roadSectionId";
@@ -130,15 +130,21 @@ public final class RepairsSummaryReportSpecifications {
    * <p>Priority sorts by its rank in {@code REPAIR_PRIORITY_CODE_ORDER}, as legacy's
    * {@code ORDER BY RPCO.REPAIR_PRIORITY_CODE_ORDER} does — a left join, as legacy's is, with a
    * repair whose priority has no rank after the ranked ones.
+   *
+   * <p>Forest Service Road is matched on road sections, not on a name: the name picked becomes
+   * the sections LRMOPS gives it ({@code RoadNameService#sectionsNamed}). No join to CBR's road
+   * copy: the name shown is LRMOPS's too, looked up afterwards (2026-11-25).
+   *
+   * @param roadSections the sections LRMOPS gives the name picked; null when none was picked
    */
   public static CriteriaQuery<RepairsSummaryLine> lines(
-      CriteriaBuilder builder, RepairsSummaryCriteria criteria) {
+      CriteriaBuilder builder, RepairsSummaryCriteria criteria,
+      List<RoadSectionKey> roadSections) {
     CriteriaQuery<RepairsSummaryLine> query = builder.createQuery(RepairsSummaryLine.class);
     Root<StructureRepairEntity> repair = query.from(StructureRepairEntity.class);
     Root<CrossingStructureEntity> structure = query.from(CrossingStructureEntity.class);
     From<?, ?> inspection = repair.join(INSPECTION, JoinType.LEFT);
     From<?, ?> site = structure.join(SITE, JoinType.LEFT);
-    From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
     From<?, ?> district = site.join(ORG_UNIT, JoinType.LEFT);
     // No association maps the rank, so Hibernate's entity join reaches it.
     var priorityOrder = ((JpaRoot<StructureRepairEntity>) repair)
@@ -152,7 +158,10 @@ public final class RepairsSummaryReportSpecifications {
     predicates.add(builder.equal(repair.get(CARRIED_FORWARD), NO));
     predicates.add(builder.not(builder.exists(portableInStorage(query, builder, structure))));
     structureCriteria(builder, structure, site, criteria, predicates);
-    siteCriteria(builder, site, roadSection, criteria, predicates);
+    siteCriteria(builder, site, criteria, predicates);
+    if (roadSections != null) {
+      predicates.add(onRoadSections(builder, site, roadSections));
+    }
     repairCriteria(builder, query, repair, structure, criteria, predicates);
     if (Boolean.TRUE.equals(criteria.mostRecentInspections())) {
       predicates.add(mostRecentRoutine(builder, query, inspection));
@@ -170,7 +179,6 @@ public final class RepairsSummaryReportSpecifications {
             site.get(ROAD_SECTION_ID),
             site.get(CROSSING_NAME),
             district.get(ORG_UNIT_NAME),
-            roadSection.get(ROAD_SECTION_NAME),
             site.get(KILOMETRES),
             site.get(USER_KM),
             site.get(LONGITUDE),
@@ -209,14 +217,11 @@ public final class RepairsSummaryReportSpecifications {
   private static void siteCriteria(
       CriteriaBuilder builder,
       From<?, ?> site,
-      From<?, ?> roadSection,
       RepairsSummaryCriteria criteria,
       List<Predicate> predicates) {
     contains(builder, site.get(SITE_ID), criteria.siteId()).ifPresent(predicates::add);
     contains(builder, site.get(FOREST_FILE_ID), criteria.forestFileId()).ifPresent(predicates::add);
     contains(builder, site.get(ROAD_SECTION_ID), criteria.roadSectionId())
-        .ifPresent(predicates::add);
-    contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
         .ifPresent(predicates::add);
     // Legacy matches the maintainer with LIKE, as it does every text box; a number picked from the
     // lookup is a whole value, so here it is exact, as on the other reports.

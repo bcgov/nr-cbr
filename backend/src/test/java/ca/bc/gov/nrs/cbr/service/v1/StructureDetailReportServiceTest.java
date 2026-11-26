@@ -10,7 +10,6 @@ import ca.bc.gov.nrs.cbr.exception.StructureNotFoundException;
 import ca.bc.gov.nrs.cbr.model.v1.AbutmentCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.BuiltByCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
@@ -46,6 +45,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -59,6 +59,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import({StructureDetailReportService.class, StructureDetailRows.class,
     StructureInventoryReportSupport.class, StructureInventoryNames.class, ReportRenderer.class})
 class StructureDetailReportServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   private static final LocalDateTime PAST = LocalDateTime.now().minusYears(10);
   private static final LocalDateTime FUTURE = LocalDateTime.now().plusYears(10);
@@ -82,10 +88,11 @@ class StructureDetailReportServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     for (String entity : List.of("ForestServiceBridgeSpanEntity", "ForestServiceBridgeEntity",
         "ForestServiceCulvertEntity", "StructureCommentEntity", "StructureReplacementXrefEntity",
-        "CrossingStructureEntity", "CrossingSiteEntity", "CbrRoadSectionEntity",
+        "CrossingStructureEntity", "CrossingSiteEntity",
         "RecreationProjectEntity", "StructureTypeClassCodeEntity", "SuperstructureTypeCodeEntity",
         "DeckTypeCodeEntity", "AbutmentCodeEntity", "StructureCurbTypeCodeEntity",
         "BuiltByCodeEntity", "DesignVehicleLoadCodeEntity", "EngineeredClvrtMaterialCodeEntity", "ClientPublicEntity",
@@ -124,8 +131,7 @@ class StructureDetailReportServiceTest {
       entityManager.persist(OrgUnitEntity.builder().orgUnitNo((Long) unit[0])
           .orgUnitCode("D" + unit[0]).orgUnitName("ORG_UNIT " + unit[1]).build());
     }
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
     entityManager.persist(RecreationProjectEntity.builder()
         .forestFileId("REC1234").projectName("Purden Lake Rec Site").build());
     entityManager.persist(CrossingSiteEntity.builder()

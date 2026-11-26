@@ -2,11 +2,11 @@ package ca.bc.gov.nrs.cbr.service.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.model.v1.AbutmentCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.DeckTypeCodeEntity;
@@ -42,6 +42,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -53,6 +54,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import({InspectionsBlankService.class, InspectionsBlankRows.class, RepairsSummaryNames.class,
     InspectionsDueCriteriaLine.class, StructureInventoryReportSupport.class, ReportRenderer.class})
 class InspectionsBlankServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   private static final List<CodeOptionResponse> RATINGS = List.of(
       new CodeOptionResponse("E", "Excellent"), new CodeOptionResponse("G", "Good"),
@@ -85,22 +92,18 @@ class InspectionsBlankServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
-    when(forms.forms(anyList())).thenAnswer(invocation -> {
-      Map<Long, InspectionFormResponse> answered = new java.util.HashMap<>();
-      for (CrossingStructureEntity structure
-          : invocation.<List<CrossingStructureEntity>>getArgument(0)) {
-        Long id = structure.getCrossingStructureId();
-        answered.put(id, formsById.getOrDefault(id, new InspectionFormResponse(
-            String.valueOf(id), List.of(), List.of(), List.of())));
-      }
-      return answered;
-    });
+    // The report reads its catalogues once and hands them, with the bridges it read, to each
+    // batch's forms; the stand-in answers the same either way.
+    when(forms.catalogues()).thenReturn(new InspectionFormService.Catalogues());
+    when(forms.forms(anyList(), any(), any())).thenAnswer(this::formsFor);
+    when(forms.forms(anyList())).thenAnswer(this::formsFor);
     when(codes.getMonitoringStatusCodes()).thenReturn(
         List.of(new CodeOptionResponse("SUG", "Suggested")));
     for (String entity : List.of("StructureMonitorItemEntity", "StructureRepairEntity",
         "ForestServiceBridgeEntity", "CrossingStructureEntity", "CrossingSiteEntity",
-        "CbrRoadSectionEntity", "AbutmentCodeEntity", "DeckTypeCodeEntity",
+        "AbutmentCodeEntity", "DeckTypeCodeEntity",
         "SuperstructureTypeCodeEntity", "RepairStatusCodeEntity", "RepairPriorityCodeEntity",
         "MonitoringStatusCodeEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
@@ -122,13 +125,24 @@ class InspectionsBlankServiceTest {
       entityManager.persist(SuperstructureTypeCodeEntity.builder().superstructureTypeCode(code[0])
           .description(code[1]).build());
     }
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
     entityManager.persist(CrossingSiteEntity.builder()
         .crossingSiteId("62-001").crossingName("Deadman Creek")
         .userKm(new BigDecimal("12.75")).forestFileId("R00123").roadSectionId("01")
         .latitude(new BigDecimal("53.917777")).longitude(new BigDecimal("122.749999"))
         .utmZone(10).utmEasting(512345L).utmNorthing(5987654L).build());
+  }
+
+  private Map<Long, InspectionFormResponse> formsFor(
+      org.mockito.invocation.InvocationOnMock invocation) {
+    Map<Long, InspectionFormResponse> answered = new java.util.HashMap<>();
+    for (CrossingStructureEntity structure
+        : invocation.<List<CrossingStructureEntity>>getArgument(0)) {
+      Long id = structure.getCrossingStructureId();
+      answered.put(id, formsById.getOrDefault(id, new InspectionFormResponse(
+          String.valueOf(id), List.of(), List.of(), List.of())));
+    }
+    return answered;
   }
 
   private long structure(

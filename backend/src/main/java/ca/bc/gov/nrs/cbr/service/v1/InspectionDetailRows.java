@@ -11,14 +11,17 @@ import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceBridgeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceCulvertRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureBridgeDetail;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCulvertDetail;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureValue;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionReportRecords.Records;
+import ca.bc.gov.nrs.cbr.service.v1.RepairsSummaryNames.Names;
 import ca.bc.gov.nrs.cbr.specification.v1.InspectionsConductedReportSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionsConductedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionsConductedSort;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,8 +31,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -77,6 +82,7 @@ public class InspectionDetailRows {
   private final InspectionReportItems items;
   private final InspectionReportRecords records;
   private final ConfigurationService codes;
+  private final RoadNameService roadNames;
 
   public InspectionDetailRows(
       EntityManager entityManager,
@@ -84,13 +90,15 @@ public class InspectionDetailRows {
       ForestServiceCulvertRepository culverts,
       InspectionReportItems items,
       InspectionReportRecords records,
-      ConfigurationService codes) {
+      ConfigurationService codes,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.bridges = bridges;
     this.culverts = culverts;
     this.items = items;
     this.records = records;
     this.codes = codes;
+    this.roadNames = roadNames;
   }
 
   /** The report's rows, an inspection each, in its order. */
@@ -99,13 +107,43 @@ public class InspectionDetailRows {
     return rows(load(ids(criteria, sort)));
   }
 
+  /**
+   * The report's rows for Jasper to fill from, as {@link #rows} has them but loaded a batch of
+   * inspections at a time as Jasper reaches them, the session cleared before each — so a
+   * province's inspections are never all in memory. The road names are looked up once,
+   * beforehand. Fill it inside a transaction: it loads as it is read.
+   */
+  BatchedRowSource<Long> rowSource(
+      InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
+    List<Long> ids = ids(criteria, sort);
+    Function<CrossingSiteEntity, String> roads = roadsOf(ids);
+    // The code tables once for the report, not once a batch.
+    InspectionReportItems.ItemCodes itemCodes = items.codes();
+    Names repairCodes = records.repairCodes();
+    return new BatchedRowSource<>(ids, StructureInventoryReportSupport.BATCH, batch -> {
+      // The last batch's rows are Jasper's now, as plain values; its entities can go.
+      entityManager.clear();
+      return rows(load(batch, roads, repairCodes), itemCodes);
+    });
+  }
+
   /** One inspection's row, as the report would print it — for its audit record. */
   public List<Map<String, Object>> rows(long inspectionId) {
     return rows(load(List.of(inspectionId)));
   }
 
   private List<Map<String, Object>> rows(Loaded loaded) {
-    Map<Long, List<Map<String, String>>> itemLines = items.lines(loaded.ids());
+    return rows(loaded, null);
+  }
+
+  /** The same, with the item code tables already read; null to read them. */
+  private List<Map<String, Object>> rows(
+      Loaded loaded, InspectionReportItems.ItemCodes itemCodes) {
+    return assemble(loaded, items.lines(loaded.ids(), itemCodes));
+  }
+
+  private List<Map<String, Object>> assemble(
+      Loaded loaded, Map<Long, List<Map<String, String>>> itemLines) {
     Records other = loaded.records();
     List<Map<String, Object>> rows = new ArrayList<>();
     for (Long id : loaded.ids()) {
@@ -114,7 +152,7 @@ public class InspectionDetailRows {
       Map<String, Object> row = new HashMap<>();
       header(inspection, loaded.codes().types(), row);
       CrossingSiteEntity site = inspection.getStructure().getSite();
-      site(site, row);
+      site(site, loaded.roads().apply(site), row);
       structure(inspection.getStructure(), row);
       if (loaded.bridges().containsKey(structureId)) {
         bridge(loaded.bridges().get(structureId), loaded.spanLengths().get(structureId), row);
@@ -135,8 +173,63 @@ public class InspectionDetailRows {
   /** The CSV's rows, in {@link InspectionDetailCsv#COLUMNS} order: a row per item, as it writes them. */
   public List<List<String>> csvRows(
       InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
-    Loaded loaded = load(ids(criteria, sort));
-    return InspectionDetailCsv.rows(loaded, items.answers(loaded.ids()));
+    List<List<String>> rows = new ArrayList<>();
+    csvRows(criteria, sort, rows::add);
+    return rows;
+  }
+
+  /**
+   * The CSV, as {@link #csvRows} has it, written to {@code csv} as it is made: the inspections a
+   * batch at a time, the session cleared after each, so a province's items — over a quarter of a
+   * million rows — are never all in memory. The road names are looked up once, for every
+   * inspection, beforehand.
+   */
+  public void writeCsv(
+      InspectionsConductedCriteria criteria, InspectionsConductedSort sort, CsvStream csv) {
+    csvRows(criteria, sort, csv::row);
+  }
+
+  private void csvRows(InspectionsConductedCriteria criteria, InspectionsConductedSort sort,
+      Consumer<List<String>> out) {
+    List<Long> ids = ids(criteria, sort);
+    Function<CrossingSiteEntity, String> roads = roadsOf(ids);
+    // The code tables once for the report, not once a batch.
+    InspectionReportItems.ItemCodes itemCodes = items.codes();
+    Names repairCodes = records.repairCodes();
+    for (int from = 0; from < ids.size(); from += StructureInventoryReportSupport.BATCH) {
+      List<Long> batch =
+          ids.subList(from, Math.min(ids.size(), from + StructureInventoryReportSupport.BATCH));
+      Loaded loaded = load(batch, roads, repairCodes);
+      InspectionDetailCsv.rows(loaded, items.answers(loaded.ids(), itemCodes)).forEach(out);
+      // What this batch loaded is written; let it go before the next.
+      entityManager.clear();
+    }
+  }
+
+  /**
+   * LRMOPS's road names for these inspections' sites: their distinct road sections read in one
+   * small query a batch at a time, then looked up together.
+   */
+  private Function<CrossingSiteEntity, String> roadsOf(List<Long> inspectionIds) {
+    List<RoadSectionKey> sections = new ArrayList<>();
+    for (int from = 0; from < inspectionIds.size(); from += StructureInventoryReportSupport.BATCH) {
+      entityManager.createQuery("""
+              SELECT DISTINCT site.forestFileId, site.roadSectionId
+                FROM StructureInspectionEntity inspection
+                JOIN inspection.structure structure
+                JOIN structure.site site
+               WHERE inspection.inspectionId IN :ids
+              """, Object[].class)
+          .setParameter("ids", inspectionIds.subList(from,
+              Math.min(inspectionIds.size(), from + StructureInventoryReportSupport.BATCH)))
+          .getResultList()
+          .forEach(pair -> sections.add(RoadSectionKey.of((String) pair[0], (String) pair[1])));
+    }
+    Map<RoadSectionKey, String> names = roadNames.namesOf(sections);
+    return site -> {
+      RoadSectionKey key = RoadSectionKey.of(site.getForestFileId(), site.getRoadSectionId());
+      return key == null ? null : names.get(key);
+    };
   }
 
   /** The structures of the report's inspections, an inspection's each, in its order — for its KMZ. */
@@ -150,15 +243,31 @@ public class InspectionDetailRows {
   /** The inspections for these criteria, in order. */
   private List<Long> ids(InspectionsConductedCriteria criteria, InspectionsConductedSort sort) {
     return entityManager.createQuery(InspectionsConductedReportSpecifications.detailIds(
-        entityManager.getCriteriaBuilder(), criteria, sort)).getResultList();
+        entityManager.getCriteriaBuilder(), criteria, sort))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
+        .getResultList();
   }
 
   /** These inspections, in this order, and everything read beside them. */
   private Loaded load(List<Long> ids) {
+    return load(ids, null);
+  }
+
+  /**
+   * The same, with the road names already looked up — or, when {@code roads} is null, looked up
+   * for these inspections' sites.
+   */
+  private Loaded load(List<Long> ids, Function<CrossingSiteEntity, String> roads) {
+    return load(ids, roads, null);
+  }
+
+  /** The same, with the repair code tables already read; null to read them. */
+  private Loaded load(List<Long> ids, Function<CrossingSiteEntity, String> roads,
+      Names repairCodes) {
     if (ids.isEmpty()) {
       return new Loaded(List.of(), Map.of(), Map.of(), Map.of(), Map.of(),
           new Records(Map.of(), Map.of(), Map.of(), Map.of(), Map.of()),
-          new Codes(Map.of(), Map.of()));
+          new Codes(Map.of(), Map.of()), site -> null);
     }
     Map<Long, StructureInspectionEntity> inspections = inspections(ids);
     List<Long> structureIds = inspections.values().stream()
@@ -170,14 +279,20 @@ public class InspectionDetailRows {
             StructureCulvertDetail::crossingStructureId, Function.identity()),
         spanLengths(structureIds),
         records.of(ids, inspections.values().stream()
-            .map(StructureInspectionEntity::getInspectionReviewerId).toList()),
+                .map(StructureInspectionEntity::getInspectionReviewerId).toList(),
+            repairCodes),
         new Codes(byCode(codes.getInspectionTypeCodes()),
-            byCode(codes.getInspectionReportStatusCodes())));
+            byCode(codes.getInspectionReportStatusCodes())),
+        // LRMOPS's road names, for the report's distinct road sections.
+        roads != null ? roads : roadNames.namesFor(
+            inspections.values().stream().map(i -> i.getStructure().getSite()).toList(),
+            CrossingSiteEntity::getForestFileId, CrossingSiteEntity::getRoadSectionId));
   }
 
   /**
    * The inspections, in the report's order, and what is read beside them: each structure's first
-   * bridge and first culvert, its span lengths, the inspections' records and the codes' names.
+   * bridge and first culvert, its span lengths, the inspections' records, the codes' names, and
+   * each site's road name — LRMOPS's.
    */
   record Loaded(
       List<Long> ids,
@@ -186,7 +301,8 @@ public class InspectionDetailRows {
       Map<Long, StructureCulvertDetail> culverts,
       Map<Long, String> spanLengths,
       Records records,
-      Codes codes) {}
+      Codes codes,
+      Function<CrossingSiteEntity, String> roads) {}
 
   /** The inspection types' and report statuses' names, by code. */
   record Codes(Map<String, String> types, Map<String, String> statuses) {}
@@ -200,10 +316,10 @@ public class InspectionDetailRows {
                 FROM StructureInspectionEntity inspection
                 JOIN FETCH inspection.structure structure
                 JOIN FETCH structure.site site
-                LEFT JOIN FETCH site.roadSection
                 LEFT JOIN FETCH site.orgUnit
                WHERE inspection.inspectionId IN :ids
               """, StructureInspectionEntity.class)
+          .setHint(HibernateHints.HINT_FETCH_SIZE, Integer.parseInt(ReportQueryHints.FETCH_SIZE))
           .setParameter("ids",
               ids.subList(from, Math.min(ids.size(), from + StructureInventoryReportSupport.BATCH)))
           .getResultList()
@@ -238,9 +354,9 @@ public class InspectionDetailRows {
     row.put("INSPECTION_TYPE", types.get(inspection.getStrctreInspectionTypeCode()));
   }
 
-  private static void site(CrossingSiteEntity site, Map<String, Object> row) {
+  private static void site(CrossingSiteEntity site, String roadName, Map<String, Object> row) {
     row.put("CROSSING_SITE_ID", site.getCrossingSiteId());
-    row.put("ROAD_SECT_NAME", site.getRoadSection() == null ? null : site.getRoadSection().getRoadSectName());
+    row.put("ROAD_SECT_NAME", roadName);
     row.put("DISTRICT", site.getOrgUnit() == null ? null : site.getOrgUnit().getOrgUnitName());
     row.put("KM", decimal(site.getPointOfCommencementDistance(), KILOMETRES));
     row.put("USER_KM", decimal(site.getUserKm(), KILOMETRES));

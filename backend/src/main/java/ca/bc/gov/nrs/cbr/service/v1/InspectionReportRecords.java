@@ -61,6 +61,22 @@ public class InspectionReportRecords {
 
   /** The records of these inspections. */
   Records of(List<Long> inspectionIds, Collection<Long> reviewerIds) {
+    return of(inspectionIds, reviewerIds, null);
+  }
+
+  /**
+   * The repair code tables a record's status, priority and type are named from. A report reads
+   * them once and hands them to each batch: read per batch, they were four queries a batch.
+   */
+  Names repairCodes() {
+    return repairNames.names();
+  }
+
+  /**
+   * The records of these inspections, with the repair code tables already read
+   * ({@link #repairCodes}); null to read them.
+   */
+  Records of(List<Long> inspectionIds, Collection<Long> reviewerIds, Names repairCodes) {
     List<InspectionReportStatusEntity> statusRows =
         fetch(inspectionIds, statuses::findByInspectionIdIn);
     Map<Long, String> reviewerNames = new HashMap<>();
@@ -68,7 +84,7 @@ public class InspectionReportRecords {
         .forEach(reviewer -> reviewerNames.put(reviewer.getInspectionReviewerId(), name(reviewer)));
     return new Records(
         repairRows(fetch(inspectionIds, repairs::findByInspectionIdInOrderByRepairNumberAsc),
-            repairNames.names()),
+            repairCodes != null ? repairCodes : repairNames.names()),
         monitorRows(fetch(inspectionIds, monitors::findByInspectionIdInOrderByMonitorNumberAsc)),
         current(statusRows),
         accepted(fetch(inspectionIds, loadRatings::findByInspectionIdIn), statusRows),

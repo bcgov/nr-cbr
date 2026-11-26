@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
@@ -71,7 +70,7 @@ class StructureSearchServiceTest {
     for (String entity : List.of("InspectionReportStatusEntity", "StructureLoadRatingEntity",
         "StructureInspectionEntity", "StructureRepairEntity", "InspectionReportStatusCodeEntity",
         "ForestServiceBridgeEntity", "ForestServiceCulvertEntity",
-        "CrossingStructureEntity", "CrossingSiteEntity", "CbrRoadSectionEntity", "OrgUnitEntity",
+        "CrossingStructureEntity", "CrossingSiteEntity", "OrgUnitEntity",
         "ClientPublicEntity", "StructureTypeClassCodeEntity", "CrossingSiteStatusCodeEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
     }
@@ -185,8 +184,6 @@ class StructureSearchServiceTest {
     @Test
     @DisplayName("matches on the site the structure stands on, and on its road")
     void matchesOnTheSite() {
-      entityManager.persist(CbrRoadSectionEntity.builder()
-          .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
       // CROSSING_SITE's status is a real foreign key.
       entityManager.persist(CrossingSiteStatusCodeEntity.builder()
           .crossingSiteStatusCode("ACT").description("Active")

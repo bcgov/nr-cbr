@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
@@ -39,6 +38,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -52,6 +52,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import({StructureInventorySummaryService.class, StructureInventoryReportSupport.class,
     ReportRenderer.class})
 class StructureInventorySummaryServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   @Autowired
   private StructureInventorySummaryService service;
@@ -72,6 +78,7 @@ class StructureInventorySummaryServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     when(codes.getForestDistricts()).thenReturn(
         List.of(new OrgUnitResponse("18", "DPG", "Prince George Natural Resource District")));
@@ -80,7 +87,7 @@ class StructureInventorySummaryServiceTest {
         List.of(new CodeOptionResponse("PB", "Permanent Bridge")));
     for (String entity : List.of("InspectionReportStatusEntity", "StructureInspectionEntity",
         "ForestServiceBridgeEntity", "ForestServiceCulvertEntity", "CrossingStructureEntity",
-        "CrossingSiteEntity", "CbrRoadSectionEntity", "OrgUnitEntity",
+        "CrossingSiteEntity", "OrgUnitEntity",
         "CrossingSiteStatusCodeEntity", "InspectionReportStatusCodeEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
     }
@@ -101,8 +108,7 @@ class StructureInventorySummaryServiceTest {
           .expiryDate(LocalDateTime.now().plusYears(10))
           .updateTimestamp(LocalDateTime.now()).build());
     }
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
   }
 
   private void site(String id, UnaryOperator<CrossingSiteEntity.CrossingSiteEntityBuilder> with) {

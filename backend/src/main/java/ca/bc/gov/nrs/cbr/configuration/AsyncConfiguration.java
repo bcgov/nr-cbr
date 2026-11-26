@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * The executors {@code @Async} methods run on, after EDUC-STUDENT-ASSESSMENT-API's.
+ * The executors {@code @Async} methods run on.
  *
  * <p>Defining an {@code Executor} bean makes Spring Boot drop its {@code applicationTaskExecutor};
  * CBR has no async MVC or unnamed {@code @Async} that would use it.
@@ -47,6 +47,22 @@ public class AsyncConfiguration {
     executor.setCorePoolSize(threads);
     executor.setMaxPoolSize(threads);
     executor.setQueueCapacity(numberOfFilesToProcess);
+    return executor;
+  }
+
+  /**
+   * {@code RoadNameService.namesOf}: the batches of a road-name lookup, sent to the LRM Ops API a
+   * few at a time. One pool for the whole application, so however many reports run at once, at
+   * most {@code ca.bc.gov.nrs.lrmops-api.lookup-threads} lookups reach the API together — it has a
+   * pool of five database connections. The queue is unbounded: a batch waits rather than fails.
+   */
+  @Bean(name = "roadNameLookupExecutor")
+  public Executor roadNameLookupExecutor(
+      @Value("${ca.bc.gov.nrs.lrmops-api.lookup-threads:4}") int threads) {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setThreadNamePrefix("road-name-lookup-");
+    executor.setCorePoolSize(threads);
+    executor.setMaxPoolSize(threads);
     return executor;
   }
 }

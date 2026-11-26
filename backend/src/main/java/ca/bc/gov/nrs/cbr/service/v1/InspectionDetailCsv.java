@@ -102,7 +102,7 @@ final class InspectionDetailCsv {
         blankIfNull(site.getCrossingSiteId()),
         blankIfNull(structure.getCrossingStructureName()),
         blankIfNull(InspectionDetailRows.structureType(structure.getStructureTypeClassCode())),
-        site.getRoadSection() == null ? "" : blankIfNull(site.getRoadSection().getRoadSectName()),
+        blankIfNull(loaded.roads().apply(site)),
         date(inspection.getInspectionDate()),
         blankIfNull(loaded.codes().types().get(inspection.getStrctreInspectionTypeCode())),
         plain(site.getPointOfCommencementDistance()),

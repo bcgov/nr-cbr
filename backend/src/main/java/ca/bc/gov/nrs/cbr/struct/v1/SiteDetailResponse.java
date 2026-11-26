@@ -17,8 +17,8 @@ import java.util.List;
  * legacy makes, where `LongLatCoordinate` sits in the form and the column stores a decimal.
  *
  * @param maintainerLabel the Designated Maintainer as one line, or null when the site names none
- * @param forestServiceRoad the road's name from {@code CBR_ROAD_SECTION_VW}; null when the
- *                          snapshot does not carry that section yet
+ * @param forestServiceRoad the road's name, LRMOPS's; null when LRMOPS has no name for that
+ *                          section, or cannot be asked
  * @param activeStructureCount how many structures stand on the site. The form warns when a
  *                          Deactivated site still carries some (legacy also refused them on a
  *                          Proposed site; no longer — business, 2026-11). Legacy asks the same

@@ -108,7 +108,6 @@ public final class InspectionSearchSpecifications {
   private static final String STATUS_CODE = "statusCode";
   private static final String SITE = "site";
   private static final String ORG_UNIT = "orgUnit";
-  private static final String ROAD_SECTION = "roadSection";
 
   /* Columns on CROSSING_STRUCTURE. */
   private static final String STRUCTURE_NAME = "crossingStructureName";
@@ -126,7 +125,6 @@ public final class InspectionSearchSpecifications {
 
   /* Columns elsewhere. */
   private static final String ORG_UNIT_CODE = "orgUnitCode";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String STATUS_CODE_VALUE = "inspectionReportStatusCode";
   private static final String STATUS_DESCRIPTION = "description";
   private static final String CROSSING_NAME = "crossingName";
@@ -159,6 +157,7 @@ public final class InspectionSearchSpecifications {
 
   /**
    * Builds the predicate, ordered by the header the user chose — or legacy's default when none.
+   * Forest Service Road is not applied: see the overload taking road sections.
    *
    * @param sort      the columns the user sorted by, first deciding; none for legacy's order
    */
@@ -168,11 +167,11 @@ public final class InspectionSearchSpecifications {
   }
 
   /**
-   * Builds the predicate, with Forest Service Road matched on road sections rather than on the
-   * name in {@code CBR_ROAD_SECTION_VW}.
+   * Builds the predicate, with Forest Service Road matched on road sections: the name picked
+   * becomes the sections LRMOPS gives it ({@code RoadNameService#sectionsNamed}), resolved by the
+   * caller. {@code criteria.forestServiceRoad()} itself is not read here.
    *
-   * @param roadSections the sections LRMOPS gives the name picked ({@code RoadNameService});
-   *     null to match {@code criteria.forestServiceRoad()} against the view as before
+   * @param roadSections the sections LRMOPS gives the name picked; null when none was picked
    */
   public static Specification<StructureInspectionEntity> matching(
       InspectionSearchCriteria criteria, List<HeaderSort<InspectionSortColumn>> sort,
@@ -242,18 +241,13 @@ public final class InspectionSearchSpecifications {
 
       // The org unit is read by every results row, so it is joined once here — fetched when
       // projecting — and shared. LEFT: a site pointing at an org unit the table has no row for is
-      // still a candidate for every other criterion. CBR's road copy is neither shown nor sorted
-      // on — the name shown is LRMOPS's (2026-11-25) — but still fetched, as @NotFound(IGNORE)
-      // loads it eagerly and leaving it out costs a second select per page.
-      From<?, ?> roadSection = joinOrFetch(site, ROAD_SECTION, JoinType.LEFT, projecting);
+      // still a candidate for every other criterion.
       From<?, ?> orgUnit = joinOrFetch(site, ORG_UNIT, JoinType.LEFT, projecting);
       From<?, ?> statusCode =
           projecting ? joinOrFetch(status, STATUS_CODE, JoinType.LEFT, true) : null;
 
-      if (roadSections == null) {
-        contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
-            .ifPresent(predicates::add);
-      } else {
+      // The road: the sections LRMOPS gives the name picked (2026-11-25).
+      if (roadSections != null) {
         predicates.add(onRoadSections(builder, site, roadSections));
       }
 

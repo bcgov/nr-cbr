@@ -88,9 +88,11 @@ public class RepairsSummaryCsv {
    * The CSV's rows for these repairs, in their order, in {@link #COLUMNS} order.
    *
    * @param lastRoutine each structure's last routine inspection date, by structure id
+   * @param roads       each repair's road name, LRMOPS's
    */
   List<List<String>> rows(
-      List<RepairsSummaryLine> lines, Map<Long, LocalDate> lastRoutine, Names names) {
+      List<RepairsSummaryLine> lines, Map<Long, LocalDate> lastRoutine, Names names,
+      Function<RepairsSummaryLine, String> roads) {
     List<Long> structureIds = lines.stream().map(RepairsSummaryLine::structureId).distinct().toList();
     Map<Long, StructureBridgeDetail> bridge = firstOf(structureIds, bridges::findDetails,
         StructureBridgeDetail::crossingStructureId, Function.identity());
@@ -123,7 +125,8 @@ public class RepairsSummaryCsv {
               List.of(line.typeClassCode(), line.repairTypeCode()), NO_GROUP);
       return typeGroups.stream().map(group -> row(line,
           new Context(bridge.get(line.structureId()), culvert.get(line.structureId()),
-              clientNames.get(line.clientNumber()), lastRoutine.get(line.structureId()), names),
+              clientNames.get(line.clientNumber()), lastRoutine.get(line.structureId()), names,
+              roads.apply(line)),
           group == null ? null : group.getStructureRepairGroupCode(),
           group == null ? null : classNames.get(group.getStructureRepairClassCode()),
           group == null ? null : groupNames.get(group.getStructureRepairGroupCode())));
@@ -139,7 +142,7 @@ public class RepairsSummaryCsv {
     return List.of(
         blankIfNull(line.forestFileId()),
         blankIfNull(line.roadSectionId()),
-        blankIfNull(line.roadSectionName()),
+        blankIfNull(context.roadName()),
         plain(line.userKm()),
         blankIfNull(line.siteId()),
         blankIfNull(line.districtName()),
@@ -197,5 +200,6 @@ public class RepairsSummaryCsv {
       StructureCulvertDetail culvert,
       String clientName,
       LocalDate lastRoutine,
-      Names names) {}
+      Names names,
+      String roadName) {}
 }

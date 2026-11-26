@@ -7,6 +7,7 @@ import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.forma
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.millisSince;
 import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.plain;
 
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.specification.v1.InspectionsConductedLine;
 import ca.bc.gov.nrs.cbr.specification.v1.InspectionsConductedReportSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
@@ -20,6 +21,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import org.hibernate.jpa.HibernateHints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -70,39 +73,54 @@ public class InspectionsConductedSummaryService {
   private final StructureInventoryReportSupport support;
   private final ConfigurationService codes;
   private final InspectionsConductedCriteriaLine criteriaLine;
+  private final RoadNameService roadNames;
 
   public InspectionsConductedSummaryService(
       EntityManager entityManager,
       ReportRenderer renderer,
       StructureInventoryReportSupport support,
       ConfigurationService codes,
-      InspectionsConductedCriteriaLine criteriaLine) {
+      InspectionsConductedCriteriaLine criteriaLine,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.renderer = renderer;
     this.support = support;
     this.codes = codes;
     this.criteriaLine = criteriaLine;
+    this.roadNames = roadNames;
   }
 
   /** The report, as a PDF or a CSV. */
   public ReportFile generate(InspectionsConductedCriteria criteria, ReportFormat format) {
+    if (format == ReportFormat.CSV) {
+      return ReportTarget.inMemory(target -> writeCsv(criteria, target));
+    }
     long started = System.nanoTime();
     List<Inspection> inspections = inspections(criteria);
     String printed = support.today();
-    byte[] content = switch (format) {
-      case PDF -> {
-        Map<String, Object> parameters = support.parameters(REPORT_ID, printed);
-        parameters.put("P_SELECTED_CRITERIA",
-            criteriaLine.of(criteria, criteria.sortOr(DEFAULT_SORT)));
-        yield renderer.pdf(TEMPLATE, parameters, inspections.stream()
-            .<Map<String, ?>>map(InspectionsConductedSummaryService::pdfRow).toList());
-      }
-      case CSV -> StructureInventoryReportSupport.csv(CSV_COLUMNS,
-          inspections.stream().map(InspectionsConductedSummaryService::csvRow).toList());
-    };
+    Map<String, Object> parameters = support.parameters(REPORT_ID, printed);
+    parameters.put("P_SELECTED_CRITERIA", criteriaLine.of(criteria, criteria.sortOr(DEFAULT_SORT)));
+    byte[] content = renderer.pdf(TEMPLATE, parameters, inspections.stream()
+        .<Map<String, ?>>map(InspectionsConductedSummaryService::pdfRow).toList());
     log.info("Inspections Conducted - Summary: {} inspections as {} ({} bytes) in {} ms",
         inspections.size(), format, content.length, millisSince(started));
     return new ReportFile(content, filename(FILENAME, printed, format), format.mediaType());
+  }
+
+  /**
+   * The CSV, written to {@code target} as it is made rather than assembled in memory first — the
+   * download's response, or {@link ReportTarget#inMemory}. The target is opened once the rows are
+   * ready.
+   */
+  public void writeCsv(InspectionsConductedCriteria criteria, ReportTarget target) {
+    long started = System.nanoTime();
+    List<List<String>> csvRows = inspections(criteria).stream().map(InspectionsConductedSummaryService::csvRow).toList();
+    try (CsvStream csv = StructureInventoryReportSupport.csv(target,
+        filename(FILENAME, support.today(), ReportFormat.CSV), CSV_COLUMNS)) {
+      csv.rows(csvRows);
+    }
+    log.info("Inspections Conducted - Summary: {} rows as CSV, streamed, in {} ms",
+        csvRows.size(), millisSince(started));
   }
 
   /** The PDF's rows, an inspection each, in order, every value as the template prints it. */
@@ -120,20 +138,26 @@ public class InspectionsConductedSummaryService {
     return lines(criteria).stream().map(InspectionsConductedLine::structureId).toList();
   }
 
-  /** The inspections for these criteria, in order, with their type and status named. */
+  /**
+   * The inspections for these criteria, in order, with their type, status and road named — the
+   * road by LRMOPS, for the report's distinct road sections.
+   */
   private List<Inspection> inspections(InspectionsConductedCriteria criteria) {
     List<InspectionsConductedLine> lines = lines(criteria);
     Map<String, String> types = byCode(codes.getInspectionTypeCodes());
     Map<String, String> statuses = byCode(codes.getInspectionReportStatusCodes());
+    Function<InspectionsConductedLine, String> roads = roadNames.namesFor(
+        lines, InspectionsConductedLine::forestFileId, InspectionsConductedLine::roadSectionId);
     return lines.stream().map(line -> new Inspection(line,
-        types.get(line.inspectionTypeCode()), statuses.get(line.reportStatusCode()))).toList();
+        types.get(line.inspectionTypeCode()), statuses.get(line.reportStatusCode()),
+        roads.apply(line))).toList();
   }
 
   private List<InspectionsConductedLine> lines(InspectionsConductedCriteria criteria) {
     return entityManager
         .createQuery(InspectionsConductedReportSpecifications.lines(
             entityManager.getCriteriaBuilder(), criteria, criteria.sortOr(DEFAULT_SORT)))
-        .getResultList();
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS).getResultList();
   }
 
   private static Map<String, String> pdfRow(Inspection inspection) {
@@ -144,7 +168,7 @@ public class InspectionsConductedSummaryService {
     row.put("INSPECTION_TYPE", inspection.type());
     row.put("INSPECTION_DATE", formatDate(line.inspectionDate()));
     row.put("INSPECTION_STATUS", inspection.status());
-    row.put("ROAD_SECT_NAME", line.roadSectionName());
+    row.put("ROAD_SECT_NAME", inspection.road());
     row.put("POINT_OF_COMMENCEMENT_DISTANCE", kilometres(line.kilometres()));
     row.put("USER_KM", kilometres(line.userKm()));
     row.put("CROSSING_NAME", line.crossingName());
@@ -159,7 +183,7 @@ public class InspectionsConductedSummaryService {
         blankIfNull(inspection.type()),
         date(line.inspectionDate()),
         blankIfNull(inspection.status()),
-        blankIfNull(line.roadSectionName()),
+        blankIfNull(inspection.road()),
         plain(line.kilometres()),
         plain(line.userKm()),
         blankIfNull(line.crossingName()));
@@ -180,5 +204,6 @@ public class InspectionsConductedSummaryService {
   }
 
   /** An inspection as selected, with its type's and its current status's names. */
-  private record Inspection(InspectionsConductedLine line, String type, String status) {}
+  private record Inspection(
+      InspectionsConductedLine line, String type, String status, String road) {}
 }

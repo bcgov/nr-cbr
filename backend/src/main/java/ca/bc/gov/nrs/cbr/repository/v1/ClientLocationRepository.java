@@ -3,11 +3,14 @@ package ca.bc.gov.nrs.cbr.repository.v1;
 import ca.bc.gov.nrs.cbr.model.v1.ClientLocationEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ClientPublicEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.ClientLookupResult;
+import jakarta.persistence.QueryHint;
 import java.util.Collection;
 import java.util.List;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -218,5 +221,6 @@ public interface ClientLocationRepository
    * here; the entity it reads, {@code V_CLIENT_PUBLIC}, is the one they all join for the name.
    */
   @Query("SELECT client FROM ClientPublicEntity client WHERE client.clientNumber IN :numbers")
+  @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = ReportQueryHints.FETCH_SIZE))
   List<ClientPublicEntity> findClientsByNumber(@Param("numbers") Collection<String> numbers);
 }

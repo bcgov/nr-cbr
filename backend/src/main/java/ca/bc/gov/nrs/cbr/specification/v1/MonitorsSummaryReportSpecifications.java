@@ -4,12 +4,14 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.onRoadSections;
 
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.StructureMonitorItemEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorsSummaryCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorsSummarySort;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -41,8 +43,6 @@ public final class MonitorsSummaryReportSpecifications {
   private static final String ACTIVE_IND = "activeInd";
 
   private static final String SITE = "site";
-  private static final String ROAD_SECTION = "roadSection";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String SITE_ID = "crossingSiteId";
   private static final String FOREST_FILE_ID = "forestFileId";
   private static final String ROAD_SECTION_ID = "roadSectionId";
@@ -75,15 +75,21 @@ public final class MonitorsSummaryReportSpecifications {
    * The items the report lists for these criteria: the order chosen, then legacy's — by Structure
    * # (its id keeping each structure's items together), newest inspection first (its id keeping
    * each inspection's together), then monitor number.
+   *
+   * <p>Forest Service Road is matched on road sections, not on a name: the name picked becomes
+   * the sections LRMOPS gives it ({@code RoadNameService#sectionsNamed}). No join to CBR's road
+   * copy: the name shown is LRMOPS's too, looked up afterwards (2026-11-25).
+   *
+   * @param roadSections the sections LRMOPS gives the name picked; null when none was picked
    */
   public static CriteriaQuery<MonitorsSummaryLine> lines(
-      CriteriaBuilder builder, MonitorsSummaryCriteria criteria) {
+      CriteriaBuilder builder, MonitorsSummaryCriteria criteria,
+      List<RoadSectionKey> roadSections) {
     CriteriaQuery<MonitorsSummaryLine> query = builder.createQuery(MonitorsSummaryLine.class);
     Root<StructureMonitorItemEntity> item = query.from(StructureMonitorItemEntity.class);
     Root<CrossingStructureEntity> structure = query.from(CrossingStructureEntity.class);
     From<?, ?> inspection = item.join(INSPECTION, JoinType.LEFT);
     From<?, ?> site = structure.join(SITE, JoinType.LEFT);
-    From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
 
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(builder.equal(item.get(STRUCTURE_ID), structure.get(STRUCTURE_ID)));
@@ -91,7 +97,10 @@ public final class MonitorsSummaryReportSpecifications {
     predicates.add(builder.exists(knownStatus(query, builder, item)));
     contains(builder, structure.get(STRUCTURE_NAME), criteria.structureName())
         .ifPresent(predicates::add);
-    siteCriteria(builder, site, roadSection, criteria, predicates);
+    siteCriteria(builder, site, criteria, predicates);
+    if (roadSections != null) {
+      predicates.add(onRoadSections(builder, site, roadSections));
+    }
     equalsText(builder, item.get(MONITORING_STATUS), criteria.monitoringStatusCode())
         .ifPresent(predicates::add);
     if (Boolean.TRUE.equals(criteria.mostRecentInspections())) {
@@ -107,7 +116,6 @@ public final class MonitorsSummaryReportSpecifications {
             site.get(FOREST_FILE_ID),
             site.get(ROAD_SECTION_ID),
             site.get(CROSSING_NAME),
-            roadSection.get(ROAD_SECTION_NAME),
             site.get(KILOMETRES),
             site.get(CLIENT_NUMBER),
             inspection.get(INSPECTION_ID),
@@ -123,13 +131,10 @@ public final class MonitorsSummaryReportSpecifications {
   private static void siteCriteria(
       CriteriaBuilder builder,
       From<?, ?> site,
-      From<?, ?> roadSection,
       MonitorsSummaryCriteria criteria,
       List<Predicate> predicates) {
     contains(builder, site.get(FOREST_FILE_ID), criteria.forestFileId()).ifPresent(predicates::add);
     contains(builder, site.get(ROAD_SECTION_ID), criteria.roadSectionId())
-        .ifPresent(predicates::add);
-    contains(builder, roadSection.get(ROAD_SECTION_NAME), criteria.forestServiceRoad())
         .ifPresent(predicates::add);
     // Legacy matches the maintainer with LIKE, as it does every text box; a number picked from the
     // lookup is a whole value, so here it is exact, as on the other reports.

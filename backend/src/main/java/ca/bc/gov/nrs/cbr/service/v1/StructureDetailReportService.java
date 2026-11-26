@@ -150,18 +150,15 @@ public class StructureDetailReportService {
    * @throws StructureNotFoundException when there is no such structure, or it is archived
    */
   public ReportFile generate(long structureId, ReportFormat format) {
+    if (format == ReportFormat.CSV) {
+      return ReportTarget.inMemory(target -> writeCsv(structureId, target));
+    }
     long started = System.nanoTime();
     List<Map<String, Object>> detail = rows.rows(structureId);
     String printed = support.today();
-    byte[] content = switch (format) {
-      case PDF -> renderer.pdf(TEMPLATE, support.parameters(REPORT_ID, printed),
-          detail.stream().<Map<String, ?>>map(StructureDetailReportService::pdfRow).toList());
-      case CSV -> StructureInventoryReportSupport.csv(CSV_COLUMNS,
-          detail.stream().map(StructureDetailReportService::csvRow).toList());
-    };
-    String structureName = detail.isEmpty()
-        ? Long.toString(structureId)
-        : Objects.toString(detail.getFirst().get("CROSSING_STRUCTURE_NAME"), "");
+    byte[] content = renderer.pdf(TEMPLATE, support.parameters(REPORT_ID, printed),
+        detail.stream().<Map<String, ?>>map(StructureDetailReportService::pdfRow).toList());
+    String structureName = structureName(structureId, detail);
     log.info("Structure Detail Report: structure {} as {} ({} rows, {} bytes) in {} ms",
         structureId, format, detail.size(), content.length, millisSince(started));
     return new ReportFile(content,
@@ -174,6 +171,31 @@ public class StructureDetailReportService {
     Map<String, String> printed = new HashMap<>();
     row.forEach((field, value) -> printed.put(field, pdf(field, value)));
     return printed;
+  }
+
+  /**
+   * The CSV, written to {@code target} as it is made rather than assembled in memory first — the
+   * download's response, or {@link ReportTarget#inMemory}. The target is opened once the rows are
+   * ready.
+   */
+  public void writeCsv(long structureId, ReportTarget target) {
+    long started = System.nanoTime();
+    List<Map<String, Object>> detail = rows.rows(structureId);
+    List<List<String>> csvRows = detail.stream().map(StructureDetailReportService::csvRow).toList();
+    String filename = StructureInventoryReportSupport.filename(
+        FILENAME + "_" + structureName(structureId, detail), support.today(), ReportFormat.CSV);
+    try (CsvStream csv = StructureInventoryReportSupport.csv(target, filename, CSV_COLUMNS)) {
+      csv.rows(csvRows);
+    }
+    log.info("Structure Detail Report: structure {} as CSV, streamed ({} rows) in {} ms",
+        structureId, csvRows.size(), millisSince(started));
+  }
+
+  /** The structure's name for the file, or its id when it has no rows. */
+  private static String structureName(long structureId, List<Map<String, Object>> detail) {
+    return detail.isEmpty()
+        ? Long.toString(structureId)
+        : Objects.toString(detail.getFirst().get("CROSSING_STRUCTURE_NAME"), "");
   }
 
   /** A row as the CSV writes it, in {@link #CSV_COLUMNS} order. */

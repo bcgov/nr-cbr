@@ -118,4 +118,28 @@ class RoadNameServiceTest {
     assertThat(service.nameOf("R07571", " ")).isNull();
     assertThat(service.nameOf("R99999", "A")).isNull();
   }
+
+  @Test
+  @DisplayName("batches run on the lookup pool, and a failed batch blanks only its own names")
+  void namesOfInParallel() {
+    java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      RoadNameService parallel = new RoadNameService(lrmops, pool);
+      List<RoadSectionKey> many = IntStream.range(0, RoadNameService.LOOKUP_BATCH + 1)
+          .mapToObj(i -> RoadSectionKey.of("R" + i, "A")).toList();
+      when(lrmops.lookUpRoadSections(any())).thenAnswer(call -> {
+        List<SectionKey> batch = call.getArgument(0);
+        if (batch.size() == 1) {
+          throw new ResourceAccessException("down");
+        }
+        return List.of(new RoadSummary("R0", "A", "FIRST ROAD", "FSR", false, null));
+      });
+
+      assertThat(parallel.namesOf(many))
+          .containsExactlyEntriesOf(java.util.Map.of(RoadSectionKey.of("R0", "A"), "FIRST ROAD"));
+      verify(lrmops, times(2)).lookUpRoadSections(any());
+    } finally {
+      pool.shutdownNow();
+    }
+  }
 }

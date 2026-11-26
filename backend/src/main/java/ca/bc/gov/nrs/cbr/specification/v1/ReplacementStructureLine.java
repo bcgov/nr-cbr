@@ -11,6 +11,8 @@ import java.math.BigDecimal;
  * @param loadRestrictionYear {@code FULL_LOG_HAUL_TRFFC_RPLCMNT_DT}, a year
  * @param replacementYear {@code LIGHT_VEHICLE_TRFFC_RPLCMNT_DT}, a year
  * @param closureYear {@code ESTIMATED_CLOSURE_DATE}, a year
+ *
+ * <p>No road name: it is LRMOPS's, looked up afterwards (2026-11-25).
  */
 public record ReplacementStructureLine(
     Long structureId,
@@ -26,7 +28,6 @@ public record ReplacementStructureLine(
     String siteId,
     String forestFileId,
     String roadSectionId,
-    String roadSectionName,
     BigDecimal kilometres,
     String crossingName,
     String clientNumber,

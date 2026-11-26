@@ -4,7 +4,6 @@ import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
-import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.joinOrFetch;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.onRoadSections;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.returnsEntities;
 
@@ -81,8 +80,6 @@ public final class SiteSearchSpecifications {
   /* The associations, and the one column read through each. */
   private static final String ORG_UNIT = "orgUnit";
   private static final String ORG_UNIT_CODE = "orgUnitCode";
-  private static final String ROAD_SECTION = "roadSection";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String CLIENT_NAME = "clientName";
   private static final String STATUS = "status";
   private static final String STATUS_DESCRIPTION = "description";
@@ -107,6 +104,8 @@ public final class SiteSearchSpecifications {
   /**
    * Builds the predicate, ordered by the column the user chose — or legacy's order when none.
    *
+   * Forest Service Road is not applied: see the overload taking road sections.
+   *
    * @param sort      the columns the user sorted by, first deciding; none for legacy's order
    */
   public static Specification<CrossingSiteEntity> matching(
@@ -115,11 +114,11 @@ public final class SiteSearchSpecifications {
   }
 
   /**
-   * Builds the predicate, with Forest Service Road matched on road sections rather than on the
-   * name in {@code CBR_ROAD_SECTION_VW}.
+   * Builds the predicate, with Forest Service Road matched on road sections: the name picked
+   * becomes the sections LRMOPS gives it ({@code RoadNameService#sectionsNamed}), resolved by the
+   * caller. {@code criteria.forestServiceRoad()} itself is not read here.
    *
-   * @param roadSections the sections LRMOPS gives the name picked ({@code RoadNameService});
-   *     null to match {@code criteria.forestServiceRoad()} against the view as before
+   * @param roadSections the sections LRMOPS gives the name picked; null when none was picked
    */
   public static Specification<CrossingSiteEntity> matching(
       SiteSearchCriteria criteria, List<HeaderSort<SiteSortColumn>> sort,
@@ -133,8 +132,9 @@ public final class SiteSearchSpecifications {
       if (roadSections != null) {
         predicates.add(onRoadSections(builder, root, roadSections));
       }
-      joinedCriteriaAndProjection(root, query, builder,
-          roadSections == null ? criteria.forestServiceRoad() : null, predicates, sort);
+      if (returnsEntities(query)) {
+        fetchAndOrder(root, query, builder, sort);
+      }
 
       return allOf(builder, predicates);
     };
@@ -200,49 +200,6 @@ public final class SiteSearchSpecifications {
     }
     if (Boolean.TRUE.equals(criteria.incomplete())) {
       predicates.add(incomplete(builder, root));
-    }
-  }
-
-  /**
-   * The road section: filtered on by one criterion, displayed by every results row, joined once for
-   * both.
-   *
-   * <p>LEFT, so a site with no road section is still a candidate for every other criterion; the
-   * predicate then excludes it, which is what an inner join would have done anyway — but only for
-   * this criterion rather than for the whole query.
-   *
-   * <p><b>One join, not two.</b> It used to be created twice — a plain join here and a fetch in the
-   * projection — because {@code root.fetch(X)} is a new join every time and never reuses
-   * {@code root.join(X)}. That put two left joins to {@code CBR_ROAD_SECTION_VW}, a materialized
-   * view reached over a database link, in every search that filtered on Forest Service Road. The
-   * same mistake in Inspection Search cost far more, because the join it duplicated carried a
-   * correlated subquery.
-   *
-   * <p>Neither shown nor sorted on any more: the road name shown is LRMOPS's, looked up for the
-   * page (2026-11-25). The projection still fetches it, though nothing reads it there: the association is
-   * {@code @NotFound(IGNORE)}, which Hibernate always loads eagerly, so leaving it out costs a second
-   * select per page rather than saving a join.
-   */
-  private static void joinedCriteriaAndProjection(
-      Root<CrossingSiteEntity> root,
-      CriteriaQuery<?> query,
-      CriteriaBuilder builder,
-      String forestServiceRoad,
-      List<Predicate> predicates,
-      List<HeaderSort<SiteSortColumn>> sort) {
-    boolean projecting = returnsEntities(query);
-    boolean filtering = StringUtils.hasText(forestServiceRoad);
-    if (!projecting && !filtering) {
-      return;
-    }
-
-    From<?, ?> roadSection = joinOrFetch(root, ROAD_SECTION, JoinType.LEFT, projecting);
-    if (filtering) {
-      contains(builder, roadSection.get(ROAD_SECTION_NAME), forestServiceRoad)
-          .ifPresent(predicates::add);
-    }
-    if (projecting) {
-      fetchAndOrder(root, query, builder, sort);
     }
   }
 

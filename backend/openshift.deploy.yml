@@ -36,8 +36,15 @@ parameters:
     value: "2"
   - name: MIN_CPU
     value: "200m"
+  # Memory request. Kept equal to MAX_MEM for Guaranteed QoS — see the
+  # resources block on the backend container for the quota arithmetic.
   - name: MIN_MEM
-    value: "500Mi"
+    value: "1Gi"
+  # Memory limit. The JVM derives its max heap from this value
+  # (-XX:MaxRAMPercentage=60), so raising it raises the heap. Bounded by the
+  # namespace's memory quota across the backend and frontend replicas.
+  - name: MAX_MEM
+    value: "1Gi"
   # Container timezone. Drives the JVM default zone, which the log pattern
   # (%d in logging.pattern.console) renders against — OpenShift containers are
   # UTC by default, which puts every log line 7-8 hours off the BC business
@@ -287,7 +294,17 @@ objects:
                       name: ${NAME}-backend-secret-${ZONE}
                       key: KEYSTORE_SECRET
               # The JVM sizes its heap as a percentage of the memory LIMIT (-XX:MaxRAMPercentage=60
-              # in the Dockerfile), so changing the limit here changes the heap: 800Mi ⇒ ~480MB.
+              # in the Dockerfile), so changing the limit here changes the heap: 1Gi ⇒ ~614MB. It
+              # was 800Mi ⇒ ~480MB, which the largest reports outgrew: a province-wide
+              # Inspections Conducted – Detail PDF ran out of heap at -Xmx480m (2026-11-26).
+              #
+              # 1Gi is bounded by the namespace's memory quota. With merge.yml's replica counts:
+              #   TEST: backend 2 x 1Gi + frontend 2 x 128Mi = 2304Mi
+              #   PROD (planned 3 + 3): 3 x 1Gi + 3 x 128Mi  = 3456Mi
+              # Check the namespace quota before raising this or the replica counts.
+              #
+              # requests == limits puts the pod in the Guaranteed QoS class, so it is the last thing
+              # evicted under node memory pressure.
               #
               # ephemeral-storage must hold at once: a heap dump on OOM
               # (/temp, up to the max heap), the multipart spool for uploads in flight (/tmp — a
@@ -301,7 +318,7 @@ objects:
                   ephemeral-storage: "500Mi"
                 limits:
                   cpu: "1000m"
-                  memory: "800Mi"
+                  memory: ${MAX_MEM}
                   ephemeral-storage: "1Gi"
               livenessProbe:
                 httpGet:

@@ -6,7 +6,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
@@ -50,8 +49,6 @@ class InspectionSearchServiceTest {
   private static StructureInspectionEntity inspection() {
     OrgUnitEntity orgUnit = OrgUnitEntity.builder()
         .orgUnitNo(18L).orgUnitCode("DPG").orgUnitName("Prince George").build();
-    CbrRoadSectionEntity roadSection = CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Deadman FSR").build();
     CrossingSiteEntity site = CrossingSiteEntity.builder()
         .crossingSiteId("site-1")
         .crossingName("Deadman Creek")
@@ -59,7 +56,6 @@ class InspectionSearchServiceTest {
         .forestFileId("R00123")
         .roadSectionId("01")
         .orgUnit(orgUnit)
-        .roadSection(roadSection)
         .build();
     CrossingStructureEntity structure = CrossingStructureEntity.builder()
         .crossingStructureId(100L).crossingStructureName("BR000001").site(site).build();

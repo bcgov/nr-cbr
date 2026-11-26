@@ -13,12 +13,14 @@ import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryNames.Codes.describ
 
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceBridgeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceCulvertRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureBridgeDetail;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCulvertDetail;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.specification.v1.StructureInventoryDetailLine;
 import ca.bc.gov.nrs.cbr.specification.v1.StructureInventoryReportSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.struct.v1.StructureInventoryDetailedCriteria;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -31,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import org.hibernate.jpa.HibernateHints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -52,6 +55,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Where it differs from the Summary, it does as legacy's Detailed did: the last routine
  * inspection counts whatever its status, and a structure with no type/class is not listed.
+ *
+ * <p><b>The road name is LRMOPS's</b>, looked up for the report's distinct road sections after
+ * the query, in batches ({@link RoadNameService#namesOf}); blank where LRMOPS has none or cannot be
+ * asked (2026-11-25). Each lookup logs its size and time.
  */
 @Service
 @Transactional(readOnly = true)
@@ -69,6 +76,9 @@ public class StructureInventoryDetailedService {
   static final String FILENAME = "StructureInventoryDetailReport";
 
   private static final String YES = "Y";
+
+  /** The site type with no road. */
+  private static final String RECREATION = "REC";
 
   /** Legacy's template pattern for a whole number: {@code #,##0}. */
   private static final String WHOLE = "#,##0";
@@ -97,6 +107,7 @@ public class StructureInventoryDetailedService {
   private final ReportRenderer renderer;
   private final StructureInventoryReportSupport support;
   private final StructureInventoryNames names;
+  private final RoadNameService roadNames;
 
   public StructureInventoryDetailedService(
       EntityManager entityManager,
@@ -105,7 +116,8 @@ public class StructureInventoryDetailedService {
       StructureInspectionRepository inspections,
       ReportRenderer renderer,
       StructureInventoryReportSupport support,
-      StructureInventoryNames names) {
+      StructureInventoryNames names,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.bridges = bridges;
     this.culverts = culverts;
@@ -113,21 +125,38 @@ public class StructureInventoryDetailedService {
     this.renderer = renderer;
     this.support = support;
     this.names = names;
+    this.roadNames = roadNames;
   }
 
   /** The report, as a PDF or a CSV. */
   public ReportFile generate(StructureInventoryDetailedCriteria criteria, ReportFormat format) {
+    if (format == ReportFormat.CSV) {
+      return ReportTarget.inMemory(target -> writeCsv(criteria, target));
+    }
     long started = System.nanoTime();
     List<Facts> facts = facts(criteria);
     String printed = support.today();
-    byte[] content = switch (format) {
-      case PDF -> renderer.pdf(TEMPLATE, support.parameters(criteria, REPORT_ID, printed),
-          blocks(facts).stream().<Map<String, ?>>map(Block::fields).toList());
-      case CSV -> StructureInventoryReportSupport.csv(CSV_COLUMNS, csvRows(facts));
-    };
+    byte[] content = renderer.pdf(TEMPLATE, support.parameters(criteria, REPORT_ID, printed),
+        blocks(facts).stream().<Map<String, ?>>map(Block::fields).toList());
     log.info("Structure Inventory - Detailed: {} structures as {} ({} bytes) in {} ms",
         facts.size(), format, content.length, millisSince(started));
     return new ReportFile(content, filename(FILENAME, printed, format), format.mediaType());
+  }
+
+  /**
+   * The CSV, written to {@code target} as it is made rather than assembled in memory first — the
+   * download's response, or {@link ReportTarget#inMemory}. The target is opened once the rows are
+   * ready.
+   */
+  public void writeCsv(StructureInventoryDetailedCriteria criteria, ReportTarget target) {
+    long started = System.nanoTime();
+    List<List<String>> csvRows = csvRows(facts(criteria));
+    try (CsvStream csv = StructureInventoryReportSupport.csv(target,
+        filename(FILENAME, support.today(), ReportFormat.CSV), CSV_COLUMNS)) {
+      csv.rows(csvRows);
+    }
+    log.info("Structure Inventory - Detailed: {} rows as CSV, streamed, in {} ms",
+        csvRows.size(), millisSince(started));
   }
 
   /** The KMZ's media type: Google Earth's. */
@@ -157,7 +186,7 @@ public class StructureInventoryDetailedService {
       entityManager.createQuery(StructureInventoryReportSpecifications.detailedOf(
               entityManager.getCriteriaBuilder(),
               ids.subList(from, Math.min(ids.size(), from + StructureInventoryReportSupport.BATCH))))
-          .getResultList()
+          .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS).getResultList()
           .forEach(line -> lines.put(line.crossingStructureId(), line));
     }
     return kmz(facts(ids.stream().map(lines::get).filter(Objects::nonNull).toList()), report,
@@ -191,7 +220,9 @@ public class StructureInventoryDetailedService {
   private List<Facts> facts(StructureInventoryDetailedCriteria criteria) {
     return facts(entityManager.createQuery(
         StructureInventoryReportSpecifications.detailed(
-            entityManager.getCriteriaBuilder(), criteria)).getResultList());
+            entityManager.getCriteriaBuilder(), criteria))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
+        .getResultList());
   }
 
   /** The same, for these lines, in their order. */
@@ -203,10 +234,26 @@ public class StructureInventoryDetailedService {
         StructureCulvertDetail::crossingStructureId, Function.identity());
     Map<Long, LocalDate> lastInspected =
         firstOf(ids, inspections::findLastRoutineInspectionDatesAnyStatus);
+    Map<RoadSectionKey, String> roads = roadNames.namesOf(lines.stream()
+        .map(StructureInventoryDetailedService::roadOf)
+        .filter(Objects::nonNull)
+        .toList());
     return lines.stream().map(line -> {
       Long id = line.crossingStructureId();
-      return new Facts(line, bridgeDetails.get(id), culvertDetails.get(id), lastInspected.get(id));
+      RoadSectionKey road = roadOf(line);
+      return new Facts(line, bridgeDetails.get(id), culvertDetails.get(id), lastInspected.get(id),
+          road == null ? null : roads.get(road));
     }).toList();
+  }
+
+  /**
+   * The road section a line's site is on, for LRMOPS's name; null for none, and for a recreation
+   * site, whose Project File ID# names a recreation project, not a road.
+   */
+  private static RoadSectionKey roadOf(StructureInventoryDetailLine line) {
+    return RECREATION.equals(line.crossingSiteTypeCode())
+        ? null
+        : RoadSectionKey.of(line.forestFileId(), line.roadSectionId());
   }
 
   private static List<Block> blocks(List<Facts> facts) {
@@ -225,7 +272,7 @@ public class StructureInventoryDetailedService {
           blankIfNull(line.forestFileId()),
           blankIfNull(line.roadSectionId()),
           blankIfNull(line.districtName()),
-          blankIfNull(line.roadSectName()),
+          blankIfNull(fact.roadName()),
           blankIfNull(line.crossingName()),
           of(bridge, StructureBridgeDetail::superstructureType),
           of(bridge, StructureBridgeDetail::deckType),
@@ -275,7 +322,7 @@ public class StructureInventoryDetailedService {
           blankIfNull(line.forestFileId()),
           blankIfNull(line.roadSectionId()),
           orgUnit(orgUnitNames, line.businessAreaOrgUnitNo()),
-          blankIfNull(line.roadSectName()),
+          blankIfNull(fact.roadName()),
           blankIfNull(line.crossingName()),
           of(bridge, StructureBridgeDetail::superstructureType),
           of(bridge, StructureBridgeDetail::deckType),
@@ -333,7 +380,8 @@ public class StructureInventoryDetailedService {
       StructureInventoryDetailLine line,
       StructureBridgeDetail bridge,
       StructureCulvertDetail culvert,
-      LocalDate lastInspected) {
+      LocalDate lastInspected,
+      String roadName) {
 
     /** Legacy counts the spans of no bridge as 0, so a culvert shows 0. */
     long spanCount() {

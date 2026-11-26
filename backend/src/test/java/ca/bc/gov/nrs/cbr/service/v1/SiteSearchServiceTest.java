@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteStatusCodeEntity;
@@ -54,7 +53,6 @@ class SiteSearchServiceTest {
     // No Forest Service Road filter unless a test says otherwise.
     when(roadNames.sectionsNamed(any())).thenReturn(Optional.empty());
     entityManager.createQuery("DELETE FROM CrossingSiteEntity").executeUpdate();
-    entityManager.createQuery("DELETE FROM CbrRoadSectionEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM OrgUnitEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CrossingSiteStatusCodeEntity").executeUpdate();
   }
@@ -194,8 +192,6 @@ class SiteSearchServiceTest {
   void ordersAsLegacyDoes() {
     givenDistrict(18L, "DPG", "Prince George");
     givenDistrict(21L, "DKA", "Thompson Rivers");
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
     givenSite("DPG-01-20", 18L, "01", "20.0");
     givenSite("DPG-01-10", 18L, "01", "10.0");
     givenSite("DKA-01-99", 21L, "01", "99.0");
@@ -243,8 +239,6 @@ class SiteSearchServiceTest {
         .effectiveDate(LocalDateTime.now().minusYears(1))
         .expiryDate(LocalDateTime.now().plusYears(1))
         .updateTimestamp(LocalDateTime.now()).build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
     entityManager.persist(CrossingSiteEntity.builder()
         .crossingSiteId("SITE-1").orgUnitNo(18L).crossingSiteStatusCode("ACT")
         .forestFileId("R00123").roadSectionId("01").crossingName("Deadman Creek")

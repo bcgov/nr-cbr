@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.cbr.model.v1.AbutmentCodeEntity;
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
@@ -41,6 +40,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -55,6 +55,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
     InspectionsDueRows.class,
     InspectionsDueCriteriaLine.class, StructureInventoryReportSupport.class, ReportRenderer.class})
 class InspectionsDueSummaryServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   @Autowired
   private InspectionsDueSummaryService service;
@@ -85,6 +91,7 @@ class InspectionsDueSummaryServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     when(codes.getSpecialEquipmentCodes()).thenReturn(
         List.of(new CodeOptionResponse("BOAT", "Boat")));
@@ -99,7 +106,7 @@ class InspectionsDueSummaryServiceTest {
         "StructureInspectionEntity", "ForestServiceBridgePierEntity",
         "ForestServiceBridgeSpanEntity", "ForestServiceBridgeEntity",
         "ForestServiceCulvertEntity", "CrossingStructureEntity", "CrossingSiteEntity",
-        "CbrRoadSectionEntity", "OrgUnitEntity", "InspectionReportStatusCodeEntity",
+        "OrgUnitEntity", "InspectionReportStatusCodeEntity",
         "AbutmentCodeEntity", "SuperstructureTypeCodeEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
     }
@@ -112,8 +119,7 @@ class InspectionsDueSummaryServiceTest {
         .orgUnitNo(18L).orgUnitCode("DPG").orgUnitName("Prince George").build());
     entityManager.persist(OrgUnitEntity.builder()
         .orgUnitNo(9L).orgUnitCode("DMH").orgUnitName("100 Mile House").build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
     site("62-001", 18L, s -> s);
   }
 
@@ -348,8 +354,7 @@ class InspectionsDueSummaryServiceTest {
   @DisplayName("orders by district number, then the sort chosen, branch, km and user km")
   void order() {
     site("62-002", 9L, s -> s.forestFileId("R00999"));
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00999").roadSectionId("01").roadSectName("Alpha FSR").build());
+    roads.name("R00999", "01", "Alpha FSR");
     site("62-003", 18L, s -> s.forestFileId("R00999").pointOfCommencementDistance(BigDecimal.ONE));
     structure("ON-BOWRON", s -> s);
     structure("IN-100-MILE", s -> s.crossingSiteId("62-002"));

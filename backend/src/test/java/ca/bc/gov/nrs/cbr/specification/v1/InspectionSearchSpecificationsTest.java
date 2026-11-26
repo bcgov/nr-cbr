@@ -2,7 +2,6 @@ package ca.bc.gov.nrs.cbr.specification.v1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.InspectionReportStatusCodeEntity;
@@ -13,6 +12,7 @@ import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionReviewerEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureInspectionRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.HeaderSort;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSearchCriteria;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.util.CriteriaValues;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionSortColumn;
 import jakarta.persistence.EntityManager;
@@ -80,7 +80,6 @@ class InspectionSearchSpecificationsTest {
     entityManager.createQuery("DELETE FROM StructureInspectionEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CrossingStructureEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM CrossingSiteEntity").executeUpdate();
-    entityManager.createQuery("DELETE FROM CbrRoadSectionEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM OrgUnitEntity").executeUpdate();
     entityManager.createQuery("DELETE FROM InspectionReportStatusCodeEntity").executeUpdate();
     nextStatusId = 1L;
@@ -294,14 +293,23 @@ class InspectionSearchSpecificationsTest {
     }
 
     @Test
-    @DisplayName("filters on the road section name when one is asked for")
+    @DisplayName("filters on the road sections LRMOPS gives the road picked")
     void filtersByForestServiceRoad() {
-      entityManager.persist(CbrRoadSectionEntity.builder()
-          .forestFileId("R00123").roadSectionId("01").roadSectName("Deadman FSR").build());
       givenCompleteInspection(1L, "SUB");
 
-      assertThat(search(criteria().forestServiceRoad("Deadman").build())).containsExactly(1L);
-      assertThat(search(criteria().forestServiceRoad("Nowhere").build())).isEmpty();
+      assertThat(onSections(List.of(RoadSectionKey.of("r00123", "01")))).containsExactly(1L);
+      assertThat(onSections(List.of(RoadSectionKey.of("R00123", "02")))).isEmpty();
+      assertThat(onSections(List.of())).isEmpty();
+    }
+
+    private List<Long> onSections(List<RoadSectionKey> sections) {
+      return repository
+          .findAll(InspectionSearchSpecifications.matching(criteria().build(), List.of(), sections),
+              PageRequest.of(0, 50))
+          .getContent()
+          .stream()
+          .map(StructureInspectionEntity::getInspectionId)
+          .toList();
     }
   }
 
@@ -619,8 +627,6 @@ class InspectionSearchSpecificationsTest {
     private void givenAPageOfResults() {
       givenSite("site-1");
       givenStructure(100L, "BR000001", "site-1");
-      entityManager.persist(CbrRoadSectionEntity.builder()
-          .forestFileId("R00123").roadSectionId("01").roadSectName("Deadman FSR").build());
       for (long id = 1; id <= 5; id++) {
         givenInspection(id, 100L, LocalDate.of(2026, 6, (int) id), "SUB");
       }
@@ -657,7 +663,6 @@ class InspectionSearchSpecificationsTest {
       found.forEach(inspection -> {
         inspection.getCurrentStatus().getStatusCode().getDescription();
         inspection.getStructure().getSite().getOrgUnit();
-        inspection.getStructure().getSite().getRoadSection();
       });
 
       assertThat(found).hasSize(5);

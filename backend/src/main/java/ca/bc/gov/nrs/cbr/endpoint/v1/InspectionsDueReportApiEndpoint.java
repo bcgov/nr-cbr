@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.cbr.endpoint.v1;
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionsDueCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,7 +36,8 @@ public interface InspectionsDueReportApiEndpoint {
   @GetMapping("/inspections-due-summary")
   ResponseEntity<byte[]> inspectionsDueSummary(
       @Valid @ModelAttribute InspectionsDueCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 
   /**
    * Inspections Due – Detailed (legacy CBR003): a box per structure under its forest district, as
@@ -50,7 +52,8 @@ public interface InspectionsDueReportApiEndpoint {
   @GetMapping("/inspections-due-detailed")
   ResponseEntity<byte[]> inspectionsDueDetailed(
       @Valid @ModelAttribute InspectionsDueCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 
   /**
    * Inspections – Blank Report (legacy CBR010): a blank routine inspection form per structure, as a
@@ -65,5 +68,6 @@ public interface InspectionsDueReportApiEndpoint {
   @GetMapping("/inspections-blank")
   ResponseEntity<byte[]> inspectionsBlank(
       @Valid @ModelAttribute InspectionsDueCriteria criteria,
-      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format);
+      @RequestParam(name = "format", defaultValue = "PDF") ReportFormat format,
+      HttpServletResponse response);
 }

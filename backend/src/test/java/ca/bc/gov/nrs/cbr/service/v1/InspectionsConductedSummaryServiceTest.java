@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
@@ -36,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -49,6 +49,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import({InspectionsConductedSummaryService.class, InspectionsConductedCriteriaLine.class,
     StructureInventoryReportSupport.class, ReportRenderer.class})
 class InspectionsConductedSummaryServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   @Autowired
   private InspectionsConductedSummaryService service;
@@ -71,6 +77,7 @@ class InspectionsConductedSummaryServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     when(codes.getInspectionTypeCodes()).thenReturn(List.of(
         new CodeOptionResponse("ROUT", "Routine"), new CodeOptionResponse("SPEC", "Special")));
@@ -84,7 +91,7 @@ class InspectionsConductedSummaryServiceTest {
         List.of(new CodeOptionResponse("CRS", "Stream crossing")));
     for (String entity : List.of("InspectionReportStatusEntity", "StructureInspectionEntity",
         "ForestServiceBridgeEntity", "CrossingStructureEntity", "CrossingSiteEntity",
-        "CbrRoadSectionEntity", "OrgUnitEntity", "InspectionReportStatusCodeEntity")) {
+        "OrgUnitEntity", "InspectionReportStatusCodeEntity")) {
       entityManager.createQuery("DELETE FROM " + entity).executeUpdate();
     }
     for (String[] code : List.of(new String[] {"SUB", "Submitted"},
@@ -94,8 +101,7 @@ class InspectionsConductedSummaryServiceTest {
     }
     entityManager.persist(OrgUnitEntity.builder()
         .orgUnitNo(18L).orgUnitCode("DPG").orgUnitName("Prince George").build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
     entityManager.persist(CrossingSiteEntity.builder()
         .crossingSiteId("62-001").crossingName("Deadman Creek")
         .pointOfCommencementDistance(new BigDecimal("12.5")).userKm(new BigDecimal("12.75"))
@@ -249,8 +255,7 @@ class InspectionsConductedSummaryServiceTest {
   @Test
   @DisplayName("sorts in legacy's direction for the column, then by Structure # and newest first")
   void order() {
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("A00001").roadSectionId("01").roadSectName("Zeballos FSR").build());
+    roads.name("A00001", "01", "Zeballos FSR");
     entityManager.persist(CrossingSiteEntity.builder().crossingSiteId("10-001")
         .forestFileId("A00001").roadSectionId("01").userKm(BigDecimal.ONE).build());
     long b = structure("B", s -> s);
@@ -286,9 +291,7 @@ class InspectionsConductedSummaryServiceTest {
   @Test
   @DisplayName("produces the landscape PDF, a long road name wrapped rather than cut off")
   void producesThePdf() throws Exception {
-    entityManager.persist(CbrRoadSectionEntity.builder().forestFileId("R00999").roadSectionId("01")
-        .roadSectName("Upper Fraser Mainline North Rd")
-        .build());
+    roads.name("R00999", "01", "Upper Fraser Mainline North Rd");
     entityManager.persist(CrossingSiteEntity.builder().crossingSiteId("62-009")
         .forestFileId("R00999").roadSectionId("01").build());
     long id = structure("B1", s -> s.crossingSiteId("62-009"));

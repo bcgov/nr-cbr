@@ -10,6 +10,7 @@ import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.plain
 import ca.bc.gov.nrs.cbr.model.v1.StructureCommentEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceBridgeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.ForestServiceCulvertRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureBridgeDetail;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureBridgeLength;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureCommentRepository;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,6 +78,7 @@ public class InspectionsDueRows {
   private final ForestServiceCulvertRepository culverts;
   private final StructureCommentRepository comments;
   private final ConfigurationService codes;
+  private final RoadNameService roadNames;
 
   public InspectionsDueRows(
       EntityManager entityManager,
@@ -83,13 +86,15 @@ public class InspectionsDueRows {
       ForestServiceBridgeRepository bridges,
       ForestServiceCulvertRepository culverts,
       StructureCommentRepository comments,
-      ConfigurationService codes) {
+      ConfigurationService codes,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.inspections = inspections;
     this.bridges = bridges;
     this.culverts = culverts;
     this.comments = comments;
     this.codes = codes;
+    this.roadNames = roadNames;
   }
 
   /** The Summary's CSV columns: the PDF's, in its order, after the district it is grouped by. */
@@ -143,7 +148,7 @@ public class InspectionsDueRows {
           blankIfNull(line.roadSectionId()),
           plain(entry.totalLength()),
           String.valueOf(piers(entry.bridge())),
-          blankIfNull(line.roadSectionName()),
+          blankIfNull(beside.roads().apply(line)),
           plain(line.kilometres()),
           plain(line.userKm()),
           blankIfNull(line.crossingName()),
@@ -205,7 +210,7 @@ public class InspectionsDueRows {
           date(line.nextPlannedInspectionDate()),
           blankIfNull(line.forestFileId()),
           blankIfNull(line.roadSectionId()),
-          blankIfNull(line.roadSectionName()),
+          blankIfNull(beside.roads().apply(line)),
           blankIfNull(line.crossingName()),
           plain(entry.totalLength()),
           blankIfNull(beside.access().get(line.specialAccessCode())),
@@ -224,6 +229,7 @@ public class InspectionsDueRows {
     return entityManager
         .createQuery(InspectionsDueReportSpecifications.lines(
             entityManager.getCriteriaBuilder(), criteria))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
         .getResultList().stream().map(InspectionsDueLine::structureId).toList();
   }
 
@@ -232,6 +238,7 @@ public class InspectionsDueRows {
     return entityManager
         .createQuery(InspectionsDueReportSpecifications.detailedLines(
             entityManager.getCriteriaBuilder(), criteria))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS)
         .getResultList().stream().map(InspectionsDueLine::structureId).toList();
   }
 
@@ -239,7 +246,7 @@ public class InspectionsDueRows {
     List<InspectionsDueLine> lines = entityManager
         .createQuery(InspectionsDueReportSpecifications.lines(
             entityManager.getCriteriaBuilder(), criteria))
-        .getResultList();
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS).getResultList();
     Beside beside = beside(lines);
     return new Loaded<>(expand(lines, grouped(beside.ids(), bridges::findLengthsAndPiers,
         StructureBridgeLength::crossingStructureId), beside, StructureBridgeLength::totalLength),
@@ -250,7 +257,7 @@ public class InspectionsDueRows {
     List<InspectionsDueLine> lines = entityManager
         .createQuery(InspectionsDueReportSpecifications.detailedLines(
             entityManager.getCriteriaBuilder(), criteria))
-        .getResultList();
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS).getResultList();
     Beside beside = beside(lines);
     return new Loaded<>(expand(lines, grouped(beside.ids(), bridges::findDetails,
         StructureBridgeDetail::crossingStructureId), beside, StructureBridgeDetail::totalLength),
@@ -285,7 +292,10 @@ public class InspectionsDueRows {
         grouped(ids, culverts::findLengths, StructureValue::crossingStructureId),
         plannedComments(ids),
         new Names(byCode(codes.getSpecialEquipmentCodes()), byCode(codes.getSpecialAccessCodes()),
-            byCode(codes.getStructureTypeClassCodes())));
+            byCode(codes.getStructureTypeClassCodes())),
+        // LRMOPS's road names, for the report's distinct road sections.
+        roadNames.namesFor(lines, InspectionsDueLine::forestFileId,
+            InspectionsDueLine::roadSectionId));
   }
 
   /** The fields both reports print alike. */
@@ -294,7 +304,7 @@ public class InspectionsDueRows {
     Map<String, String> row = new HashMap<>();
     row.put("CROSSING_STRUCTURE_NAME", line.structureName());
     row.put("CROSSING_SITE_ID", line.siteId());
-    row.put("ROAD_SECT_NAME", line.roadSectionName());
+    row.put("ROAD_SECT_NAME", beside.roads().apply(line));
     row.put("CROSSING_NAME", line.crossingName());
     row.put("LAST_INSPECTION_DATE", formatDate(beside.lastInspected().get(id)));
     row.put("NEXT_PLANNED_INSPECTION_DATE", formatDate(line.nextPlannedInspectionDate()));
@@ -355,7 +365,8 @@ public class InspectionsDueRows {
       Map<Long, LocalDate> lastInspected,
       Map<Long, List<StructureValue<BigDecimal>>> culvertLengths,
       Map<Long, String> comments,
-      Names names) {
+      Names names,
+      Function<InspectionsDueLine, String> roads) {
 
     Map<String, String> equipment() {
       return names.equipment();

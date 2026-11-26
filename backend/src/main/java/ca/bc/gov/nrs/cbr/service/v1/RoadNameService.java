@@ -13,9 +13,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientException;
@@ -51,9 +57,18 @@ public class RoadNameService {
   static final int LOOKUP_BATCH = 500;
 
   private final LrmopsApiClient lrmops;
+  private final Executor lookups;
 
-  public RoadNameService(LrmopsApiClient lrmops) {
+  @Autowired
+  public RoadNameService(
+      LrmopsApiClient lrmops, @Qualifier("roadNameLookupExecutor") Executor lookups) {
     this.lrmops = lrmops;
+    this.lookups = lookups;
+  }
+
+  /** Test hook: batches sent one after another, on the caller's thread. */
+  RoadNameService(LrmopsApiClient lrmops) {
+    this(lrmops, Runnable::run);
   }
 
   /**
@@ -100,8 +115,12 @@ public class RoadNameService {
    * The names of the given sections, keyed as given (normalized, {@link RoadSectionKey#of}). A
    * section LRMOPS does not have, or has no name for, is absent.
    *
-   * <p><b>Never throws.</b> The names are a column of a results page that is otherwise CBR's own,
-   * so the API being down blanks the column (logged) rather than failing the search.
+   * <p>In batches of {@value #LOOKUP_BATCH}, sent in parallel on the shared
+   * {@code roadNameLookupExecutor}, which caps how many reach the API at once.
+   *
+   * <p><b>Never throws.</b> The names are a column of a page or report that is otherwise CBR's
+   * own, so a batch the API cannot answer leaves its names blank (logged) rather than failing it;
+   * the other batches' names are kept.
    */
   public Map<RoadSectionKey, String> namesOf(Collection<RoadSectionKey> sections) {
     List<RoadSectionKey> wanted = new ArrayList<>(new LinkedHashSet<>(
@@ -115,30 +134,52 @@ public class RoadNameService {
     }
 
     long start = System.nanoTime();
+    List<CompletableFuture<List<RoadSummary>>> calls = new ArrayList<>();
+    for (int from = 0; from < wanted.size(); from += LOOKUP_BATCH) {
+      List<SectionKey> batch = wanted.subList(from, Math.min(from + LOOKUP_BATCH, wanted.size()))
+          .stream()
+          .map(key -> new SectionKey(key.forestFileId(), key.roadSectionId()))
+          .toList();
+      calls.add(CompletableFuture.supplyAsync(() -> lrmops.lookUpRoadSections(batch), lookups));
+    }
+
     Map<RoadSectionKey, String> names = new HashMap<>();
-    int calls = 0;
-    try {
-      for (int from = 0; from < wanted.size(); from += LOOKUP_BATCH) {
-        List<SectionKey> batch = wanted.subList(from, Math.min(from + LOOKUP_BATCH, wanted.size()))
-            .stream()
-            .map(key -> new SectionKey(key.forestFileId(), key.roadSectionId()))
-            .toList();
-        calls++;
-        for (RoadSummary road : lrmops.lookUpRoadSections(batch)) {
+    int failed = 0;
+    for (CompletableFuture<List<RoadSummary>> call : calls) {
+      try {
+        for (RoadSummary road : call.join()) {
           RoadSectionKey key = RoadSectionKey.of(road.roadId(), road.sectionId());
           if (key != null && road.roadName() != null) {
             names.putIfAbsent(key, road.roadName());
           }
         }
+      } catch (CompletionException ex) {
+        failed++;
+        log.warn("road-name lookup: a batch failed; its names left blank: {}",
+            ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
       }
-    } catch (RestClientException ex) {
-      log.warn("road-name lookup failed after {} call(s), {} ms; names left blank: {}",
-          calls, millisSince(start), ex.getMessage());
-      return names;
     }
-    log.info("road-name lookup: {} section(s), {} found, {} call(s), {} ms",
-        wanted.size(), names.size(), calls, millisSince(start));
+    log.info("road-name lookup: {} section(s), {} found, {} call(s), {} failed, {} ms",
+        wanted.size(), names.size(), calls.size(), failed, millisSince(start));
     return names;
+  }
+
+  /**
+   * The road names of a report's rows: one {@link #namesOf} for their distinct road sections, then
+   * each row's name by its pair. Null for a row with no road, or one LRMOPS has no name for.
+   *
+   * @param forestFileId  a row's {@code FOREST_FILE_ID}
+   * @param roadSectionId a row's {@code ROAD_SECTION_ID}
+   */
+  public <T> Function<T, String> namesFor(
+      Collection<T> rows, Function<T, String> forestFileId, Function<T, String> roadSectionId) {
+    Function<T, RoadSectionKey> key =
+        row -> RoadSectionKey.of(forestFileId.apply(row), roadSectionId.apply(row));
+    Map<RoadSectionKey, String> names = namesOf(rows.stream().map(key).toList());
+    return row -> {
+      RoadSectionKey road = key.apply(row);
+      return road == null ? null : names.get(road);
+    };
   }
 
   /**

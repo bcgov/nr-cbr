@@ -11,16 +11,20 @@ import ca.bc.gov.nrs.cbr.model.v1.MonitoringStatusCodeEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RecreationProjectEntity;
 import ca.bc.gov.nrs.cbr.repository.v1.MonitoringStatusCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.RecreationProjectRepository;
+import ca.bc.gov.nrs.cbr.repository.v1.ReportQueryHints;
 import ca.bc.gov.nrs.cbr.specification.v1.MonitorsSummaryLine;
 import ca.bc.gov.nrs.cbr.specification.v1.MonitorsSummaryReportSpecifications;
 import ca.bc.gov.nrs.cbr.struct.v1.MonitorsSummaryCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import jakarta.persistence.EntityManager;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.Objects;
+import org.hibernate.jpa.HibernateHints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -73,6 +77,7 @@ public class MonitorsSummaryService {
   private final MonitoringStatusCodeRepository statuses;
   private final RecreationProjectRepository projects;
   private final MonitorsSummaryCriteriaLine criteriaLine;
+  private final RoadNameService roadNames;
 
   public MonitorsSummaryService(
       EntityManager entityManager,
@@ -81,7 +86,8 @@ public class MonitorsSummaryService {
       StructureInventoryNames clients,
       MonitoringStatusCodeRepository statuses,
       RecreationProjectRepository projects,
-      MonitorsSummaryCriteriaLine criteriaLine) {
+      MonitorsSummaryCriteriaLine criteriaLine,
+      RoadNameService roadNames) {
     this.entityManager = entityManager;
     this.renderer = renderer;
     this.support = support;
@@ -89,26 +95,40 @@ public class MonitorsSummaryService {
     this.statuses = statuses;
     this.projects = projects;
     this.criteriaLine = criteriaLine;
+    this.roadNames = roadNames;
   }
 
   /** The report, as a PDF or a CSV. */
   public ReportFile generate(MonitorsSummaryCriteria criteria, ReportFormat format) {
+    if (format == ReportFormat.CSV) {
+      return ReportTarget.inMemory(target -> writeCsv(criteria, target));
+    }
     long started = System.nanoTime();
     List<Item> items = items(criteria);
     String printed = support.today();
-    byte[] content = switch (format) {
-      case PDF -> {
-        Map<String, Object> parameters = support.parameters(REPORT_ID, printed);
-        parameters.put("P_SELECTED_CRITERIA", criteriaLine.of(criteria));
-        yield renderer.pdf(TEMPLATE, parameters,
-            items.stream().<Map<String, ?>>map(MonitorsSummaryService::pdfRow).toList());
-      }
-      case CSV -> StructureInventoryReportSupport.csv(CSV_COLUMNS,
-          items.stream().map(MonitorsSummaryService::csvRow).toList());
-    };
+    Map<String, Object> parameters = support.parameters(REPORT_ID, printed);
+    parameters.put("P_SELECTED_CRITERIA", criteriaLine.of(criteria));
+    byte[] content = renderer.pdf(TEMPLATE, parameters,
+        items.stream().<Map<String, ?>>map(MonitorsSummaryService::pdfRow).toList());
     log.info("Monitors Summary: {} items as {} ({} bytes) in {} ms",
         items.size(), format, content.length, millisSince(started));
     return new ReportFile(content, filename(FILENAME, printed, format), format.mediaType());
+  }
+
+  /**
+   * The CSV, written to {@code target} as it is made rather than assembled in memory first — the
+   * download's response, or {@link ReportTarget#inMemory}. The target is opened once the rows are
+   * ready.
+   */
+  public void writeCsv(MonitorsSummaryCriteria criteria, ReportTarget target) {
+    long started = System.nanoTime();
+    List<List<String>> csvRows = items(criteria).stream().map(MonitorsSummaryService::csvRow).toList();
+    try (CsvStream csv = StructureInventoryReportSupport.csv(target,
+        filename(FILENAME, support.today(), ReportFormat.CSV), CSV_COLUMNS)) {
+      csv.rows(csvRows);
+    }
+    log.info("Monitors Summary: {} rows as CSV, streamed, in {} ms",
+        csvRows.size(), millisSince(started));
   }
 
   /** The PDF's rows, an item each, in order, every value as the template prints it. */
@@ -121,12 +141,20 @@ public class MonitorsSummaryService {
     return items(criteria).stream().map(MonitorsSummaryService::csvRow).toList();
   }
 
-  /** The items for these criteria, each with the names read beside the query. */
+  /**
+   * The items for these criteria, each with the names read beside the query — the road's from
+   * LRMOPS, whose sections for the Forest Service Road picked also filter the query.
+   */
   private List<Item> items(MonitorsSummaryCriteria criteria) {
+    List<RoadSectionKey> roadSections =
+        roadNames.sectionsNamed(criteria.forestServiceRoad()).orElse(null);
     List<MonitorsSummaryLine> lines = entityManager
         .createQuery(MonitorsSummaryReportSpecifications.lines(
-            entityManager.getCriteriaBuilder(), criteria))
-        .getResultList();
+            entityManager.getCriteriaBuilder(), criteria, roadSections))
+        .setHint(HibernateHints.HINT_FETCH_SIZE, ReportQueryHints.FETCH_ROWS).getResultList();
+    Function<MonitorsSummaryLine, String> roads = roadNames.namesFor(
+        lines.stream().filter(line -> !RECREATION.equals(line.siteTypeCode())).toList(),
+        MonitorsSummaryLine::forestFileId, MonitorsSummaryLine::roadSectionId);
     Map<String, String> statusNames = new HashMap<>();
     for (MonitoringStatusCodeEntity status : statuses.findAll()) {
       statusNames.put(status.getMonitoringStatusCode(), status.getDescription());
@@ -138,7 +166,7 @@ public class MonitorsSummaryService {
         clientNames.get(line.clientNumber()),
         RECREATION.equals(line.siteTypeCode())
             ? projectNames.get(line.forestFileId())
-            : line.roadSectionName(),
+            : roads.apply(line),
         statusNames.get(line.monitoringStatusCode()))).toList();
   }
 

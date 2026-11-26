@@ -1,14 +1,17 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.StructureRepairEntity;
+import jakarta.persistence.QueryHint;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -145,11 +148,13 @@ public interface StructureRepairRepository extends JpaRepository<StructureRepair
    * Report's outstanding repairs (legacy's {@code BLANK_INSPECTION_REPAIRS_SR}: Required and
    * Suggested).
    */
+  @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = ReportQueryHints.FETCH_SIZE))
   List<StructureRepairEntity>
       findByCrossingStructureIdInAndRepairStatusCodeInOrderByCrossingStructureIdAscRepairNumberAsc(
           Collection<Long> structureIds, Collection<String> statusCodes);
 
   /** The repairs recorded on these inspections, each's by repair number — a report's. */
+  @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = ReportQueryHints.FETCH_SIZE))
   List<StructureRepairEntity> findByInspectionIdInOrderByRepairNumberAsc(
       Collection<Long> inspectionIds);
 }

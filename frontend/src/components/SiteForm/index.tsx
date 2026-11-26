@@ -84,7 +84,7 @@ type Props = {
    *
    * <p>One prop for both because they are one cell: `site.jsp:803-824` is a single `<c:if>` that
    * shows "Forest Service Road" for every type but `REC` and "Project Name" for `REC`, never both.
-   * They come from different tables — `CBR_ROAD_SECTION_VW` and `RECREATION_PROJECT` — so the page
+   * They come from different places — LRMOPS's roads and `RECREATION_PROJECT` — so the page
    * decides which question to ask; this only decides what to call the answer.
    *
    * <p>Supplied by the page rather than fetched here: Site Detail already has it from the site it

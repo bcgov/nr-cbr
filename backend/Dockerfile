@@ -47,8 +47,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
 
 # Heap is sized as a percentage of the container's cgroup memory limit rather than a fixed -Xmx: a
 # fixed -Xmx drifts out of step with the Deployment's limit and can run out of heap on attachment
-# uploads with most of the pod unused. 60% of the 800Mi limit in
-# openshift.deploy.yml is ~480MB (the old -Xmx was 400m); the other ~40% is the non-heap footprint —
+# uploads with most of the pod unused. 60% of the 1Gi limit in
+# openshift.deploy.yml is ~614MB (it was 800Mi, ~480MB; the old -Xmx was 400m); the other ~40% is
+# the non-heap footprint —
 # Metaspace (capped at 200m below), JIT code cache, thread stacks, Undertow's direct buffers.
 # Raising the percentage risks the kernel OOM-killing the container instead, which leaves no dump.
 #

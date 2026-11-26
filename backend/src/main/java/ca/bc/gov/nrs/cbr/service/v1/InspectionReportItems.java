@@ -88,8 +88,35 @@ public class InspectionReportItems {
 
   /** Each inspection's printed lines, by inspection id; an inspection with no items has none. */
   Map<Long, List<Map<String, String>>> lines(Collection<Long> inspectionIds) {
+    return lines(inspectionIds, null);
+  }
+
+  /**
+   * The code tables an item's subsection, question and answer are named from. A report reads them
+   * once and hands them to each batch: read per batch, they were re-read 20 times for a province.
+   */
+  ItemCodes codes() {
+    return new ItemCodes(
+        byKey(subsections.findAll(), InspectionSubsectionCodeEntity::getSubsectionCode),
+        names(questions.findAll(), InspectionQuestionCodeEntity::getQuestionCode,
+            InspectionQuestionCodeEntity::getDescription),
+        names(answers.findAll(), InspectionAnswerCodeEntity::getAnswerCode,
+            InspectionAnswerCodeEntity::getDescription));
+  }
+
+  /** The item code tables, by code: each subsection, and each question's and answer's name. */
+  record ItemCodes(
+      Map<String, InspectionSubsectionCodeEntity> subsections,
+      Map<String, String> questions,
+      Map<String, String> answers) {}
+
+  /**
+   * The same, with the code tables already read ({@link #codes}, once for a report rather than for
+   * each batch); null to read them.
+   */
+  Map<Long, List<Map<String, String>>> lines(Collection<Long> inspectionIds, ItemCodes codes) {
     Map<Long, List<Map<String, String>>> lines = new HashMap<>();
-    items(inspectionIds).forEach((id, list) -> lines.put(id, printed(rows(sorted(list)))));
+    items(inspectionIds, codes).forEach((id, list) -> lines.put(id, printed(rows(sorted(list)))));
     return lines;
   }
 
@@ -99,8 +126,13 @@ public class InspectionReportItems {
    * each a row of their own rather than folded into one. An inspection with no items has none.
    */
   Map<Long, List<List<String>>> answers(Collection<Long> inspectionIds) {
+    return answers(inspectionIds, null);
+  }
+
+  /** The same, with the code tables already read ({@link #codes}); null to read them. */
+  Map<Long, List<List<String>>> answers(Collection<Long> inspectionIds, ItemCodes codes) {
     Map<Long, List<List<String>>> byInspection = new HashMap<>();
-    items(inspectionIds).forEach((id, list) -> byInspection.put(id, sorted(list).stream()
+    items(inspectionIds, codes).forEach((id, list) -> byInspection.put(id, sorted(list).stream()
         .sorted(Comparator.comparing(Item::subsectionDescription,
             Comparator.nullsFirst(Comparator.naturalOrder())))
         .map(item -> List.of(
@@ -115,8 +147,12 @@ public class InspectionReportItems {
     return byInspection;
   }
 
-  /** The items of these inspections, with their codes named, by inspection id. */
-  private Map<Long, List<Item>> items(Collection<Long> inspectionIds) {
+  /**
+   * The items of these inspections, with their codes named, by inspection id.
+   *
+   * @param codes the code tables, already read; null to read them here
+   */
+  private Map<Long, List<Item>> items(Collection<Long> inspectionIds, ItemCodes codes) {
     if (inspectionIds.isEmpty()) {
       return Map.of();
     }
@@ -126,12 +162,10 @@ public class InspectionReportItems {
       rows.addAll(items.findByInspectionIdIn(
           ids.subList(from, Math.min(ids.size(), from + StructureInventoryReportSupport.BATCH))));
     }
-    Map<String, InspectionSubsectionCodeEntity> subsectionCodes = byKey(subsections.findAll(),
-        InspectionSubsectionCodeEntity::getSubsectionCode);
-    Map<String, String> questionNames = names(questions.findAll(),
-        InspectionQuestionCodeEntity::getQuestionCode, InspectionQuestionCodeEntity::getDescription);
-    Map<String, String> answerNames = names(answers.findAll(),
-        InspectionAnswerCodeEntity::getAnswerCode, InspectionAnswerCodeEntity::getDescription);
+    ItemCodes named = codes != null ? codes : codes();
+    Map<String, InspectionSubsectionCodeEntity> subsectionCodes = named.subsections();
+    Map<String, String> questionNames = named.questions();
+    Map<String, String> answerNames = named.answers();
     Map<Long, Long> spanNumbers = spanNumbers(spans.findAllById(ids(rows,
         StructureInspectionItemEntity::getForestServiceBridgeSpanId)));
     Map<Long, Long> pierNumbers = pierNumbers(piers.findAllById(ids(rows,

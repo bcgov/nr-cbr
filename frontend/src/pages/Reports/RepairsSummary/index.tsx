@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 
+import RoadNameCombo from '@/components/core/RoadNameCombo';
+
 import { areaGroup } from '../criteriaGroups';
 import MaintainerFields from '../MaintainerFields';
 import ReportCriteriaForm from '../ReportCriteriaForm';
@@ -116,7 +118,12 @@ const RepairsSummaryPage: FC = () => {
               'Any structural safety',
               repairClassCodes.data ?? [],
             )}
-            {fields.text('forestServiceRoad', 'Forest Service Road', 20)}
+            {/* A pick list of LRMOPS's names, matched exactly — as on the search screens. */}
+            <RoadNameCombo
+              id={`${ID}-forestServiceRoad`}
+              value={criteria.forestServiceRoad}
+              onChange={(roadName) => updateCriteria('forestServiceRoad', roadName)}
+            />
 
             {/* Where the structure is held */}
             {areaGroup(fields, codeTables, {

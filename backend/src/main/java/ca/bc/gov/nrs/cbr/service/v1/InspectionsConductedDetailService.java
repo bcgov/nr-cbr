@@ -6,11 +6,16 @@ import static ca.bc.gov.nrs.cbr.service.v1.StructureInventoryReportSupport.milli
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionsConductedCriteria;
 import ca.bc.gov.nrs.cbr.struct.v1.InspectionsConductedSort;
 import ca.bc.gov.nrs.cbr.struct.v1.ReportFormat;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import net.sf.jasperreports.engine.JasperPrint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Inspections Conducted – Detail (legacy CBR001): each inspection in full — its structure and
@@ -57,31 +62,63 @@ public class InspectionsConductedDetailService {
     return rows.structureIds(criteria, criteria.sortOr(DEFAULT_SORT));
   }
 
-  /** The report, as a PDF or a CSV. */
+  /** The report, as a PDF or a CSV, in memory — for a caller that needs the whole file. */
+  @Transactional(readOnly = true)
   public ReportFile generate(InspectionsConductedCriteria criteria, ReportFormat format) {
+    return format == ReportFormat.CSV
+        ? ReportTarget.inMemory(target -> writeCsv(criteria, target))
+        : ReportTarget.inMemory(target -> writePdf(criteria, target));
+  }
+
+  /**
+   * The PDF, written to {@code target} as it is exported. The inspections are handed to Jasper a
+   * batch at a time as it fills ({@link InspectionDetailRows#rowSource}), so a province's are
+   * never all loaded at once; the filled pages are, until exported. The target is opened once the
+   * report is filled, so a failure while filling is still an ordinary error.
+   *
+   * <p>One transaction for the whole fill: the rows are loaded as Jasper reads them.
+   */
+  @Transactional(readOnly = true)
+  public void writePdf(InspectionsConductedCriteria criteria, ReportTarget target) {
     long started = System.nanoTime();
     InspectionsConductedSort sort = criteria.sortOr(DEFAULT_SORT);
     String printed = support.today();
-    int count;
-    byte[] content;
-    if (format == ReportFormat.CSV) {
-      List<List<String>> csvRows = rows.csvRows(criteria, sort);
-      count = csvRows.size();
-      content = StructureInventoryReportSupport.csv(InspectionDetailCsv.COLUMNS, csvRows);
-    } else {
-      List<Map<String, Object>> detail = rows.rows(criteria, sort);
-      count = detail.size();
-      Map<String, Object> parameters = support.parameters("CBR001", printed);
-      parameters.put("P_SELECTED_CRITERIA", criteriaLine.of(criteria, sort));
-      parameters.put("P_ITEMS_REPORT", renderer.compiled(ITEMS));
-      parameters.put("P_REPAIRS_REPORT", renderer.compiled(REPAIRS));
-      parameters.put("P_MONITORS_REPORT", renderer.compiled(MONITORS));
-      content = renderer.pdf(TEMPLATE, parameters,
-          detail.stream().<Map<String, ?>>map(row -> row).toList());
+    Map<String, Object> parameters = support.parameters("CBR001", printed);
+    parameters.put("P_SELECTED_CRITERIA", criteriaLine.of(criteria, sort));
+    parameters.put("P_ITEMS_REPORT", renderer.compiled(ITEMS));
+    parameters.put("P_REPAIRS_REPORT", renderer.compiled(REPAIRS));
+    parameters.put("P_MONITORS_REPORT", renderer.compiled(MONITORS));
+    BatchedRowSource<Long> source = rows.rowSource(criteria, sort);
+    JasperPrint print = renderer.fill(TEMPLATE, parameters, source);
+    long filled = System.nanoTime();
+    try (OutputStream out = target.open(
+        filename(FILENAME, printed, ReportFormat.PDF), ReportFormat.PDF.mediaType())) {
+      renderer.export(print, out);
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
     }
-    log.info("Inspections Conducted - Detail: {} rows as {} ({} bytes) in {} ms",
-        count, format, content.length, millisSince(started));
-    return new ReportFile(content, filename(FILENAME, printed, format), format.mediaType());
+    log.info("Inspections Conducted - Detail: {} inspections as PDF ({} pages), streamed — "
+            + "fill {} ms, export {} ms",
+        source.count(), print.getPages().size(), (filled - started) / 1_000_000,
+        millisSince(filled));
+  }
+
+  /**
+   * The CSV, written to {@code target} as it is made rather than assembled in memory first — the
+   * download's response, or {@link ReportTarget#inMemory}. The target is opened once the rows are
+   * ready.
+   */
+  public void writeCsv(InspectionsConductedCriteria criteria, ReportTarget target) {
+    long started = System.nanoTime();
+    int count;
+    try (CsvStream csv = StructureInventoryReportSupport.csv(target,
+        filename(FILENAME, support.today(), ReportFormat.CSV), InspectionDetailCsv.COLUMNS)) {
+      // A batch at a time, written as made: the rows of a province never all in memory at once.
+      rows.writeCsv(criteria, criteria.sortOr(DEFAULT_SORT), csv);
+      count = csv.count();
+    }
+    log.info("Inspections Conducted - Detail: {} rows as CSV, streamed, in {} ms",
+        count, millisSince(started));
   }
 
   /**

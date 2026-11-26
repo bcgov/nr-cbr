@@ -40,7 +40,7 @@ const WOOD_LOG_CULVERT = 'WLC';
 const DetailsTab: FC<Props> = ({ structure, outstanding, outstandingTone }) => {
   const { details, bridge, culvert, loadRating, replacement } = structure;
 
-  /** The card being edited, if any — one at a time, as nr-fspts' sections. */
+  /** The card being edited, if any — one at a time. */
   const [editing, setEditing] = useState<
     'structure' | 'bridge' | 'culvert' | 'load-rating' | 'replacement' | null
   >(null);

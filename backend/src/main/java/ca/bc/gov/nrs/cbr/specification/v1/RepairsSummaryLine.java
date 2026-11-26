@@ -7,6 +7,8 @@ import java.time.LocalDate;
  * One repair as the Repairs Summary prints it — in the PDF or the CSV — with the structure, site
  * and inspection it sits under: what {@link RepairsSummaryReportSpecifications#lines} selects. Codes stay codes: their
  * descriptions are read once, beside the query.
+ *
+ * <p>No road name: it is LRMOPS's, looked up afterwards (2026-11-25).
  */
 public record RepairsSummaryLine(
     Long structureId,
@@ -19,7 +21,6 @@ public record RepairsSummaryLine(
     String roadSectionId,
     String crossingName,
     String districtName,
-    String roadSectionName,
     BigDecimal kilometres,
     BigDecimal userKm,
     BigDecimal longitude,

@@ -8,6 +8,9 @@ import java.time.LocalDate;
  * CSV row show of the structure and its site — the block's codes already as their descriptions, the
  * CSV's further codes and org units as they are stored, named afterwards. The bridge, the culvert
  * and the routine inspections are read beside it, a batch of structures at a time.
+ *
+ * <p>No road name: it is LRMOPS's, looked up for the report's road sections afterwards
+ * (2026-11-25).
  */
 public record StructureInventoryDetailLine(
     Long crossingStructureId,
@@ -25,7 +28,6 @@ public record StructureInventoryDetailLine(
     String forestFileId,
     String roadSectionId,
     String districtName,
-    String roadSectName,
     String crossingName,
     String capitalRoadInd,
     // The CSV's further columns

@@ -8,6 +8,8 @@ import java.time.LocalDate;
  * {@link InspectionsDueReportSpecifications#lines} selects; the Detailed also prints the year
  * built and where the site is. Its special access and equipment stay
  * codes: their descriptions are read once, beside the query.
+ *
+ * <p>No road name: it is LRMOPS's, looked up afterwards (2026-11-25).
  */
 public record InspectionsDueLine(
     Long structureId,
@@ -18,7 +20,6 @@ public record InspectionsDueLine(
     String siteId,
     String forestFileId,
     String roadSectionId,
-    String roadSectionName,
     BigDecimal kilometres,
     BigDecimal userKm,
     String crossingName,

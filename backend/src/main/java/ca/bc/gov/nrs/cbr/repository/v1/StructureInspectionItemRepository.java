@@ -1,9 +1,12 @@
 package ca.bc.gov.nrs.cbr.repository.v1;
 
 import ca.bc.gov.nrs.cbr.model.v1.StructureInspectionItemEntity;
+import jakarta.persistence.QueryHint;
 import java.util.Collection;
 import java.util.List;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.stereotype.Repository;
 
 /** {@code THE.STRUCTURE_INSPECTION_ITEM} — the answered questions of an inspection form. */
@@ -17,6 +20,7 @@ public interface StructureInspectionItemRepository
   List<StructureInspectionItemEntity> findByInspectionId(Long inspectionId);
 
   /** The items of these inspections — a report's, a batch at a time. */
+  @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = ReportQueryHints.FETCH_SIZE))
   List<StructureInspectionItemEntity> findByInspectionIdIn(Collection<Long> inspectionIds);
 
   /** An inspection's answers to one question group — a Condition card. */

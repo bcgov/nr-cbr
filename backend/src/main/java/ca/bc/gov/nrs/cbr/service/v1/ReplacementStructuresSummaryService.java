@@ -50,24 +50,38 @@ public class ReplacementStructuresSummaryService {
 
   /** The report, as a PDF or a CSV. */
   public ReportFile generate(ReplacementStructuresCriteria criteria, ReportFormat format) {
+    if (format == ReportFormat.CSV) {
+      return ReportTarget.inMemory(target -> writeCsv(criteria, target));
+    }
     long started = System.nanoTime();
     String printed = support.today();
     int count;
     byte[] content;
-    if (format == ReportFormat.CSV) {
-      List<List<String>> csvRows = rows.csvRows(criteria);
-      count = csvRows.size();
-      content = StructureInventoryReportSupport.csv(ReplacementStructuresRows.CSV_COLUMNS, csvRows);
-    } else {
-      List<Map<String, String>> pdfRows = rows.rows(criteria);
-      count = pdfRows.size();
-      Map<String, Object> parameters = support.parameters(REPORT_ID, printed);
-      parameters.put("P_SELECTED_CRITERIA", criteriaLine.of(criteria));
-      content = renderer.pdf(TEMPLATE, parameters,
-          pdfRows.stream().<Map<String, ?>>map(row -> row).toList());
-    }
+    List<Map<String, String>> pdfRows = rows.rows(criteria);
+    count = pdfRows.size();
+    Map<String, Object> parameters = support.parameters(REPORT_ID, printed);
+    parameters.put("P_SELECTED_CRITERIA", criteriaLine.of(criteria));
+    content = renderer.pdf(TEMPLATE, parameters,
+        pdfRows.stream().<Map<String, ?>>map(row -> row).toList());
     log.info("Replacement Structures Summary: {} rows as {} ({} bytes) in {} ms",
         count, format, content.length, millisSince(started));
     return new ReportFile(content, filename(FILENAME, printed, format), format.mediaType());
+  }
+
+  /**
+   * The CSV, written to {@code target} as it is made rather than assembled in memory first — the
+   * download's response, or {@link ReportTarget#inMemory}. The target is opened once the rows are
+   * ready.
+   */
+  public void writeCsv(ReplacementStructuresCriteria criteria, ReportTarget target) {
+    long started = System.nanoTime();
+    int count;
+    List<List<String>> csvRows = rows.csvRows(criteria);
+    try (CsvStream csv = StructureInventoryReportSupport.csv(target,
+        filename(FILENAME, support.today(), ReportFormat.CSV), ReplacementStructuresRows.CSV_COLUMNS)) {
+      csv.rows(csvRows);
+      count = csv.count();
+    }
+    log.info("Replacement Structures Summary: {} rows as CSV, streamed, in {} ms", count, millisSince(started));
   }
 }

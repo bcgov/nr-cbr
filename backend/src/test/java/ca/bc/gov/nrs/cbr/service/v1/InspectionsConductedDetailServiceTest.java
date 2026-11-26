@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.when;
 
-import ca.bc.gov.nrs.cbr.model.v1.CbrRoadSectionEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingSiteEntity;
 import ca.bc.gov.nrs.cbr.model.v1.CrossingStructureEntity;
 import ca.bc.gov.nrs.cbr.model.v1.ForestServiceBridgeEntity;
@@ -50,6 +49,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import ca.bc.gov.nrs.cbr.support.RoadNamesStub;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -65,6 +65,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
     InspectionsConductedCriteriaLine.class, StructureInventoryReportSupport.class,
     ReportRenderer.class})
 class InspectionsConductedDetailServiceTest {
+
+  /** Road names come from LRMOPS; here, from the names each test gives. */
+  @MockitoBean
+  private RoadNameService roadNames;
+
+  private RoadNamesStub roads;
 
   private static final LocalDateTime PAST = LocalDateTime.now().minusYears(10);
   private static final LocalDateTime FUTURE = LocalDateTime.now().plusYears(10);
@@ -91,6 +97,7 @@ class InspectionsConductedDetailServiceTest {
 
   @BeforeEach
   void setUp() {
+    roads = RoadNamesStub.stub(roadNames);
     when(loggedUser.getLoggedUserId()).thenReturn("IDIR\\REPORTER");
     when(codes.getInspectionTypeCodes()).thenReturn(List.of(
         new CodeOptionResponse("ROUT", "Routine"), new CodeOptionResponse("SPEC", "Special")));
@@ -102,7 +109,7 @@ class InspectionsConductedDetailServiceTest {
         "StructureMonitorItemEntity", "StructureLoadRatingEntity", "InspectionReportStatusEntity",
         "StructureInspectionEntity", "StructureInspectionReviewerEntity",
         "ForestServiceBridgeSpanEntity", "ForestServiceBridgeEntity", "ForestServiceCulvertEntity",
-        "CrossingStructureEntity", "CrossingSiteEntity", "CbrRoadSectionEntity", "OrgUnitEntity",
+        "CrossingStructureEntity", "CrossingSiteEntity", "OrgUnitEntity",
         "InspectionReportStatusCodeEntity", "InspectionSubsectionCodeEntity",
         "InspectionQuestionCodeEntity", "InspectionAnswerCodeEntity", "RepairStatusCodeEntity",
         "RepairPriorityCodeEntity", "StructureRepairTypeCodeEntity", "MonitoringStatusCodeEntity",
@@ -111,8 +118,7 @@ class InspectionsConductedDetailServiceTest {
     }
     entityManager.persist(OrgUnitEntity.builder()
         .orgUnitNo(18L).orgUnitCode("DPG").orgUnitName("Prince George").build());
-    entityManager.persist(CbrRoadSectionEntity.builder()
-        .forestFileId("R00123").roadSectionId("01").roadSectName("Bowron FSR").build());
+    roads.name("R00123", "01", "Bowron FSR");
     entityManager.persist(CrossingSiteEntity.builder()
         .crossingSiteId("62-001").crossingName("Deadman Creek")
         .pointOfCommencementDistance(new BigDecimal("12.5")).userKm(new BigDecimal("12.75"))

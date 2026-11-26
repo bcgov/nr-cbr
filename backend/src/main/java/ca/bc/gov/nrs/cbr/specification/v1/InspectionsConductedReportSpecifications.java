@@ -43,8 +43,6 @@ public final class InspectionsConductedReportSpecifications {
   private static final String CLOSE_PROXIMITY = "closeProximityInd";
 
   private static final String SITE = "site";
-  private static final String ROAD_SECTION = "roadSection";
-  private static final String ROAD_SECTION_NAME = "roadSectName";
   private static final String SITE_ID = "crossingSiteId";
   private static final String FOREST_FILE_ID = "forestFileId";
   private static final String ROAD_SECTION_ID = "roadSectionId";
@@ -87,8 +85,8 @@ public final class InspectionsConductedReportSpecifications {
     Root<StructureInspectionEntity> inspection = query.from(StructureInspectionEntity.class);
     Root<CrossingStructureEntity> structure = query.from(CrossingStructureEntity.class);
     From<?, ?> status = inspection.join(CURRENT_STATUS, JoinType.INNER);
+    // No join to CBR's road copy: the road name is LRMOPS's, looked up afterwards (2026-11-25).
     From<?, ?> site = structure.join(SITE, JoinType.LEFT);
-    From<?, ?> roadSection = site.join(ROAD_SECTION, JoinType.LEFT);
 
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(builder.equal(inspection.get(STRUCTURE_ID), structure.get(STRUCTURE_ID)));
@@ -102,7 +100,8 @@ public final class InspectionsConductedReportSpecifications {
             structure.get(STRUCTURE_ID),
             structure.get(STRUCTURE_NAME),
             site.get(SITE_ID),
-            roadSection.get(ROAD_SECTION_NAME),
+            site.get(FOREST_FILE_ID),
+            site.get(ROAD_SECTION_ID),
             site.get(KILOMETRES),
             site.get(USER_KM),
             site.get(CROSSING_NAME),
