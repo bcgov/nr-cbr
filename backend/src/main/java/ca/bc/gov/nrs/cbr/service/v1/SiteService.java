@@ -218,7 +218,8 @@ public class SiteService {
         request.pointOfAccessDescription());
 
     // Not taken: the number is the one being edited, so there is nothing for it to clash with.
-    validator.validate(site, false, checkRoad(site));
+    // The fields no role sets here are not checked: the user could not fix them.
+    validator.validateEdit(site, checkRoad(site));
     Long roadSegmentId = sameRoad(stored, site) ? stored.getRoadSegmentId() : null;
 
     return stored.toBuilder()

@@ -67,6 +67,10 @@ public class SiteValidator {
   private static final String LONGITUDE = "longitude";
   private static final String LATITUDE = "latitude";
   private static final String SITE_DETAILS = "pointOfAccessDescription";
+
+  /** The fields no role sets on the site page: stored or written by LRMOPS. */
+  private static final Set<String> NOT_EDITED = Set.of(SITE_ID, "userKm", "businessAreaOrgUnitNo",
+      "clientNumber", "clientLocationCode", "capitalRoad");
   private static final String SITE_STATUS = "crossingSiteStatusCode";
 
   private static final String CROSSING = "CRS";
@@ -122,6 +126,33 @@ public class SiteValidator {
    * @throws SiteValidationException if anything fails
    */
   public void validate(SiteCreateRequest request, boolean siteIdTaken, RoadCheck roadCheck) {
+    Map<String, String> errors = errorsOf(request, siteIdTaken, roadCheck);
+    if (!errors.isEmpty()) {
+      throw new SiteValidationException(errors);
+    }
+  }
+
+  /**
+   * Checks an edited site as {@link #validate} checks a new one, but not the fields no role sets
+   * on the site page — the number, User Kilometres, BCTS BA Responsible, the Designated Maintainer
+   * and Capital Road ({@link #NOT_EDITED}). Their stored values go into the request so the site is
+   * judged whole, but the user cannot change them, so a stored value the rules refuse — User
+   * Kilometres of {@code -0.06}, written by LRMOPS — must not refuse a save the user has no way to
+   * fix. Legacy never checked them either.
+   *
+   * @throws SiteValidationException if anything the user may change fails
+   */
+  public void validateEdit(SiteCreateRequest request, RoadCheck roadCheck) {
+    Map<String, String> errors = errorsOf(request, false, roadCheck);
+    errors.keySet().removeAll(NOT_EDITED);
+    if (!errors.isEmpty()) {
+      throw new SiteValidationException(errors);
+    }
+  }
+
+  /** Every problem with the site, by field. */
+  private Map<String, String> errorsOf(
+      SiteCreateRequest request, boolean siteIdTaken, RoadCheck roadCheck) {
     Map<String, String> errors = new LinkedHashMap<>();
     String type = trimmed(request.crossingSiteTypeCode());
 
@@ -134,10 +165,7 @@ public class SiteValidator {
     checkOrgUnits(request, errors);
     checkInspectionAgreesWithStatus(request, type, errors);
     checkRoadResolves(roadCheck, errors);
-
-    if (!errors.isEmpty()) {
-      throw new SiteValidationException(errors);
-    }
+    return errors;
   }
 
   /**
