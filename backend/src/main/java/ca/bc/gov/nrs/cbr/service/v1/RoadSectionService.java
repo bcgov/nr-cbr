@@ -81,7 +81,7 @@ public class RoadSectionService {
             criteria.forestFileId(),
             criteria.roadSectionId(),
             criteria.tenureType(),
-            criteria.clientName()),
+            criteria.district()),
         Math.max(pageNumber, 0),
         pageSize,
         sort.stream()
@@ -95,7 +95,7 @@ public class RoadSectionService {
                 road.roadId(),
                 road.sectionId(),
                 storedTenureType(road.tenureType(), road.retired()),
-                road.clientName()))
+                road.districts()))
             .toList(),
         page.totalElements(),
         page.totalPages(),
@@ -119,7 +119,7 @@ public class RoadSectionService {
       case PROJECT_FILE -> "ROAD_ID";
       case BRANCH -> "SECTION_ID";
       case TENURE_TYPE -> "TENURE_TYPE";
-      case CLIENT_NAME -> "CLIENT_NAME";
+      case DISTRICT -> "DISTRICT";
     };
   }
 

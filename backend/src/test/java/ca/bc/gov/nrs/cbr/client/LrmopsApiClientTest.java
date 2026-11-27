@@ -47,12 +47,12 @@ class LrmopsApiClientTest {
         .andExpect(method(HttpMethod.GET))
         .andRespond(withSuccess("""
             {"content":[{"roadId":"R07571","sectionId":"AA","roadName":"BIG CREEK FSR",
-              "tenureType":"FSR","retired":false,"clientName":null}],
+              "tenureType":"FSR","retired":false,"districts":["DPG"]}],
              "totalElements":16,"totalPages":2,"pageNumber":1,"pageSize":15}
             """, MediaType.APPLICATION_JSON));
 
     RoadPage page = client.searchRoads(
-        new RoadSearchCriteria(" big creek ", "R07571", "  ", null, ""), 1, 15,
+        new RoadSearchCriteria(" big creek ", "R07571", "  ", null, null), 1, 15,
         List.of(new RoadSort("ROAD_NAME", "DESC")));
 
     server.verify();
@@ -61,7 +61,22 @@ class LrmopsApiClientTest {
         .satisfies(road -> {
           assertThat(road.roadId()).isEqualTo("R07571");
           assertThat(road.tenureType()).isEqualTo("FSR");
+          assertThat(road.districts()).containsExactly("DPG");
         });
+  }
+
+  @Test
+  void searchSendsTheDistrict() {
+    server.expect(requestTo("http://lrmops.test/api/v1/roads?district=18"
+            + "&pageNumber=0&pageSize=15"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(withSuccess("""
+            {"content":[],"totalElements":0,"totalPages":0,"pageNumber":0,"pageSize":15}
+            """, MediaType.APPLICATION_JSON));
+
+    client.searchRoads(new RoadSearchCriteria(null, null, null, null, 18L), 0, 15, List.of());
+
+    server.verify();
   }
 
   @Test
@@ -182,7 +197,7 @@ class LrmopsApiClientTest {
         .andExpect(content().json("[{\"roadId\":\"R07571\",\"sectionId\":\"AA\"}]"))
         .andRespond(withSuccess("""
             [{"roadId":"R07571","sectionId":"AA","roadName":"BIG CREEK FSR","tenureType":"FSR",
-              "retired":false,"clientName":null}]
+              "retired":false,"districts":["DPG"]}]
             """, MediaType.APPLICATION_JSON));
 
     assertThat(client.lookUpRoadSections(List.of(new SectionKey("R07571", "AA"))))

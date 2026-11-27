@@ -5,14 +5,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import RoadSearchModal from './index';
 
 const roadApi = vi.hoisted(() => ({ searchRoads: vi.fn(), getTenureTypes: vi.fn() }));
-vi.mock('@/services/APIs', () => ({ default: { road: roadApi } }));
+const configurationApi = vi.hoisted(() => ({ getForestDistricts: vi.fn() }));
+vi.mock('@/services/APIs', () => ({
+  default: { road: roadApi, configuration: configurationApi },
+}));
 
 const bowron = {
   forestServiceRoad: 'Bowron FSR',
   forestFileId: 'R00123',
   roadSectionId: '01',
   tenureType: 'FSR',
-  clientName: 'CANFOR CORPORATION',
+  districts: ['DPG'],
 };
 
 /** One page as the server answers it: these rows, out of `total` matches. */
@@ -58,6 +61,11 @@ beforeEach(() => {
     { code: 'FSR', description: 'Forest Service Road' },
     { code: 'RP', description: 'Road Permit' },
   ]);
+  configurationApi.getForestDistricts.mockReset();
+  configurationApi.getForestDistricts.mockResolvedValue([
+    { orgUnitNo: '18', orgUnitCode: 'DPG', orgUnitName: 'Prince George Natural Resource District' },
+    { orgUnitNo: '19', orgUnitCode: 'DMH', orgUnitName: 'Mackenzie Natural Resource District' },
+  ]);
 });
 
 describe('RoadSearchModal', () => {
@@ -69,7 +77,7 @@ describe('RoadSearchModal', () => {
       'forestFileId',
       'roadSectionId',
       'tenureType',
-      'clientName',
+      'district',
     ]) {
       expect(screen.getByTestId(`road-search-${name}`)).toBeInTheDocument();
     }
@@ -84,20 +92,34 @@ describe('RoadSearchModal', () => {
     expect(screen.getByRole('option', { name: 'RP - Road Permit' })).toBeInTheDocument();
   });
 
-  it('searches on the client name as typed — LRMOPS records no client number', async () => {
+  it('searches on the district picked, by its org unit number — no client name', async () => {
     renderModal();
-    criterion('clientName', 'canfor');
+    await screen.findByRole('option', {
+      name: 'DPG - Prince George Natural Resource District',
+    });
+    criterion('district', '18');
 
     search();
 
     await waitFor(() => {
       expect(roadApi.searchRoads).toHaveBeenCalledWith(
-        expect.objectContaining({ clientName: 'canfor' }),
+        expect.objectContaining({ district: '18' }),
         0,
         15,
       );
     });
-    expect(roadApi.searchRoads.mock.calls[0][0]).not.toHaveProperty('clientNumber');
+    expect(roadApi.searchRoads.mock.calls[0][0]).not.toHaveProperty('clientName');
+  });
+
+  it("lists each road's districts — both, for one crossing a boundary", async () => {
+    roadApi.searchRoads.mockResolvedValue(paged([{ ...bowron, districts: ['DMH', 'DPG'] }]));
+    renderModal();
+
+    search();
+
+    expect(await screen.findByText('DMH, DPG')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /District/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Client Name/ })).not.toBeInTheDocument();
   });
 
   it('says the road lookup is unavailable when LRMOPS cannot be asked', async () => {
@@ -141,18 +163,18 @@ describe('RoadSearchModal', () => {
     });
   });
 
-  it('shows what came back, with the client that holds the file', async () => {
+  it('shows what came back, with the district it lies in', async () => {
     renderModal();
 
     search();
 
     expect(await screen.findByTestId('road-search-results')).toBeInTheDocument();
     expect(screen.getByText('R00123')).toBeInTheDocument();
-    expect(screen.getByText('CANFOR CORPORATION')).toBeInTheDocument();
+    expect(screen.getByText('DPG')).toBeInTheDocument();
   });
 
   it('picks the road from anywhere in the row', async () => {
-    // The user is reading the whole row — the tenure type, the client — so having to travel back
+    // The user is reading the whole row — the tenure type, the district — so having to travel back
     // to the first cell to act on it is work the dialog can spare them.
     renderModal();
     search();

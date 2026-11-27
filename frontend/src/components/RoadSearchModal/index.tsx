@@ -26,6 +26,7 @@ import type {
   RoadSortColumn,
 } from '@/services/road.service';
 
+import { useForestDistricts } from '@/hooks/useConfiguration';
 import { useRoadSearch, useRoadTenureTypes } from '@/hooks/useRoadSearch';
 import {
   EMPTY_ROAD_CRITERIA,
@@ -50,15 +51,15 @@ const ROADS_PER_PAGE = 15;
 const ROAD_PAGE_SIZES = [15, 50, 100];
 
 /**
- * The five columns, in legacy's order — each sorts by its header. No Client #: LRMOPS records the
- * tenure holder's name only.
+ * The five columns, in legacy's order — each sorts by its header. District where legacy showed the
+ * client: LRMOPS's client name is not kept up to date (business, 2026-11-26).
  */
 const COLUMNS: { column: RoadSortColumn; label: string }[] = [
   { column: 'FOREST_SERVICE_ROAD', label: 'Forest Service Road' },
   { column: 'PROJECT_FILE', label: 'Project File ID#' },
   { column: 'BRANCH', label: 'Br.' },
   { column: 'TENURE_TYPE', label: 'Tenure Type' },
-  { column: 'CLIENT_NAME', label: 'Client Name' },
+  { column: 'DISTRICT', label: 'District' },
 ];
 
 type Props = {
@@ -90,6 +91,7 @@ type Props = {
 const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
   const [criteria, setCriteria] = useState<RoadSearchCriteria>(EMPTY_ROAD_CRITERIA);
   const tenureTypes = useRoadTenureTypes();
+  const districts = useForestDistricts();
   /** One-based, as Carbon's Pagination counts. */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(ROADS_PER_PAGE);
@@ -178,9 +180,30 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
               />
             ))}
           </Select>
-          {/* A name, partial match: LRMOPS records the tenure holder's name and no client number,
-              so there is nothing for a client lookup to pick. */}
-          {text('clientName', 'Client Name', 60)}
+          {/* The Forest District, where legacy asked for the client: LRMOPS's client name is the
+              tenure holder's when the tenure was created, not updated when the road changes hands
+              (business, 2026-11-26). The same list as the site's Forest District. */}
+          <Select
+            id="road-search-district"
+            data-testid="road-search-district"
+            labelText="District"
+            disabled={districts.isPending}
+            invalid={districts.isError}
+            invalidText="The districts could not be loaded."
+            value={criteria.district}
+            onChange={(event) => update('district', event.target.value)}
+          >
+            <SelectItem value="" text="Any" />
+            {(districts.data ?? []).map((unit) => (
+              <SelectItem
+                key={unit.orgUnitNo}
+                value={unit.orgUnitNo}
+                text={
+                  unit.orgUnitName ? `${unit.orgUnitCode} - ${unit.orgUnitName}` : unit.orgUnitCode
+                }
+              />
+            ))}
+          </Select>
           <div className="road-search__actions">
             <Button kind="tertiary" type="button" onClick={onClose}>
               Cancel
@@ -260,7 +283,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
               ) : (
                 rows.map((road) => (
                   /* The whole row picks the road, because the whole row is what the user is
-                     reading — scanning the tenure type or the client and then having to travel
+                     reading — scanning the tenure type or the district and then having to travel
                      back to the first cell to act on it is work the dialog can spare them.
 
                      The row is a convenience for a mouse and nothing more: a <tr> cannot be
@@ -296,7 +319,7 @@ const RoadSearchModal: FC<Props> = ({ onSelect, onClose }) => {
                     <TableCell>{road.forestFileId}</TableCell>
                     <TableCell>{road.roadSectionId}</TableCell>
                     <TableCell>{road.tenureType}</TableCell>
-                    <TableCell>{road.clientName}</TableCell>
+                    <TableCell>{road.districts.join(', ')}</TableCell>
                   </TableRow>
                 ))
               )}

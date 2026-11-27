@@ -70,8 +70,8 @@ class RoadNameServiceTest {
   @DisplayName("names are looked up once per distinct section, keyed as CBR keys them")
   void namesOf() {
     when(lrmops.lookUpRoadSections(any())).thenReturn(List.of(
-        new RoadSummary("R07571", "AA", "BIG CREEK FSR", "FSR", false, null),
-        new RoadSummary("R00001", "B", null, "OTH", false, null)));
+        new RoadSummary("R07571", "AA", "BIG CREEK FSR", "FSR", false, List.of()),
+        new RoadSummary("R00001", "B", null, "OTH", false, List.of())));
 
     var names = service.namesOf(java.util.Arrays.asList(
         RoadSectionKey.of("r07571", "aa"), RoadSectionKey.of("R07571", "AA"),
@@ -112,7 +112,7 @@ class RoadNameServiceTest {
   @DisplayName("one section's name, null when blank or not found")
   void nameOf() {
     when(lrmops.lookUpRoadSections(List.of(new SectionKey("R07571", "AA")))).thenReturn(
-        List.of(new RoadSummary("R07571", "AA", "BIG CREEK FSR", "FSR", false, null)));
+        List.of(new RoadSummary("R07571", "AA", "BIG CREEK FSR", "FSR", false, List.of())));
 
     assertThat(service.nameOf(" r07571", "aa ")).isEqualTo("BIG CREEK FSR");
     assertThat(service.nameOf("R07571", " ")).isNull();
@@ -132,7 +132,7 @@ class RoadNameServiceTest {
         if (batch.size() == 1) {
           throw new ResourceAccessException("down");
         }
-        return List.of(new RoadSummary("R0", "A", "FIRST ROAD", "FSR", false, null));
+        return List.of(new RoadSummary("R0", "A", "FIRST ROAD", "FSR", false, List.of()));
       });
 
       assertThat(parallel.namesOf(many))
