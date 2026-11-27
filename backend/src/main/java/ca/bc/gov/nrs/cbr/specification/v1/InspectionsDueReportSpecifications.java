@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.inArea;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.dayRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
@@ -100,6 +101,8 @@ public final class InspectionsDueReportSpecifications {
     predicates.add(builder.equal(structure.get(ACTIVE_IND), YES));
     structureCriteria(builder, structure, criteria, predicates);
     siteCriteria(builder, site, criteria, predicates);
+    inArea(builder, query, site.get(ORG_UNIT_NO), criteria.areaOrgUnit())
+        .ifPresent(predicates::add);
     return query
         .select(structure.get(STRUCTURE_ID))
         .where(predicates.toArray(new Predicate[0]))
@@ -121,6 +124,8 @@ public final class InspectionsDueReportSpecifications {
     }
     structureCriteria(builder, structure, criteria, predicates);
     siteCriteria(builder, site, criteria, predicates);
+    inArea(builder, query, site.get(ORG_UNIT_NO), criteria.areaOrgUnit())
+        .ifPresent(predicates::add);
 
     return query
         .select(builder.construct(InspectionsDueLine.class,

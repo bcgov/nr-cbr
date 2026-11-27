@@ -18,6 +18,7 @@ const api = vi.hoisted(() => ({
   getSpecialAccessCodes: vi.fn(),
   getPortableSuperstructureStatusCodes: vi.fn(),
   getMonitoringStatusCodes: vi.fn(),
+  getAreas: vi.fn(),
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
@@ -73,7 +74,7 @@ beforeEach(() => {
 });
 
 describe('MonitorsSummaryPage', () => {
-  it("offers legacy's criteria, less Area and Road Responsibility, and no Management Area", async () => {
+  it("offers legacy's criteria, Area among them, less Road Responsibility, and no Management Area", async () => {
     renderPage();
 
     await waitFor(async () =>
@@ -97,7 +98,8 @@ describe('MonitorsSummaryPage', () => {
     }
     expect(screen.getByText('Designated Maintainer')).toBeInTheDocument();
     expect(screen.getByText('Most Recent Inspections Only?')).toBeInTheDocument();
-    for (const absent of [/Management Area/, /^Area/, /Road Responsibility/, /Site #/]) {
+    expect(screen.getByLabelText('Area')).toBeInTheDocument();
+    for (const absent of [/Management Area/, /Road Responsibility/, /Site #/]) {
       expect(screen.queryByText(absent)).not.toBeInTheDocument();
     }
     expect(api.getManagementAreas).not.toHaveBeenCalled();

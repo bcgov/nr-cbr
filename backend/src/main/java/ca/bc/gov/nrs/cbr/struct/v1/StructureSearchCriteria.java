@@ -46,6 +46,8 @@ public record StructureSearchCriteria(
     String userKmStart,
     @Pattern(regexp = SiteSearchCriteria.DECIMAL, message = INVALID_USER_KILOMETRES)
     String userKmEnd,
+    /** Area, legacy's: an Area's number, matching each site whose district rolls up into it. */
+    String areaOrgUnit,
     /** Forest District. */
     String orgUnit,
     /**

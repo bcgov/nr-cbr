@@ -23,6 +23,8 @@ public record StructureInventoryDetailedCriteria(
     String kiloStart,
     @Pattern(regexp = SiteSearchCriteria.DECIMAL, message = StructureSearchCriteria.INVALID_KILOMETRES)
     String kiloEnd,
+    /** Area, legacy's: an Area's number, matching each site whose district rolls up into it. */
+    String areaOrgUnit,
     String orgUnit,
     String businessAreaOrgUnit,
     String managementOrgUnit,

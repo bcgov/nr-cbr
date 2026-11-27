@@ -5,6 +5,7 @@ import useDebounce from '@/hooks/useDebounce';
 
 import type { RecreationProjectResponse } from '@/services/configuration.service';
 import type {
+  AreaOption,
   BridgeCodes,
   CodeOption,
   CulvertCodes,
@@ -86,6 +87,12 @@ export const inspectionReportStatusCodesQuery = queryOptions({
 export const businessAreasQuery = queryOptions({
   queryKey: [CONFIGURATION_QUERY_KEY, 'business-areas'],
   queryFn: () => API.configuration.getBusinessAreas(),
+  staleTime: REFERENCE_DATA_STALE_TIME,
+});
+
+export const areasQuery = queryOptions({
+  queryKey: [CONFIGURATION_QUERY_KEY, 'areas'],
+  queryFn: () => API.configuration.getAreas(),
   staleTime: REFERENCE_DATA_STALE_TIME,
 });
 
@@ -278,6 +285,7 @@ const STRUCTURE_INVENTORY_SUMMARY_LOOKUPS = [
   siteStatusCodesQuery,
   siteTypeCodesQuery,
   structureTypeClassCodesQuery,
+  areasQuery,
   forestDistrictsQuery,
   businessAreasQuery,
   specialAccessCodesQuery,
@@ -288,11 +296,16 @@ const STRUCTURE_INVENTORY_SUMMARY_LOOKUPS = [
   deckTypeCodesQuery,
 ] as const;
 
-const STRUCTURE_DETAIL_REPORT_LOOKUPS = [siteTypeCodesQuery, forestDistrictsQuery] as const;
+const STRUCTURE_DETAIL_REPORT_LOOKUPS = [
+  siteTypeCodesQuery,
+  areasQuery,
+  forestDistrictsQuery,
+] as const;
 
 const STRUCTURE_INVENTORY_DETAILED_LOOKUPS = [
   siteStatusCodesQuery,
   siteTypeCodesQuery,
+  areasQuery,
   forestDistrictsQuery,
   businessAreasQuery,
   specialAccessCodesQuery,
@@ -305,6 +318,7 @@ const REPAIRS_SUMMARY_LOOKUPS = [
   repairStatusCodesQuery,
   repairPriorityCodesQuery,
   repairClassCodesQuery,
+  areasQuery,
   forestDistrictsQuery,
   businessAreasQuery,
 ] as const;
@@ -313,6 +327,7 @@ const MONITORS_SUMMARY_LOOKUPS = [
   siteStatusCodesQuery,
   siteTypeCodesQuery,
   monitoringStatusCodesQuery,
+  areasQuery,
   forestDistrictsQuery,
   businessAreasQuery,
 ] as const;
@@ -324,6 +339,7 @@ const INSPECTIONS_DUE_LOOKUPS = [
   siteStatusCodesQuery,
   specialAccessCodesQuery,
   specialEquipmentCodesQuery,
+  areasQuery,
   forestDistrictsQuery,
   businessAreasQuery,
 ] as const;
@@ -331,6 +347,7 @@ const INSPECTIONS_DUE_LOOKUPS = [
 const REPLACEMENT_STRUCTURES_SUMMARY_LOOKUPS = [
   siteStatusCodesQuery,
   siteTypeCodesQuery,
+  areasQuery,
   forestDistrictsQuery,
   businessAreasQuery,
 ] as const;
@@ -339,6 +356,7 @@ const INSPECTIONS_CONDUCTED_LOOKUPS = [
   siteTypeCodesQuery,
   inspectionReportStatusCodesQuery,
   inspectionTypeCodesQuery,
+  areasQuery,
   forestDistrictsQuery,
   businessAreasQuery,
 ] as const;
@@ -402,6 +420,9 @@ export const useInspectionReportStatusCodes = (): UseQueryResult<CodeOption[]> =
   useQuery(inspectionReportStatusCodesQuery);
 
 export const useBusinessAreas = (): UseQueryResult<OrgUnitOption[]> => useQuery(businessAreasQuery);
+
+/** The Areas, each with its current forest districts — the reports' Area select. */
+export const useAreas = (): UseQueryResult<AreaOption[]> => useQuery(areasQuery);
 
 export const useForestDistricts = (): UseQueryResult<OrgUnitOption[]> =>
   useQuery(forestDistrictsQuery);
@@ -588,6 +609,7 @@ export const usePrefetchConfiguration = (enabled: boolean): void => {
     void queryClient.query(specialAccessCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(siteTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(forestDistrictsQuery).catch(ignoreWarmUpFailure);
+    void queryClient.query(areasQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(structureTypeClassCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(inspectionTypeCodesQuery).catch(ignoreWarmUpFailure);
     void queryClient.query(inspectionReportStatusCodesQuery).catch(ignoreWarmUpFailure);

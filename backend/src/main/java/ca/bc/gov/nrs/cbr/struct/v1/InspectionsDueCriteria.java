@@ -27,6 +27,8 @@ public record InspectionsDueCriteria(
     String closeProximity,
     String structureInspectionStatusCode,
     String siteStatusCode,
+    /** Area, legacy's: an Area's number, matching each site whose district rolls up into it. */
+    String areaOrgUnit,
     String orgUnit,
     String managementOrgUnit,
     String businessAreaOrgUnit,

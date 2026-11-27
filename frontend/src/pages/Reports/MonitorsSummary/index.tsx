@@ -1,5 +1,6 @@
 import RoadNameCombo from '@/components/core/RoadNameCombo';
 
+import { districtsInArea } from '../criteriaGroups';
 import MaintainerFields from '../MaintainerFields';
 import ReportCriteriaForm from '../ReportCriteriaForm';
 import ReportPageLayout from '../ReportPageLayout';
@@ -97,11 +98,12 @@ const MonitorsSummaryPage: FC = () => {
             )}
 
             {/* Where it is held, and its road */}
+            {fields.areaSelect(codeTables.areas)}
             {fields.orgUnitMultiSelect(
               'orgUnit',
               'Forest District',
               'Any district',
-              codeTables.forestDistricts,
+              districtsInArea(codeTables.forestDistricts, codeTables.areas, criteria.areaOrgUnit),
             )}
             {fields.multiSelect(
               'businessAreaOrgUnit',

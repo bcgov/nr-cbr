@@ -3,6 +3,7 @@ import { Button, InlineNotification } from '@carbon/react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { criteriaFields } from '../criteriaFields';
+import { districtsInArea } from '../criteriaGroups';
 import MaintainerFields from '../MaintainerFields';
 import { reportFilename } from '../reportFilename';
 import ReportPageLayout from '../ReportPageLayout';
@@ -21,6 +22,7 @@ import type { FC, SubmitEventHandler } from 'react';
 
 import { useNotification } from '@/context/notification/useNotification';
 import {
+  useAreas,
   useForestDistricts,
   useManagementAreas,
   useSiteTypeCodes,
@@ -76,6 +78,7 @@ const StructureDetailReportPage: FC = () => {
   }, [search]);
 
   const siteTypeCodes = useSiteTypeCodes();
+  const areas = useAreas();
   const forestDistricts = useForestDistricts();
   const managementAreas = useManagementAreas(criteria.orgUnit);
   const referenceData = useStructureDetailReportReferenceDataState();
@@ -83,15 +86,16 @@ const StructureDetailReportPage: FC = () => {
   // Carbon's Pagination is one-based; the backend is zero-based.
   const results = useStructureSearch(search.submitted, search.page - 1, search.pageSize);
 
-  const { text, codeSelect, orgUnitSelect } = criteriaFields<StructureDetailReportCriteria>({
-    id: ID,
-    criteria,
-    // Nothing here can be malformed: every box is a code or free text.
-    shown: {},
-    leave: () => undefined,
-    onChange: updateCriteria,
-    codeTablesLoading: referenceData.isLoading,
-  });
+  const { text, codeSelect, orgUnitSelect, areaSelect } =
+    criteriaFields<StructureDetailReportCriteria>({
+      id: ID,
+      criteria,
+      // Nothing here can be malformed: every box is a code or free text.
+      shown: {},
+      leave: () => undefined,
+      onChange: updateCriteria,
+      codeTablesLoading: referenceData.isLoading,
+    });
 
   const submit: SubmitEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
@@ -153,7 +157,13 @@ const StructureDetailReportPage: FC = () => {
             {text('forestFileId', 'Project File ID#', 10)}
             {text('roadSectionId', 'Br.', 30)}
           </div>
-          {orgUnitSelect('orgUnit', 'Forest District', 'Any district', forestDistricts.data ?? [])}
+          {areaSelect(areas.data ?? [])}
+          {orgUnitSelect(
+            'orgUnit',
+            'Forest District',
+            'Any district',
+            districtsInArea(forestDistricts.data ?? [], areas.data ?? [], criteria.areaOrgUnit),
+          )}
           {orgUnitSelect(
             'managementOrgUnit',
             'Management Area',

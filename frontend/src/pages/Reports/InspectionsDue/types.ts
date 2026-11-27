@@ -41,8 +41,8 @@ export const NO_SPECIAL_EQUIPMENT = 'NONE';
  * `inspections_due_detailed.jsp` (the same form) and `inspections_blank.jsp`, which asks the same
  * but for Structure # in place of No Next Planned Inspection Date and Sort By.
  *
- * <p>Less two of legacy's: Area (the retired ministry Areas, left out as on the other reports) and
- * Save/Delete Report Favourite. Every criterion is optional.
+ * <p>Less Save/Delete Report Favourite, legacy's. Every criterion is optional, but the Blank needs
+ * an Area or one to eight Forest Districts (business, 2026-11-27).
  */
 export type InspectionsDueCriteria = MaintainerCriteria & {
   /** Structure #, the Blank's only. A contains match. */
@@ -60,6 +60,8 @@ export type InspectionsDueCriteria = MaintainerCriteria & {
   /** Inspection Status — the structure's. */
   structureInspectionStatusCode: string;
   siteStatusCode: string[];
+  /** Area: one of the three, by number — the sites whose district rolls up into it. One pick. */
+  areaOrgUnit: string;
   /** Forest District. Changing it clears {@link managementOrgUnit}. */
   orgUnit: string[];
   managementOrgUnit: string[];
@@ -85,6 +87,7 @@ export const EMPTY_CRITERIA: InspectionsDueCriteria = {
   closeProximity: '',
   structureInspectionStatusCode: '',
   siteStatusCode: [],
+  areaOrgUnit: '',
   orgUnit: [],
   managementOrgUnit: [],
   businessAreaOrgUnit: [],

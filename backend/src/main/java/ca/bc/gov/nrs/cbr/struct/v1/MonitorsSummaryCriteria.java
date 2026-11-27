@@ -11,6 +11,8 @@ public record MonitorsSummaryCriteria(
     String clientNumber,
     String clientLocationCode,
     String monitoringStatusCode,
+    /** Area, legacy's: an Area's number, matching each site whose district rolls up into it. */
+    String areaOrgUnit,
     String orgUnit,
     String businessAreaOrgUnit,
     String forestServiceRoad,

@@ -42,6 +42,11 @@ export type StructureSearchCriteria = {
   kiloEnd: string;
   crossingName: string;
 
+  /**
+   * Area — sent by the Structure Detail Report's search alone, which asks this endpoint; Structure
+   * Search itself has no Area box.
+   */
+  areaOrgUnit?: string;
   /** Forest District. Changing it clears {@link managementOrgUnit} — see the page. */
   orgUnit: string[];
   /** Off, the default, leaves archived structures out — legacy's rule. */

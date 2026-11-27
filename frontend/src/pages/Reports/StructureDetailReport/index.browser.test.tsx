@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +7,7 @@ import StructureDetailReportPage from './index';
 
 const api = vi.hoisted(() => ({
   getSiteTypeCodes: vi.fn(),
+  getAreas: vi.fn(),
   getForestDistricts: vi.fn(),
   getManagementAreas: vi.fn(),
 }));
@@ -106,7 +107,7 @@ describe('StructureDetailReportPage', () => {
 
     await waitFor(() => expect(byId('siteTypeCode')).not.toBeDisabled());
     expect(screen.getByRole('option', { name: 'CRS - Stream crossing' })).toBeInTheDocument();
-    for (const label of ['Structure #', 'Project File ID#', 'Br.', 'Forest District']) {
+    for (const label of ['Structure #', 'Project File ID#', 'Br.', 'Area', 'Forest District']) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
     expect(screen.getByText('Designated Maintainer')).toBeInTheDocument();
@@ -219,6 +220,32 @@ describe('StructureDetailReportPage', () => {
 
     await screen.findByRole('option', { name: 'MA - Area of 2' });
     expect(byId('managementOrgUnit')).toHaveValue('');
+  });
+
+  it('narrows the districts to the Area picked, clears one outside it, and searches by it', async () => {
+    api.getAreas.mockResolvedValue([
+      { orgUnitNo: '1833', orgUnitCode: 'NOR', orgUnitName: 'Northern', districts: ['1'] },
+      { orgUnitNo: '1834', orgUnitCode: 'SOU', orgUnitName: 'Southern', districts: ['2'] },
+    ]);
+    renderPage();
+    await waitFor(() => expect(byId('areaOrgUnit')).not.toBeDisabled());
+    await screen.findByRole('option', { name: 'SOU - Southern' });
+    type('orgUnit', '1');
+
+    type('areaOrgUnit', '1834');
+
+    expect(byId('orgUnit')).toHaveValue('');
+    expect(
+      within(byId('orgUnit'))
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Any district', 'DMH - 100 Mile House']);
+    search();
+    await waitFor(() => expect(structureSearchApi.searchStructures).toHaveBeenCalled());
+    expect(structureSearchApi.searchStructures.mock.calls[0][0]).toMatchObject({
+      areaOrgUnit: '1834',
+      orgUnit: [],
+    });
   });
 
   it('keeps the criteria and the results for the tab, and Clear forgets both', async () => {

@@ -18,9 +18,9 @@ export const SORT_OPTIONS: readonly SortOption<RepairsSummarySort>[] = [
 /**
  * The Repairs Summary report's criteria (legacy CBR005).
  *
- * <p>Field-for-field from legacy's `repair_summary.jsp`, less three: Admin Area (the retired
- * ministry Areas, left out as on the other reports), Road Responsibility (commented out of the JSP,
- * so no user has set it in years) and Save/Delete Report Favourite. Every criterion is optional.
+ * <p>Field-for-field from legacy's `repair_summary.jsp`, less two: Road Responsibility (commented
+ * out of the JSP, so no user has set it in years) and Save/Delete Report Favourite. Legacy labels
+ * its Area "Admin Area"; it is the same filter as the other reports' Area, and labelled as theirs. Every criterion is optional.
  */
 export type RepairsSummaryCriteria = OwnerCriteria & {
   /** Structure #. A contains match. */
@@ -74,6 +74,7 @@ export const EMPTY_CRITERIA: RepairsSummaryCriteria = {
   repairStatusCode: 'OUT',
   repairPriorityCode: [],
   repairClassCode: [],
+  areaOrgUnit: '',
   orgUnit: [],
   businessAreaOrgUnit: [],
   managementOrgUnit: [],

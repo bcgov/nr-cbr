@@ -1,5 +1,5 @@
 import { FilterableMultiSelect, MultiSelect } from '@carbon/react';
-import { useMemo, type FC } from 'react';
+import { useMemo, type FC, type ReactNode } from 'react';
 
 import type { MultiCodeOption } from './options';
 
@@ -7,8 +7,8 @@ import './multiCodeSelect.scss';
 
 type Props = {
   id: string;
-  /** The field's label, above the box. */
-  titleText: string;
+  /** The field's label, above the box — with a required asterisk where the form asks for one. */
+  titleText: ReactNode;
   /** What the box reads with nothing picked — "Any status". Nothing picked means no filter. */
   placeholder: string;
   options: readonly MultiCodeOption[];
@@ -22,6 +22,10 @@ type Props = {
    * BCTS Business Area). The short code lists are a plain checkbox list.
    */
   filterable?: boolean;
+  /** The form's message for the picks, shown beneath the box; none when they are fine. */
+  invalidText?: string;
+  /** Focus left the box — for a form that shows a field's error once it has been visited. */
+  onBlur?: () => void;
 };
 
 const itemToString = (option: MultiCodeOption | null): string => option?.text ?? '';
@@ -46,6 +50,8 @@ const MultiCodeSelect: FC<Props> = ({
   onChange,
   disabled = false,
   filterable = false,
+  invalidText,
+  onBlur,
 }) => {
   const items = useMemo(() => [...options], [options]);
   const selectedItems = useMemo(
@@ -69,6 +75,9 @@ const MultiCodeSelect: FC<Props> = ({
   return (
     <div
       data-testid={id}
+      // On the wrapper: focus moving within the box — the input, the list — bubbles here too, which
+      // only marks the box visited a little early.
+      onBlur={onBlur}
       className={
         selectedItems.length > 0
           ? 'multi-code-select multi-code-select--picked'
@@ -87,6 +96,8 @@ const MultiCodeSelect: FC<Props> = ({
           selectionFeedback="fixed"
           sortItems={keepOrder}
           disabled={disabled}
+          invalid={Boolean(invalidText)}
+          invalidText={invalidText}
         />
       ) : (
         <MultiSelect<MultiCodeOption>
@@ -100,6 +111,8 @@ const MultiCodeSelect: FC<Props> = ({
           selectionFeedback="fixed"
           sortItems={keepOrder}
           disabled={disabled}
+          invalid={Boolean(invalidText)}
+          invalidText={invalidText}
         />
       )}
     </div>

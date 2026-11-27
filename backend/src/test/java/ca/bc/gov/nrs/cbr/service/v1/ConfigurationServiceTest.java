@@ -68,6 +68,7 @@ import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
 import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
+import ca.bc.gov.nrs.cbr.struct.v1.AreaResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import java.util.List;
 import java.util.Optional;
@@ -299,6 +300,26 @@ class ConfigurationServiceTest {
         .containsExactly(new OrgUnitResponse("1809", "DCK", "a district"));
     assertThat(service.getBusinessAreas())
         .containsExactly(new OrgUnitResponse("1833", "TCC", "a business area"));
+  }
+
+  @Test
+  @DisplayName("lists the Areas by name, each with the current districts that roll up into it")
+  void areasCarryTheirDistricts() {
+    when(orgUnits.findAreas()).thenReturn(List.of(
+        orgUnit(1834L, "ASI", "Southern Interior"), orgUnit(1835L, "ACO", "Coast")));
+    when(orgUnits.findForestDistricts()).thenReturn(List.of(
+        district(9L, 1834L), district(21L, 1834L), district(1809L, null)));
+
+    // Coast has no current district here: an empty list, not a missing Area. A district whose
+    // region the view does not map is in no Area, as in legacy.
+    assertThat(service.getAreas()).containsExactly(
+        new AreaResponse("1834", "ASI", "Southern Interior", List.of("9", "21")),
+        new AreaResponse("1835", "ACO", "Coast", List.of()));
+  }
+
+  private static CbrOrgUnitEntity district(long orgUnitNo, Long areaNo) {
+    return CbrOrgUnitEntity.builder().orgUnitNo(orgUnitNo).orgUnitCode("D" + orgUnitNo)
+        .orgUnitName("District " + orgUnitNo).rollupAreaNo(areaNo).build();
   }
 
   @Test

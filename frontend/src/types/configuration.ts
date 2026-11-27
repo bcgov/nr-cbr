@@ -25,6 +25,14 @@ export type OrgUnitOption = {
   orgUnitName: string;
 };
 
+/**
+ * An Area — one of the ministry's three old forest regions, which the reports filter by as
+ * legacy's did — with the org-unit numbers of the current forest districts in it.
+ */
+export type AreaOption = OrgUnitOption & {
+  districts: string[];
+};
+
 /** The Carbon `Tag` colours this application uses. */
 export type StatusTagType =
   | 'red'

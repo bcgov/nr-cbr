@@ -25,6 +25,9 @@ public interface StructureInventoryCriteria {
 
   String kiloEnd();
 
+  /** Area, legacy's: an Area's number, matching each site whose district rolls up into it. */
+  String areaOrgUnit();
+
   /** Forest District. */
   String orgUnit();
 

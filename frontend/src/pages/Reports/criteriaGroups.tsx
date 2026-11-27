@@ -1,8 +1,9 @@
 import MaintainerFields from './MaintainerFields';
+import { MAX_DISTRICTS } from './validation';
 
 import type { criteriaFields } from './criteriaFields';
 import type { StructureInventoryCommonCriteria } from './types';
-import type { CodeOption, OrgUnitOption } from '@/types/configuration';
+import type { AreaOption, CodeOption, OrgUnitOption } from '@/types/configuration';
 
 import { orgUnitOptions, withIsNull } from '@/components/core/MultiCodeSelect/options';
 
@@ -15,6 +16,7 @@ export type CommonCodeTables = {
   siteTypeCodes: CodeOption[];
   specialAccessCodes: CodeOption[];
   portableSuperstructureStatusCodes: CodeOption[];
+  areas: AreaOption[];
   forestDistricts: OrgUnitOption[];
   businessAreas: OrgUnitOption[];
   managementAreas: OrgUnitOption[];
@@ -24,6 +26,21 @@ export type CommonCodeTables = {
  * The groups of boxes the Structure Inventory reports' forms share, each in legacy's order and
  * with legacy's labels. A form places them where its own layout wants them.
  */
+
+/**
+ * The Forest Districts to offer once an Area is picked: those in it, as legacy narrowed its list.
+ * Every district while no Area is picked — or while the Areas have not loaded.
+ */
+export const districtsInArea = (
+  districts: readonly OrgUnitOption[],
+  areas: readonly AreaOption[],
+  area: string,
+): OrgUnitOption[] => {
+  const inArea = areas.find((option) => option.orgUnitNo === area)?.districts;
+  return inArea
+    ? districts.filter((district) => inArea.includes(district.orgUnitNo))
+    : [...districts];
+};
 
 /** The site: its status and type, its road, and how far along it. */
 export const siteGroup = <C extends StructureInventoryCommonCriteria>(
@@ -85,6 +102,7 @@ export const toggles = <C extends StructureInventoryCommonCriteria>({
 /** The criteria {@link ownerGroup} binds — every report with a district and a maintainer has them. */
 export type OwnerCriteria = Pick<
   StructureInventoryCommonCriteria,
+  | 'areaOrgUnit'
   | 'orgUnit'
   | 'managementOrgUnit'
   | 'businessAreaOrgUnit'
@@ -96,24 +114,32 @@ export type OwnerCriteria = Pick<
 /** The criteria {@link areaGroup} binds: the district, its management area, the business area. */
 export type AreaCriteria = Pick<
   OwnerCriteria,
-  'orgUnit' | 'managementOrgUnit' | 'businessAreaOrgUnit'
+  'areaOrgUnit' | 'orgUnit' | 'managementOrgUnit' | 'businessAreaOrgUnit'
 >;
 
 /**
- * Where the structure is held: its Forest District, the district's Management Area — loading, or
- * waiting on a district — and its BCTS Business Area.
+ * Where the structure is held: its Area (legacy's, narrowing the districts offered), its Forest
+ * District, the district's Management Area — loading, or waiting on a district — and its BCTS
+ * Business Area. `districtRequired` for the two reports that must be run an Area or a few districts
+ * at a time: the Forest District box then says how many ({@link MAX_DISTRICTS}).
  */
 export const areaGroup = <C extends AreaCriteria>(
-  { multiSelect }: Pick<CriteriaFields<C>, 'multiSelect'>,
-  codeTables: Pick<CommonCodeTables, 'forestDistricts' | 'managementAreas' | 'businessAreas'>,
-  options: { criteria: C; loading: boolean },
+  { multiSelect, areaSelect }: Pick<CriteriaFields<C>, 'multiSelect' | 'areaSelect'>,
+  codeTables: Pick<
+    CommonCodeTables,
+    'areas' | 'forestDistricts' | 'managementAreas' | 'businessAreas'
+  >,
+  options: { criteria: C; loading: boolean; districtRequired?: boolean },
 ) => (
   <>
+    {areaSelect(codeTables.areas)}
     {multiSelect(
       'orgUnit',
       'Forest District',
-      'Any district',
-      orgUnitOptions(codeTables.forestDistricts),
+      options.districtRequired ? `Select up to ${MAX_DISTRICTS} districts` : 'Any district',
+      orgUnitOptions(
+        districtsInArea(codeTables.forestDistricts, codeTables.areas, options.criteria.areaOrgUnit),
+      ),
       { filterable: true },
     )}
     {multiSelect(

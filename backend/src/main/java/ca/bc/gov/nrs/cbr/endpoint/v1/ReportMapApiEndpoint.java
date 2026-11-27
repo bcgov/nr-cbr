@@ -46,7 +46,9 @@ public interface ReportMapApiEndpoint {
   /**
    * Inspections Conducted – Detail's structures as the Structure Inventory – Detailed KMZ.
    *
-   * <p>{@code @Valid} turns an Inspection Date that is not a month into a 400 naming the field.
+   * <p>{@code @Valid} turns an Inspection Date that is not a month into a 400 naming the field. No
+   * Area and no Forest District, or more than eight districts, is a 400 naming {@code orgUnit} —
+   * the Detail's own rule.
    */
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/inspections-conducted-detail/kmz")

@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   getRepairStatusCodes: vi.fn(),
   getRepairPriorityCodes: vi.fn(),
   getRepairClassCodes: vi.fn(),
+  getAreas: vi.fn(),
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),

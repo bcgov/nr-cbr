@@ -40,6 +40,8 @@ public class ReportMapApiController implements ReportMapApiEndpoint {
   @Override
   public ResponseEntity<byte[]> inspectionsConductedDetailKmz(
       InspectionsConductedCriteria criteria) {
+    // The Detail's form, so the Detail's rule: its KMZ is asked for from the same criteria.
+    ReportDistricts.require(criteria.areaOrgUnit(), criteria.orgUnit());
     return ReportApiController.download(inspections.inspectionsConductedDetail(criteria));
   }
 

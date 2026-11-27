@@ -8,14 +8,15 @@ export type { ReportFormat } from '../types';
 /**
  * The Structure Detail Report's search criteria (legacy CBR006).
  *
- * <p>Field-for-field from legacy's `structure_detail.jsp`, less the Area filter, as on the other
- * reports, and the Report Favourites. They find structures; the report itself is of one structure,
+ * <p>Field-for-field from legacy's `structure_detail.jsp`, less the Report Favourites. They find structures; the report itself is of one structure,
  * picked from what they find. Every criterion is optional.
  */
 export type StructureDetailReportCriteria = MaintainerCriteria & {
   /** Structure #. A contains match, as on Structure Search. */
   structureName: string;
   siteTypeCode: string;
+  /** Area: one of the three, by number — the sites whose district rolls up into it. One pick. */
+  areaOrgUnit: string;
   /** Forest District. Changing it clears {@link managementOrgUnit}. */
   orgUnit: string;
   managementOrgUnit: string;
@@ -30,6 +31,7 @@ export const EMPTY_CRITERIA: StructureDetailReportCriteria = {
   clientNumber: '',
   clientLocationCode: '',
   maintainerLabel: '',
+  areaOrgUnit: '',
   orgUnit: '',
   managementOrgUnit: '',
   forestFileId: '',

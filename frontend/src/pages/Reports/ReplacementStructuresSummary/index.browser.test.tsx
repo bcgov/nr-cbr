@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   getSiteTypeCodes: vi.fn(),
   getSpecialAccessCodes: vi.fn(),
   getPortableSuperstructureStatusCodes: vi.fn(),
+  getAreas: vi.fn(),
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
@@ -81,7 +82,7 @@ beforeEach(() => {
 });
 
 describe('ReplacementStructuresSummaryPage', () => {
-  it("offers legacy's criteria, less Area, with no Sort By", async () => {
+  it("offers legacy's criteria, Area among them, with no Sort By", async () => {
     renderPage();
 
     await waitFor(async () =>
@@ -103,7 +104,7 @@ describe('ReplacementStructuresSummaryPage', () => {
       expect(screen.getByText(legend)).toBeInTheDocument();
     }
     expect(screen.getByText('Designated Maintainer')).toBeInTheDocument();
-    expect(screen.queryByText(/^Area/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Area')).toBeInTheDocument();
     expect(screen.queryByText('Sort By')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download CSV' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
@@ -192,6 +193,48 @@ describe('ReplacementStructuresSummaryPage', () => {
         'PDF',
       ),
     );
+  });
+
+  it('narrows the districts to the Area picked, drops one outside it, and sends the Area', async () => {
+    api.getAreas.mockResolvedValue([
+      { orgUnitNo: '1833', orgUnitCode: 'NOR', orgUnitName: 'Northern', districts: ['1'] },
+      { orgUnitNo: '1834', orgUnitCode: 'SOU', orgUnitName: 'Southern', districts: ['2'] },
+    ]);
+    renderPage();
+    await waitFor(async () =>
+      expect(await multiSelectOptions('replacement-structures-summary-orgUnit')).toHaveLength(2),
+    );
+    await toggleMultiSelect(
+      'replacement-structures-summary-orgUnit',
+      'DPG - Prince George',
+      'DMH - 100 Mile House',
+    );
+    await waitFor(() => expect(byId('areaOrgUnit')).not.toBeDisabled());
+    expect(
+      within(byId('areaOrgUnit'))
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Any area', 'NOR - Northern', 'SOU - Southern']);
+
+    type('areaOrgUnit', '1833');
+
+    expect(await multiSelectOptions('replacement-structures-summary-orgUnit')).toEqual([
+      'DPG - Prince George',
+    ]);
+    fireEvent.click(byId('run-PDF'));
+    await waitFor(() =>
+      expect(reportApi.replacementStructuresSummary).toHaveBeenLastCalledWith(
+        expect.objectContaining({ areaOrgUnit: '1833', orgUnit: ['1'] }),
+        'PDF',
+      ),
+    );
+
+    // Any area offers every district again; the one dropped stays dropped.
+    type('areaOrgUnit', '');
+    expect(await multiSelectOptions('replacement-structures-summary-orgUnit')).toHaveLength(2);
+    expect(await multiSelectSelected('replacement-structures-summary-orgUnit')).toEqual([
+      'DPG - Prince George',
+    ]);
   });
 
   it('keeps the criteria for the tab, and Clear forgets them', async () => {

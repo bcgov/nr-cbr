@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   getSuperstructureTypeCodes: vi.fn(),
   getCulvertMaterialCodes: vi.fn(),
   getDeckTypeCodes: vi.fn(),
+  getAreas: vi.fn(),
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),

@@ -1,5 +1,6 @@
 import type { CancelablePromise } from '@/config/api/CancelablePromise';
 import type {
+  AreaOption,
   BridgeCodes,
   CodeOption,
   CulvertCodes,
@@ -300,6 +301,14 @@ export class ConfigurationService extends HttpClient {
     return this.doRequest<OrgUnitOption[]>(this.config, {
       method: 'GET',
       url: '/v1/configuration/business-areas',
+    });
+  }
+
+  /** The Areas, by name, each with its current forest districts — the reports' Area select. */
+  getAreas(): CancelablePromise<AreaOption[]> {
+    return this.doRequest<AreaOption[]>(this.config, {
+      method: 'GET',
+      url: '/v1/configuration/areas',
     });
   }
 

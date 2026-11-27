@@ -5,6 +5,7 @@ import ca.bc.gov.nrs.cbr.service.v1.ConfigurationService;
 import ca.bc.gov.nrs.cbr.service.v1.InspectionReviewersService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureCulvertService;
 import ca.bc.gov.nrs.cbr.service.v1.StructureLoadRatingsService;
+import ca.bc.gov.nrs.cbr.struct.v1.AreaResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CulvertCodesResponse;
@@ -73,6 +74,11 @@ public class ConfigurationApiController implements ConfigurationApiEndpoint {
   @Override
   public ResponseEntity<List<CodeOptionResponse>> getInspectionReportStatusCodes() {
     return ResponseEntity.ok(configurationService.getInspectionReportStatusCodes());
+  }
+
+  @Override
+  public ResponseEntity<List<AreaResponse>> getAreas() {
+    return ResponseEntity.ok(configurationService.getAreas());
   }
 
   @Override

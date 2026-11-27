@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.anyOf;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.inArea;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
@@ -246,6 +247,8 @@ public final class StructureInventoryReportSpecifications {
     predicates.add(builder.equal(root.get(ACTIVE_IND), YES));
     structureCriteria(builder, root, site, criteria, predicates);
     siteCriteria(builder, site, criteria, predicates);
+    inArea(builder, query, site.get(ORG_UNIT_NO), criteria.areaOrgUnit())
+        .ifPresent(predicates::add);
     bridgeHas(builder, query, root, PORTABLE_STATUS, criteria.portableSuperstructureStatusCode())
         .ifPresent(predicates::add);
     return predicates;

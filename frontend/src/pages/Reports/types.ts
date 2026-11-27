@@ -26,6 +26,8 @@ export type StructureInventoryCommonCriteria = {
   downrated: boolean;
   capitalRoad: boolean;
   siteTypeCode: string;
+  /** Area: one of the three, by number — the sites whose district rolls up into it. One pick. */
+  areaOrgUnit: string;
   /** Forest District. Removing one clears {@link managementOrgUnit}. */
   orgUnit: string[];
   businessAreaOrgUnit: string[];
@@ -55,6 +57,7 @@ export const EMPTY_COMMON_CRITERIA: StructureInventoryCommonCriteria = {
   downrated: false,
   capitalRoad: false,
   siteTypeCode: '',
+  areaOrgUnit: '',
   orgUnit: [],
   businessAreaOrgUnit: [],
   managementOrgUnit: [],

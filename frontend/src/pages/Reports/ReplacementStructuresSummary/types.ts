@@ -5,12 +5,14 @@ export type { ReportFormat } from '../types';
 /**
  * The Replacement Structures Summary report's criteria (legacy CBR009).
  *
- * <p>Field-for-field from legacy's `replacement_structure_summary.jsp`, less two: Area (the retired
- * ministry Areas, left out as on the other reports) and Save/Delete Report Favourite. Legacy offers
+ * <p>Field-for-field from legacy's `replacement_structure_summary.jsp`, less Save/Delete Report
+ * Favourite. Legacy offers
  * no Sort By — its stored procedure fixes the order — and neither does this. Every criterion is
  * optional.
  */
 export type ReplacementStructuresSummaryCriteria = MaintainerCriteria & {
+  /** Area: one of the three, by number — the sites whose district rolls up into it. One pick. */
+  areaOrgUnit: string;
   /** Forest District. Changing it clears {@link managementOrgUnit}. */
   orgUnit: string[];
   managementOrgUnit: string[];
@@ -34,6 +36,7 @@ export const FORMATS = ['CSV', 'PDF'] as const;
 
 /** Legacy's defaults: nothing set. */
 export const EMPTY_CRITERIA: ReplacementStructuresSummaryCriteria = {
+  areaOrgUnit: '',
   orgUnit: [],
   managementOrgUnit: [],
   siteStatusCode: [],

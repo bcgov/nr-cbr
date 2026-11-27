@@ -1,11 +1,12 @@
 import { Select, SelectItem, TextInput, Toggle } from '@carbon/react';
 
 import MultiCodeSelect from '@/components/core/MultiCodeSelect';
+import { requiredLabel } from '@/utils/requiredLabel';
 
 import { DAY, MONTH, type Calendar } from './calendar';
 import CalendarRangeField from './CalendarRangeField';
 
-import type { CodeOption, OrgUnitOption } from '@/types/configuration';
+import type { AreaOption, CodeOption, OrgUnitOption } from '@/types/configuration';
 
 import {
   codeOptions,
@@ -87,6 +88,51 @@ export const criteriaFields = <C extends object>({
     </Select>
   );
 
+  /**
+   * Area — legacy's single-choice list of the three Areas. Picking one narrows the Forest District
+   * list to its districts (see {@link districtsInArea}) and drops any district picked outside it,
+   * as legacy's did: kept, it would match nothing and say nothing. A district picked does not set
+   * the Area. The form must have `areaOrgUnit` and `orgUnit` — one district, or a list.
+   */
+  const areaSelect = (areas: readonly AreaOption[]) => {
+    const values = criteria as Record<string, unknown>;
+    const change = (area: string) => {
+      onChange('areaOrgUnit' as Field, area as C[Field]);
+      const inArea = areas.find((option) => option.orgUnitNo === area)?.districts;
+      if (!inArea) {
+        return;
+      }
+      const districts = values.orgUnit;
+      if (Array.isArray(districts)) {
+        const kept = (districts as string[]).filter((district) => inArea.includes(district));
+        if (kept.length !== districts.length) {
+          onChange('orgUnit' as Field, kept as C[Field]);
+        }
+      } else if (typeof districts === 'string' && districts !== '' && !inArea.includes(districts)) {
+        onChange('orgUnit' as Field, '' as C[Field]);
+      }
+    };
+    return (
+      <Select
+        id={`${id}-areaOrgUnit`}
+        data-testid={`${id}-areaOrgUnit`}
+        labelText="Area"
+        disabled={codeTablesLoading}
+        value={String(values.areaOrgUnit ?? '')}
+        onChange={(event) => change(event.target.value)}
+      >
+        <SelectItem value="" text="Any area" />
+        {areas.map((area) => (
+          <SelectItem
+            key={area.orgUnitNo}
+            value={area.orgUnitNo}
+            text={label(area.orgUnitCode, area.orgUnitName)}
+          />
+        ))}
+      </Select>
+    );
+  };
+
   /** A code table's select, each code as "PB - Permanent Bridge"; `first` goes before the codes. */
   const codeSelect = (
     field: Field,
@@ -139,17 +185,19 @@ export const criteriaFields = <C extends object>({
     labelText: string,
     anyText: string,
     options: readonly MultiCodeOption[],
-    { filterable = false, disabled = codeTablesLoading } = {},
+    { filterable = false, disabled = codeTablesLoading, required = false } = {},
   ) => (
     <MultiCodeSelect
       id={`${id}-${field}`}
-      titleText={labelText}
+      titleText={requiredLabel(labelText, required)}
       placeholder={anyText}
       options={options}
       selected={criteria[field] as string[]}
       onChange={(values) => onChange(field, values as C[Field])}
       filterable={filterable}
       disabled={disabled}
+      invalidText={shown[field]}
+      onBlur={() => leave(field)}
     />
   );
 
@@ -249,6 +297,7 @@ export const criteriaFields = <C extends object>({
     select,
     codeSelect,
     orgUnitSelect,
+    areaSelect,
     multiSelect,
     codeMultiSelect,
     orgUnitMultiSelect,
