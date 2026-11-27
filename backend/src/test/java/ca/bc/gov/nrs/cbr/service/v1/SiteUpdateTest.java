@@ -217,6 +217,28 @@ class SiteUpdateTest {
     }
 
     @Test
+    @DisplayName("saves a site whose stored User Kilometres the rules refuse — no one can change it")
+    void savesOverAStoredValueTheUserCannotChange() {
+      // Site 65-021 on TEST: User Kilometres -0.06, written by LRMOPS. The kilometre rule refuses
+      // a negative, but the field is not on the edit form, so it must not refuse the save.
+      sites.saveAndFlush(stored().toBuilder().userKm(new BigDecimal("-0.06")).build());
+      entityManager.clear();
+
+      save(edit -> edit.pointOfCommencementDistance = new BigDecimal("0.06"));
+
+      CrossingSiteEntity site = stored();
+      assertThat(site.getPointOfCommencementDistance()).isEqualByComparingTo("0.06");
+      assertThat(site.getUserKm()).isEqualByComparingTo("-0.06");
+    }
+
+    @Test
+    @DisplayName("still refuses the same rule on a field the user can change")
+    void stillRefusesAnEditableField() {
+      assertThat(refusedWith(edit -> edit.pointOfCommencementDistance = new BigDecimal("-0.06")))
+          .containsEntry("pointOfCommencementDistance", "Kilometres cannot be negative.");
+    }
+
+    @Test
     @DisplayName("keeps the stored road segment when the road is unchanged")
     void keepsTheSegmentForTheSameRoad() {
       save(edit -> edit.forestFileId = " r00123 ");

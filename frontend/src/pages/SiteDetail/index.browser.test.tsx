@@ -548,9 +548,51 @@ describe('SiteDetailPage — saving', () => {
     expect(siteApi.updateSite).not.toHaveBeenCalled();
   });
 
+  it("saves over a stored value the user can't change — User Kilometres of -0.06", async () => {
+    // Site 65-021 on TEST: both kilometres -0.06. The kilometre rule refuses a negative; Kilometres
+    // can be corrected, but User Kilometres is never editable here, so its error had no box to show
+    // in and refused every save without a word.
+    siteApi.getSite.mockResolvedValue({
+      ...response,
+      pointOfCommencementDistance: '-0.06',
+      userKm: '-0.06',
+    });
+    await renderPage({ canEdit: true, canDelete: true });
+    edit();
+    await screen.findByText('Bowron FSR');
+
+    type('pointOfCommencementDistance', '0.06');
+    save();
+
+    await waitFor(() => {
+      expect(siteApi.updateSite).toHaveBeenCalledWith(
+        'BOWRON-001',
+        expect.objectContaining({ pointOfCommencementDistance: 0.06 }),
+      );
+    });
+  });
+
+  it('still refuses the rule on a field the user can change', async () => {
+    siteApi.getSite.mockResolvedValue({ ...response, pointOfCommencementDistance: '-0.06' });
+    await renderPage({ canEdit: true, canDelete: true });
+    edit();
+    await screen.findByText('Bowron FSR');
+
+    save();
+
+    expect(await screen.findByText('Must be a number, e.g. 12.5')).toBeInTheDocument();
+    expect(siteApi.updateSite).not.toHaveBeenCalled();
+  });
+
   it('lets Level 1 save Site Details on a site with gaps they cannot fill', async () => {
     // Only Site Details is theirs to change, so only Site Details is checked.
-    siteApi.getSite.mockResolvedValue({ ...response, crossingName: null, latitude: null });
+    siteApi.getSite.mockResolvedValue({
+      ...response,
+      crossingName: null,
+      latitude: null,
+      pointOfCommencementDistance: '-0.06',
+      userKm: '-0.06',
+    });
     await renderPage({ canEdit: true });
     edit();
 

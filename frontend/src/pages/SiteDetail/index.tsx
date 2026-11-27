@@ -83,11 +83,22 @@ const NEVER_EDITABLE = new Set<keyof SiteFormValues>([
   'capitalRoad',
 ]);
 
-/** The one message a Level 1 save can be refused over. */
-const onlySiteDetails = (errors: SiteErrors): SiteErrors =>
-  errors.pointOfAccessDescription === undefined
-    ? {}
-    : { pointOfAccessDescription: errors.pointOfAccessDescription };
+/**
+ * The errors on fields this user may change — the only ones a save can be refused over, or shown.
+ *
+ * <p>A field the user cannot change shows as plain text, with no box for its message, and nothing
+ * the user does can clear it: an error there would refuse every save without a word. Legacy never
+ * checked them either. So User Kilometres stored as `-0.06` by LRMOPS, which the kilometre rule
+ * refuses, no longer blocks a Level 2 save; and a Level 1 user, who may change Site Details alone,
+ * is refused over Site Details alone.
+ */
+const editableOnly = (
+  errors: SiteErrors,
+  isEditable: (field: keyof SiteFormValues) => boolean,
+): SiteErrors =>
+  Object.fromEntries(
+    Object.entries(errors).filter(([field]) => isEditable(field as keyof SiteFormValues)),
+  ) as SiteErrors;
 
 /**
  * Site detail — what the Site # in the search results opens.
@@ -272,10 +283,12 @@ const SiteDetailPage: FC = () => {
     // The two-field rules, live rather than held to Save — see `crossFieldErrors`.
     ...(mode === 'edit' ? { ...crossFieldErrors(site), ...stored.errors } : {}),
   };
-  const editErrors: SiteErrors = siteDetailsOnly
-    ? onlySiteDetails(merged)
-    : // As on Add Site: a district the road decides is reported on Project File ID#.
-      withRoadErrors(merged, site.crossingSiteTypeCode, road);
+  // As on Add Site: a district the road decides is reported on Project File ID#. Then only what
+  // this user may change — see `editableOnly`.
+  const editErrors: SiteErrors = editableOnly(
+    withRoadErrors(merged, site.crossingSiteTypeCode, road),
+    isEditable,
+  );
   const errors: SiteErrors =
     mode === 'edit'
       ? // What the server refused, over what the form decided — see Add Site.
@@ -313,9 +326,10 @@ const SiteDetailPage: FC = () => {
   const save = useCallback(() => {
     setSubmitted(true);
     const settledNow = fieldErrors(site, 'settled');
-    const blocking = siteDetailsOnly
-      ? onlySiteDetails(settledNow)
-      : { ...settledNow, ...crossFieldErrors(site), ...stored.errors };
+    const blocking = editableOnly(
+      siteDetailsOnly ? settledNow : { ...settledNow, ...crossFieldErrors(site), ...stored.errors },
+      isEditable,
+    );
     if (Object.keys(blocking).length > 0 || (!siteDetailsOnly && road.noRoad)) {
       return;
     }
@@ -327,7 +341,7 @@ const SiteDetailPage: FC = () => {
         setSubmitted(false);
       },
     });
-  }, [road.noRoad, site, siteDetailsOnly, stored.errors, updated]);
+  }, [isEditable, road.noRoad, site, siteDetailsOnly, stored.errors, updated]);
 
   const saveLabel = updated.isPending ? 'Saving…' : 'Save changes';
 
