@@ -118,7 +118,7 @@ export const criteriaFields = <C extends object>({
         data-testid={`${id}-areaOrgUnit`}
         labelText="Area"
         disabled={codeTablesLoading}
-        value={String(values.areaOrgUnit ?? '')}
+        value={typeof values.areaOrgUnit === 'string' ? values.areaOrgUnit : ''}
         onChange={(event) => change(event.target.value)}
       >
         <SelectItem value="" text="Any area" />

@@ -92,9 +92,11 @@ class ReportDistrictsTest {
         mock(StructureDetailReportService.class), mock(RepairsSummaryService.class),
         mock(MonitorsSummaryService.class), mock(InspectionsConductedSummaryService.class), detail);
 
-    assertThatThrownBy(() -> controller.inspectionsConductedDetail(
-        InspectionsConductedCriteria.builder().orgUnit(NINE).build(), format,
-        new MockHttpServletResponse()))
+    InspectionsConductedCriteria criteria =
+        InspectionsConductedCriteria.builder().orgUnit(NINE).build();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> controller.inspectionsConductedDetail(criteria, format, response))
         .isInstanceOf(FieldValidationException.class);
     verifyNoInteractions(detail);
   }
@@ -106,8 +108,9 @@ class ReportDistrictsTest {
     ReportMapApiController controller =
         new ReportMapApiController(mock(StructureInventoryDetailedService.class), maps);
 
-    assertThatThrownBy(() -> controller.inspectionsConductedDetailKmz(
-        InspectionsConductedCriteria.builder().build()))
+    InspectionsConductedCriteria criteria = InspectionsConductedCriteria.builder().build();
+
+    assertThatThrownBy(() -> controller.inspectionsConductedDetailKmz(criteria))
         .isInstanceOf(FieldValidationException.class);
     verifyNoInteractions(maps);
   }
@@ -120,8 +123,10 @@ class ReportDistrictsTest {
     InspectionsDueReportApiController controller = new InspectionsDueReportApiController(
         mock(InspectionsDueSummaryService.class), mock(InspectionsDueDetailedService.class), blank);
 
-    assertThatThrownBy(() -> controller.inspectionsBlank(
-        InspectionsDueCriteria.builder().build(), format, new MockHttpServletResponse()))
+    InspectionsDueCriteria criteria = InspectionsDueCriteria.builder().build();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> controller.inspectionsBlank(criteria, format, response))
         .isInstanceOf(FieldValidationException.class);
     verifyNoInteractions(blank);
   }
