@@ -9,7 +9,11 @@ import InspectionsConductedPage from './index';
 
 import type { InspectionsConductedVariant } from './types';
 
-import { multiSelectOptions } from '@/config/tests/multiSelect';
+import {
+  multiSelectDisabled,
+  multiSelectOptions,
+  toggleMultiSelect,
+} from '@/config/tests/multiSelect';
 
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
@@ -18,6 +22,7 @@ const api = vi.hoisted(() => ({
   getPortableSuperstructureStatusCodes: vi.fn(),
   getInspectionReportStatusCodes: vi.fn(),
   getInspectionTypeCodes: vi.fn(),
+  getAreas: vi.fn(),
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
@@ -66,6 +71,20 @@ const byId = (variant: InspectionsConductedVariant, field: string) =>
 const type = (variant: InspectionsConductedVariant, field: string, value: string) =>
   fireEvent.change(byId(variant, field), { target: { value } });
 
+/** Ticks these Forest Districts on the Detail, once its list has loaded — the Detail needs one. */
+const pickDistricts = async (...texts: string[]) => {
+  const box = `${ID.detail}-orgUnit`;
+  await waitFor(() => expect(multiSelectDisabled(box)).toBe(false));
+  await toggleMultiSelect(box, ...texts);
+};
+
+/** Nine districts, one more than the Detail may ask for. */
+const NINE_DISTRICTS = Array.from({ length: 9 }, (_, index) => ({
+  orgUnitNo: String(index + 1),
+  orgUnitCode: `D${index + 1}`,
+  orgUnitName: `District ${index + 1}`,
+}));
+
 beforeEach(() => {
   sessionStorage.clear();
   display.mockReset();
@@ -105,7 +124,7 @@ describe('InspectionsConductedPage', () => {
     'BCTS Business Area',
   ];
 
-  it("offers the Summary legacy's criteria, without Inspection Type, Area or Road Responsibility", async () => {
+  it("offers the Summary legacy's criteria, Area among them, without Inspection Type or Road Responsibility", async () => {
     renderPage('summary');
 
     await waitFor(async () =>
@@ -132,7 +151,7 @@ describe('InspectionsConductedPage', () => {
     }
     expect(screen.queryByLabelText('Inspection Type')).not.toBeInTheDocument();
     expect(screen.queryByText(/Road Responsibility/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Area/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Area')).toBeInTheDocument();
   });
 
   it("sorts the Summary by legacy's orders less Forest Service Road, Project File ID# first", () => {
@@ -193,6 +212,9 @@ describe('InspectionsConductedPage', () => {
     ['detail', 'inspectionsConductedDetail', 'InspectionsConductedDetailReport'],
   ] as const)('fetches the %s CSV and saves it under its name', async (variant, method, name) => {
     renderPage(variant);
+    if (variant === 'detail') {
+      await pickDistricts('DPG - Prince George');
+    }
 
     fireEvent.click(byId(variant, 'run-CSV'));
 
@@ -235,18 +257,88 @@ describe('InspectionsConductedPage', () => {
   it("fetches the Detail's PDF, not the Summary's, and saves it under its name", async () => {
     renderPage('detail');
     type('detail', 'structureName', 'B10');
+    await pickDistricts('DPG - Prince George');
 
     fireEvent.click(byId('detail', 'run-PDF'));
 
     await waitFor(() => expect(saveFile).toHaveBeenCalled());
     expect(reportApi.inspectionsConductedDetail).toHaveBeenCalledWith(
-      expect.objectContaining({ structureName: 'B10', sortBy: 'PROJECT_BRANCH_USER_KM' }),
+      expect.objectContaining({
+        structureName: 'B10',
+        orgUnit: ['1'],
+        sortBy: 'PROJECT_BRANCH_USER_KM',
+      }),
       'PDF',
     );
     expect(reportApi.inspectionsConductedSummary).not.toHaveBeenCalled();
     expect(saveFile.mock.calls[0][1]).toMatch(
       /^InspectionsConductedDetailReport_\d{4}-\d{2}-\d{2}\.pdf$/,
     );
+  });
+
+  it.each(['CSV', 'KMZ', 'PDF'] as const)(
+    'refuses the Detail as a %s until an Area or a Forest District is picked',
+    async (format) => {
+      renderPage('detail');
+
+      fireEvent.click(byId('detail', `run-${format}`));
+
+      expect(
+        await screen.findByText('Select an Area or at least one Forest District.'),
+      ).toBeInTheDocument();
+      expect(reportApi.inspectionsConductedDetail).not.toHaveBeenCalled();
+    },
+  );
+
+  it('runs the Detail for an Area alone', async () => {
+    api.getAreas.mockResolvedValue([
+      { orgUnitNo: '1833', orgUnitCode: 'NOR', orgUnitName: 'Northern', districts: ['1'] },
+    ]);
+    renderPage('detail');
+    await waitFor(() => expect(byId('detail', 'areaOrgUnit')).not.toBeDisabled());
+    await screen.findByRole('option', { name: 'NOR - Northern' });
+    type('detail', 'areaOrgUnit', '1833');
+
+    fireEvent.click(byId('detail', 'run-PDF'));
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalled());
+    expect(reportApi.inspectionsConductedDetail).toHaveBeenCalledWith(
+      expect.objectContaining({ areaOrgUnit: '1833', orgUnit: [] }),
+      'PDF',
+    );
+  });
+
+  it('refuses more than eight Forest Districts on the Detail, and runs with eight', async () => {
+    api.getForestDistricts.mockResolvedValue(NINE_DISTRICTS);
+    renderPage('detail');
+    const all = NINE_DISTRICTS.map((unit) => `${unit.orgUnitCode} - ${unit.orgUnitName}`);
+    await pickDistricts(...all);
+
+    fireEvent.click(byId('detail', 'run-PDF'));
+
+    expect(await screen.findByText('Select no more than 8 Forest Districts.')).toBeInTheDocument();
+    expect(reportApi.inspectionsConductedDetail).not.toHaveBeenCalled();
+
+    await toggleMultiSelect(`${ID.detail}-orgUnit`, all[8]);
+    await waitFor(() =>
+      expect(screen.queryByText('Select no more than 8 Forest Districts.')).toBeNull(),
+    );
+    fireEvent.click(byId('detail', 'run-PDF'));
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalled());
+    expect(reportApi.inspectionsConductedDetail).toHaveBeenCalledWith(
+      expect.objectContaining({ orgUnit: ['1', '2', '3', '4', '5', '6', '7', '8'] }),
+      'PDF',
+    );
+  });
+
+  it('runs the Summary with neither an Area nor a Forest District', async () => {
+    renderPage('summary');
+
+    fireEvent.click(byId('summary', 'run-PDF'));
+
+    await waitFor(() => expect(reportApi.inspectionsConductedSummary).toHaveBeenCalled());
+    expect(screen.queryByText('Select an Area or at least one Forest District.')).toBeNull();
   });
 
   it('keeps each report its own criteria for the tab, and Clear goes back to its defaults', async () => {

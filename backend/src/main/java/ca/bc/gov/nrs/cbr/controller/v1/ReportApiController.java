@@ -110,6 +110,7 @@ public class ReportApiController implements ReportApiEndpoint {
   @Override
   public ResponseEntity<byte[]> inspectionsConductedDetail(
       InspectionsConductedCriteria criteria, ReportFormat format, HttpServletResponse response) {
+    ReportDistricts.require(criteria.areaOrgUnit(), criteria.orgUnit());
     // Both formats streamed: a province's is the largest report CBR makes, 171 MB as a PDF.
     return format == ReportFormat.CSV
         ? streamed(response, target -> inspectionsConductedDetail.writeCsv(criteria, target))

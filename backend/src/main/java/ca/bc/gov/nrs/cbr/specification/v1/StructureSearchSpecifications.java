@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.anyOf;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.inArea;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.contains;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.decimalRange;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
@@ -159,6 +160,8 @@ public final class StructureSearchSpecifications {
       List<Predicate> predicates = new ArrayList<>();
       structureCriteria(builder, root, criteria, predicates);
       siteCriteria(builder, site, criteria, predicates);
+      inArea(builder, query, site.get(ORG_UNIT_NO), criteria.areaOrgUnit())
+          .ifPresent(predicates::add);
       if (roadSections != null) {
         predicates.add(onRoadSections(builder, site, roadSections));
       }

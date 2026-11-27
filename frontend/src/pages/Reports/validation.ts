@@ -11,6 +11,28 @@ export const DAY_MESSAGE = 'Enter a date as yyyy/mm/dd, e.g. 2026/01/31';
 export const REVERSED_DAYS = 'The end date cannot be before the start date';
 
 /**
+ * The most Forest Districts one run of Inspections Conducted – Detail or Inspections – Blank Report
+ * may ask for. A province's run of either is more than the server can produce before the browser
+ * gives up, so the business made the district required, up to eight, then let an Area do instead
+ * (2026-11-27). The server holds the same rule.
+ */
+export const MAX_DISTRICTS = 8;
+export const AREA_OR_DISTRICT_REQUIRED = 'Select an Area or at least one Forest District.';
+export const TOO_MANY_DISTRICTS = `Select no more than ${MAX_DISTRICTS} Forest Districts.`;
+
+/**
+ * The Area and Forest District rule of those two reports: an Area or a district — both is fine —
+ * and never more than {@link MAX_DISTRICTS} districts, Area or not. The message goes under Forest
+ * District.
+ */
+export const districtError = (area: string, orgUnit: readonly string[]): string | undefined => {
+  if (orgUnit.length === 0 && area.trim() === '') {
+    return AREA_OR_DISTRICT_REQUIRED;
+  }
+  return orgUnit.length > MAX_DISTRICTS ? TOO_MANY_DISTRICTS : undefined;
+};
+
+/**
  * The messages for a "from – to" pair of days, `yyyy/mm/dd` as legacy's: each box judged on its
  * own, then — when both are days — the end checked against the start, on the "To" box, as the
  * month ranges do.

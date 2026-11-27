@@ -9,7 +9,11 @@ import InspectionsDuePage from './index';
 
 import type { InspectionsDueVariant } from './types';
 
-import { multiSelectOptions } from '@/config/tests/multiSelect';
+import {
+  multiSelectDisabled,
+  multiSelectOptions,
+  toggleMultiSelect,
+} from '@/config/tests/multiSelect';
 
 const api = vi.hoisted(() => ({
   getSiteStatusCodes: vi.fn(),
@@ -19,6 +23,7 @@ const api = vi.hoisted(() => ({
   getPortableSuperstructureStatusCodes: vi.fn(),
   getStructureTypeClassCodes: vi.fn(),
   getStructureInspectionStatusCodes: vi.fn(),
+  getAreas: vi.fn(),
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),
@@ -69,6 +74,20 @@ const byId = (variant: InspectionsDueVariant, field: string) =>
 const type = (variant: InspectionsDueVariant, field: string, value: string) =>
   fireEvent.change(byId(variant, field), { target: { value } });
 
+/** Ticks these Forest Districts on the Blank, once its list has loaded — the Blank needs one. */
+const pickDistricts = async (...texts: string[]) => {
+  const box = `${ID.blank}-orgUnit`;
+  await waitFor(() => expect(multiSelectDisabled(box)).toBe(false));
+  await toggleMultiSelect(box, ...texts);
+};
+
+/** Nine districts, one more than the Blank may ask for. */
+const NINE_DISTRICTS = Array.from({ length: 9 }, (_, index) => ({
+  orgUnitNo: String(index + 1),
+  orgUnitCode: `D${index + 1}`,
+  orgUnitName: `District ${index + 1}`,
+}));
+
 beforeEach(() => {
   sessionStorage.clear();
   display.mockReset();
@@ -113,7 +132,7 @@ describe('InspectionsDuePage', () => {
   ];
 
   it.each(['summary', 'detailed'] as const)(
-    "offers the %s report legacy's criteria, without Structure #, Area or Sort By",
+    "offers the %s report legacy's criteria, Area among them, without Structure # or Sort By",
     async (variant) => {
       renderPage(variant);
 
@@ -137,7 +156,7 @@ describe('InspectionsDuePage', () => {
       expect(screen.getByText('Next Planned Inspection Date (yyyy/mm/dd)')).toBeInTheDocument();
       expect(screen.getByText('No Next Planned Inspection Date')).toBeInTheDocument();
       expect(screen.queryByLabelText('Structure #')).not.toBeInTheDocument();
-      expect(screen.queryByText(/^Area/)).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Area')).toBeInTheDocument();
       // One order left (by Project File ID#; CBR no longer holds road names), so nothing to choose.
       expect(screen.queryByText('Sort By')).not.toBeInTheDocument();
     },
@@ -229,6 +248,9 @@ describe('InspectionsDuePage', () => {
     ['blank', 'inspectionsBlank', 'InspectionsBlankReport'],
   ] as const)('fetches the %s CSV and saves it under its name', async (variant, method, name) => {
     renderPage(variant);
+    if (variant === 'blank') {
+      await pickDistricts('DPG - Prince George');
+    }
 
     fireEvent.click(byId(variant, 'run-CSV'));
 
@@ -293,16 +315,88 @@ describe('InspectionsDuePage', () => {
   it("fetches the Blank's PDF and saves it under its name", async () => {
     renderPage('blank');
     type('blank', 'structureName', 'B10');
+    await pickDistricts('DPG - Prince George');
 
     fireEvent.click(byId('blank', 'run-PDF'));
 
     await waitFor(() => expect(saveFile).toHaveBeenCalled());
     expect(reportApi.inspectionsBlank).toHaveBeenCalledWith(
-      expect.objectContaining({ structureName: 'B10' }),
+      expect.objectContaining({ structureName: 'B10', orgUnit: ['1'] }),
       'PDF',
     );
     expect(saveFile.mock.calls[0][1]).toMatch(/^InspectionsBlankReport_\d{4}-\d{2}-\d{2}\.pdf$/);
   });
+
+  it.each(['CSV', 'PDF'] as const)(
+    'refuses the Blank as a %s until an Area or a Forest District is picked',
+    async (format) => {
+      renderPage('blank');
+
+      fireEvent.click(byId('blank', `run-${format}`));
+
+      expect(
+        await screen.findByText('Select an Area or at least one Forest District.'),
+      ).toBeInTheDocument();
+      expect(reportApi.inspectionsBlank).not.toHaveBeenCalled();
+    },
+  );
+
+  it('runs the Blank for an Area alone', async () => {
+    api.getAreas.mockResolvedValue([
+      { orgUnitNo: '1833', orgUnitCode: 'NOR', orgUnitName: 'Northern', districts: ['1'] },
+    ]);
+    renderPage('blank');
+    await waitFor(() => expect(byId('blank', 'areaOrgUnit')).not.toBeDisabled());
+    await screen.findByRole('option', { name: 'NOR - Northern' });
+    type('blank', 'areaOrgUnit', '1833');
+
+    fireEvent.click(byId('blank', 'run-PDF'));
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalled());
+    expect(reportApi.inspectionsBlank).toHaveBeenCalledWith(
+      expect.objectContaining({ areaOrgUnit: '1833', orgUnit: [] }),
+      'PDF',
+    );
+  });
+
+  it('refuses more than eight Forest Districts on the Blank, and runs with eight', async () => {
+    api.getForestDistricts.mockResolvedValue(NINE_DISTRICTS);
+    renderPage('blank');
+    const all = NINE_DISTRICTS.map((unit) => `${unit.orgUnitCode} - ${unit.orgUnitName}`);
+    await pickDistricts(...all);
+
+    fireEvent.click(byId('blank', 'run-PDF'));
+
+    expect(await screen.findByText('Select no more than 8 Forest Districts.')).toBeInTheDocument();
+    expect(reportApi.inspectionsBlank).not.toHaveBeenCalled();
+
+    await toggleMultiSelect(`${ID.blank}-orgUnit`, all[8]);
+    await waitFor(() =>
+      expect(screen.queryByText('Select no more than 8 Forest Districts.')).toBeNull(),
+    );
+    fireEvent.click(byId('blank', 'run-PDF'));
+
+    await waitFor(() => expect(saveFile).toHaveBeenCalled());
+    expect(reportApi.inspectionsBlank).toHaveBeenCalledWith(
+      expect.objectContaining({ orgUnit: ['1', '2', '3', '4', '5', '6', '7', '8'] }),
+      'PDF',
+    );
+  });
+
+  it.each([
+    ['summary', 'inspectionsDueSummary'],
+    ['detailed', 'inspectionsDueDetailed'],
+  ] as const)(
+    'runs the %s report with neither an Area nor a Forest District',
+    async (variant, method) => {
+      renderPage(variant);
+
+      fireEvent.click(byId(variant, 'run-PDF'));
+
+      await waitFor(() => expect(reportApi[method]).toHaveBeenCalled());
+      expect(screen.queryByText('Select an Area or at least one Forest District.')).toBeNull();
+    },
+  );
 
   it('keeps each report its own criteria for the tab, and Clear goes back to the defaults', async () => {
     const { unmount } = renderPage('detailed');

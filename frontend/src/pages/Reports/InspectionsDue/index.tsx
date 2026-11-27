@@ -124,7 +124,9 @@ const InspectionsDuePage: FC<{ variant: InspectionsDueVariant }> = ({ variant })
   const inspectionStatusCodes = useStructureInspectionStatusCodes();
   const specialEquipmentCodes = useSpecialEquipmentCodes();
   const referenceData = useInspectionsDueReferenceDataState();
-  const errors = useMemo(() => criteriaErrors(criteria), [criteria]);
+  // The Blank must be run for an Area or one to eight Forest Districts (business, 2026-11-27): a
+  // province's forms are more than the server can produce before the browser gives up.
+  const errors = useMemo(() => criteriaErrors(criteria, config.blank), [criteria, config.blank]);
 
   // The hooks are called every render; each variant takes its own report.
   const reports = {
@@ -226,6 +228,7 @@ const InspectionsDuePage: FC<{ variant: InspectionsDueVariant }> = ({ variant })
             {areaGroup(fields, codeTables, {
               criteria,
               loading: referenceData.isLoading || managementAreasLoading,
+              districtRequired: config.blank,
             })}
             {roadFields(fields)}
 

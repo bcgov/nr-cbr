@@ -16,9 +16,8 @@ export const SORT_OPTIONS: readonly SortOption<MonitorsSummarySort>[] = [
 /**
  * The Monitors Summary report's criteria (legacy CBR011).
  *
- * <p>Field-for-field from legacy's `monitor_summary.jsp`, less three: Area (the retired ministry
- * Areas, left out as on the other reports), Road Responsibility (commented out of the JSP) and
- * Save/Delete Report Favourite. Legacy has no Management Area here, and neither does this. Every
+ * <p>Field-for-field from legacy's `monitor_summary.jsp`, less two: Road Responsibility (commented
+ * out of the JSP) and Save/Delete Report Favourite. Legacy has no Management Area here, and neither does this. Every
  * criterion is optional.
  */
 export type MonitorsSummaryCriteria = MaintainerCriteria & {
@@ -27,6 +26,8 @@ export type MonitorsSummaryCriteria = MaintainerCriteria & {
   siteStatusCode: string[];
   siteTypeCode: string;
   monitoringStatusCode: string[];
+  /** Area: one of the three, by number — the sites whose district rolls up into it. One pick. */
+  areaOrgUnit: string;
   /** Forest District. */
   orgUnit: string[];
   businessAreaOrgUnit: string[];
@@ -55,6 +56,7 @@ export const EMPTY_CRITERIA: MonitorsSummaryCriteria = {
   clientLocationCode: '',
   maintainerLabel: '',
   monitoringStatusCode: [],
+  areaOrgUnit: '',
   orgUnit: [],
   businessAreaOrgUnit: [],
   forestServiceRoad: '',

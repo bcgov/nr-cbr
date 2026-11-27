@@ -20,19 +20,19 @@ import org.hibernate.annotations.Immutable;
  * <p>CBR reads {@code ORG_UNIT} and owns none of it (cbr-data-model.local.md §6). The view is a
  * union of six branches, each stamping an {@code ORG_UNIT_TYPE}: business areas ({@code T}), current
  * districts ({@code D}), regions ({@code R}), <b>obsolete districts ({@code O})</b>, the three
- * hard-coded areas ({@code A}), and recreation districts ({@code RD}). The three lookups here read
- * the {@code D}, {@code O} and {@code T} branches, and each is keyed by a real {@code ORG_UNIT_NO},
- * which is why mapping it as the identifier is safe — the {@code RD} branch synthesises ids
- * ({@code 1000000000 + ROWNUM}) and would not be.
+ * hard-coded areas ({@code A}), and recreation districts ({@code RD}). The lookups here read the
+ * {@code D}, {@code O}, {@code T} and {@code A} branches, and each is keyed by a real
+ * {@code ORG_UNIT_NO}, which is why mapping it as the identifier is safe — the {@code RD} branch
+ * synthesises ids ({@code 1000000000 + ROWNUM}) and would not be.
  *
  * <p>Every branch except the obsolete one filters to currently-effective rows, so the view is
  * already time-filtered before any query here adds a predicate of its own. That is not incidental;
  * see {@link ca.bc.gov.nrs.cbr.repository.v1.CbrOrgUnitRepository#findManagementAreas(Long)}, where
  * it is the difference between a correct query and one that looks broken.
  *
- * <p>Only the columns the two queries need are mapped. The view also exposes the rollup
- * area/region/district codes; they are left off until something reads them, rather than mapped on
- * the chance it might.
+ * <p>Only the columns the queries need are mapped. The view also exposes the rollup
+ * region/district codes; they are left off until something reads them, rather than mapped on the
+ * chance it might.
  */
 @Entity
 @Immutable
@@ -79,6 +79,15 @@ public class CbrOrgUnitEntity {
    */
   @Column(name = "ROLLUP_DIST_NO")
   private Long rollupDistNo;
+
+  /**
+   * The Area this row rolls up into — one of the three the view hard-codes ({@code 1833},
+   * {@code 1834}, {@code 1835}), by region; an Area's own row carries its own number. The reports'
+   * Area filter (legacy's {@code SEARCH_OLD_FOREST_REGION}) matches a site's district on it. Null
+   * for a district whose region the view does not list.
+   */
+  @Column(name = "ROLLUP_AREA_NO")
+  private Long rollupAreaNo;
 
   @Column(name = "EFFECTIVE_DATE")
   private LocalDateTime effectiveDate;

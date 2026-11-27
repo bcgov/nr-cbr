@@ -9,9 +9,8 @@ export { SORT_OPTIONS, type ReportFormat, type StructureInventorySort } from '..
 /**
  * The Structure Inventory – Summary report's criteria (legacy CBR008).
  *
- * <p>Field-for-field from legacy's `structure_inventory_summary.jsp`, less two: the Area filter (the
- * retired ministry Areas, left out as on the search pages) and Save/Delete Report Favourite, left
- * out for now. The criteria the Detailed shares, then the Summary's own construction filters.
+ * <p>Field-for-field from legacy's `structure_inventory_summary.jsp`, less Save/Delete Report
+ * Favourite, left out for now. The criteria the Detailed shares, then the Summary's own construction filters.
  * Every criterion is optional — legacy runs the report with none set.
  */
 export type StructureInventorySummaryCriteria = StructureInventoryCommonCriteria & {

@@ -31,12 +31,16 @@ import ca.bc.gov.nrs.cbr.repository.v1.StructureRepairGroupCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureSourceCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.StructureTypeClassCodeRepository;
 import ca.bc.gov.nrs.cbr.repository.v1.SuperstructureTypeCodeRepository;
+import ca.bc.gov.nrs.cbr.struct.v1.AreaResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.OrgUnitResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.RecreationProjectResponse;
 import ca.bc.gov.nrs.cbr.util.CriteriaValues;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -292,6 +296,28 @@ public class ConfigurationService {
   public List<OrgUnitResponse> getForestDistricts() {
     return cbrOrgUnitRepository.findForestDistricts().stream()
         .map(ConfigurationService::toOrgUnit)
+        .toList();
+  }
+
+  /**
+   * The Areas, by name, each with its current districts — the reports' Area dropdown.
+   *
+   * <p>Replaces {@code CBR_GENERAL.FIND_OLD_FOREST_REGIONS}, and legacy's
+   * {@code getDistrictsByAreaCode} round trip after each pick: the districts come with the Area,
+   * so the form narrows its Forest District list without asking again.
+   */
+  @Cacheable("areas")
+  public List<AreaResponse> getAreas() {
+    Map<Long, List<String>> districts = new HashMap<>();
+    for (CbrOrgUnitEntity district : cbrOrgUnitRepository.findForestDistricts()) {
+      if (district.getRollupAreaNo() != null) {
+        districts.computeIfAbsent(district.getRollupAreaNo(), area -> new ArrayList<>())
+            .add(String.valueOf(district.getOrgUnitNo()));
+      }
+    }
+    return cbrOrgUnitRepository.findAreas().stream()
+        .map(area -> new AreaResponse(String.valueOf(area.getOrgUnitNo()), area.getOrgUnitCode(),
+            area.getOrgUnitName(), districts.getOrDefault(area.getOrgUnitNo(), List.of())))
         .toList();
   }
 

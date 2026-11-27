@@ -6,6 +6,7 @@ import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.model.v1.RecreationDistrictXrefEntity;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -123,6 +124,22 @@ class CbrOrgUnitRepositoryTest {
     assertThat(repository.findBusinessAreas())
         .extracting(CbrOrgUnitEntity::getOrgUnitName)
         .containsExactly("Babine Business Area", "Seaward-Tlasta Business Area");
+  }
+
+  @Test
+  @DisplayName("finds the Areas by name — retired org units, so not filtered by date — and only them")
+  void findsTheAreas() {
+    for (Object[] area : List.of(new Object[] {1835L, "Coast"}, new Object[] {1833L, "Northern"})) {
+      entityManager.persist(CbrOrgUnitEntity.builder()
+          .orgUnitNo((Long) area[0]).orgUnitCode("A" + area[0]).orgUnitName((String) area[1])
+          .orgLevelCode("R").orgUnitType(CbrOrgUnitRepository.AREA).rollupAreaNo((Long) area[0])
+          .effectiveDate(LONG_AGO).expiryDate(LONG_AGO).build());
+    }
+    givenDistrict(18L, "DPG", "Prince George");
+
+    assertThat(repository.findAreas())
+        .extracting(CbrOrgUnitEntity::getOrgUnitName)
+        .containsExactly("Coast", "Northern");
   }
 
   @Test

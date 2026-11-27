@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { CommonCodeTables } from './criteriaGroups';
 
 import {
+  useAreas,
   useBusinessAreas,
   useForestDistricts,
   useManagementAreas,
@@ -22,6 +23,7 @@ export const useCommonCodeTables = (orgUnit: string | readonly string[]) => {
   const siteTypeCodes = useSiteTypeCodes();
   const specialAccessCodes = useSpecialAccessCodes();
   const portableSuperstructureStatusCodes = usePortableSuperstructureStatusCodes();
+  const areas = useAreas();
   const forestDistricts = useForestDistricts();
   const businessAreas = useBusinessAreas();
   const managementAreas = useManagementAreas(orgUnit);
@@ -32,6 +34,7 @@ export const useCommonCodeTables = (orgUnit: string | readonly string[]) => {
       siteTypeCodes: siteTypeCodes.data ?? [],
       specialAccessCodes: specialAccessCodes.data ?? [],
       portableSuperstructureStatusCodes: portableSuperstructureStatusCodes.data ?? [],
+      areas: areas.data ?? [],
       forestDistricts: forestDistricts.data ?? [],
       businessAreas: businessAreas.data ?? [],
       managementAreas: managementAreas.data ?? [],
@@ -41,6 +44,7 @@ export const useCommonCodeTables = (orgUnit: string | readonly string[]) => {
       siteTypeCodes.data,
       specialAccessCodes.data,
       portableSuperstructureStatusCodes.data,
+      areas.data,
       forestDistricts.data,
       businessAreas.data,
       managementAreas.data,

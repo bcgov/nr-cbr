@@ -40,9 +40,9 @@ export const DETAIL_SORT_OPTIONS: readonly SortOption<InspectionsConductedDetail
  * The Inspections Conducted reports' criteria — legacy's `inspections_conducted.jsp` (Summary) and
  * `inspection_detail.jsp` (Detail), which ask the same things but for the Detail's Inspection Type.
  *
- * <p>Less three of legacy's: Area (the retired ministry Areas, left out as on the other reports),
- * Road Responsibility (commented out of both JSPs) and Save/Delete Report Favourite. Every
- * criterion is optional.
+ * <p>Less two of legacy's: Road Responsibility (commented out of both JSPs) and Save/Delete Report
+ * Favourite. Every criterion is optional, but the Detail needs an Area or one to eight Forest
+ * Districts (business, 2026-11-27).
  */
 export type InspectionsConductedCriteria = MaintainerCriteria & {
   /** Structure #. A contains match. */
@@ -54,6 +54,8 @@ export type InspectionsConductedCriteria = MaintainerCriteria & {
   /** The first and last months of the inspection dates, `yyyy/mm`. */
   inspectionDateStart: string;
   inspectionDateEnd: string;
+  /** Area: one of the three, by number — the sites whose district rolls up into it. One pick. */
+  areaOrgUnit: string;
   /** Forest District. Changing it clears {@link managementOrgUnit}. */
   orgUnit: string[];
   managementOrgUnit: string[];
@@ -75,6 +77,7 @@ const EMPTY: Omit<InspectionsConductedCriteria, 'inspectionTypeCode' | 'sortBy'>
   inspectionReportStatusCode: [],
   inspectionDateStart: '',
   inspectionDateEnd: '',
+  areaOrgUnit: '',
   orgUnit: [],
   managementOrgUnit: [],
   businessAreaOrgUnit: [],

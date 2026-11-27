@@ -1,3 +1,5 @@
+import { districtError } from '../validation';
+
 import type { InspectionsConductedCriteria } from './types';
 
 import { monthRangeErrors } from '@/utils/month';
@@ -6,10 +8,21 @@ export type CriteriaErrors = Partial<Record<keyof InspectionsConductedCriteria, 
 
 /**
  * The form's rules: each Inspection Date bound a month, `yyyy/mm`, and the end not before the
- * start — as Inspection Search's. Legacy raised one page-level message for the pair.
+ * start — as Inspection Search's. Legacy raised one page-level message for the pair. With
+ * `districtRequired` — the Detail — an Area or one to eight Forest Districts, too
+ * ({@link districtError}).
  */
-export const criteriaErrors = (criteria: InspectionsConductedCriteria): CriteriaErrors => {
+export const criteriaErrors = (
+  criteria: InspectionsConductedCriteria,
+  districtRequired = false,
+): CriteriaErrors => {
   const errors: CriteriaErrors = {};
+  const district = districtRequired
+    ? districtError(criteria.areaOrgUnit, criteria.orgUnit)
+    : undefined;
+  if (district) {
+    errors.orgUnit = district;
+  }
   const months = monthRangeErrors(criteria.inspectionDateStart, criteria.inspectionDateEnd);
   if (months.start) {
     errors.inspectionDateStart = months.start;

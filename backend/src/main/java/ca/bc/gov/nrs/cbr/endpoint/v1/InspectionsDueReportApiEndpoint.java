@@ -60,7 +60,9 @@ public interface InspectionsDueReportApiEndpoint {
    * PDF, or a CSV of the structures the forms are for, downloaded as an attachment.
    *
    * <p>{@code @Valid} turns a Next Planned Inspection Date that is not {@code yyyy/mm/dd} into a 400
-   * naming the field.
+   * naming the field. No Area and no Forest District, or more than eight districts, is a 400
+   * naming {@code orgUnit}: a province's forms are more than the pod can produce in time (business,
+   * 2026-11-27).
    *
    * @param format {@code PDF} (the default) or {@code CSV}
    */

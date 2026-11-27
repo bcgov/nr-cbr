@@ -51,6 +51,7 @@ public class InspectionsDueReportApiController implements InspectionsDueReportAp
   @Override
   public ResponseEntity<byte[]> inspectionsBlank(
       InspectionsDueCriteria criteria, ReportFormat format, HttpServletResponse response) {
+    ReportDistricts.require(criteria.areaOrgUnit(), criteria.orgUnit());
     // Both formats streamed: a province's forms run to 81 MB as a PDF.
     return format == ReportFormat.CSV
         ? ReportApiController.streamed(response, target -> blank.writeCsv(criteria, target))

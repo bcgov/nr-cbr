@@ -119,9 +119,11 @@ public interface ReportApiEndpoint {
 
   /**
    * Inspections Conducted – Detail (legacy CBR001): each inspection in full, a page of its own, as
-   * a PDF in legacy's layout, downloaded as an attachment. Its CSV is still to come: a 501 for now.
+   * a PDF in legacy's layout, or a CSV of its items, downloaded as an attachment.
    *
-   * <p>{@code @Valid} turns an Inspection Date that is not a month into a 400 naming the field.
+   * <p>{@code @Valid} turns an Inspection Date that is not a month into a 400 naming the field. No
+   * Area and no Forest District, or more than eight districts, is a 400 naming {@code orgUnit}: a
+   * province's run is more than the pod can produce in time (business, 2026-11-27).
    *
    * @param format {@code PDF} (the default) or {@code CSV}
    */

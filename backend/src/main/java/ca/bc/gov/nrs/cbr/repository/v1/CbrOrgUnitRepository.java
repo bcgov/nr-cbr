@@ -69,6 +69,13 @@ public interface CbrOrgUnitRepository extends JpaRepository<CbrOrgUnitEntity, Lo
    */
   String RECREATION_DISTRICT = "RD";
 
+  /**
+   * One of the three Areas — the ministry's old forest regions, which the view hard-codes
+   * ({@code 1833}, {@code 1834}, {@code 1835}) and rolls each district up into. The reports filter
+   * by them, as legacy's did.
+   */
+  String AREA = "A";
+
   List<CbrOrgUnitEntity> findAllByOrgUnitTypeOrderByOrgUnitNameAsc(String orgUnitType);
 
   /**
@@ -105,6 +112,17 @@ public interface CbrOrgUnitRepository extends JpaRepository<CbrOrgUnitEntity, Lo
    */
   default List<CbrOrgUnitEntity> findForestDistricts() {
     return findAllByOrgUnitTypeOrderByOrgUnitNameAsc(CURRENT_DISTRICT);
+  }
+
+  /**
+   * The Areas, by name — the reports' Area dropdown.
+   *
+   * <p>Replaces {@code CBR.FIND_OLD_FOREST_REGIONS}, whose predicate,
+   * {@code ROLLUP_AREA_NO = ORG_UNIT_NO}, selects exactly the view's {@code A} branch. Like legacy,
+   * not filtered by date: the Areas are retired org units, kept for this grouping.
+   */
+  default List<CbrOrgUnitEntity> findAreas() {
+    return findAllByOrgUnitTypeOrderByOrgUnitNameAsc(AREA);
   }
 
   /**

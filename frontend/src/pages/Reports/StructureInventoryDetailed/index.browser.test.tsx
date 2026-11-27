@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   getSiteTypeCodes: vi.fn(),
   getSpecialAccessCodes: vi.fn(),
   getPortableSuperstructureStatusCodes: vi.fn(),
+  getAreas: vi.fn(),
   getForestDistricts: vi.fn(),
   getBusinessAreas: vi.fn(),
   getManagementAreas: vi.fn(),

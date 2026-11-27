@@ -1,13 +1,17 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
+import ca.bc.gov.nrs.cbr.model.v1.CbrOrgUnitEntity;
 import ca.bc.gov.nrs.cbr.struct.v1.RoadSectionKey;
 import ca.bc.gov.nrs.cbr.util.CriteriaValues;
+import jakarta.persistence.criteria.AbstractQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -122,6 +126,32 @@ final class SearchPredicates {
       }
     }
     return anyOf(builder, path, numbers);
+  }
+
+  /**
+   * A site's district within an Area — legacy's {@code SEARCH_OLD_FOREST_REGION}, which matched
+   * {@code CBR_ORG_UNIT.ROLLUP_AREA_NO} joined on the site's {@code ORG_UNIT_NO}. A subquery here
+   * rather than a join, so the filter adds no rows: the district's number is in the Area's.
+   * Nothing when the Area is blank or not a number.
+   *
+   * @param orgUnitNo the site's Forest District column
+   * @param area      the Area's org-unit number
+   */
+  static Optional<Predicate> inArea(
+      CriteriaBuilder builder, AbstractQuery<?> query, Expression<Long> orgUnitNo, String area) {
+    Long areaNo;
+    try {
+      areaNo = StringUtils.hasText(area) ? Long.valueOf(area.trim()) : null;
+    } catch (NumberFormatException ex) {
+      areaNo = null;
+    }
+    if (areaNo == null) {
+      return Optional.empty();
+    }
+    Subquery<Long> districts = query.subquery(Long.class);
+    Root<CbrOrgUnitEntity> unit = districts.from(CbrOrgUnitEntity.class);
+    districts.select(unit.get("orgUnitNo")).where(builder.equal(unit.get("rollupAreaNo"), areaNo));
+    return Optional.of(orgUnitNo.in(districts));
   }
 
   /**

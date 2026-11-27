@@ -11,8 +11,8 @@ export type { ReportFormat, StructureInventorySort } from '../types';
  *
  * <p>Field-for-field from legacy's `structure_inventory_detailed.jsp` — the Summary's criteria less
  * its six construction filters (type/class, superstructure, deck, culvert type and material,
- * opening width) — and, as on the Summary, less the Area filter and the Report Favourites: the
- * criteria the two share, and no more. Every criterion is optional: legacy runs the report with
+ * opening width) — and, as on the Summary, less the Report Favourites: the criteria the two share,
+ * and no more. Every criterion is optional: legacy runs the report with
  * none set.
  */
 export type StructureInventoryDetailedCriteria = StructureInventoryCommonCriteria;

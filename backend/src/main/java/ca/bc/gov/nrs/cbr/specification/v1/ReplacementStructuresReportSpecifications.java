@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.specification.v1;
 
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumber;
+import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.inArea;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsNumberOrNone;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.equalsText;
 import static ca.bc.gov.nrs.cbr.specification.v1.SearchPredicates.integerRange;
@@ -87,6 +88,8 @@ public final class ReplacementStructuresReportSpecifications {
         criteria.replacementYearStart(), criteria.replacementYearEnd())
         .ifPresent(predicates::add);
     siteCriteria(builder, site, criteria, predicates);
+    inArea(builder, query, site.get(ORG_UNIT_NO), criteria.areaOrgUnit())
+        .ifPresent(predicates::add);
 
     return query
         .select(builder.construct(ReplacementStructureLine.class,

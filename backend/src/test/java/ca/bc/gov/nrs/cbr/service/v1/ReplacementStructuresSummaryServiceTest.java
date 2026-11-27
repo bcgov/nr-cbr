@@ -106,13 +106,16 @@ class ReplacementStructuresSummaryServiceTest {
     // The region a district rolls up to is read-only on the entity; set it as Oracle has it.
     entityManager.createNativeQuery("UPDATE THE.ORG_UNIT SET ROLLUP_REGION_NO = 1 "
         + "WHERE ORG_UNIT_NO IN (9, 18)").executeUpdate();
-    for (Object[] unit : List.of(new Object[] {1L, "RNI", "Northern Interior Region"},
-        new Object[] {18L, "DPG", "Prince George District"},
-        new Object[] {9L, "DMH", "100 Mile House District"},
-        new Object[] {26L, "DRV", "Robson Valley"})) {
+    // Each district rolls up into an Area, as the view has it: Prince George into 1833, 100 Mile
+    // House into 1834.
+    for (Object[] unit : List.of(new Object[] {1L, "RNI", "Northern Interior Region", null},
+        new Object[] {18L, "DPG", "Prince George District", 1833L},
+        new Object[] {9L, "DMH", "100 Mile House District", 1834L},
+        new Object[] {26L, "DRV", "Robson Valley", 1833L})) {
       entityManager.persist(CbrOrgUnitEntity.builder().orgUnitNo((Long) unit[0])
           .orgUnitCode((String) unit[1]).orgUnitName((String) unit[2]).orgLevelCode("D")
-          .orgUnitType("D").effectiveDate(PAST).expiryDate(FUTURE).build());
+          .orgUnitType("D").rollupAreaNo((Long) unit[3]).effectiveDate(PAST).expiryDate(FUTURE)
+          .build());
     }
     entityManager.persist(ClientPublicEntity.builder()
         .clientNumber("00012345").clientName("CANFOR").build());
@@ -279,7 +282,7 @@ class ReplacementStructuresSummaryServiceTest {
   }
 
   @Test
-  @DisplayName("filters by district, area, status, type, capital road and maintainer")
+  @DisplayName("filters by Area, district, management area, status, type, capital road and maintainer")
   void siteCriteria() {
     site("62-001", s -> s.capitalRoadInd("Y").crossingSiteTypeCode("RD"));
     site("62-002", s -> s.orgUnitNo(9L).managementOrgUnitNo(null).clientNumber(null));
@@ -288,6 +291,7 @@ class ReplacementStructuresSummaryServiceTest {
 
     for (ReplacementStructuresCriteria criteria : List.of(
         ReplacementStructuresCriteria.builder().orgUnit("18").build(),
+        ReplacementStructuresCriteria.builder().areaOrgUnit("1833").build(),
         ReplacementStructuresCriteria.builder().managementOrgUnit("26").build(),
         ReplacementStructuresCriteria.builder().capitalRoad(true).build(),
         ReplacementStructuresCriteria.builder().siteTypeCode("RD").build(),
@@ -297,6 +301,21 @@ class ReplacementStructuresSummaryServiceTest {
     }
     assertThat(outline(rows(ReplacementStructuresCriteria.builder().capitalRoad(false).build())))
         .hasSize(2);
+  }
+
+  @Test
+  @DisplayName("finds by Area the sites whose district rolls up into it, and nothing in an empty one")
+  void area() {
+    site("62-001", s -> s);
+    site("62-002", s -> s.orgUnitNo(9L).managementOrgUnitNo(null));
+    structure("B1", "62-001", s -> s.fullLogHaulReplacementYear(2030));
+    structure("B2", "62-002", s -> s.fullLogHaulReplacementYear(2030));
+
+    assertThat(outline(rows(ReplacementStructuresCriteria.builder().areaOrgUnit("1834").build())))
+        .containsExactly("2030 Estimated Load B2");
+    assertThat(rows(ReplacementStructuresCriteria.builder().areaOrgUnit("1835").build())).isEmpty();
+    // A value the form never sends is no filter, as on the other org-unit boxes.
+    assertThat(rows(ReplacementStructuresCriteria.builder().areaOrgUnit("x").build())).hasSize(2);
   }
 
   @Test

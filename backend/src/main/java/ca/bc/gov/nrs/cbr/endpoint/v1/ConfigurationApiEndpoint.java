@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.cbr.endpoint.v1;
 
 import ca.bc.gov.nrs.cbr.security.CbrAuthorities;
+import ca.bc.gov.nrs.cbr.struct.v1.AreaResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.BridgeCodesResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CodeOptionResponse;
 import ca.bc.gov.nrs.cbr.struct.v1.CulvertCodesResponse;
@@ -74,6 +75,14 @@ public interface ConfigurationApiEndpoint {
   @PreAuthorize(CbrAuthorities.READ)
   @GetMapping("/forest-districts")
   ResponseEntity<List<OrgUnitResponse>> getForestDistricts();
+
+  /**
+   * The Areas — the reports' Area select — each with the current forest districts in it, which
+   * the form narrows its Forest District list to.
+   */
+  @PreAuthorize(CbrAuthorities.READ)
+  @GetMapping("/areas")
+  ResponseEntity<List<AreaResponse>> getAreas();
 
   /** BCTS business areas — the BCTS Business Area select. */
   @PreAuthorize(CbrAuthorities.READ)

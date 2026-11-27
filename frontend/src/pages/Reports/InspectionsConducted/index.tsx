@@ -51,6 +51,11 @@ type Variant = {
   inspectionType: boolean;
   /** The file's name before the date. */
   filename: string;
+  /**
+   * An Area or one to eight Forest Districts required — the Detail, which a province's run is too
+   * large to produce (business, 2026-11-27).
+   */
+  districtRequired: boolean;
 };
 
 const VARIANTS: Record<InspectionsConductedVariant, Variant> = {
@@ -63,6 +68,7 @@ const VARIANTS: Record<InspectionsConductedVariant, Variant> = {
     sortOptions: SUMMARY_SORT_OPTIONS,
     inspectionType: false,
     filename: 'InspectionsConductedSummaryReport',
+    districtRequired: false,
   },
   detail: {
     id: 'inspections-conducted-detail',
@@ -74,6 +80,7 @@ const VARIANTS: Record<InspectionsConductedVariant, Variant> = {
     sortOptions: DETAIL_SORT_OPTIONS,
     inspectionType: true,
     filename: 'InspectionsConductedDetailReport',
+    districtRequired: true,
   },
 };
 
@@ -102,7 +109,10 @@ const InspectionsConductedPage: FC<{ variant: InspectionsConductedVariant }> = (
   const reportStatusCodes = useInspectionReportStatusCodes();
   const inspectionTypeCodes = useInspectionTypeCodes();
   const referenceData = useInspectionsConductedReferenceDataState();
-  const errors = useMemo(() => criteriaErrors(criteria), [criteria]);
+  const errors = useMemo(
+    () => criteriaErrors(criteria, config.districtRequired),
+    [criteria, config.districtRequired],
+  );
 
   // Both mutations, as hooks are called every render; the page's variant picks its own.
   const summaryReport = useInspectionsConductedSummaryReport();
@@ -162,6 +172,7 @@ const InspectionsConductedPage: FC<{ variant: InspectionsConductedVariant }> = (
             {areaGroup(fields, codeTables, {
               criteria,
               loading: referenceData.isLoading || managementAreasLoading,
+              districtRequired: config.districtRequired,
             })}
             {roadFields(fields)}
 

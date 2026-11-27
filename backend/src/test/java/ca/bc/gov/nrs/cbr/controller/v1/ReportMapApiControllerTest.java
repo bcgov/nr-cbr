@@ -51,7 +51,10 @@ class ReportMapApiControllerTest {
     when(detailed.kmz(inventory)).thenReturn(file("StructureInventoryDetailReport"));
     when(inspections.inspectionsConductedSummary(conducted))
         .thenReturn(file("InspectionsConductedSummaryReport"));
-    when(inspections.inspectionsConductedDetail(conducted))
+    // The Detail asks for a Forest District, as its form does.
+    InspectionsConductedCriteria inDistrict =
+        InspectionsConductedCriteria.builder().orgUnit("1832").build();
+    when(inspections.inspectionsConductedDetail(inDistrict))
         .thenReturn(file("InspectionsConductedDetailReport"));
     when(inspections.inspectionsDueDetailed(due)).thenReturn(file("InspectionsDueDetailedReport"));
 
@@ -59,7 +62,7 @@ class ReportMapApiControllerTest {
         .contains("StructureInventoryDetailReport_");
     assertThat(disposition(controller.inspectionsConductedSummaryKmz(conducted)))
         .contains("InspectionsConductedSummaryReport_");
-    assertThat(disposition(controller.inspectionsConductedDetailKmz(conducted)))
+    assertThat(disposition(controller.inspectionsConductedDetailKmz(inDistrict)))
         .contains("InspectionsConductedDetailReport_");
     assertThat(disposition(controller.inspectionsDueDetailedKmz(due)))
         .contains("InspectionsDueDetailedReport_");
